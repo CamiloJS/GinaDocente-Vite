@@ -35,20 +35,20 @@ const TasksTab = React.memo(({
             
             {role === 'teacher' && (
                 <div className={`${glassCard} !p-4 mb-5 flex flex-col gap-2.5`}>
-                    <div className="flex gap-1 mb-2 bg-white/40 p-0.5 rounded-lg w-fit border border-white/50">
+                    <div className="flex gap-1 mb-2 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg w-fit border border-gray-200 dark:border-gray-700">
                         <button onClick={() => setPostType('task')} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${postType === 'task' ? 'bg-white shadow-sm text-[#AD3333]' : 'text-gray-600 hover:text-gray-900'}`}>Tarea nueva</button>
                         <button onClick={() => setPostType('post')} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${postType === 'post' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-600 hover:text-gray-900'}`}>Nueva publicación</button>
                     </div>
 
                     <div className="relative z-[60] mb-2">
-    <button type="button" onClick={() => setIsGroupDropdownOpen(!isGroupDropdownOpen)} className={`w-full flex justify-between items-center bg-white/30 backdrop-blur-xl border border-white/50 rounded-xl px-3 py-2 font-bold transition-all shadow-inner hover:bg-white/40 ${postTargetGroup ? (isDarkMode ? 'text-blue-400' : 'text-blue-700') : (isDarkMode ? 'text-gray-300' : 'text-gray-700')}`}>
+    <button type="button" onClick={() => setIsGroupDropdownOpen(!isGroupDropdownOpen)} className={`w-full flex justify-between items-center bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 font-bold transition-all shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 ${postTargetGroup ? (isDarkMode ? 'text-blue-400' : 'text-blue-700') : (isDarkMode ? 'text-gray-300' : 'text-gray-700')}`}>
         <span className="flex items-center gap-2">
             {postTargetGroup === 'all' ? <><Globe size={18}/> Todos los estudiantes</> : (postTargetGroup ? <><Book size={18}/> {academicGroups?.find(g => g.id === postTargetGroup)?.name}</> : <><Target size={18}/> Seleccionar Materia / Grupo (Obligatorio)</>)}
         </span>
         <ChevronRight size={18} className={`transition-transform duration-300 ${isGroupDropdownOpen ? 'rotate-90' : ''}`} />
     </button>
     
-    <div className={`absolute top-full left-0 w-full mt-2 backdrop-blur-3xl border shadow-[0_8px_32px_0_rgba(31,38,135,0.15)] rounded-2xl overflow-hidden transition-all duration-300 origin-top ${isGroupDropdownOpen ? 'scale-y-100 opacity-100' : 'scale-y-0 opacity-0 pointer-events-none'} ${isDarkMode ? 'bg-gray-800/80 border-gray-600' : 'bg-white/80 border-white/60'}`}>
+    <div className={`absolute top-full left-0 w-full mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl rounded-2xl overflow-hidden transition-all duration-200 origin-top ${isGroupDropdownOpen ? 'scale-y-100 opacity-100' : 'scale-y-0 opacity-0 pointer-events-none'}`}>
         <div className="max-h-48 overflow-y-auto p-2 flex flex-col gap-1">
             <button type="button" onClick={() => { setPostTargetGroup('all'); setIsGroupDropdownOpen(false); }} className={`px-4 py-3 flex items-center gap-2 rounded-xl font-bold transition-all ${postTargetGroup === 'all' ? 'bg-blue-500 text-white shadow-md' : (isDarkMode ? 'text-gray-200 hover:bg-gray-700' : 'text-gray-800 hover:bg-white/50')}`}><Globe size={18}/> Todos los estudiantes</button>
             {academicGroups?.length === 0 && <p className="text-xs text-gray-500 p-3 italic">No hay materias creadas. Créalas en el Directorio.</p>}
@@ -91,7 +91,7 @@ const TasksTab = React.memo(({
                             const descMatch = result.match(/(?:DESCRIPCI[OÓ]N|DESCRIPTION|DESCRIPCION)\s*[:\-]?\s*\*?\*?\s*([\s\S]*)/i);
                             if (titleMatch && descMatch) { setTaskTitle(titleMatch[1].replace(/\*/g, '').trim()); setTaskDesc(descMatch[1].trim()); } else { setTaskDesc(result); }
                             setHasAiModified(true); setIsAiLoading(false);
-                        }} disabled={isAiLoading} className="bg-gradient-to-r from-purple-500 to-indigo-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-1 disabled:opacity-50"><Sparkles size={16} /> Potenciar</button>
+                        }} disabled={isAiLoading} className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition-all flex items-center gap-2 disabled:opacity-50"><Sparkles size={16} /> Potenciar</button>
                         
                         <button type="button" onClick={async () => {
                             if (!taskDesc) return showMessage("Escribe algo en la descripción para corregir.");
@@ -99,10 +99,10 @@ const TasksTab = React.memo(({
                             const result = await callGemini(`Corrige la ortografía y gramática manteniendo el idioma original. Devuelve SÓLO el texto corregido:\n\n${taskDesc}`);
                             if (!result) { setIsAiLoading(false); return; }
                             setTaskDesc(result); setHasAiModified(true); setIsAiLoading(false);
-                        }} disabled={isAiLoading} className="bg-white/50 text-gray-800 border border-white/60 px-3 py-1.5 rounded-lg text-sm font-bold shadow-sm hover:bg-white/80 transition-all flex items-center gap-1 disabled:opacity-50"><CheckCheck size={16} /> Corregir</button>
+                        }} disabled={isAiLoading} className="bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 px-3 py-2 rounded-xl text-sm font-bold shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-all flex items-center gap-2 disabled:opacity-50"><CheckCheck size={16} /> Corregir</button>
                         
-                        <button type="button" onClick={() => handleAiTranslate('Inglés')} disabled={isAiLoading} className="bg-white/50 text-gray-800 border border-white/60 px-3 py-1.5 rounded-lg text-lg shadow-sm hover:bg-white/80 transition-all disabled:opacity-50">🇺🇸</button>
-                        <button type="button" onClick={() => handleAiTranslate('Francés')} disabled={isAiLoading} className="bg-white/50 text-gray-800 border border-white/60 px-3 py-1.5 rounded-lg text-lg shadow-sm hover:bg-white/80 transition-all disabled:opacity-50">🇫🇷</button>
+                        <button type="button" onClick={() => handleAiTranslate('Inglés')} disabled={isAiLoading} className="bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 px-3 py-2 rounded-xl text-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-all disabled:opacity-50">🇺🇸</button>
+                        <button type="button" onClick={() => handleAiTranslate('Francés')} disabled={isAiLoading} className="bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 px-3 py-2 rounded-xl text-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-all disabled:opacity-50">🇫🇷</button>
 
                         <div className="relative z-[9999]">
                             <button type="button" onClick={() => setShowPostAttachmentMenu(!showPostAttachmentMenu)} className={`bg-transparent px-2 py-1.5 rounded-full text-sm font-bold hover:text-blue-600 transition-colors flex items-center gap-1 ${showImageInput || showPostAttachmentMenu ? 'text-blue-600' : (isDarkMode ? 'text-gray-300' : 'text-gray-600')}`} title="Adjuntar">
@@ -110,7 +110,7 @@ const TasksTab = React.memo(({
                             </button>
                             
                             {showPostAttachmentMenu && (
-                                <div className={`absolute top-full left-0 mt-2 w-44 backdrop-blur-2xl border shadow-xl rounded-xl p-2 flex flex-col gap-1 z-[9999] animate-in fade-in zoom-in duration-200 ${isDarkMode ? 'bg-gray-800/95 border-gray-600' : 'bg-white/95 border-gray-300'}`}>
+                                <div className={`absolute top-full left-0 mt-2 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl rounded-xl p-2 flex flex-col gap-1 z-[9999] animate-in fade-in zoom-in duration-200`}>
                                     <label className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold cursor-pointer transition-colors ${isDarkMode ? 'hover:bg-gray-700 text-gray-200' : 'hover:bg-gray-100 text-gray-700'}`}>
                                         <ImageIcon size={16} /> Imagen
                                         <input type="file" accept="image/*" className="hidden" onChange={(e) => { handlePostLocalFileUpload(e); setShowPostAttachmentMenu(false); }} />
@@ -129,7 +129,7 @@ const TasksTab = React.memo(({
                         {hasAiModified && <button type="button" onClick={() => { setTaskTitle(prevTaskTitle); setTaskDesc(prevTaskDesc); setHasAiModified(false); }} className="bg-white/50 text-red-600 border border-red-300 px-3 py-1.5 rounded-lg text-sm font-bold shadow-sm hover:bg-red-50 transition-all flex items-center gap-1 ml-auto"><Undo2 size={16} /> Deshacer</button>}
                     </div>
 
-                    <div className="flex flex-wrap gap-x-3 gap-y-1.5 items-center bg-white/30 p-2.5 rounded-xl border border-white/40">
+                    <div className="flex flex-wrap gap-4 items-center bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
                         {postType === 'task' && (
                             <>
                                 <div><label className="text-xs font-bold text-gray-700 block">Fecha límite</label><input type="date" value={taskDate} onChange={(e) => setTaskDate(e.target.value)} className={`${glassInput} py-2`} required /></div>
