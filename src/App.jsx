@@ -108,16 +108,18 @@ useEffect(() => {
             }, []);
             useEffect(() => {
                 localStorage.setItem('englishTech_theme', isDarkMode ? 'dark' : 'light');
-              if (isDarkMode) {
-                  document.body.classList.add('bg-gray-900', 'dark-mode');
-                  document.body.classList.remove('bg-gray-100');
-                  document.documentElement.style.colorScheme = 'dark'; // Le avisa al navegador que la web es oscura
-              } else {
-                  document.body.classList.add('bg-gray-100');
-                  document.body.classList.remove('bg-gray-900', 'dark-mode');
-                  document.documentElement.style.colorScheme = 'light';
-              }
-          }, [isDarkMode]);
+                if (isDarkMode) {
+                    document.documentElement.classList.add('dark');
+                    document.body.classList.add('bg-gray-900');
+                    document.body.classList.remove('bg-gray-100');
+                    document.documentElement.style.colorScheme = 'dark';
+                } else {
+                    document.documentElement.classList.remove('dark');
+                    document.body.classList.add('bg-gray-100');
+                    document.body.classList.remove('bg-gray-900');
+                    document.documentElement.style.colorScheme = 'light';
+                }
+            }, [isDarkMode]);
 
           // --- DETECTOR DE NAVEGACIÓN (HISTORIAL) ---
           useEffect(() => {
@@ -1774,9 +1776,9 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                       <button type="submit" className={redButton}>Añadir</button>
                     </form>
                   )}
-                  <div className={`${glassCard} overflow-x-auto p-0`}>
+                  <div className={`bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-x-auto shadow-sm`}>
                     <table className="w-full text-left">
-                      <thead className="bg-white/40 border-b border-white/50">
+                      <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300">
                         <tr><th className="p-4 font-bold">Semana</th><th className="p-4 font-bold">Tema</th><th className="p-4 font-bold">Material</th>{role === 'teacher' && <th></th>}</tr>
                       </thead>
                       <tbody>
@@ -2022,9 +2024,9 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                               <span className="bg-white/40 px-4 py-2 rounded-xl font-bold text-sm border border-white/50">{viewingResultsFor.title}</span>
                           </div>
 
-                          <div className={`${glassCard} overflow-x-auto p-0`}>
+                          <div className={`bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-x-auto shadow-sm`}>
                               <table className="w-full text-left">
-                                  <thead className={`border-b ${isDarkMode ? 'bg-gray-800/50 border-gray-700 text-gray-300' : 'bg-white/40 border-white/50 text-gray-800'}`}>
+                                  <thead className={`border-b bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300`}>
                                       <tr>
                                           <th className="p-4 font-bold">Estudiante</th>
                                           <th className="p-4 font-bold text-center">Nota (0.0 - 5.0)</th>
@@ -2280,17 +2282,17 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
 
           if (!hasEntered) {
               return (
-                  <div className={`min-h-screen flex items-center justify-center bg-gradient-to-br ${isDarkMode ? 'from-gray-900 via-slate-900 to-black' : 'from-red-50/80 via-gray-100/90 to-blue-50/80'} transition-colors duration-500 relative overflow-hidden ${isDarkMode ? 'dark-mode' : ''}`}>
+                  <div className={`min-h-screen flex items-center justify-center bg-gradient-to-br ${isDarkMode ? 'from-gray-900 via-slate-900 to-black' : 'from-red-50/80 via-gray-100/90 to-blue-50/80'} transition-colors duration-500 relative overflow-hidden ${isDarkMode ? 'dark' : ''}`}>
                       <style>{`
-                        .dark-mode .text-gray-800 { color: #f3f4f6 !important; }
-                        .dark-mode .text-gray-700 { color: #d1d5db !important; }
-                        .dark-mode .text-gray-600 { color: #9ca3af !important; }
-                        .dark-mode [class*="bg-white/20"] { background-color: rgba(0, 0, 0, 0.4) !important; border-color: rgba(255, 255, 255, 0.1) !important; }
-                        .dark-mode [class*="bg-white/30"] { background-color: rgba(0, 0, 0, 0.5) !important; border-color: rgba(255, 255, 255, 0.15) !important; }
-                        .dark-mode [class*="bg-white/40"] { background-color: rgba(0, 0, 0, 0.6) !important; border-color: rgba(255, 255, 255, 0.2) !important; }
-                        .dark-mode [class*="border-white/"] { border-color: rgba(255, 255, 255, 0.2) !important; }
-                        .dark-mode input { color: #ffffff !important; }
-                        .dark-mode input::placeholder { color: #9ca3af !important; }
+                        .dark .text-gray-800 { color: #f3f4f6 !important; }
+                        .dark .text-gray-700 { color: #d1d5db !important; }
+                        .dark .text-gray-600 { color: #9ca3af !important; }
+                        .dark [class*="bg-white/20"] { background-color: rgba(0, 0, 0, 0.4) !important; border-color: rgba(255, 255, 255, 0.1) !important; }
+                        .dark [class*="bg-white/30"] { background-color: rgba(0, 0, 0, 0.5) !important; border-color: rgba(255, 255, 255, 0.15) !important; }
+                        .dark [class*="bg-white/40"] { background-color: rgba(0, 0, 0, 0.6) !important; border-color: rgba(255, 255, 255, 0.2) !important; }
+                        .dark [class*="border-white/"] { border-color: rgba(255, 255, 255, 0.2) !important; }
+                        .dark input { color: #ffffff !important; }
+                        .dark input::placeholder { color: #9ca3af !important; }
                       `}</style>
                       
                       <button onClick={() => setIsDarkMode(!isDarkMode)} className="absolute top-4 right-4 md:top-6 md:right-6 p-3 rounded-full bg-white/40 hover:bg-white/60 text-gray-800 transition-all shadow-sm border border-white/50 z-50" title="Alternar Modo Oscuro">
@@ -2380,16 +2382,16 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
           }
 
           return (
-            <div className={`min-h-screen bg-gradient-to-br ${isDarkMode ? 'from-gray-900 via-slate-900 to-black' : 'from-red-50/80 via-gray-100/90 to-red-100/80'} font-sans relative overflow-hidden transition-colors duration-500 ${isDarkMode ? 'dark-mode' : ''}`}>
+            <div className={`min-h-screen bg-gradient-to-br ${isDarkMode ? 'from-gray-900 via-slate-900 to-black' : 'from-red-50/80 via-gray-100/90 to-red-100/80'} font-sans relative overflow-hidden transition-colors duration-500 ${isDarkMode ? 'dark' : ''}`}>
                             <style>{`
-                .dark-mode .text-gray-900 { color: #f9fafb !important; }
-                .dark-mode .text-gray-800 { color: #f3f4f6 !important; }
-                .dark-mode .text-gray-700 { color: #d1d5db !important; }
-                .dark-mode .text-gray-600 { color: #9ca3af !important; }
-                .dark-mode .text-gray-500 { color: #6b7280 !important; }
+                .dark .text-gray-900 { color: #f9fafb !important; }
+                .dark .text-gray-800 { color: #f3f4f6 !important; }
+                .dark .text-gray-700 { color: #d1d5db !important; }
+                .dark .text-gray-600 { color: #9ca3af !important; }
+                .dark .text-gray-500 { color: #6b7280 !important; }
 
-                .dark-mode input, .dark-mode textarea { color: #ffffff !important; }
-                .dark-mode input::placeholder, .dark-mode textarea::placeholder { color: #9ca3af !important; }
+                .dark input, .dark textarea { color: #ffffff !important; }
+                .dark input::placeholder, .dark textarea::placeholder { color: #9ca3af !important; }
 
                 .pb-safe { padding-bottom: env(safe-area-inset-bottom, 20px); }
               `}</style>
@@ -2433,7 +2435,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
       </button>
 
       {showUserMenu && (
-          <div className={`absolute right-0 top-12 mt-2 w-72 rounded-2xl shadow-2xl border backdrop-blur-2xl z-[99999] animate-in fade-in slide-in-from-top-4 ${isDarkMode ? 'bg-gray-800/95 border-gray-600' : 'bg-white/95 border-gray-200'}`}>
+          <div className={`absolute right-0 top-12 mt-2 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl rounded-2xl z-[99999] animate-in fade-in slide-in-from-top-4`}>
               <div className="p-4 border-b border-gray-500/20 flex flex-col items-center px-6">
                   <div className="w-14 h-14 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 mb-2 shrink-0 overflow-hidden border-2 border-blue-200">
                       {userMappings[myChatId]?.profilePicUrl ? <img src={userMappings[myChatId].profilePicUrl} className="w-full h-full object-cover" /> : <UserIcon size={30} />}
@@ -2933,7 +2935,7 @@ return <span className="text-xs font-medium text-gray-400">Desconectado</span>;
 
                                                   {/* Modal de miembros del grupo */}
                                                   {showGroupInfo && activeChat.type === 'group' && (
-                                                      <div className={`absolute top-full left-0 mt-3 w-72 p-4 rounded-2xl shadow-2xl backdrop-blur-3xl border z-[99999] animate-in fade-in slide-in-from-top-4 ${isDarkMode ? 'bg-gray-800/95 border-gray-600' : 'bg-white/95 border-gray-300'}`}>
+                                                      <div className={`absolute top-full left-0 mt-3 w-72 p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl rounded-xl z-[99999] animate-in fade-in slide-in-from-top-4`}>
                                                           <div className="flex justify-between items-center mb-3 pb-2 border-b border-gray-500/30">
                                                               <h4 className={`text-sm font-bold ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>Miembros del grupo</h4>
                                                               <button onClick={() => setShowGroupInfo(false)} className="text-gray-500 hover:text-red-500 transition-colors"><X size={16}/></button>
@@ -2966,7 +2968,7 @@ return <span className="text-xs font-medium text-gray-400">Desconectado</span>;
                                                   </button>
 
                                                   {showChatSettings && (
-                                                      <div className={`absolute top-full right-0 mt-3 w-[280px] p-5 rounded-2xl shadow-2xl backdrop-blur-3xl border z-[99999] animate-in fade-in slide-in-from-top-4 ${isDarkMode ? 'bg-gray-800/95 border-gray-600' : 'bg-white/95 border-gray-300'}`}>
+                                                      <div className={`absolute top-full right-0 mt-3 w-[280px] p-5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl rounded-xl z-[99999] animate-in fade-in slide-in-from-top-4`}>
                                                           <h4 className={`text-sm font-bold mb-3 ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>Color del Chat</h4>
                                                           <div className="flex flex-wrap gap-2 mb-5">
                                                               {CHAT_GRADIENTS.map((grad, idx) => (
@@ -3185,7 +3187,7 @@ tickIcon = (
                                               )}
                                               
                                               {/* CONTENEDOR CON pr-[13px] PARA LA DISTANCIA EXACTA */}
-                                              <div className={`flex gap-2 items-center rounded-full pl-3 pr-[13px] py-2 transition-all shadow-inner border focus-within:ring-2 ${isDarkMode ? 'bg-gray-900 border-gray-700 focus-within:ring-blue-500/50' : 'bg-gray-50 border-gray-300 focus-within:ring-blue-400/50'}`}>
+                                              <div className={`flex gap-2 items-center bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-full pl-3 pr-[13px] py-2 focus-within:ring-2 focus-within:ring-blue-500/50 transition-all`}>
                                                   
                                                   <div className="relative">
                                                       <button type="button" onClick={() => setShowChatAppEmojiPicker(!showChatAppEmojiPicker)} className={`p-2 bg-transparent transition-colors rounded-full ${showChatAppEmojiPicker ? 'text-blue-500' : (isDarkMode ? 'text-gray-400 hover:text-blue-400' : 'text-gray-500 hover:text-blue-600')}`}>
@@ -3193,7 +3195,7 @@ tickIcon = (
 </button>
 
                                                       {showChatAppEmojiPicker && (
-                                                          <div className={`absolute bottom-full left-0 mb-4 backdrop-blur-2xl border shadow-2xl rounded-2xl p-3 grid grid-cols-5 gap-3 z-[99999] w-[280px] animate-in fade-in zoom-in-95 duration-200 ${isDarkMode ? 'bg-gray-800/95 border-gray-600' : 'bg-white/95 border-gray-300'}`}>
+                                                          <div className={`absolute bottom-full left-0 mb-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl rounded-xl p-2 flex flex-col gap-1 z-[99999] animate-in fade-in zoom-in duration-200`}>
                                                               {COMMENT_EMOJIS.map(emj => (
                                                                   <button key={emj} type="button" onClick={() => {setChatAppInput(chatAppInput + emj); setShowChatAppEmojiPicker(false);}} className="text-3xl hover:scale-125 transition-transform">{emj}</button>
                                                               ))}
@@ -3207,7 +3209,7 @@ tickIcon = (
 </button>
 
                                                       {showChatAppAttachmentMenu && (
-                                                          <div className={`absolute bottom-full left-0 mb-4 w-44 backdrop-blur-2xl border shadow-2xl rounded-2xl p-2 flex flex-col gap-1 z-[99999] animate-in fade-in zoom-in duration-200 ${isDarkMode ? 'bg-gray-800/95 border-gray-600' : 'bg-white/95 border-gray-300'}`}>
+                                                          <div className={`absolute bottom-full left-0 mb-4 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl rounded-xl p-2 flex flex-col gap-1 z-[99999] animate-in fade-in zoom-in duration-200`}>
                                                               <button type="button" onClick={() => { setShowChatAppImageInput(!showChatAppImageInput); setShowChatAppAttachmentMenu(false); }} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-bold transition-colors text-left ${isDarkMode ? 'hover:bg-gray-700 text-gray-200' : 'hover:bg-gray-100 text-gray-700'}`}>
                                                                   <ImageIcon size={16} /> Enlace de imagen
                                                               </button>
