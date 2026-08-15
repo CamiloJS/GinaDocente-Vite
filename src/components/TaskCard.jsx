@@ -169,7 +169,7 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput, callGemini, cu
               const isSelected = (typeof rData === 'object' ? rData.type : rData) === key;
               const hoverText = namesByType[key].length > 0 ? `${namesByType[key].join(', ')} reaccionó así` : "";
               return (
-                <button key={key} onClick={() => toggleReaction(key)} disabled={isLocked} title={hoverText} className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-bold transition-all border ${isSelected ? 'bg-white/60 border-[#AD3333] shadow-sm scale-105' : 'bg-white/30 border-white/40 hover:bg-white/50'} ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                <button key={key} onClick={() => toggleReaction(key)} disabled={isLocked} title={hoverText} className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-bold transition-all border ${isSelected ? 'bg-red-50 dark:bg-red-900/20 border-red-500 text-red-700 dark:text-red-400 shadow-sm scale-105' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'} ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}>
                   {emoji} {counts[key] > 0 && <span className="text-gray-800">{counts[key]}</span>}
                 </button>
               );
@@ -183,7 +183,7 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput, callGemini, cu
             <div className="flex justify-between items-start">
                 <div className="flex-1 pr-4">
                     <div className="flex items-center gap-2 mb-1">
-                        {task.type !== 'post' && <span className="text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-md bg-[#AD3333]/20 text-[#AD3333]">Tarea</span>}
+                        {task.type !== 'post' && <span className="text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 border border-red-100 dark:border-red-500/20">Tarea</span>}
                     </div>
                     {isEditingTask ? (
                         <input value={editTaskData.title} onChange={e => setEditTaskData({...editTaskData, title: e.target.value})} className={`${glassInput} text-xl font-bold mb-2 p-2`} placeholder="Título..." />
@@ -239,7 +239,7 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput, callGemini, cu
             )}
             
             {task.imageUrl && (
-                <div className="mt-2.5 rounded-2xl overflow-hidden border border-white/40 shadow-sm max-w-full">
+                <div className="mt-2.5 rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm max-w-full bg-gray-50 dark:bg-gray-800/50">
                     <img src={task.imageUrl} loading="lazy" decoding="async" alt="Adjunto" onClick={() => setFullScreenImage(task.imageUrl)} className="w-full h-auto max-h-96 object-contain bg-black/5 cursor-pointer hover:opacity-90 transition-opacity" onError={(e) => e.target.style.display = 'none'} />
                 </div>
             )}
@@ -256,14 +256,14 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput, callGemini, cu
             {renderReactions()}
 
             <div className="mt-2.5 pt-2.5 border-t border-white/30">
-                <button onClick={() => setShowCommentModal(true)} className={`w-full py-2 bg-white/40 hover:bg-white/60 border border-white/50 shadow-sm rounded-xl font-bold transition-all flex justify-center items-center gap-2 ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>
+                <button onClick={() => setShowCommentModal(true)} className={`w-full py-2.5 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm rounded-xl font-bold transition-all flex justify-center items-center gap-2 text-gray-700 dark:text-gray-300`}>
                     <FileText size={18} className="text-[#AD3333]" />
                     {task.comments?.length > 0 ? `Ver los ${task.comments.length} comentarios` : <span className="flex items-center gap-2">Sé el primero en comentar <MessageSquareText size={16}/></span>}
                 </button>
             </div>
 
             {showCommentModal && ReactDOM.createPortal(
-                <div className={`fixed inset-0 z-[9999] flex justify-center items-end md:items-center bg-black/70 backdrop-blur-md p-0 md:p-4 transition-all ${isDarkMode ? 'dark-mode' : ''}`}>
+                <div className={`fixed inset-0 z-[9999] flex justify-center items-end md:items-center bg-black/60 backdrop-blur-sm p-0 md:p-4 transition-all ${isDarkMode ? 'dark-mode' : ''}`}>
                     <div className={`w-full max-w-3xl h-[90vh] md:h-[85vh] flex flex-col p-4 md:p-6 rounded-t-[2rem] md:rounded-[2rem] shadow-2xl animate-in slide-in-from-bottom-10 fade-in duration-300 overflow-hidden ${isDarkMode ? 'bg-gray-900 border border-gray-700' : 'bg-gray-50 border border-gray-200'}`}>
                         
                         <div className={`flex justify-between items-center mb-4 border-b pb-4 shrink-0 ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`}>
@@ -417,7 +417,7 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput, callGemini, cu
                                       <SmileIcon size={20} />
                                   </button>
                                   {showEmojiPicker && (
-                                      <div className={`absolute bottom-full left-0 mb-4 backdrop-blur-2xl border shadow-2xl rounded-2xl p-3 grid grid-cols-5 gap-3 z-[99999] w-[240px] animate-in fade-in zoom-in-95 duration-200 ${isDarkMode ? 'bg-gray-800/95 border-gray-600' : 'bg-white/95 border-gray-300'}`}>
+                                      <div className={`absolute bottom-full left-0 mb-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl rounded-xl p-2 flex flex-col gap-1 z-[99999] animate-in fade-in zoom-in duration-200`}>
                                           {COMMENT_EMOJIS.map(emj => (
                                               <button key={emj} type="button" onClick={() => {setCommentText(prev => prev + emj); setShowEmojiPicker(false);}} className="text-2xl hover:scale-125 transition-transform">{emj}</button>
                                           ))}
@@ -430,7 +430,7 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput, callGemini, cu
                                       <Plus size={20} />
                                   </button>
                                   {showAttachmentMenu && (
-                                      <div className={`absolute bottom-full left-0 mb-4 w-44 backdrop-blur-2xl border shadow-2xl rounded-2xl p-2 flex flex-col gap-1 z-[9999] animate-in fade-in zoom-in duration-200 ${isDarkMode ? 'bg-gray-800/95 border-gray-600' : 'bg-white/95 border-gray-300'}`}>
+                                      <div className={`absolute bottom-full left-0 mb-4 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl rounded-xl p-2 flex flex-col gap-1 z-[9999] animate-in fade-in zoom-in duration-200`}>
                                           <button type="button" onClick={() => { setShowCommentImageInput(!showCommentImageInput); setShowAttachmentMenu(false); }} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-bold transition-colors text-left ${isDarkMode ? 'hover:bg-gray-700 text-gray-200' : 'hover:bg-gray-100 text-gray-700'}`}>
                                               <ImageIcon size={16} /> Enlace de imagen
                                           </button>
