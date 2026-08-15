@@ -2295,10 +2295,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                       
                       <button onClick={() => setIsDarkMode(!isDarkMode)} className="absolute top-4 right-4 md:top-6 md:right-6 p-3 rounded-full bg-white/40 hover:bg-white/60 text-gray-800 transition-all shadow-sm border border-white/50 z-50" title="Alternar Modo Oscuro">
                           {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
-                      </button>
-
-                      <div className="absolute top-[-15%] left-[-10%] w-[50%] h-[50%] bg-[#AD3333]/20 rounded-full blur-[100px] pointer-events-none" />
-                      <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-blue-400/20 rounded-full blur-[120px] pointer-events-none" />
+                      </button>
                       
                       <div className="relative z-10 w-full max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-center gap-8 px-4 animate-in fade-in zoom-in duration-500 py-12">
                           
@@ -2384,243 +2381,19 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
 
           return (
             <div className={`min-h-screen bg-gradient-to-br ${isDarkMode ? 'from-gray-900 via-slate-900 to-black' : 'from-red-50/80 via-gray-100/90 to-red-100/80'} font-sans relative overflow-hidden transition-colors duration-500 ${isDarkMode ? 'dark-mode' : ''}`}>
-              <style>{`
+                            <style>{`
                 .dark-mode .text-gray-900 { color: #f9fafb !important; }
                 .dark-mode .text-gray-800 { color: #f3f4f6 !important; }
                 .dark-mode .text-gray-700 { color: #d1d5db !important; }
                 .dark-mode .text-gray-600 { color: #9ca3af !important; }
                 .dark-mode .text-gray-500 { color: #6b7280 !important; }
-                
-                .dark-mode [class*="bg-white/20"] { background-color: rgba(0, 0, 0, 0.4) !important; border-color: rgba(255, 255, 255, 0.1) !important; }
-                .dark-mode [class*="bg-white/30"] { background-color: rgba(0, 0, 0, 0.5) !important; border-color: rgba(255, 255, 255, 0.15) !important; }
-                .dark-mode [class*="bg-white/40"] { background-color: rgba(0, 0, 0, 0.6) !important; border-color: rgba(255, 255, 255, 0.2) !important; }
-                .dark-mode [class*="bg-white/50"] { background-color: rgba(0, 0, 0, 0.7) !important; border-color: rgba(255, 255, 255, 0.25) !important; }
-                .dark-mode [class*="bg-white/60"] { background-color: rgba(0, 0, 0, 0.8) !important; border-color: rgba(255, 255, 255, 0.3) !important; }
-                .dark-mode [class*="bg-white/80"] { background-color: rgba(0, 0, 0, 0.9) !important; border-color: rgba(255, 255, 255, 0.4) !important; }
-                
-                .dark-mode [class*="border-white/"] { border-color: rgba(255, 255, 255, 0.2) !important; }
-                .dark-mode [class*="bg-red-100/"] { background-color: rgba(153, 27, 27, 0.2) !important; border-color: rgba(220, 38, 38, 0.3) !important; }
-                .dark-mode [class*="bg-red-50"] { background-color: rgba(69, 10, 0, 0.4) !important; }
-                .dark-mode [class*="text-red-600"] { color: #f87171 !important; }
-                .dark-mode [class*="bg-green-100/"] { background-color: rgba(6, 78, 59, 0.4) !important; border-color: rgba(52, 211, 153, 0.3) !important; }
-                .dark-mode [class*="text-green-700"] { color: #34d399 !important; }
-                .dark-mode [class*="bg-indigo-50/"] { background-color: rgba(49, 46, 129, 0.5) !important; border-color: rgba(129, 140, 248, 0.3) !important; }
-                .dark-mode [class*="text-indigo-800"] { color: #818cf8 !important; }
 
                 .dark-mode input, .dark-mode textarea { color: #ffffff !important; }
                 .dark-mode input::placeholder, .dark-mode textarea::placeholder { color: #9ca3af !important; }
-                @keyframes looking {
-                    0%, 100% { transform: translateX(0); }
-                    25% { transform: translateX(-3.5px); }
-                    75% { transform: translateX(3.5px); }
-                }
-                .animate-looking { animation: looking 2.5s ease-in-out infinite; }
-
-                @keyframes writing {
-                    0%, 100% { transform: translate(0, 0) rotate(0deg); }
-                    25% { transform: translate(2px, -2px) rotate(-5deg); }
-                    50% { transform: translate(3px, 0) rotate(0deg); }
-                    75% { transform: translate(1px, 2px) rotate(5deg); }
-                }
-                .animate-writing-pencil { animation: writing 0.5s linear infinite; transform-origin: bottom left; }
-
-                @keyframes text-glow-green {
-                    0%, 100% { text-shadow: 0 0 5px rgba(34, 197, 94, 0.4), 0 0 10px rgba(34, 197, 94, 0.2); color: #22c55e; }
-                    50% { text-shadow: 0 0 8px rgba(34, 197, 94, 0.8), 0 0 15px rgba(34, 197, 94, 0.5); color: #4ade80; }
-                }
-                .animate-text-glow-green {
-                    animation: text-glow-green 2.5s ease-in-out infinite;
-                }
-                @keyframes breathe-scale {
-                    0%   { transform: scale(1); }
-                    50%  { transform: scale(1.05); }
-                    100% { transform: scale(1); }
-                }
-
-                @keyframes pulse-unread-dark {
-                    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); }
-                    50% { box-shadow: 0 0 20px 8px rgba(255, 255, 255, 0.3); }
-                }
-
-                @keyframes pulse-unread-light {
-                    0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
-                    50% { box-shadow: 0 0 20px 8px rgba(59, 130, 246, 0.3); }
-                }
-
-                .unread-pulse-dark { animation: pulse-unread-dark 2s infinite !important; }
-                .unread-pulse-light { animation: pulse-unread-light 2s infinite !important; }
-                @keyframes tick-glow {
-                    0% { filter: drop-shadow(0 0 0 rgba(59, 130, 246, 0)); transform: scale(1); }
-                    50% { filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.9)); transform: scale(1.3); color: #60a5fa; }
-                    100% { filter: drop-shadow(0 0 3px rgba(59, 130, 246, 0.5)); transform: scale(1); }
-                }
-                .animate-tick-glow {
-                    animation: tick-glow 0.8s ease-out forwards;
-                }
-                @keyframes heartbeat-slow {
-                    0%, 100% { transform: scale(1); }
-                    50% { transform: scale(1.25); }
-                }
-                .animate-heartbeat { 
-                    animation: heartbeat-slow 2s ease-in-out infinite; 
-                    display: inline-block; 
-                }
-                
-                @keyframes spin-glow {
-                    0%   { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
-                }
-
-                .bot-idle-animated {
-                    position: relative;
-                    background: rgba(255, 255, 255, 0.15) !important;
-                    backdrop-filter: blur(12px) saturate(150%);
-                    -webkit-backdrop-filter: blur(12px) saturate(150%);
-                    border: 1.5px solid rgba(255, 255, 255, 0.5) !important;
-                    box-shadow: inset 0 4px 15px rgba(255, 255, 255, 0.6), 
-                                inset 0 -4px 15px rgba(0, 0, 0, 0.1) !important;
-                    
-                    color: #ffffff !important;
-                    
-                    animation: breathe-scale 8s ease-in-out infinite !important;
-                    transition: none !important;
-                    z-index: 10;
-                }
-
-                .dark-mode .bot-idle-animated {
-                    background: rgba(20, 20, 30, 0.25) !important;
-                    border: 1.5px solid rgba(255, 255, 255, 0.2) !important;
-                    box-shadow: inset 0 4px 15px rgba(255, 255, 255, 0.2), 
-                                inset 0 -4px 15px rgba(0, 0, 0, 0.3) !important;
-                }
-
-                .bot-idle-animated::before {
-                    content: '';
-                    position: absolute;
-                    top: -6px; left: -6px; right: -6px; bottom: -6px;
-                    border-radius: 50%;
-                    background: conic-gradient(from 0deg, #ff4d4d, #ff8533, #ff3333, #ff8533, #ff4d4d);
-                    filter: blur(14px);
-                    z-index: -1;
-                    opacity: 0.95;
-                    animation: spin-glow 8s linear infinite;
-                }
-
-                .dark-mode .bot-idle-animated::before {
-                    background: conic-gradient(from 0deg, #AD3333, #6b1d1d, #e64a19, #AD3333);
-                    opacity: 0.85;
-                }
-
-                .chat-btn-animated {
-                    position: relative;
-                    background: rgba(37, 99, 235, 0.8) !important;
-                    backdrop-filter: blur(12px) saturate(150%);
-                    -webkit-backdrop-filter: blur(12px) saturate(150%);
-                    border: 1.5px solid rgba(255, 255, 255, 0.5) !important;
-                    box-shadow: inset 0 4px 15px rgba(255, 255, 255, 0.6), 
-                                inset 0 -4px 15px rgba(0, 0, 0, 0.1) !important;
-                    color: #ffffff !important;
-                    animation: breathe-scale 8s ease-in-out infinite !important;
-                    transition: none !important;
-                    z-index: 10;
-                }
-
-                .dark-mode .chat-btn-animated {
-                    background: rgba(30, 58, 138, 0.8) !important;
-                    border: 1.5px solid rgba(255, 255, 255, 0.2) !important;
-                    box-shadow: inset 0 4px 15px rgba(255, 255, 255, 0.2), 
-                                inset 0 -4px 15px rgba(0, 0, 0, 0.3) !important;
-                }
-
-                .chat-btn-animated::before {
-                    content: '';
-                    position: absolute;
-                    top: -6px; left: -6px; right: -6px; bottom: -6px;
-                    border-radius: 50%;
-                    background: conic-gradient(from 0deg, #1e3a8a, #60a5fa, #3b82f6, #60a5fa, #1e3a8a);
-                    filter: blur(14px);
-                    z-index: -1;
-                    opacity: 0.95;
-                    animation: spin-glow 8s linear infinite;
-                }
-
-                .dark-mode .chat-btn-animated::before {
-                    background: conic-gradient(from 0deg, #0f172a, #1d4ed8, #2563eb, #1d4ed8, #0f172a);
-                    opacity: 0.85;
-                }
-
-                .nav-active-tab {
-                    background-color: #e64a19 !important; 
-                    color: #ffffff !important;
-                    font-weight: 800 !important;
-                    border: 1.5px solid rgba(255, 255, 255, 0.4) !important;
-                    box-shadow: 0 4px 15px rgba(230, 74, 25, 0.4), inset 0 2px 5px rgba(255, 255, 255, 0.3) !important;
-                    transition: all 0.3s ease;
-                }
-                .dark-mode .nav-active-tab {
-                    background-color: #6b1d1d !important; 
-                    border: 1.5px solid rgba(255, 255, 255, 0.2) !important;
-                    box-shadow: 0 4px 15px rgba(107, 29, 29, 0.5), inset 0 2px 5px rgba(255, 255, 255, 0.1) !important;
-                }
 
                 .pb-safe { padding-bottom: env(safe-area-inset-bottom, 20px); }
-
-                /* --- SCROLLBAR LIQUID GLASS GLOBAL --- */
-                ::-webkit-scrollbar {
-                    width: 14px;
-                    height: 14px;
-                }
-                ::-webkit-scrollbar-track {
-                    background: transparent;
-                }
-                ::-webkit-scrollbar-thumb {
-                    background-color: rgba(150, 150, 150, 0.4);
-                    border-radius: 20px;
-                    border: 4px solid transparent;
-                    background-clip: padding-box;
-                }
-                ::-webkit-scrollbar-thumb:hover {
-                    background-color: rgba(150, 150, 150, 0.6);
-                }
-                
-                /* Adaptación al Modo Oscuro */
-                .dark-mode::-webkit-scrollbar-thumb,
-                .dark-mode ::-webkit-scrollbar-thumb {
-                    background-color: rgba(255, 255, 255, 0.25);
-                }
-                .dark-mode::-webkit-scrollbar-thumb:hover,
-                .dark-mode ::-webkit-scrollbar-thumb:hover {
-                    background-color: rgba(255, 255, 255, 0.4);
-                }
-
-                /* Ocultar las flechitas por defecto */
-                ::-webkit-scrollbar-button {
-                    display: none !important;
-                }
-
-               /* --- NUEVO GLOW GIRATORIO SUTIL --- */
-                .teacher-bot-spin {
-                    position: relative;
-                    z-index: 10;
-                }
-                .teacher-bot-spin::before {
-                    content: '';
-                    position: absolute;
-                    top: -3px; left: -3px; right: -3px; bottom: -3px;
-                    border-radius: 50%;
-                    background: conic-gradient(from 0deg, transparent 0%, rgba(59, 130, 246, 0.9) 25%, transparent 50%);
-                    filter: blur(4px);
-                    z-index: -1;
-                    animation: spin-glow 2.5s linear infinite;
-                }
-                .dark-mode .teacher-bot-spin::before {
-                    background: conic-gradient(from 0deg, transparent 0%, rgba(255, 255, 255, 0.9) 25%, transparent 50%);
-                }
-
               `}</style>
-              
-              <div className="absolute top-[-15%] left-[-10%] w-[50%] h-[50%] bg-[#AD3333]/15 rounded-full blur-[100px] pointer-events-none" />
-              <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-blue-300/15 rounded-full blur-[120px] pointer-events-none" />
+
 
               <nav className="sticky top-0 z-50 bg-white/20 backdrop-blur-xl border-b border-white/40 px-4 md:px-6 py-4 flex justify-between items-start md:items-center shadow-sm">
                 
@@ -2786,7 +2559,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                       
                       <button
                           onClick={() => setIsChatOpen(!isChatOpen)} 
-                          className={`w-16 h-16 rounded-full flex items-center justify-center focus:outline-none ${!isChatOpen ? 'bot-idle-animated' : 'transition-all duration-300 bg-white/40 border border-white/60 shadow-[0_8px_32px_0_rgba(0,0,0,0.2)] text-gray-700 hover:scale-110 hover:bg-white/60 backdrop-blur-2xl'}`}
+                          className={`w-14 h-14 rounded-full flex items-center justify-center focus:outline-none transition-all duration-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl hover:shadow-2xl hover:-translate-y-1 text-gray-800 dark:text-gray-200`}
                       >
                           <CuteBotIcon size={32} />
                       </button>
@@ -2863,7 +2636,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                           </div>
                       )}
                       
-                      <button onClick={() => setIsTeacherBotOpen(!isTeacherBotOpen)} className={`w-16 h-16 rounded-full flex items-center justify-center focus:outline-none backdrop-blur-2xl border-2 transition-all hover:scale-110 shadow-2xl ${isDarkMode ? 'bg-white text-black border-gray-200' : 'bg-gray-900 text-white border-gray-900'}`}>
+                      <button onClick={() => setIsTeacherBotOpen(!isTeacherBotOpen)} className={`w-14 h-14 rounded-full flex items-center justify-center focus:outline-none transition-all duration-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl hover:shadow-2xl hover:-translate-y-1 text-gray-800 dark:text-gray-200`}>
                           <CuteBotIcon size={32} className={isDarkMode ? '!text-black' : '!text-white'} />
                       </button>
                   </div>
@@ -2875,7 +2648,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                   <div className="fixed bottom-[100px] md:bottom-8 right-4 md:right-6 z-[90]">
                       <button
                           onClick={openChatApp}
-                          className={`chat-btn-animated w-16 h-16 rounded-full flex items-center justify-center focus:outline-none ${hasUnreadChat ? (isDarkMode ? 'unread-pulse-dark' : 'unread-pulse-light') : ''}`}
+                          className={`w-14 h-14 rounded-full flex items-center justify-center focus:outline-none transition-all duration-300 bg-blue-600 hover:bg-blue-700 text-white shadow-xl hover:shadow-2xl hover:-translate-y-1 ${hasUnreadChat ? 'ring-2 ring-red-500 ring-offset-2 ring-offset-white dark:ring-offset-gray-900' : ''}`}
                           title="Mensajes Directos"
                       >
                           <MessageCircle size={28} />
@@ -3124,7 +2897,7 @@ const targetCurrentChatId = presenceData.currentChatId;
 if (isTyping) return <span className="text-xs font-bold text-blue-500 animate-pulse">Escribiendo...</span>;
 if (userStatus === 'online') {
     if (targetCurrentChatId === activeChat.id) {
-        return <span className="text-xs font-bold animate-text-glow-green">En este chat</span>;
+        return <span className="text-xs font-bold text-green-600">En este chat</span>;
     }
     return <span className="text-xs font-bold text-green-500">En línea</span>;
 }
@@ -3261,7 +3034,7 @@ return <span className="text-xs font-medium text-gray-400">Desconectado</span>;
                                                           const readTimeStr = m.readAt ? new Date(m.readAt).toLocaleTimeString('es-CO', {hour: '2-digit', minute: '2-digit', hour12: true}) : '';
 tickIcon = (
     <div title={readTimeStr ? `Leído a las ${readTimeStr}` : 'Leído'} className="inline-flex cursor-help">
-        <DoubleTick size={14} className="text-blue-400 animate-tick-glow" />
+        <DoubleTick size={14} className="text-blue-500" />
     </div>
 );
                                                       } else {
@@ -3351,7 +3124,7 @@ tickIcon = (
                                                                               }
                                                                               return (
                                                                                   <div key={idx} className="relative inline-flex items-center cursor-help" title={tooltipText}>
-                                                                                      <span className={`text-2xl drop-shadow-lg ${emoji === '❤️' ? 'animate-heartbeat' : ''}`}>{emoji}</span>
+                                                                                      <span className={`text-2xl drop-shadow-lg ${emoji === '❤️' ? '' : ''}`}>{emoji}</span>
                                                                                       {count > 1 && <span className="absolute -bottom-1 -right-1 bg-white/90 text-gray-800 text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center shadow-md border border-gray-200">{count}</span>}
                                                                                   </div>
                                                                               );
