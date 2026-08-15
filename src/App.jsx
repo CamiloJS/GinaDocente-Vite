@@ -2293,7 +2293,48 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                         .dark [class*="border-white/"] { border-color: rgba(255, 255, 255, 0.2) !important; }
                         .dark input { color: #ffffff !important; }
                         .dark input::placeholder { color: #9ca3af !important; }
-                      `}</style>
+                      
+                .dark .text-black { color: #f9fafb !important; }
+                .dark .text-blue-600 { color: #93c5fd !important; }
+                .dark .text-blue-700 { color: #93c5fd !important; }
+                .dark .text-indigo-600 { color: #a5b4fc !important; }
+                .dark .text-indigo-700 { color: #a5b4fc !important; }
+                .dark .text-green-600 { color: #4ade80 !important; }
+                .dark .text-green-700 { color: #4ade80 !important; }
+                .dark .text-red-600 { color: #f87171 !important; }
+                .dark .text-red-700 { color: #f87171 !important; }
+                .dark .text-purple-600 { color: #c084fc !important; }
+                .dark .text-purple-700 { color: #c084fc !important; }
+                .dark .text-orange-600 { color: #fb923c !important; }
+                .dark .text-orange-700 { color: #fb923c !important; }
+                .dark .text-amber-600 { color: #fbbf24 !important; }
+                .dark .text-amber-700 { color: #fbbf24 !important; }
+                .dark .text-teal-600 { color: #2dd4bf !important; }
+                .dark .text-teal-700 { color: #2dd4bf !important; }
+                .dark .text-cyan-600 { color: #22d3ee !important; }
+                .dark .text-cyan-700 { color: #22d3ee !important; }
+                .dark .text-fuchsia-600 { color: #e879f9 !important; }
+                .dark .text-fuchsia-700 { color: #e879f9 !important; }
+                .dark .text-rose-600 { color: #fb7185 !important; }
+                .dark .text-rose-700 { color: #fb7185 !important; }
+
+                .dark .text-blue-500 { color: #93c5fd !important; }
+                .dark .text-blue-800 { color: #93c5fd !important; }
+                .dark .text-green-500 { color: #4ade80 !important; }
+                .dark .text-green-800 { color: #4ade80 !important; }
+                .dark .text-red-500 { color: #f87171 !important; }
+                .dark .text-red-800 { color: #f87171 !important; }
+                .dark .text-indigo-500 { color: #a5b4fc !important; }
+                .dark .text-purple-500 { color: #c084fc !important; }
+                .dark .text-orange-500 { color: #fb923c !important; }
+                .dark .text-amber-500 { color: #fbbf24 !important; }
+                .dark .text-teal-500 { color: #2dd4bf !important; }
+                .dark .text-cyan-500 { color: #22d3ee !important; }
+                .dark .text-fuchsia-500 { color: #e879f9 !important; }
+                .dark .text-rose-500 { color: #fb7185 !important; }
+                .dark .text-gray-400 { color: #9ca3af !important; }
+                .dark .text-gray-300 { color: #d1d5db !important; }
+`}</style>
                       
                       <button onClick={() => setIsDarkMode(!isDarkMode)} className="absolute top-4 right-4 md:top-6 md:right-6 p-3 rounded-full bg-white/40 hover:bg-white/60 text-gray-800 transition-all shadow-sm border border-white/50 z-50" title="Alternar Modo Oscuro">
                           {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
@@ -2394,7 +2435,48 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                 .dark input::placeholder, .dark textarea::placeholder { color: #9ca3af !important; }
 
                 .pb-safe { padding-bottom: env(safe-area-inset-bottom, 20px); }
-              `}</style>
+              
+                .dark .text-black { color: #f9fafb !important; }
+                .dark .text-blue-600 { color: #93c5fd !important; }
+                .dark .text-blue-700 { color: #93c5fd !important; }
+                .dark .text-indigo-600 { color: #a5b4fc !important; }
+                .dark .text-indigo-700 { color: #a5b4fc !important; }
+                .dark .text-green-600 { color: #4ade80 !important; }
+                .dark .text-green-700 { color: #4ade80 !important; }
+                .dark .text-red-600 { color: #f87171 !important; }
+                .dark .text-red-700 { color: #f87171 !important; }
+                .dark .text-purple-600 { color: #c084fc !important; }
+                .dark .text-purple-700 { color: #c084fc !important; }
+                .dark .text-orange-600 { color: #fb923c !important; }
+                .dark .text-orange-700 { color: #fb923c !important; }
+                .dark .text-amber-600 { color: #fbbf24 !important; }
+                .dark .text-amber-700 { color: #fbbf24 !important; }
+                .dark .text-teal-600 { color: #2dd4bf !important; }
+                .dark .text-teal-700 { color: #2dd4bf !important; }
+                .dark .text-cyan-600 { color: #22d3ee !important; }
+                .dark .text-cyan-700 { color: #22d3ee !important; }
+                .dark .text-fuchsia-600 { color: #e879f9 !important; }
+                .dark .text-fuchsia-700 { color: #e879f9 !important; }
+                .dark .text-rose-600 { color: #fb7185 !important; }
+                .dark .text-rose-700 { color: #fb7185 !important; }
+
+                .dark .text-blue-500 { color: #93c5fd !important; }
+                .dark .text-blue-800 { color: #93c5fd !important; }
+                .dark .text-green-500 { color: #4ade80 !important; }
+                .dark .text-green-800 { color: #4ade80 !important; }
+                .dark .text-red-500 { color: #f87171 !important; }
+                .dark .text-red-800 { color: #f87171 !important; }
+                .dark .text-indigo-500 { color: #a5b4fc !important; }
+                .dark .text-purple-500 { color: #c084fc !important; }
+                .dark .text-orange-500 { color: #fb923c !important; }
+                .dark .text-amber-500 { color: #fbbf24 !important; }
+                .dark .text-teal-500 { color: #2dd4bf !important; }
+                .dark .text-cyan-500 { color: #22d3ee !important; }
+                .dark .text-fuchsia-500 { color: #e879f9 !important; }
+                .dark .text-rose-500 { color: #fb7185 !important; }
+                .dark .text-gray-400 { color: #9ca3af !important; }
+                .dark .text-gray-300 { color: #d1d5db !important; }
+`}</style>
 
 
               <nav className="sticky top-0 z-50 bg-white/20 backdrop-blur-xl border-b border-white/40 px-4 md:px-6 py-4 flex justify-between items-start md:items-center shadow-sm">
