@@ -1606,37 +1606,37 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                 <div className="space-y-6 pb-20 md:pb-0">
                   <h2 className="text-3xl font-bold text-gray-800 mb-6 flex items-center gap-2 drop-shadow-sm"><Edit3 className="text-[#AD3333]" /> Edición de Diapositivas</h2>
                   <div className={`${glassCard} flex flex-col gap-8`}>
-                    <div className="bg-white/30 backdrop-blur-sm p-6 rounded-3xl border border-white/60 shadow-sm">
+                    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm">
                        <label className="text-sm font-bold text-gray-800 mb-2 block">Título de la Presentación</label>
-                       <input className={`${glassInput} font-extrabold text-xl bg-white/80`} value={draftReview.topic} onChange={e => setDraftReview({...draftReview, topic: e.target.value})} />
+                       <input className={`${glassInput} font-extrabold text-xl`} value={draftReview.topic} onChange={e => setDraftReview({...draftReview, topic: e.target.value})} />
                     </div>
                     {draftReview.slides.map((slide, i) => (
-                      <div key={i} className={`bg-gradient-to-br ${slide.gradient || SLIDE_GRADIENTS[0]} backdrop-blur-xl p-6 rounded-3xl border border-white/60 relative shadow-md`}>
-                        <div className="absolute inset-0 bg-white/40 rounded-3xl pointer-events-none"></div>
+                      <div key={i} className={`bg-gradient-to-br ${slide.gradient || SLIDE_GRADIENTS[0]} p-6 rounded-3xl border border-gray-200 dark:border-gray-700 relative shadow-md`}>
+                        <div className="absolute inset-0 bg-black/5 dark:bg-black/40 rounded-3xl pointer-events-none"></div>
                         <div className="relative z-10">
                           <span className="absolute -top-2 -right-2 bg-gray-900 text-white font-bold px-4 py-1.5 rounded-full text-xs shadow-lg">Slide {i + 1}</span>
-                          <div className="mb-4 bg-white/40 p-2 rounded-2xl inline-flex gap-2 border border-white/50">
+                          <div className="mb-4 bg-white dark:bg-gray-900 p-2 rounded-2xl inline-flex gap-2 border border-gray-200 dark:border-gray-700">
                             <span className="text-xs font-bold text-gray-700 flex items-center gap-1 ml-1 mr-2"><Palette size={14}/> Color:</span>
                             {SLIDE_GRADIENTS.map(grad => (
                               <button key={grad} type="button" onClick={() => { const newSlides = [...draftReview.slides]; newSlides[i].gradient = grad; setDraftReview({...draftReview, slides: newSlides}); }} className={`w-6 h-6 rounded-full bg-gradient-to-br ${grad} border-2 transition-transform ${slide.gradient === grad ? 'border-gray-800 scale-125' : 'border-white/80'}`} />
                             ))}
                           </div>
-                          <div className="mb-6 bg-white/50 p-4 rounded-2xl border border-white/50">
+                          <div className="mb-6 bg-white dark:bg-gray-900 p-4 rounded-2xl border border-gray-200 dark:border-gray-700">
                             <label className="text-sm font-bold text-gray-800 mb-1 block mt-1">Título de la diapositiva</label>
-                            <input className={`${glassInput} mb-4 font-bold text-lg bg-white/60`} value={slide.title} onChange={e => { const newSlides = [...draftReview.slides]; newSlides[i].title = e.target.value; setDraftReview({...draftReview, slides: newSlides}); }} />
+                            <input className={`${glassInput} mb-4 font-bold text-lg`} value={slide.title} onChange={e => { const newSlides = [...draftReview.slides]; newSlides[i].title = e.target.value; setDraftReview({...draftReview, slides: newSlides}); }} />
                             {slide.type === 'quiz' ? (
                               <div className="space-y-4">
-                                <div><label className="text-sm font-bold text-gray-800 mb-1 block">Pregunta</label><textarea className={`${glassInput} h-24 resize-none bg-white/60`} value={slide.question || ""} onChange={e => { const newSlides = [...draftReview.slides]; newSlides[i].question = e.target.value; setDraftReview({...draftReview, slides: newSlides}); }} /></div>
-                                <div><label className="text-sm font-bold text-green-800 mb-1 block">Respuesta correcta</label><textarea className={`${glassInput} h-20 resize-none border-green-300 bg-white/60`} value={slide.answer || ""} onChange={e => { const newSlides = [...draftReview.slides]; newSlides[i].answer = e.target.value; setDraftReview({...draftReview, slides: newSlides}); }} /></div>
+                                <div><label className="text-sm font-bold text-gray-800 mb-1 block">Pregunta</label><textarea className={`${glassInput} h-24 resize-none`} value={slide.question || ""} onChange={e => { const newSlides = [...draftReview.slides]; newSlides[i].question = e.target.value; setDraftReview({...draftReview, slides: newSlides}); }} /></div>
+                                <div><label className="text-sm font-bold text-green-800 mb-1 block">Respuesta correcta</label><textarea className={`${glassInput} h-20 resize-none border-green-300`} value={slide.answer || ""} onChange={e => { const newSlides = [...draftReview.slides]; newSlides[i].answer = e.target.value; setDraftReview({...draftReview, slides: newSlides}); }} /></div>
                               </div>
                             ) : (
-                              <div><label className="text-sm font-bold text-gray-800 mb-1 block">Contenido</label><textarea className={`${glassInput} h-32 resize-none leading-relaxed bg-white/60`} value={slide.content || ""} onChange={e => { const newSlides = [...draftReview.slides]; newSlides[i].content = e.target.value; setDraftReview({...draftReview, slides: newSlides}); }} /></div>
+                              <div><label className="text-sm font-bold text-gray-800 mb-1 block">Contenido</label><textarea className={`${glassInput} h-32 resize-none leading-relaxed`} value={slide.content || ""} onChange={e => { const newSlides = [...draftReview.slides]; newSlides[i].content = e.target.value; setDraftReview({...draftReview, slides: newSlides}); }} /></div>
                             )}
                           </div>
                           <div className="bg-gradient-to-r from-purple-100/70 to-indigo-100/70 p-4 rounded-2xl border border-indigo-200/50 flex flex-col sm:flex-row gap-3 sm:items-end">
                             <div className="flex-1">
                               <label className="text-xs font-bold text-indigo-800 mb-1 block">Instrucción para la IA</label>
-                              <input placeholder="Ej. Hazla sobre verbos irregulares..." className={`${glassInput} py-2 text-sm border-indigo-200 bg-white/80`} value={slideInstructions[i] || ""} onChange={e => setSlideInstructions({...slideInstructions, [i]: e.target.value})} />
+                              <input placeholder="Ej. Hazla sobre verbos irregulares..." className={`${glassInput} py-2 text-sm border-indigo-200`} value={slideInstructions[i] || ""} onChange={e => setSlideInstructions({...slideInstructions, [i]: e.target.value})} />
                             </div>
                             <button onClick={() => handleRegenerateSingleSlide(i)} disabled={loadingSlides[i]} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-5 rounded-xl shadow-md transition disabled:opacity-50 flex items-center gap-2 justify-center">
                               {loadingSlides[i] ? <Loader2 size={16} className="animate-spin"/> : <Sparkles size={16}/>} Regenerar
@@ -1646,7 +1646,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                       </div>
                     ))}
                     <div className="flex gap-4 pt-4 border-t border-white/40">
-                       <button onClick={() => setDraftReview(null)} className="px-6 py-3 rounded-full font-bold bg-white/50 border border-white/60 text-gray-700 hover:bg-white/80 hover:text-red-600 transition flex items-center gap-2 shadow-sm"><X size={20}/> Descartar</button>
+                       <button onClick={() => setDraftReview(null)} className="px-6 py-3 rounded-full font-bold bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-red-600 transition flex items-center gap-2 shadow-sm"><X size={20}/> Descartar</button>
                        <button onClick={handlePublishDraft} className={`${redButton} ml-auto`}><Send size={20}/> Publicar Presentación</button>
                     </div>
                   </div>
@@ -1671,21 +1671,21 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                 )}
 
                 {activeReview && activeSlide ? (
-                  <div className={`relative overflow-hidden rounded-[2rem] border border-white/50 shadow-[0_15px_40px_0_rgba(0,0,0,0.15)] min-h-[550px] flex flex-col justify-between bg-gradient-to-br ${activeSlide?.gradient || SLIDE_GRADIENTS[0]} backdrop-blur-2xl transition-all duration-700`}>
+                  <div className={`relative overflow-hidden rounded-[2rem] border border-gray-200 dark:border-gray-700 shadow-[0_10px_30px_0_rgba(0,0,0,0.1)] min-h-[550px] flex flex-col justify-between bg-gradient-to-br ${activeSlide?.gradient || SLIDE_GRADIENTS[0]} backdrop-blur-sm transition-all duration-700`}>
                     <div className="absolute inset-0 bg-white/20 pointer-events-none"></div>
-                    <div className="relative z-10 flex justify-between items-center p-6 border-b border-white/30 bg-white/10">
+                    <div className="relative z-10 flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700 bg-black/5 dark:bg-black/40">
                       <h3 className="text-xl font-extrabold text-gray-900 drop-shadow-sm">{activeReview.topic}</h3>
-                      <button onClick={() => setActiveReview(null)} className="bg-white/40 hover:bg-white/60 text-gray-800 rounded-full p-2 transition"><X size={24} /></button>
+                      <button onClick={() => setActiveReview(null)} className="bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-full p-2 transition"><X size={24} /></button>
                     </div>
                     <div className="relative z-10 flex-1 flex flex-col items-center justify-center p-6 sm:p-12 text-center">
-                      <div className="bg-white/50 backdrop-blur-2xl border border-white/60 p-8 md:p-12 rounded-[2rem] shadow-xl max-w-3xl w-full">
+                      <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border border-gray-200 dark:border-gray-700 p-8 md:p-12 rounded-[2rem] shadow-xl max-w-3xl w-full">
                         <h4 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-8 drop-shadow-sm leading-tight">{activeSlide?.title}</h4>
                         {activeSlide?.type === 'quiz' ? (
                           <div className="flex flex-col items-center gap-4 w-full">
                             <p className="text-2xl text-gray-800 font-bold mb-4">{activeSlide.question}</p>
                             {!showQuizAnswer ? (
                               <form onSubmit={handleQuizSubmit} className="w-full flex flex-col gap-4">
-                                <input value={studentQuizAnswer} onChange={e => setStudentQuizAnswer(e.target.value)} placeholder="Tu respuesta..." className="w-full bg-white/60 border border-white/80 rounded-2xl px-6 py-4 text-xl text-center font-medium text-gray-800" />
+                                <input value={studentQuizAnswer} onChange={e => setStudentQuizAnswer(e.target.value)} placeholder="Tu respuesta..." className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-2xl px-6 py-4 text-xl text-center font-medium text-gray-800 dark:text-gray-100" />
                                 <button type="submit" disabled={isEvaluatingQuiz} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-full shadow-lg mx-auto disabled:opacity-50">
                                   {isEvaluatingQuiz ? <Loader2 className="animate-spin" size={24}/> : <ArrowRightIcon size={20}/>} Comprobar
                                 </button>
@@ -1700,10 +1700,10 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                         )}
                       </div>
                     </div>
-                    <div className="relative z-10 flex justify-between items-center p-6 border-t border-white/30 bg-white/10 backdrop-blur-md">
-                      <button onClick={() => setCurrentSlide(s => Math.max(0, s - 1))} disabled={currentSlide === 0} className="flex gap-2 px-6 py-3 bg-white/50 rounded-full font-bold text-gray-900 disabled:opacity-40"><ChevronLeft size={20} /> Anterior</button>
-                      <span className="font-extrabold text-gray-900 tracking-widest bg-white/50 px-5 py-2 rounded-full">{currentSlide + 1} / {activeReview.slides?.length || 1}</span>
-                      <button onClick={() => setCurrentSlide(s => Math.min((activeReview.slides?.length || 1) - 1, s + 1))} disabled={currentSlide === (activeReview.slides?.length || 1) - 1} className="flex gap-2 px-6 py-3 bg-white/80 rounded-full font-bold text-gray-900 disabled:opacity-40">Siguiente <ChevronRight size={20} /></button>
+                    <div className="relative z-10 flex justify-between items-center p-6 border-t border-gray-200 dark:border-gray-700 bg-black/5 dark:bg-black/40 backdrop-blur-md">
+                      <button onClick={() => setCurrentSlide(s => Math.max(0, s - 1))} disabled={currentSlide === 0} className="flex gap-2 px-6 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full font-bold text-gray-900 dark:text-gray-100 disabled:opacity-40"><ChevronLeft size={20} /> Anterior</button>
+                      <span className="font-extrabold text-gray-900 dark:text-gray-100 tracking-widest bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-5 py-2 rounded-full">{currentSlide + 1} / {activeReview.slides?.length || 1}</span>
+                      <button onClick={() => setCurrentSlide(s => Math.min((activeReview.slides?.length || 1) - 1, s + 1))} disabled={currentSlide === (activeReview.slides?.length || 1) - 1} className="flex gap-2 px-6 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full font-bold text-gray-900 dark:text-gray-100 disabled:opacity-40">Siguiente <ChevronRight size={20} /></button>
                     </div>
                   </div>
                 ) : (
@@ -1712,9 +1712,9 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                     {reviews.map((r, idx) => (
                       <div key={r.id} className={`cursor-pointer hover:scale-[1.03] transition-transform duration-300 relative overflow-hidden rounded-[1.5rem] border border-white/50 shadow-lg flex flex-col bg-gradient-to-br ${r.slides?.[0]?.gradient || SLIDE_GRADIENTS[0]} backdrop-blur-xl aspect-video`} onClick={() => { setActiveReview(r); setCurrentSlide(0); setShowQuizAnswer(false); }}>
                         <div className="relative z-10 flex-1 flex flex-col items-center justify-center p-5 text-center">
-                          <div className="bg-white/40 backdrop-blur-md border border-white/60 p-4 rounded-xl w-full"><h4 className="text-lg font-extrabold text-gray-900 drop-shadow-sm line-clamp-3">{r.topic}</h4></div>
+                          <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border border-gray-200 dark:border-gray-700 p-4 rounded-xl w-full"><h4 className="text-lg font-extrabold text-gray-900 drop-shadow-sm line-clamp-3">{r.topic}</h4></div>
                         </div>
-                        <div className="relative z-10 flex justify-between items-center px-5 py-3 border-t border-white/30 bg-white/20 backdrop-blur-md">
+                        <div className="relative z-10 flex justify-between items-center px-5 py-3 border-t border-gray-200 dark:border-gray-700 bg-black/5 dark:bg-black/40 backdrop-blur-md">
                           <span className="text-xs font-bold text-gray-900">{r.slides?.length || 0} diapositivas</span>
                           {role === 'teacher' && <button onClick={(e) => { e.stopPropagation(); confirmAction("¿Borrar este repaso de forma permanente?", () => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reviews', r.id))); }} className="text-gray-800 hover:text-red-600"><Trash2 size={16} /></button>}
                         </div>
@@ -1735,7 +1735,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                       <div className="flex-1 max-h-40 overflow-y-auto space-y-2 pr-1">
                           {botInfoList.length === 0 && <p className="text-xs text-gray-500 italic">No hay información guardada. Escribe algo para que el bot lo aprenda.</p>}
                           {botInfoList.map(item => (
-                              <div key={item.id} className="bg-white/50 p-3 rounded-xl text-xs flex justify-between items-start gap-2 border border-white/60 shadow-sm">
+                              <div key={item.id} className="bg-gray-50 dark:bg-gray-800 p-3 rounded-xl text-xs flex justify-between items-start gap-2 border border-gray-200 dark:border-gray-700 shadow-sm">
                                   <span className="text-gray-800 break-words flex-1 font-medium">{item.text}</span>
                                   <button onClick={() => {
                                       confirmAction("¿Seguro que desea eliminar esta instrucción del bot?", () => {
@@ -1905,7 +1905,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                         const studentClasses = academicGroups.filter(g => g.members.includes(userKey));
 
                         return (
-                        <div key={userKey} className="bg-white/50 p-3 rounded-xl flex justify-between items-start border border-white/60 shadow-sm">
+                        <div key={userKey} className="bg-gray-50 dark:bg-gray-800 p-3 rounded-xl flex justify-between items-start border border-gray-200 dark:border-gray-700 shadow-sm">
                             <div className="flex-1 pr-2">
                                 <p className="font-bold text-sm text-gray-800">{data.fullName}</p>
                                 <p className="text-xs text-gray-600">Usuario: @{userKey}</p>
@@ -1956,7 +1956,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                                   <h2 className={`text-2xl font-extrabold ${isDarkMode ? 'text-gray-100' : 'text-gray-800'}`}>{activeTakingEval.title}</h2>
                                   <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>{activeTakingEval.description}</p>
                               </div>
-                              <div className="bg-red-100/90 backdrop-blur-md text-red-700 px-6 py-3 rounded-2xl font-black font-mono text-2xl flex items-center gap-3 shadow-lg border border-red-200 shrink-0">
+                              <div className="bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 px-6 py-3 rounded-2xl font-black font-mono text-2xl flex items-center gap-3 shadow-sm border border-red-200 dark:border-red-800 shrink-0">
                                   <Clock size={24}/> {formatTime(timeRemaining)}
                               </div>
                           </div>
@@ -2189,7 +2189,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                                   <h3 className="text-xl font-bold text-gray-900 mb-2 pr-10">{ev.title}</h3>
                                   <p className="text-sm text-gray-700 mb-4 line-clamp-2">{ev.description}</p>
                                   
-                                  <div className="mt-auto space-y-2 bg-white/40 p-3 rounded-xl border border-white/50">
+                                  <div className="mt-auto space-y-2 bg-gray-50 dark:bg-gray-800/50 p-3 rounded-xl border border-gray-200 dark:border-gray-700">
                                       <p className={`text-xs font-bold flex items-center gap-1 ${isExpired ? 'text-red-600' : 'text-[#AD3333]'}`}><CalendarEmoji size={14}/> Cierre: {ev.dueDate} a las {ev.dueTime}</p>
                                       <p className="text-xs font-bold flex items-center gap-1 text-gray-600"><Clock size={14}/> Tiempo: {ev.timeLimit} minutos</p>
                                       <p className="text-xs font-bold flex items-center gap-1 text-blue-600"><CheckCheck size={14}/> Preguntas: {ev.questions?.length || 0}</p>
@@ -2243,7 +2243,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                   <h3 className="text-xl font-bold text-green-700 mb-4 flex items-center gap-2">Sugerencias</h3>
                   <div className="space-y-4">
                     {suggestions.length === 0 ? <p className="text-sm text-gray-500">Buzón vacío.</p> : suggestions.map(s => (
-                      <div key={s.id} className="bg-white/40 p-4 rounded-xl border border-green-200 relative group">
+                      <div key={s.id} className="bg-green-50 dark:bg-green-900/10 p-4 rounded-xl border border-green-200 dark:border-green-800 relative group">
                         <p className="font-bold text-gray-800 text-sm mb-1">{s.studentName}</p>
                         <p className="text-gray-700">{s.text}</p>
                         <p className="text-xs text-gray-400 mt-2">{new Date(s.createdAt).toLocaleString()}</p>
