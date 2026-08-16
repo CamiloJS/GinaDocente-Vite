@@ -8,7 +8,7 @@ import './index.css'
 // Con registerType: 'autoUpdate' el SW nuevo toma control de inmediato;
 // al detectar controllerchange recargamos para evitar mezclar el JS viejo
 // en memoria con los chunks nuevos del deploy (causa del "¡Ups!").
-if ('serviceWorker' in navigator) {
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
   const hadController = !!navigator.serviceWorker.controller
   let refreshing = false
   navigator.serviceWorker.addEventListener('controllerchange', () => {
