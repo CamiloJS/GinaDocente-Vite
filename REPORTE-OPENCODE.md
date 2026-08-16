@@ -22,8 +22,11 @@ El usuario decidió que Antigravity trabaje 100% solo, sin depender de opencode.
 - Añadidos botones flotantes de traducción en los mensajes del chat y descripciones del muro.
 - Mostrado resultado de la traducción de forma amigable.
 
-### ESTADO: EN ESPERA DE NUEVAS INSTRUCCIONES
+### 4. Bugs Silenciosos Arreglados
+- **Service Worker en DEV:** Se añadió la validación `import.meta.env.PROD` en `main.jsx` para evitar que intente registrar el Service Worker en entorno local (lo cual lanzaba un `SecurityError`).
+- **ErrorBoundary Local Logging:** Se eliminó la petición a `http://localhost:4000/log` en `ErrorBoundary.jsx` para evitar el error de red (`ERR_CONNECTION_REFUSED`) cuando la app está en producción en Vercel.
 
+### ESTADO: EN ESPERA DE NUEVAS INSTRUCCIONES
 ### Historial del bucle (instrucciones #1-#29 completadas y desplegadas)
 1. Lazy loading (TasksTab, GifPickerModal)
 2. /api/filter + checkBadWordsAsync
