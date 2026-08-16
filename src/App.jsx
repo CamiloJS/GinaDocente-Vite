@@ -1741,7 +1741,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
             if (draftReview) {
               return (
                 <div className="space-y-6 pb-20 md:pb-0">
-                  <h2 className="text-3xl font-bold text-gray-800 mb-6 flex items-center gap-2 drop-shadow-sm"><Edit3 className="text-[#AD3333]" /> Edición de diapositivas</h2>
+                  <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-6 flex items-center gap-2 drop-shadow-sm"><Edit3 className="text-[#AD3333]" /> Edición de diapositivas</h2>
                   <div className={`${glassCard} flex flex-col gap-8`}>
                     <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm">
                        <label className="text-sm font-bold text-gray-800 mb-2 block">Título de la presentación</label>
@@ -1795,7 +1795,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
 
             return (
               <div className="space-y-6 pb-20 md:pb-0">
-                <h2 className="text-3xl font-bold text-gray-800 mb-6 flex items-center gap-2 drop-shadow-sm">Repasos</h2>
+                <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-6 flex items-center gap-2 drop-shadow-sm">Repasos</h2>
                 {role === 'teacher' && !activeReview && (
                   <form onSubmit={handleGenerateReview} className={`${glassCard} mb-8 flex flex-col gap-4`}>
                     <h3 className="font-bold text-gray-800 flex items-center gap-2"><Wand2 size={20}/> Generador inteligente de diapositivas</h3>
@@ -1864,7 +1864,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
 
           const renderSyllabus = () => (
             <div className="space-y-6 pb-20 md:pb-0">
-              <h2 className="text-3xl font-bold text-gray-800 mb-6 flex items-center gap-2"><CalendarEmoji className="text-[#AD3333]" /> Contenidos programáticos</h2>
+              <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-6 flex items-center gap-2"><CalendarEmoji className="text-[#AD3333]" /> Contenidos programáticos</h2>
               
               {role === 'teacher' && (
                   <div className={`${glassCard} flex flex-col gap-4 mb-6`}>
@@ -1967,7 +1967,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
 
     return (
         <div className="space-y-6 max-w-3xl mx-auto pb-20 md:pb-0">
-            <h2 className="text-3xl font-bold text-gray-800 mb-6 flex items-center gap-2 drop-shadow-sm"><UsersIcon className="text-[#AD3333]" /> Directorio y materias</h2>
+            <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-6 flex items-center gap-2 drop-shadow-sm"><UsersIcon className="text-[#AD3333]" /> Directorio y materias</h2>
             
             {/* PANEL DE MATERIAS / GRUPOS ACADÉMICOS */}
             <div className={`${glassCard} flex flex-col gap-4 mb-6 border-blue-500/30 shadow-[0_8px_32px_0_rgba(37,99,235,0.1)]`}>
@@ -2309,7 +2309,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
               return (
                 <div className="space-y-6 max-w-5xl mx-auto pb-20 md:pb-0">
                   <div className="flex justify-between items-center mb-6">
-                      <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2 drop-shadow-sm"><FileText className="text-[#AD3333]" /> Evaluaciones</h2>
+                      <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2 drop-shadow-sm"><FileText className="text-[#AD3333]" /> Evaluaciones</h2>
                       {role === 'teacher' && (
                           <button onClick={() => setIsCreatingEval(true)} className="bg-blue-600 hover:bg-blue-700 text-white shadow-md font-bold px-4 py-2.5 rounded-xl transition flex items-center gap-2 text-sm"><Plus size={16}/> Crear</button>
                       )}
@@ -2378,7 +2378,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
 
           const renderInbox = () => (
             <div className="space-y-8">
-              <h2 className="text-3xl font-bold text-gray-800 mb-6 flex items-center gap-2 drop-shadow-sm">
+              <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-6 flex items-center gap-2 drop-shadow-sm">
                   <Mail className="text-[#AD3333]" /> Buzón de sugerencias
               </h2>
               <div className="grid md:grid-cols-2 gap-6">
