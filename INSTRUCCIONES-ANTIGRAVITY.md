@@ -205,4 +205,19 @@ El Muro principal (`TasksTab`) puede volverse muy largo a medida que se acumulan
 
 **Entrega:** Documenta en `REPORTE-OPENCODE.md` dónde ubicaste el botón flotante y confirma que funciona correctamente.
 
+---
+
+# INSTRUCCION #14
+
+**Objetivo:** UX Premium: Skeleton Loading (Pantallas de Carga Esqueleto).
+
+Actualmente, mientras se descargan las publicaciones iniciales de Firebase (lo cual puede demorar un par de segundos en móviles), la plataforma puede sentirse vacía o "congelada". Las apps modernas como Facebook usan "Skeleton Loaders" (bloques grises parpadeantes que simulan el contenido).
+
+**Acciones a implementar por Opencode:**
+1. **Crear Componente Skeleton:** Crea `src/components/SkeletonCard.jsx` usando Tailwind. Debe tener el esqueleto de una publicación: un círculo (avatar), dos barras cortas (nombre/fecha) y un bloque grande o varias líneas (texto/imagen). Aplícale la clase `animate-pulse` para el efecto de parpadeo y dota de estilos para modo claro y oscuro (`isDarkMode`).
+2. **Integrar en el Muro (`TasksTab`):** En `TasksTab.jsx`, si el estado de las tareas (`visibleTasks` o equivalente) indica que aún está cargando datos por primera vez (puedes usar un estado booleano `isLoading` que se ponga en false cuando el primer snapshot de Firebase responda), renderiza un arreglo de 2 o 3 `<SkeletonCard />` apilados en lugar de la lista vacía o el loader global.
+3. **Deploy:** Valida con `npm run build`, haz `commit`/`push` a `main` y sube con `vercel deploy --prod`.
+
+**Entrega:** Documenta en `REPORTE-OPENCODE.md` la creación del Skeleton y cómo manejaste el estado de carga (`isLoading`) en `TasksTab`.
+
 ESTADO: LISTA PARA IMPLEMENTAR

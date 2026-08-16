@@ -5,6 +5,7 @@ import {
 } from './Icons.jsx'
 import TaskCard from './TaskCard.jsx'
 import EmptyState from './EmptyState.jsx'
+import SkeletonCard from './SkeletonCard.jsx'
 import { collection, addDoc } from '../firebase/config.js'
 
 const TasksTab = React.memo(({
@@ -16,7 +17,7 @@ const TasksTab = React.memo(({
     setHasAiModified, callGemini, showMessage, handleAiTranslate, taskDate, setTaskDate,
     taskTime, setTaskTime, allowLate, setAllowLate, db, appId, loggedInName, getToday,
     tasks, user, isDarkMode, confirmAction, setFullScreenImage, handleOpenProfileByName,
-    academicGroups, myChatId
+    academicGroups, myChatId, tasksLoading
 }) => {
 
     // ESTADOS DEL MENÚ LIQUID GLASS
@@ -155,7 +156,9 @@ const TasksTab = React.memo(({
                     </div>
                 </div>
             )}
-            {visibleTasks.length === 0 ? <EmptyState icon={BookOpen} title="Todavía no hay publicaciones" message="Cuando la profesora publique una tarea o aviso, aparecerá aquí." isDarkMode={isDarkMode} /> : null}
+            {tasksLoading ? (
+                <div className="space-y-4">{[0,1,2].map(i => <SkeletonCard key={i} isDarkMode={isDarkMode} />)}</div>
+            ) : visibleTasks.length === 0 ? <EmptyState icon={BookOpen} title="Todavía no hay publicaciones" message="Cuando la profesora publique una tarea o aviso, aparecerá aquí." isDarkMode={isDarkMode} /> : null}
 {visibleTasks.map(task => <TaskCard key={task.id} task={{...task, type: task.type || 'task'}} role={role} db={db} appId={appId} glassCard={glassCard} glassInput={glassInput} callGemini={callGemini} currentUser={user} showMessage={showMessage} loggedInName={loggedInName} isDarkMode={isDarkMode} confirmAction={confirmAction} handleOpenProfileByName={handleOpenProfileByName} setFullScreenImage={setFullScreenImage} />)}
         </div>
     );

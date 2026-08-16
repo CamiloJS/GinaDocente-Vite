@@ -355,6 +355,7 @@ const handleOpenProfileByName = (name) => {
           const myChatId = role === 'teacher' ? 'teacher' : (loggedInUser ? loggedInUser.replace('@', '') : '');
 
           const [tasks, setTasks] = useState([]);
+          const [tasksLoading, setTasksLoading] = useState(true);
           const [syllabus, setSyllabus] = useState([]);
           const [evaluations, setEvaluations] = useState([]);
           const [grades, setGrades] = useState([]);
@@ -737,7 +738,7 @@ useEffect(() => {
 useEffect(() => {
     if (!user || !myChatId || activeTab !== 'tasks') return;
     const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'tasks'), orderBy('createdAt', 'desc'), limit(20));
-    const uTasks = onSnapshot(q, s => setTasks(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const uTasks = onSnapshot(q, s => { setTasks(s.docs.map(d => ({ id: d.id, ...d.data() }))); setTasksLoading(false); });
     return () => uTasks();
 }, [user, myChatId, activeTab]);
 
@@ -2676,7 +2677,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                             callGemini={callGemini} showMessage={showMessage} handleAiTranslate={handleAiTranslate} taskDate={taskDate}
                             setTaskDate={setTaskDate} taskTime={taskTime} setTaskTime={setTaskTime} allowLate={allowLate} setAllowLate={setAllowLate}
                             db={db} appId={appId} loggedInName={loggedInName} getToday={getToday} tasks={tasks} user={user} isDarkMode={isDarkMode}
-                            confirmAction={confirmAction} setFullScreenImage={setFullScreenImage}
+                            confirmAction={confirmAction} setFullScreenImage={setFullScreenImage} tasksLoading={tasksLoading}
                         />
                           </React.Suspense>
                     )}
