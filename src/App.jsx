@@ -24,8 +24,8 @@ import {
   Send, SingleTick, SmileIcon, Sparkles, Sun, TeacherIcon, Trash2, UserIcon,
   UsersGroupIcon, UsersIcon, Wand2, X, XLine,
 } from './components/Icons.jsx'
-import GifPickerModal from './components/GifPickerModal.jsx'
-import TasksTab from './components/TasksTab.jsx'
+const GifPickerModal = React.lazy(() => import('./components/GifPickerModal.jsx'))
+const TasksTab = React.lazy(() => import('./components/TasksTab.jsx'))
 
 function App() {
           const [hasEntered, setHasEntered] = useState(false); 
@@ -2565,33 +2565,148 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
 </div>
 </nav>
 
-              <main className="max-w-5xl mx-auto p-4 md:p-8 pb-28 md:pb-8 relative z-10">
-  {activeTab === 'tasks' && (
-      <TasksTab 
-          academicGroups={academicGroups} 
-          myChatId={myChatId}
-          handleOpenProfileByName={handleOpenProfileByName}
-          role={role} glassCard={glassCard} glassInput={glassInput} redButton={redButton}
-          postType={postType} setPostType={setPostType} taskTitle={taskTitle} // ... el resto sigue igualito hacia abajo
-        taskDesc={taskDesc} setTaskDesc={setTaskDesc} showImageInput={showImageInput} setShowImageInput={setShowImageInput}
-        postImageUrl={postImageUrl} setPostImageUrl={setPostImageUrl} postFileUrl={postFileUrl} setPostFileUrl={setPostFileUrl}
-        postFileName={postFileName} setPostFileName={setPostFileName} showPostAttachmentMenu={showPostAttachmentMenu}
-        setShowPostAttachmentMenu={setShowPostAttachmentMenu} handlePostLocalFileUpload={handlePostLocalFileUpload}
-        isAiLoading={isAiLoading} setIsAiLoading={setIsAiLoading} prevTaskTitle={prevTaskTitle} setPrevTaskTitle={setPrevTaskTitle}
-        prevTaskDesc={prevTaskDesc} setPrevTaskDesc={setPrevTaskDesc} hasAiModified={hasAiModified} setHasAiModified={setHasAiModified}
-        callGemini={callGemini} showMessage={showMessage} handleAiTranslate={handleAiTranslate} taskDate={taskDate}
-        setTaskDate={setTaskDate} taskTime={taskTime} setTaskTime={setTaskTime} allowLate={allowLate} setAllowLate={setAllowLate}
-        db={db} appId={appId} loggedInName={loggedInName} getToday={getToday} tasks={tasks} user={user} isDarkMode={isDarkMode}
-        confirmAction={confirmAction} setFullScreenImage={setFullScreenImage}
-    />
-)}
-                {activeTab === 'reviews' && renderReviews()}
-                {activeTab === 'syllabus' && renderSyllabus()}
-                {activeTab === 'evaluations' && renderEvaluations()}
-                {activeTab === 'directory' && role === 'teacher' && renderDirectory()}
-                {activeTab === 'inbox' && role === 'teacher' && renderInbox()}
-                {activeTab === 'profile' && renderProfile()}
-              </main>
+              <div className="max-w-[1600px] mx-auto w-full flex justify-center items-start px-0 md:px-4 gap-6 relative z-10">
+                  {/* LEFT SIDEBAR (Facebook style) */}
+                  <aside className={`w-[300px] hidden lg:block sticky top-[90px] h-[calc(100vh-100px)] overflow-y-auto overflow-x-hidden pr-2 z-10 space-y-4 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      {/* Teacher/User Profile Card */}
+                      <div className={`p-4 rounded-2xl border shadow-sm flex flex-col items-center text-center ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+                          <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 mb-3 shrink-0 overflow-hidden border-4 border-white shadow-sm dark:border-gray-700">
+                              {userMappings[myChatId]?.profilePicUrl ? <img src={userMappings[myChatId].profilePicUrl} className="w-full h-full object-cover" /> : <UserIcon size={40} />}
+                          </div>
+                          <p className={`font-bold text-lg w-full leading-tight ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>{loggedInName}</p>
+                          <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-3">{userMappings[myChatId]?.customLabel || (role === 'teacher' ? 'Docente' : 'Estudiante')}</p>
+                          
+                          <div className="w-full space-y-1">
+                              <button onClick={() => { setViewingProfileId(null); changeTab('profile'); }} className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-xl transition-colors ${activeTab === 'profile' && !viewingProfileId ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : isDarkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`}>
+                                  <UserIcon size={20} /> Mi Perfil
+                              </button>
+                              {role === 'teacher' ? (
+                                  <button onClick={() => { changeTab('inbox'); }} className={`w-full flex items-center justify-between px-3 py-2 text-sm font-bold rounded-xl transition-colors ${activeTab === 'inbox' ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : isDarkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`}>
+                                      <div className="flex items-center gap-3"><Mail size={20} /> Buzón</div>
+                                      {alerts.length > 0 && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>}
+                                  </button>
+                              ) : (
+                                  <button onClick={() => { setShowSugModal(true); }} className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-xl transition-colors ${isDarkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`}>
+                                      <Mail size={20} /> Sugerencias
+                                  </button>
+                              )}
+                          </div>
+                      </div>
+
+                      {/* Navigation Links like Facebook */}
+                      <div className="space-y-1">
+                          <h3 className={`px-3 py-2 text-xs font-bold uppercase tracking-wider ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Explorar</h3>
+                          <button onClick={() => changeTab('tasks')} className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-xl transition-colors ${activeTab === 'tasks' ? 'bg-gray-200 dark:bg-gray-700' : 'hover:bg-gray-200 dark:hover:bg-gray-800'}`}>
+                              <NavNotebook size={24} className="text-blue-500" /> Asignaciones
+                          </button>
+                          <button onClick={() => changeTab('reviews')} className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-xl transition-colors ${activeTab === 'reviews' ? 'bg-gray-200 dark:bg-gray-700' : 'hover:bg-gray-200 dark:hover:bg-gray-800'}`}>
+                              <NavSlides size={24} className="text-purple-500" /> Repasos IA
+                          </button>
+                          <button onClick={() => changeTab('syllabus')} className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-xl transition-colors ${activeTab === 'syllabus' ? 'bg-gray-200 dark:bg-gray-700' : 'hover:bg-gray-200 dark:hover:bg-gray-800'}`}>
+                              <NavFile size={24} className="text-green-500" /> Programación
+                          </button>
+                          <button onClick={() => changeTab('evaluations')} className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-xl transition-colors ${activeTab === 'evaluations' ? 'bg-gray-200 dark:bg-gray-700' : 'hover:bg-gray-200 dark:hover:bg-gray-800'}`}>
+                              <CheckCheck size={24} className="text-red-500" /> Evaluaciones
+                          </button>
+                          {role === 'teacher' && (
+                              <button onClick={() => changeTab('directory')} className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-xl transition-colors ${activeTab === 'directory' ? 'bg-gray-200 dark:bg-gray-700' : 'hover:bg-gray-200 dark:hover:bg-gray-800'}`}>
+                                  <UsersIcon size={24} className="text-indigo-500" /> Directorio
+                              </button>
+                          )}
+                      </div>
+
+                      {role === 'teacher' && (
+                          <div className={`mt-4 p-4 rounded-xl border shadow-sm ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-purple-50 border-purple-100'}`}>
+                              <h3 className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-purple-400' : 'text-purple-600'}`}>Funciones IA</h3>
+                              <button onClick={() => setShowIAKnowledgeModal(true)} className="w-full flex items-center gap-2 px-3 py-2 text-sm font-bold rounded-xl transition-colors bg-purple-600 text-white hover:bg-purple-700 shadow-md">
+                                  <Sparkles size={18} /> Entrenar Bot
+                              </button>
+                          </div>
+                      )}
+                  </aside>
+
+                  {/* CENTER CONTENT */}
+                  <main className="flex-1 max-w-[680px] w-full p-4 md:p-8 pb-28 md:pb-8 relative z-10 shrink-0 mx-auto">
+                      {activeTab === 'tasks' && (
+                          <React.Suspense fallback={<p className="text-gray-500 p-8 text-center">Cargando muro...</p>}>
+                          <TasksTab 
+                              academicGroups={academicGroups} 
+                              myChatId={myChatId}
+                              handleOpenProfileByName={handleOpenProfileByName}
+                              role={role} glassCard={glassCard} glassInput={glassInput} redButton={redButton}
+                              postType={postType} setPostType={setPostType} taskTitle={taskTitle} setTaskTitle={setTaskTitle} // ... el resto sigue igualito hacia abajo
+                            taskDesc={taskDesc} setTaskDesc={setTaskDesc} showImageInput={showImageInput} setShowImageInput={setShowImageInput}
+                            postImageUrl={postImageUrl} setPostImageUrl={setPostImageUrl} postFileUrl={postFileUrl} setPostFileUrl={setPostFileUrl}
+                            postFileName={postFileName} setPostFileName={setPostFileName} showPostAttachmentMenu={showPostAttachmentMenu}
+                            setShowPostAttachmentMenu={setShowPostAttachmentMenu} handlePostLocalFileUpload={handlePostLocalFileUpload}
+                            isAiLoading={isAiLoading} setIsAiLoading={setIsAiLoading} prevTaskTitle={prevTaskTitle} setPrevTaskTitle={setPrevTaskTitle}
+                            prevTaskDesc={prevTaskDesc} setPrevTaskDesc={setPrevTaskDesc} hasAiModified={hasAiModified} setHasAiModified={setHasAiModified}
+                            callGemini={callGemini} showMessage={showMessage} handleAiTranslate={handleAiTranslate} taskDate={taskDate}
+                            setTaskDate={setTaskDate} taskTime={taskTime} setTaskTime={setTaskTime} allowLate={allowLate} setAllowLate={setAllowLate}
+                            db={db} appId={appId} loggedInName={loggedInName} getToday={getToday} tasks={tasks} user={user} isDarkMode={isDarkMode}
+                            confirmAction={confirmAction} setFullScreenImage={setFullScreenImage}
+                        />
+                          </React.Suspense>
+                    )}
+                    {activeTab === 'reviews' && renderReviews()}
+                    {activeTab === 'syllabus' && renderSyllabus()}
+                    {activeTab === 'evaluations' && renderEvaluations()}
+                    {activeTab === 'directory' && role === 'teacher' && renderDirectory()}
+                    {activeTab === 'inbox' && role === 'teacher' && renderInbox()}
+                    {activeTab === 'profile' && renderProfile()}
+                  </main>
+
+                  {/* RIGHT SIDEBAR (Chats) */}
+                  <aside className={`w-[320px] hidden xl:block sticky top-[90px] h-[calc(100vh-100px)] overflow-y-auto overflow-x-hidden pl-4 border-l z-10 space-y-6 ${isDarkMode ? 'border-gray-800 text-gray-300' : 'border-gray-200 text-gray-700'}`}>
+                      <div>
+                          <div className="flex justify-between items-center mb-3">
+                              <h3 className={`text-sm font-bold uppercase tracking-wider ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Grupos</h3>
+                              <button onClick={() => { setIsCreatingGroup(true); setIsChatAppOpen(true); }} className="text-blue-500 font-bold text-xs bg-blue-500/10 px-2 py-1 rounded hover:bg-blue-500/20 transition-colors">+ Crear</button>
+                          </div>
+                          <div className="space-y-1">
+                              {myGroups && myGroups.length === 0 && <p className="text-sm italic text-gray-500">No hay grupos.</p>}
+                              {myGroups && myGroups.map(g => {
+                                  const chatId = `group_${g.id}`;
+                                  const isUnread = unreadChats[chatId];
+                                  return (
+                                      <button key={g.id} onClick={() => { handleOpenChat({ id: chatId, name: g.name, type: 'group' }); setIsChatAppOpen(true); }} className={`w-full flex items-center gap-3 p-2 rounded-xl transition-colors ${isDarkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-200'}`}>
+                                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white shrink-0"><UsersGroupIcon size={18}/></div>
+                                          <div className="text-left flex-1 overflow-hidden">
+                                              <p className={`font-bold text-sm truncate ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>{g.name}</p>
+                                          </div>
+                                          {isUnread && <span className="w-2 h-2 bg-red-500 rounded-full absolute right-2"></span>}
+                                      </button>
+                                  );
+                              })}
+                          </div>
+                      </div>
+
+                      <div>
+                          <h3 className={`text-sm font-bold uppercase tracking-wider mb-3 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Contactos</h3>
+                          <div className="space-y-1">
+                              {allChatUsers && allChatUsers.map(u => {
+                                  const chatId = `dm_${[myChatId, u.id].sort().join('_')}`;
+                                  const isUnread = unreadChats[chatId];
+                                  const isOnline = userPresence[u.id]?.status === 'online';
+                                  return (
+                                      <button key={u.id} onClick={() => { handleOpenChat({ id: chatId, name: u.name, type: 'dm', role: u.role }); setIsChatAppOpen(true); }} className={`w-full flex items-center gap-3 p-2 rounded-xl transition-colors relative ${isDarkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-200'}`}>
+                                          <div className="relative shrink-0">
+                                              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white shadow-sm transition-all duration-300 ${u.role === 'teacher' ? 'bg-gradient-to-br from-[#AD3333] to-[#8a2828]' : 'bg-gradient-to-br from-blue-400 to-indigo-500'}`}>
+                                                  {u.role === 'teacher' ? <TeacherIcon size={18}/> : <UserIcon size={18}/>}
+                                              </div>
+                                              <div className={`absolute bottom-0 right-0 w-3 h-3 border-2 rounded-full ${isDarkMode ? 'border-gray-900' : 'border-gray-100'} ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                                          </div>
+                                          <div className="text-left flex-1 overflow-hidden">
+                                              <p className={`font-bold text-sm truncate leading-tight ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>{u.name}</p>
+                                          </div>
+                                          {isUnread && <span className="w-2 h-2 bg-blue-500 rounded-full"></span>}
+                                      </button>
+                                  );
+                              })}
+                          </div>
+                      </div>
+                  </aside>
+              </div>
 
               <nav className={`fixed bottom-0 left-0 w-full backdrop-blur-xl border-t flex justify-around items-center pt-3 pb-safe md:hidden z-[100] transition-colors duration-500 ${isDarkMode ? 'bg-gray-900/80 border-gray-800 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]' : 'bg-white/90 border-gray-200 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]'}`}>
                 <button onClick={() => changeTab('tasks')} className={`flex flex-col items-center justify-center p-2 rounded-2xl transition-all w-14 h-14 mb-2 ${getMobileTabClass('tasks')}`}>
@@ -3398,7 +3513,7 @@ tickIcon = (
               , document.body)}
 
               {/* MODAL GLOBAL DE CONFIRMACIÓN */}
-              {globalGifCallback && ReactDOM.createPortal(<GifPickerModal onSelect={(url) => { globalGifCallback(url); setGlobalGifCallback(null); }} onClose={() => setGlobalGifCallback(null)} isDarkMode={isDarkMode} />, document.body)}
+              {globalGifCallback && ReactDOM.createPortal(<React.Suspense fallback={null}><GifPickerModal onSelect={(url) => { globalGifCallback(url); setGlobalGifCallback(null); }} onClose={() => setGlobalGifCallback(null)} isDarkMode={isDarkMode} /></React.Suspense>, document.body)}
                 {confirmDialog.isOpen && ReactDOM.createPortal(
                   <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                       <div className={`max-w-sm w-full flex flex-col gap-4 p-6 rounded-3xl animate-in fade-in zoom-in duration-200 shadow-2xl ${isDarkMode ? 'bg-gray-900 border border-gray-700' : 'bg-white border border-gray-200'}`}>
