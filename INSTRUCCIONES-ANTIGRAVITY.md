@@ -137,4 +137,20 @@ Para redondear la experiencia PWA e interactiva, vamos a dar contexto visual cla
 
 **Entrega:** Confirma en `REPORTE-OPENCODE.md` si implementaste los títulos dinámicos y si lograste capturar los eventos de red.
 
+---
+
+# INSTRUCCION #10
+
+**Objetivo:** Estabilidad de Producción: Implementar un Error Boundary global de React.
+
+Para evitar que la aplicación muestre la "pantalla blanca de la muerte" (Blank Screen of Death) si un componente hijo lanza un error no controlado durante el renderizado (por ejemplo, si falla la carga de un componente Lazy, o hay un error al intentar parsear datos de Firestore).
+
+**Acciones a implementar por Opencode:**
+1. **Crear Componente ErrorBoundary:** Crea un archivo `ErrorBoundary.jsx` con un componente de clase que implemente `static getDerivedStateFromError` y `componentDidCatch` (o usa la librería ligera `react-error-boundary`).
+2. **Interfaz de Rescate:** Si ocurre un error, el ErrorBoundary debe atraparlo y renderizar una UI amigable (ej. "¡Ups! Algo salió mal. Por favor recarga la página.") con un botón centrado para recargar la aplicación (`window.location.reload()`).
+3. **Envolver la App:** En `src/main.jsx` (o donde renderices tu raíz), envuelve el árbol principal o al componente `<App />` dentro de tu nuevo `<ErrorBoundary>`.
+4. **Deploy:** Ejecuta `npm run build`, realiza `commit`/`push` y haz `vercel deploy --prod`.
+
+**Entrega:** Documenta en `REPORTE-OPENCODE.md` si optaste por clase o librería, y si el build fue exitoso.
+
 ESTADO: LISTA PARA IMPLEMENTAR
