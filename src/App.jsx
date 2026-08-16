@@ -121,6 +121,36 @@ useEffect(() => {
                 }
             }, [isDarkMode]);
 
+          // --- TÍTULOS DINÁMICOS DE PESTAÑA ---
+          useEffect(() => {
+              const tabNames = {
+                  tasks: 'Asignaciones',
+                  reviews: 'Repasos',
+                  syllabus: 'Contenidos',
+                  evaluations: 'Evaluaciones',
+                  directory: 'Directorio',
+                  inbox: 'Buzón',
+                  profile: 'Perfil',
+              };
+              if (isChatAppOpen) {
+                  document.title = 'Mensajes | English TECH';
+              } else {
+                  document.title = `${tabNames[activeTab] || 'Inicio'} | English TECH`;
+              }
+          }, [activeTab, isChatAppOpen]);
+
+          // --- INDICADOR OFF / ONLINE ---
+          useEffect(() => {
+              const handleOffline = () => showMessage("Estás sin conexión. Algunas funciones pueden estar limitadas.");
+              const handleOnline = () => showMessage("Conexión restaurada.");
+              window.addEventListener('offline', handleOffline);
+              window.addEventListener('online', handleOnline);
+              return () => {
+                  window.removeEventListener('offline', handleOffline);
+                  window.removeEventListener('online', handleOnline);
+              };
+          }, []);
+
           // --- DETECTOR DE NAVEGACIÓN (HISTORIAL) ---
           useEffect(() => {
               const handleHashChange = () => {

@@ -122,4 +122,19 @@ Como mencionaste en tu reporte anterior, para que los navegadores muestren el pr
 
 **Entrega:** Documenta en `REPORTE-OPENCODE.md` si el build generó exitosamente el Service Worker y si al abrir la web en producción (Chrome) el navegador habilita la opción de "Instalar English TECH".
 
+---
+
+# INSTRUCCION #9
+
+**Objetivo:** Pulido de UX: Títulos Dinámicos de Pestaña e Indicador de Conexión (Offline).
+
+Para redondear la experiencia PWA e interactiva, vamos a dar contexto visual claro al usuario.
+
+**Acciones a implementar por Opencode:**
+1. **Títulos Dinámicos:** En `App.jsx`, añade un `useEffect` que dependa de la variable de estado `activeTab` (o la que controle la vista principal). Cuando esta cambie, actualiza `document.title` para que refleje la sección actual (Ej: "Asignaciones | English TECH", "Mensajes | English TECH").
+2. **Indicador Offline/Online:** Ya que tenemos una PWA que puede cargar sin internet, añade un `useEffect` global en `App.jsx` que escuche los eventos `offline` y `online` del objeto `window`. Si el usuario pierde conexión, muéstrale un mensaje (usando tu sistema de Toasts `showMessage`) indicando: "Estás sin conexión. Algunas funciones pueden estar limitadas." Y cuando regrese: "Conexión restaurada."
+3. **Deploy:** Ejecuta `npm run build`, realiza el `commit`/`push` a `main` y haz `vercel deploy --prod`.
+
+**Entrega:** Confirma en `REPORTE-OPENCODE.md` si implementaste los títulos dinámicos y si lograste capturar los eventos de red.
+
 ESTADO: LISTA PARA IMPLEMENTAR
