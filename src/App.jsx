@@ -80,6 +80,7 @@ const [teacherBotInput, setTeacherBotInput] = useState("");
 const [teacherBotInfoList, setTeacherBotInfoList] = useState([]);
 const [isTeacherBotLoading, setIsTeacherBotLoading] = useState(false);
 const [showIAKnowledgeModal, setShowIAKnowledgeModal] = useState(false);
+const [showSettingsModal, setShowSettingsModal] = useState(false);
 const [newIAKnowledge, setNewIAKnowledge] = useState("");
 const [editingIAId, setEditingIAId] = useState(null);
 const [editIAText, setEditIAText] = useState("");
@@ -2682,10 +2683,41 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                                   <UsersIcon size={24} className="text-indigo-500" /> Directorio
                               </button>
                           )}
+                          <button onClick={() => setShowSettingsModal(true)} className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-xl transition-colors ${isDarkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-200 text-gray-700'}`}>
+                              <Settings size={24} className="text-purple-500" /> Ajustes
+                          </button>
+                      </div>
+
+                      {/* Apartado de Ajustes en el Panel Izquierdo */}
+                      <div className={`mt-3 p-3.5 rounded-2xl border transition-all ${isDarkMode ? 'bg-gray-800/90 border-gray-700' : 'bg-gray-50 border-gray-200 shadow-sm'}`}>
+                          <h3 className={`text-xs font-bold uppercase tracking-wider mb-2.5 flex items-center gap-1.5 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                              <Settings size={14} /> Ajustes
+                          </h3>
+                          <div className="flex items-center justify-between py-1">
+                              <div className="flex items-center gap-2">
+                                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${isDarkMode ? 'bg-purple-950 text-purple-300' : 'bg-amber-100 text-amber-600'}`}>
+                                      {isDarkMode ? <Moon size={14} /> : <Sun size={14} />}
+                                  </div>
+                                  <span className={`text-xs font-semibold ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>Modo oscuro</span>
+                              </div>
+                              <button 
+                                  onClick={() => setIsDarkMode(!isDarkMode)} 
+                                  className={`w-10 h-5 flex items-center rounded-full p-0.5 transition-colors duration-300 ${isDarkMode ? 'bg-blue-600 justify-end' : 'bg-gray-300 justify-start'}`}
+                                  title="Alternar tema"
+                              >
+                                  <div className="bg-white w-4 h-4 rounded-full shadow-md transform transition-transform" />
+                              </button>
+                          </div>
+                          <button 
+                              onClick={() => setShowSettingsModal(true)} 
+                              className={`w-full mt-2.5 py-1.5 px-3 text-[11px] font-bold rounded-xl border text-center transition-colors ${isDarkMode ? 'bg-gray-700 border-gray-600 text-gray-200 hover:bg-gray-600' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-100 shadow-sm'}`}
+                          >
+                              Ver todos los ajustes ⚙️
+                          </button>
                       </div>
 
                       {role === 'teacher' && (
-                          <div className={`mt-4 p-4 rounded-xl border shadow-sm ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-purple-50 border-purple-100'}`}>
+                          <div className={`mt-3 p-4 rounded-xl border shadow-sm ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-purple-50 border-purple-100'}`}>
                               <h3 className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-purple-400' : 'text-purple-600'}`}>Funciones IA</h3>
                               <button onClick={() => setShowIAKnowledgeModal(true)} className="w-full flex items-center gap-2 px-3 py-2 text-sm font-bold rounded-xl transition-colors bg-purple-600 text-white hover:bg-purple-700 shadow-md">
                                   <Sparkles size={18} /> Entrenar bot
@@ -3842,6 +3874,135 @@ tickIcon = (
                                       setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'teacherBot'), { infoList: newList });
                                       setNewIAKnowledge("");
                                   }} className={`${redButton} h-auto px-4 !bg-purple-600 hover:!bg-purple-700`}><Plus size={18}/></button>
+                              </div>
+                          </div>
+                      </div>
+                  , document.body)}
+
+                  {/* MODAL DE AJUSTES GENERALES DE LA CUENTA (TIPO FACEBOOK) */}
+                  {showSettingsModal && ReactDOM.createPortal(
+                      <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-200">
+                          <div className={`max-w-md w-full rounded-3xl p-6 relative border shadow-2xl space-y-4 animate-in zoom-in-95 duration-200 ${isDarkMode ? 'bg-gray-900 border-gray-700 text-gray-100' : 'bg-white border-gray-200 text-gray-800'}`}>
+                              <button onClick={() => setShowSettingsModal(false)} className="absolute top-5 right-5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors p-1"><X size={20}/></button>
+                              
+                              <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-2xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+                                      <Settings size={22} />
+                                  </div>
+                                  <div>
+                                      <h3 className="text-lg font-bold">Ajustes y preferencias</h3>
+                                      <p className="text-xs text-gray-500">Configuración general de tu cuenta y experiencia</p>
+                                  </div>
+                              </div>
+
+                              <div className="space-y-3 pt-2">
+                                  {/* Modo Oscuro */}
+                                  <div className={`p-3.5 rounded-2xl border transition-all ${isDarkMode ? 'bg-gray-800/80 border-gray-700' : 'bg-gray-50 border-gray-200 shadow-sm'}`}>
+                                      <div className="flex items-center justify-between">
+                                          <div className="flex items-center gap-3">
+                                              <div className={`w-8 h-8 rounded-xl flex items-center justify-center shadow-sm ${isDarkMode ? 'bg-purple-950/70 text-purple-300' : 'bg-amber-50 text-amber-500'}`}>
+                                                  {isDarkMode ? <Moon size={16} /> : <Sun size={16} />}
+                                              </div>
+                                              <div>
+                                                  <p className="text-xs font-bold">Modo oscuro</p>
+                                                  <p className="text-[11px] text-gray-500">{isDarkMode ? 'Tema nocturno activo' : 'Tema diurno activo'}</p>
+                                              </div>
+                                          </div>
+                                          <button 
+                                              onClick={() => setIsDarkMode(!isDarkMode)} 
+                                              className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors duration-300 ${isDarkMode ? 'bg-blue-600 justify-end' : 'bg-gray-300 justify-start'}`}
+                                          >
+                                              <div className="bg-white w-4 h-4 rounded-full shadow-md transform transition-transform" />
+                                          </button>
+                                      </div>
+                                  </div>
+
+                                  {/* Sonidos */}
+                                  <div className={`p-3.5 rounded-2xl border transition-all ${isDarkMode ? 'bg-gray-800/80 border-gray-700' : 'bg-gray-50 border-gray-200 shadow-sm'}`}>
+                                      <div className="flex items-center justify-between">
+                                          <div className="flex items-center gap-3">
+                                              <div className={`w-8 h-8 rounded-xl flex items-center justify-center shadow-sm ${soundEnabled ? 'bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-300' : 'bg-gray-100 text-gray-400'}`}>
+                                                  {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+                                              </div>
+                                              <div>
+                                                  <p className="text-xs font-bold">Sonidos de notificaciones</p>
+                                                  <p className="text-[11px] text-gray-500">{soundEnabled ? 'Alertas activas' : 'En silencio'}</p>
+                                              </div>
+                                          </div>
+                                          <button 
+                                              onClick={() => setSoundEnabled(!soundEnabled)} 
+                                              className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors duration-300 ${soundEnabled ? 'bg-blue-600 justify-end' : 'bg-gray-300 justify-start'}`}
+                                          >
+                                              <div className="bg-white w-4 h-4 rounded-full shadow-md transform transition-transform" />
+                                          </button>
+                                      </div>
+                                  </div>
+
+                                  {/* Estado de conexión */}
+                                  <div className={`p-3.5 rounded-2xl border space-y-2 transition-all ${isDarkMode ? 'bg-gray-800/80 border-gray-700' : 'bg-gray-50 border-gray-200 shadow-sm'}`}>
+                                      <div className="flex items-center gap-2">
+                                          <Shield size={15} className="text-green-500" />
+                                          <p className="text-xs font-bold">Estado de conexión</p>
+                                      </div>
+                                      <div className="grid grid-cols-3 gap-1.5 text-[11px] font-bold">
+                                          <button 
+                                              onClick={() => {
+                                                  const finalPresenceId = role === 'teacher' ? 'teacher' : myChatId;
+                                                  if (finalPresenceId) {
+                                                      setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'presence', finalPresenceId), { isOnline: true, status: 'online', lastPing: Date.now() }, { merge: true }).catch(()=>{});
+                                                  }
+                                              }} 
+                                              className={`py-1.5 px-2 rounded-xl flex items-center justify-center gap-1 border transition-all ${userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'online' ? 'bg-green-500/15 border-green-500 text-green-600 dark:text-green-400' : 'border-gray-200 dark:border-gray-700 text-gray-500'}`}
+                                          >
+                                              <span className="w-2 h-2 rounded-full bg-green-500"></span> En línea
+                                          </button>
+                                          <button 
+                                              onClick={() => {
+                                                  const finalPresenceId = role === 'teacher' ? 'teacher' : myChatId;
+                                                  if (finalPresenceId) {
+                                                      setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'presence', finalPresenceId), { isOnline: true, status: 'away', lastPing: Date.now() }, { merge: true }).catch(()=>{});
+                                                  }
+                                              }} 
+                                              className={`py-1.5 px-2 rounded-xl flex items-center justify-center gap-1 border transition-all ${userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'away' ? 'bg-orange-500/15 border-orange-500 text-orange-600 dark:text-orange-400' : 'border-gray-200 dark:border-gray-700 text-gray-500'}`}
+                                          >
+                                              <span className="w-2 h-2 rounded-full bg-orange-400"></span> Ausente
+                                          </button>
+                                          <button 
+                                              onClick={() => {
+                                                  const finalPresenceId = role === 'teacher' ? 'teacher' : myChatId;
+                                                  if (finalPresenceId) {
+                                                      setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'presence', finalPresenceId), { isOnline: true, status: 'busy', lastPing: Date.now() }, { merge: true }).catch(()=>{});
+                                                  }
+                                              }} 
+                                              className={`py-1.5 px-2 rounded-xl flex items-center justify-center gap-1 border transition-all ${userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'busy' ? 'bg-red-500/15 border-red-500 text-red-600 dark:text-red-400' : 'border-gray-200 dark:border-gray-700 text-gray-500'}`}
+                                          >
+                                              <span className="w-2 h-2 rounded-full bg-red-500"></span> Ocupado
+                                          </button>
+                                      </div>
+                                  </div>
+
+                                  {/* Cuenta institucional */}
+                                  <div className={`p-3.5 rounded-2xl border transition-all ${isDarkMode ? 'bg-gray-800/80 border-gray-700' : 'bg-gray-50 border-gray-200 shadow-sm'}`}>
+                                      <div className="flex items-center gap-3">
+                                          <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shrink-0 overflow-hidden border border-blue-200 dark:border-gray-700">
+                                              {userMappings[myChatId]?.profilePicUrl ? <img src={userMappings[myChatId].profilePicUrl} className="w-full h-full object-cover" /> : <UserIcon size={20} />}
+                                          </div>
+                                          <div className="overflow-hidden flex-1">
+                                              <p className="font-bold text-xs truncate leading-tight">{loggedInName}</p>
+                                              <p className="text-[10px] text-gray-500 font-bold uppercase">{userMappings[myChatId]?.customLabel || (role === 'teacher' ? 'Docente' : 'Estudiante')}</p>
+                                              <p className="text-[11px] text-gray-500 truncate mt-0.5">{loggedInUser}</p>
+                                          </div>
+                                      </div>
+                                  </div>
+                              </div>
+
+                              <div className="pt-2 flex gap-3">
+                                  <button onClick={enableNotifications} className={`flex-1 py-2.5 px-3 text-xs font-bold rounded-xl border flex items-center justify-center gap-1.5 ${isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-200 hover:bg-gray-700' : 'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200'}`}>
+                                      <Bell size={14} /> Push
+                                  </button>
+                                  <button onClick={() => { setShowSettingsModal(false); handleLogout(); }} className="flex-1 py-2.5 px-3 text-xs font-bold rounded-xl bg-red-600 hover:bg-red-700 text-white shadow-md flex items-center justify-center gap-1.5 transition-all">
+                                      <LogOutIcon size={14} /> Cerrar sesión
+                                  </button>
                               </div>
                           </div>
                       </div>
