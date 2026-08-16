@@ -145,3 +145,21 @@ export const formatTime = (seconds) => {
   const s = (seconds % 60).toString().padStart(2, '0')
   return `${m}:${s}`
 }
+
+// Fecha relativa en español (ej: "Justo ahora", "Hace 5 min")
+export const timeAgo = (timestamp) => {
+  if (!timestamp) return ''
+  const diffMs = Date.now() - Number(timestamp)
+  const diffSec = Math.floor(diffMs / 1000)
+  if (diffSec < 60) return 'Justo ahora'
+  const diffMin = Math.floor(diffSec / 60)
+  if (diffMin < 60) return `Hace ${diffMin} min`
+  const diffH = Math.floor(diffMin / 60)
+  if (diffH < 24) return `Hace ${diffH} h`
+  const diffD = Math.floor(diffH / 24)
+  if (diffD < 7) return `Hace ${diffD} d`
+  const d = new Date(Number(timestamp))
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  return `${dd}/${mm}/${d.getFullYear()}`
+}

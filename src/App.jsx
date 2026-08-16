@@ -3047,6 +3047,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
     <span className="text-[10px] font-bold text-green-500 block">En este chat</span>
 ) : null}
 <p className={`text-xs truncate ${isUnread ? (isDarkMode ? 'text-blue-400 font-bold' : 'text-blue-600 font-bold') : (isDarkMode ? 'text-gray-400' : 'text-gray-500')} ${isTyping || inThisChat ? 'mt-0.5' : ''}`}>{lastMsg.text}</p>
+{lastMsg.createdAt && <p className="text-[10px] text-gray-400">{timeAgo(lastMsg.createdAt)}</p>}
                                                   </div>
                                                   {isUnread && <div className="w-3 h-3 bg-red-500 rounded-full shadow-sm ml-2 shrink-0"></div>}
                                               </button>

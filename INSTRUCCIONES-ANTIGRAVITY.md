@@ -384,4 +384,25 @@ En clases de inglés, los docentes suelen enviar videos explicativos, canciones 
 
 **Entrega:** Documenta en `REPORTE-OPENCODE.md` cómo integraste la extracción del ID de YouTube y confirma que los videos se ajustan bien en la pantalla del celular (`w-full aspect-video`).
 
+---
+
+# INSTRUCCION #24
+
+**Objetivo:** UX Dinámica: Fechas Relativas (Relative Timestamps).
+
+En redes sociales modernas, las fechas de las publicaciones y comentarios recientes no se muestran estáticas (ej. "16/8/2026"), sino de forma relativa: "Hace 5 minutos", "Justo ahora", "Hace 2 horas". Esto hace que la plataforma se sienta viva.
+
+**Acciones a implementar por Opencode:**
+1. **Crear Utilidad `timeAgo`:** En `src/utils/helpers.js`, crea y exporta una función `timeAgo(timestamp)` que reciba un timestamp numérico y devuelva un texto en español. Lógica sugerida:
+   - Diferencia `< 60 seg`: "Justo ahora"
+   - `< 60 min`: "Hace X min"
+   - `< 24 hrs`: "Hace X h"
+   - `< 7 días`: "Hace X d"
+   - Mayor a eso: retorna la fecha corta tradicional (ej. `16/08/2026`).
+2. **Aplicar en el Muro:** En `TasksTab.jsx` o `TaskCard.jsx`, busca donde se renderizan `task.createdAt` y `c.createdAt` (comentarios) y envuélvelos con la función `timeAgo()`.
+3. **Aplicar en el Chat (Opcional):** En `App.jsx`, puedes aplicar `timeAgo()` para la hora de los últimos mensajes en el panel izquierdo (lista de contactos).
+4. **Deploy:** Verifica tu compilación (`npm run build`), realiza `commit`/`push` a `main` y lanza `vercel deploy --prod`.
+
+**Entrega:** Documenta en `REPORTE-OPENCODE.md` la implementación de la función y si pudiste visualizar el cambio en los posts más recientes del muro.
+
 ESTADO: LISTA PARA IMPLEMENTAR
