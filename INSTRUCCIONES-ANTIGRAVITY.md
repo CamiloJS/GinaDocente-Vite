@@ -507,4 +507,19 @@ En una plataforma de aprendizaje de inglés, poder escuchar cómo se pronuncian 
 
 **Entrega:** Documenta en `REPORTE-OPENCODE.md` si la voz del navegador respeta el idioma `en-US` y si implementaste el botón solo en chat o también en el muro.
 
+ESTADO: COMPLETADA
+
+---
+
+# INSTRUCCION #31
+
+**Objetivo:** Traducción en un clic (Diccionario / Gemini).
+
+Para ayudar a los alumnos cuando no entienden una frase en el chat o en las tareas, vamos a agregar un botón "Traducir". Este botón usará la API de Gemini (que ya tenemos configurada en Vercel) para devolver la traducción al español del mensaje seleccionado.
+
+**Acciones a implementar:**
+1. **Icono:** En `Icons.jsx`, añade un icono `Languages` (o `Translate`).
+2. **Botón Traducir:** Al lado de los botones de Copiar y Escuchar (`Volume2`), añade el nuevo botón.
+3. **Integración con Gemini:** Al pulsar el botón, muestra un Toast de "Traduciendo..." y llama a `callGemini(text, 'traducir esto al español de forma natural')`. Muestra el resultado en una alerta bonita o expandiendo el mensaje.
+
 ESTADO: LISTA PARA IMPLEMENTAR

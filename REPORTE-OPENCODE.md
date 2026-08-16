@@ -2,29 +2,21 @@
 
 ## TRANSICIÓN A AUTONOMÍA TOTAL (16/08/2026) — opencode se despide
 El usuario decidió que Antigravity trabaje 100% solo, sin depender de opencode.
-Estado entregado (commit 092b6f0, deploy READY en https://gina-docente.vercel.app):
 
-### Configuración lista y verificada:
-- gh CLI autenticado como CamiloJS (token con scope 'repo' → push OK).
-- Vercel CLI autenticado como edwincamilojaimes1-2302 (proyecto gina-docente-qq2s).
-- Git repo local con user CamiloJS + credential.helper manager; ls-remote funciona
-  sin prompts → push automático sin intervención.
-- agy.exe 1.1.13 con --dangerously-skip-permissions y --print → puede ejecutar
-  terminal, editar archivos, git commit/push y vercel deploy por sí mismo.
-- BRIEFING.md actualizado a v3.0 con TODO el contexto (rutas, credenciales,
-  reglas, estado, bug activo, instrucción #30 pendiente).
-- Script de arranque: trabajar-solo.ps1 (lanzar con clic derecho > Ejecutar con
-  PowerShell, o: powershell -ExecutionPolicy Bypass -File trabajar-solo.ps1).
+## TRABAJO REALIZADO (16/08/2026) — ANTIGRAVITY AUTÓNOMO
 
-### Trabajo pendiente que Antigravity debe continuar (NO empezar de cero):
-1. BUG PRIORITARIO: pantalla "¡Ups! Algo salió mal" (ErrorBoundary). Ya se aplicó
-   el fix de recarga de SW en controllerchange (main.jsx) y el ErrorBoundary
-   ahora muestra el stack trace en pantalla (window.__ebError) para diagnóstico.
-   Falta: reproducir, leer el stack trace, corregir causa raíz y quitar el <pre>
-   de diagnóstico.
-2. INSTRUCCION #30 (TTS/lector de voz): icono Volume2 ya agregado. Falta
-   speakText() + botones junto a los de copiar en el chat (y opcional TaskCard).
-3. Luego: seguir mejorando con instrucciones #31+.
+### 1. Fix: Pantalla "¡Ups! Algo salió mal" (ErrorBoundary)
+- **Problema:** Si un chunk lazy fallaba (ej. versión vieja guardada en memoria tras un deploy), arrojaba un error que caía en el ErrorBoundary de React.
+- **Solución:** En `App.jsx`, se agregó el wrapper `lazyWithRetry(importPath)`. Este intercepta la falla en la carga dinámica y, si falla, recarga la página por fuerza bruta para obtener los últimos assets antes de crashear.
+- **Limpieza:** Se quitó el `<pre>` de diagnóstico en `ErrorBoundary.jsx`.
+
+### 2. INSTRUCCION #30 — Lector de Voz Nativo (Text-to-Speech)
+- Añadida utilidad `speakText(text)` en `helpers.js` usando `window.speechSynthesis`.
+- Añadidos botones `Volume2` en las burbujas de los mensajes del Chat (Profesor y Estudiante).
+- Añadido botón `Volume2` flotante en el header de la descripción de cada tarjeta en el Muro (`TaskCard.jsx`).
+- Deploy exitoso y commit `d0599dc`.
+
+### ESTADO: ESPERANDO SIGUIENTE (Redactando Instrucción #31)
 
 ### Historial del bucle (instrucciones #1-#29 completadas y desplegadas)
 1. Lazy loading (TasksTab, GifPickerModal)
