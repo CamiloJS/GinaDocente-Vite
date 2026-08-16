@@ -11,7 +11,7 @@ import {
 import {
   CHAT_GRADIENTS, CHAT_PATTERNS, COMMENT_EMOJIS, FALLBACK_MAP, SLIDE_GRADIENTS,
   TEACHER_NAME, compressImage, containsBadWords, checkBadWordsAsync, formatChatDate, formatTime,
-  uploadImageToStorage, uploadRawFileToStorage, speakText
+  uploadImageToStorage, uploadRawFileToStorage, speakText, splitNameFirstAndLast
 } from './utils/helpers.js'
 import {
   glassCard, glassInput, outlineButton, redButton,
@@ -24,8 +24,9 @@ import {
   NavFile, NavNotebook, NavSlides, Palette, PaperclipIcon, Plus, ReplyIcon, SearchIcon,
   Send, SingleTick, SmileIcon, Sparkles, Sun, TeacherIcon, Trash2, UserIcon,
   UsersGroupIcon, UsersIcon, Wand2, X, XLine, Copy, Mic, Square, Bell, Volume2, Languages,
-  Settings, VolumeX, Shield
+  Settings, VolumeX, Shield, Play, Pause
 } from './components/Icons.jsx'
+import AudioPlayer, { AudioRecordingVisualizer } from './components/AudioPlayer.jsx'
 
 // Helper para evitar el error "Failed to fetch dynamically imported module" (Chunks viejos tras deploys).
 // Si falla la carga del chunk, forzamos recarga dura de la página en lugar de lanzar ErrorBoundary.
@@ -2640,7 +2641,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
 
           if (!hasEntered) {
               return (
-                  <div className={`min-h-screen flex items-center justify-center bg-gradient-to-br ${isDarkMode ? 'from-gray-900 via-slate-900 to-black' : 'from-red-50/80 via-gray-100/90 to-blue-50/80'} transition-colors duration-500 relative overflow-hidden ${isDarkMode ? 'dark' : ''}`}>
+                  <div className={`min-h-screen app-root-bg flex items-center justify-center transition-colors duration-300 relative overflow-hidden ${isDarkMode ? 'dark' : ''}`}>
                       <style>{`
                         .dark .text-gray-800 { color: #f3f4f6 !important; }
                         .dark .text-gray-700 { color: #d1d5db !important; }
@@ -2779,7 +2780,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
           }
 
           return (
-            <div className={`min-h-screen bg-gradient-to-br ${isDarkMode ? 'from-gray-900 via-slate-900 to-black' : 'from-red-50/80 via-gray-100/90 to-red-100/80'} font-sans relative overflow-hidden transition-colors duration-500 ${isDarkMode ? 'dark' : ''}`}>
+            <div className={`min-h-screen app-root-bg font-sans relative overflow-hidden transition-colors duration-300 ${isDarkMode ? 'dark' : ''}`}>
                             <style>{`
                 .dark .text-gray-900 { color: #f9fafb !important; }
                 .dark .text-gray-800 { color: #f3f4f6 !important; }
@@ -2833,19 +2834,48 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                 .dark .text-gray-400 { color: #9ca3af !important; }
                 .dark .text-gray-300 { color: #d1d5db !important; }
 `}</style>
+              
+              {/* Audio de notificación */}
+              <audio ref={notificationAudioRef} src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto" />
 
+              {/* Toast / Mensaje Flotante Global */}
+              {message && (
+                <div className="fixed top-5 right-5 z-[99999] bg-gray-900/90 backdrop-blur-md text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-300 border border-white/10">
+                  <Sparkles className="text-yellow-400" size={18} />
+                  <span className="font-bold text-sm tracking-wide">{message}</span>
+                </div>
+              )}
 
-              <nav className="sticky top-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 px-4 md:px-6 py-4 flex justify-between items-start md:items-center shadow-sm">
-                
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 min-w-[44px] bg-gradient-to-br from-[#AD3333] to-[#8a2828] rounded-xl flex items-center justify-center text-white font-extrabold shadow-lg shadow-[#AD3333]/40 border border-white/20">UP</div>
-                  <div>
-                    <h1 className="text-xl font-extrabold text-gray-800 dark:text-gray-100 leading-tight drop-shadow-sm">English TECH</h1>
-                    <p className="text-xs text-[#AD3333] font-bold">Universidad de Pamplona</p>
+              {/* Dialogo de Confirmación Global */}
+              {confirmDialog && (
+                <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                  <div className={`${glassCard} max-w-md w-full flex flex-col gap-4 text-center shadow-2xl border-white/20`}>
+                    <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 flex items-center justify-center mx-auto">
+                      <AlertTriangle size={24} />
+                    </div>
+                    <h3 className="text-lg font-bold">{confirmDialog.message}</h3>
+                    <div className="flex gap-3 justify-center mt-2">
+                      <button onClick={() => setConfirmDialog(null)} className={outlineButton}>Cancelar</button>
+                      <button onClick={() => { confirmDialog.onConfirm(); setConfirmDialog(null); }} className={redButton}>Confirmar</button>
+                    </div>
                   </div>
                 </div>
+              )}
 
-                <div className="flex gap-2 items-center">
+              {/* Navbar Principal Estilo Moderno */}
+              <nav className={`sticky top-0 z-50 backdrop-blur-md border-b transition-colors duration-300 ${isDarkMode ? 'bg-gray-900/80 border-gray-800' : 'bg-white/80 border-gray-200'}`}>
+                <div className="max-w-[1600px] mx-auto px-4 h-16 flex items-center justify-between gap-4">
+                  {/* Left: Brand */}
+                  <div className="flex items-center gap-3 cursor-pointer select-none" onClick={() => changeTab('tasks')}>
+                    <div className="w-10 h-10 bg-gradient-to-br from-[#AD3333] to-[#8a2828] rounded-xl flex items-center justify-center text-white font-black text-lg shadow-md shadow-[#AD3333]/30">
+                      UP
+                    </div>
+                    <div>
+                      <h1 className="font-extrabold text-lg leading-tight text-gray-900 dark:text-white">English TECH</h1>
+                      <p className="text-[10px] font-bold text-[#AD3333] tracking-wide uppercase">Universidad de Pamplona</p>
+                    </div>
+                  </div>
+
                   {/* Navbar limpio sin botones redundantes */}
                 </div>
               </nav>
@@ -2866,8 +2896,23 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                               }`} />
                           </div>
                           
-                          <p className={`font-bold text-sm w-full leading-tight truncate px-1 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>{loggedInName}</p>
-                          <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mt-0.5">{userMappings[myChatId]?.customLabel || (role === 'teacher' ? 'Docente' : 'Estudiante')}</p>
+                          {/* Tipografía del Usuario: Nombre y los dos apellidos debajo con margen estrecho */}
+                          {(() => {
+                              const { first, last } = splitNameFirstAndLast(loggedInName);
+                              return (
+                                  <div className="w-full px-1 flex flex-col items-center">
+                                      <p className={`font-extrabold text-sm leading-tight text-center truncate max-w-full ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                                          {first}
+                                      </p>
+                                      {last && (
+                                          <p className={`font-semibold text-xs leading-tight text-center truncate max-w-full mt-0.5 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                                              {last}
+                                          </p>
+                                      )}
+                                  </div>
+                              );
+                          })()}
+                          <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mt-1">{userMappings[myChatId]?.customLabel || (role === 'teacher' ? 'Docente' : 'Estudiante')}</p>
                       </div>
 
                       {/* Navigation Links like Facebook */}
@@ -3627,7 +3672,7 @@ tickIcon = (
         <button onClick={() => handleCopy(m.text)} className="text-gray-400 hover:text-blue-500 p-1 bg-white/10 dark:bg-black/20 rounded-md backdrop-blur-sm" title="Copiar"><Copy size={14} /></button>
     </div>
 )}
-{m.audioUrl && <audio src={m.audioUrl} controls className="h-10 max-w-[200px] mt-1 outline-none" />}
+{m.audioUrl && <div className="mt-1.5"><AudioPlayer src={m.audioUrl} title="Nota de voz" isDarkMode={isDarkMode} compact={true} /></div>}
 {m.imageUrl && <img src={m.imageUrl} loading="lazy" decoding="async" alt="Adjunto" onLoad={() => chatMessagesEndRef.current?.scrollIntoView({ behavior: "smooth" })} onClick={() => setFullScreenImage(m.imageUrl)} className={isImageOnly ? "rounded-2xl max-h-72 object-contain cursor-pointer hover:opacity-90 transition-opacity drop-shadow-lg" : "mt-2 rounded-xl max-h-60 object-contain cursor-pointer hover:opacity-90 transition-opacity bg-black/10 border border-white/20"} />}
 {m.fileUrl && (
     <a href={m.fileUrl} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-2 p-3 rounded-xl mt-1 w-fit transition-colors border ${isMe ? (currentPrefs.gradient ? 'bg-white/20 border-white/30 hover:bg-white/30' : 'bg-blue-700 border-blue-500 hover:bg-blue-800') : (currentPrefs.gradient ? 'bg-black/20 border-white/20 hover:bg-black/30' : (isDarkMode ? 'bg-gray-700 border-gray-600 hover:bg-gray-600' : 'bg-gray-100 border-gray-300 hover:bg-gray-200'))}`}>
@@ -3799,8 +3844,7 @@ tickIcon = (
 
                                               {chatAppAudioUrl && (
                 <div className="relative w-fit mt-3">
-                    <audio src={chatAppAudioUrl} controls className="h-10 max-w-[220px] outline-none" />
-                    <button type="button" onClick={() => setChatAppAudioUrl("")} className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 hover:bg-red-700 transition shadow-md"><X size={14} /></button>
+                    <AudioPlayer src={chatAppAudioUrl} title="Nota de voz" isDarkMode={isDarkMode} onDelete={() => setChatAppAudioUrl("")} compact={true} />
                 </div>
             )}
             {(showChatAppImageInput || chatAppImageUrl) && (

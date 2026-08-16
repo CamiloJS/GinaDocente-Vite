@@ -48,6 +48,18 @@ export const CHAT_PATTERNS = [
 
 export const TEACHER_NAME = 'Gina Marcela Quintana Delgado'
 
+export const splitNameFirstAndLast = (fullName) => {
+  if (!fullName) return { first: '', last: '' }
+  const parts = fullName.trim().split(/\s+/)
+  if (parts.length <= 1) return { first: fullName, last: '' }
+  if (parts.length === 2) return { first: parts[0], last: parts[1] }
+  if (parts.length === 3) return { first: parts[0], last: `${parts[1]} ${parts[2]}` }
+  // 4 o más palabras (ej: Gina Marcela Quintana Delgado -> First: Gina Marcela, Last: Quintana Delgado)
+  const first = parts.slice(0, parts.length - 2).join(' ')
+  const last = parts.slice(-2).join(' ')
+  return { first, last }
+}
+
 export const FALLBACK_MAP = {
   ginadocente: { email: 'ginamarcelaquintana19@gmail.com', name: 'La profe', role: 'teacher' },
 }

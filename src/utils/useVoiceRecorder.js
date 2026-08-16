@@ -63,7 +63,24 @@ export const useVoiceRecorder = (folderName, showMessage) => {
     recorderRef.current = null
   }
 
-  return { isRecording, audioUrl, isUploading, setAudioUrl, startRecording, stopRecording, cancelRecording }
+  const [recordingTime, setRecordingTime] = React.useState(0)
+
+  React.useEffect(() => {
+    let interval = null
+    if (isRecording) {
+      setRecordingTime(0)
+      interval = setInterval(() => {
+        setRecordingTime((t) => t + 1)
+      }, 1000)
+    } else {
+      setRecordingTime(0)
+    }
+    return () => {
+      if (interval) clearInterval(interval)
+    }
+  }, [isRecording])
+
+  return { isRecording, audioUrl, isUploading, recordingTime, setAudioUrl, startRecording, stopRecording, cancelRecording }
 }
 
 export default useVoiceRecorder

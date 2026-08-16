@@ -1,13 +1,14 @@
 // src/components/TasksTab.jsx
 import React, { useState } from 'react'
 import {
-  Book, BookOpen, CheckCheck, ChevronRight, Globe, ImageIcon, Mic, NavNotebook, PaperclipIcon, Plus, SearchIcon, Sparkles, Square, Target, Undo2, X,
+  Book, BookOpen, CheckCheck, ChevronRight, Globe, ImageIcon, Mic, NavNotebook, PaperclipIcon, Plus, SearchIcon, Sparkles, Square, Target, Undo2, X, Play, Pause
 } from './Icons.jsx'
 import TaskCard from './TaskCard.jsx'
 import EmptyState from './EmptyState.jsx'
 import SkeletonCard from './SkeletonCard.jsx'
 import { useVoiceRecorder } from '../utils/useVoiceRecorder.js'
 import { collection, addDoc } from '../firebase/config.js'
+import AudioPlayer, { AudioRecordingVisualizer } from './AudioPlayer.jsx'
 
 const TasksTab = React.memo(({
     role, glassCard, glassInput, redButton, postType, setPostType, taskTitle, setTaskTitle,
@@ -26,7 +27,7 @@ const TasksTab = React.memo(({
     const [postTargetGroup, setPostTargetGroup] = useState("");
     const [isGroupDropdownOpen, setIsGroupDropdownOpen] = useState(false);
     const [wallSearchTerm, setWallSearchTerm] = useState("");
-    const { isRecording: recPub, audioUrl: audioPub, isUploading: upPub, setAudioUrl: setAudioPub, startRecording: startPub, stopRecording: stopPub, cancelRecording: cancelPub } = useVoiceRecorder('tasks_audios', showMessage);
+    const { isRecording: recPub, audioUrl: audioPub, isUploading: upPub, recordingTime: recTimePub, setAudioUrl: setAudioPub, startRecording: startPub, stopRecording: stopPub, cancelRecording: cancelPub } = useVoiceRecorder('tasks_audios', showMessage);
 
     // FILTRO: ¿Qué ve el estudiante?
     const visibleTasks = role === 'teacher' ? tasks : tasks.filter(t => {
@@ -250,14 +251,23 @@ const TasksTab = React.memo(({
                                     )}
 
                                     {audioPub && (
-                                        <div className="flex items-center gap-2 p-2 rounded-xl bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800 w-fit">
-                                            <audio src={audioPub} controls className="h-8 max-w-[240px] outline-none" />
-                                            <button type="button" onClick={cancelPub} className="text-red-500 hover:text-red-700 p-1" title="Quitar audio"><X size={14} /></button>
+                                        <div className="mt-2">
+                                            <AudioPlayer src={audioPub} title="Nota de voz adjunta" onDelete={cancelPub} isDarkMode={isDarkMode} />
                                         </div>
                                     )}
                                 </div>
                             )}
                             {upPub && <p className="text-xs text-purple-600 dark:text-purple-400 italic pt-2">Subiendo audio adjunto...</p>}
+                            {recPub && (
+                                <div className="pt-2">
+                                    <AudioRecordingVisualizer 
+                                        recordingTime={recTimePub} 
+                                        onStop={stopPub} 
+                                        onCancel={cancelPub} 
+                                        isDarkMode={isDarkMode} 
+                                    />
+                                </div>
+                            )}
                         </div>
 
                         {/* Barra de IA y adjuntos */}
@@ -296,9 +306,9 @@ const TasksTab = React.memo(({
                                     <CheckCheck size={15} /> Corregir
                                 </button>
                                 
-                                <div className="flex gap-1">
-                                    <button type="button" onClick={() => handleAiTranslate('Inglés')} disabled={isAiLoading} className="px-2.5 py-1.5 rounded-xl text-xs font-bold border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all shadow-sm" title="Traducir a Inglés">🇺🇸 EN</button>
-                                    <button type="button" onClick={() => handleAiTranslate('Francés')} disabled={isAiLoading} className="px-2.5 py-1.5 rounded-xl text-xs font-bold border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all shadow-sm" title="Traducir a Francés">🇫🇷 FR</button>
+                                <div className="flex flex-wrap gap-1.5">
+                                    <button type="button" onClick={() => handleAiTranslate('Inglés')} disabled={isAiLoading} className="px-3 py-2 rounded-xl text-xs font-bold border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all shadow-sm flex items-center gap-1.5" title="Traducir a inglés">🇺🇸 Traducir a inglés</button>
+                                    <button type="button" onClick={() => handleAiTranslate('Francés')} disabled={isAiLoading} className="px-3 py-2 rounded-xl text-xs font-bold border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all shadow-sm flex items-center gap-1.5" title="Traducir a francés">🇫🇷 Traducir a francés</button>
                                 </div>
 
                                 {/* Dropdown adjuntos */}

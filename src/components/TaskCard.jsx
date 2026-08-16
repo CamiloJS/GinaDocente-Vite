@@ -3,7 +3,7 @@ import React, { useState } from 'react'
 import ReactDOM from 'react-dom'
 import confetti from 'canvas-confetti'
 import {
-  CheckCheck, CheckLine, Clock, Edit3, FileDocIcon, FileText, ImageIcon, Loader2, Lock, MessageSquareText, Mic, PaperclipIcon, Plus, ReplyIcon, Send, SmileIcon, Square, Star, Pin, Trash2, X, XLine, Volume2, Languages, UserIcon, BookOpen, NavNotebook
+  CheckCheck, CheckLine, Clock, Edit3, FileDocIcon, FileText, ImageIcon, Loader2, Lock, MessageSquareText, Mic, PaperclipIcon, Plus, ReplyIcon, Send, SmileIcon, Square, Star, Pin, Trash2, X, XLine, Volume2, Languages, UserIcon, BookOpen, NavNotebook, Play, Pause
 } from './Icons.jsx'
 import {
   compressImage, containsBadWords, checkBadWordsAsync, uploadImageToStorage, uploadRawFileToStorage, TEACHER_NAME, COMMENT_EMOJIS, REACTION_EMOJIS, speakText
@@ -13,6 +13,7 @@ import { useClickOutside } from '../utils/hooks.js'
 import LinkifyText from './LinkifyText.jsx'
 import { useVoiceRecorder } from '../utils/useVoiceRecorder.js'
 import { doc, setDoc, updateDoc, deleteDoc } from '../firebase/config.js'
+import AudioPlayer, { AudioRecordingVisualizer } from './AudioPlayer.jsx'
 
 const TaskCard = React.memo(({ task, role, db, appId, glassInput: propGlassInput, callGemini, currentUser, showMessage, loggedInName, isDarkMode, confirmAction, handleOpenProfileByName }) => {
     const [isEditingTask, setIsEditingTask] = useState(false);
@@ -47,7 +48,7 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput: propGlassInput
     const [gradeValue, setGradeValue] = useState("");
     const [gradeFeedback, setGradeFeedback] = useState("");
 
-    const { isRecording: recCom, audioUrl: audioCom, isUploading: upCom, setAudioUrl: setAudioCom, startRecording: startCom, stopRecording: stopCom, cancelRecording: cancelCom } = useVoiceRecorder('comments_audios', showMessage);
+    const { isRecording: recCom, audioUrl: audioCom, isUploading: upCom, recordingTime: recTimeCom, setAudioUrl: setAudioCom, startRecording: startCom, stopRecording: stopCom, cancelRecording: cancelCom } = useVoiceRecorder('comments_audios', showMessage);
     const emojiPickerRef = React.useRef(null);
     const attachmentMenuRef = React.useRef(null);
     useClickOutside(emojiPickerRef, () => setShowEmojiPicker(false));
@@ -171,9 +172,9 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput: propGlassInput
 
     const handleAddComment = async (e) => {
         e.preventDefault();
-        if(!commentText.trim() && !commentImageUrl && !commentFileUrl) return;
+        if(!commentText.trim() && !commentImageUrl && !commentFileUrl && !audioCom) return;
         setIsProcessing(true);
-        if (await checkBadWordsAsync(commentText)) { showMessage("⚠️ Comentario bloqueado: Lenguaje inapropiado."); setIsProcessing(false); return; }
+        if (commentText.trim() && await checkBadWordsAsync(commentText)) { showMessage("⚠️ Comentario bloqueado: Lenguaje inapropiado."); setIsProcessing(false); return; }
 
         const newComment = { 
             id: Date.now().toString() + Math.random().toString(36).substr(2, 5), 
@@ -374,8 +375,8 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput: propGlassInput
 
             {/* Audio adjunto */}
             {task.audioUrl && (
-                <div className="mt-2.5 p-2 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 w-fit">
-                    <audio src={task.audioUrl} controls className="h-9 max-w-[240px] outline-none" />
+                <div className="mt-2.5">
+                    <AudioPlayer src={task.audioUrl} title="Audio adjunto" isDarkMode={isDarkMode} />
                 </div>
             )}
 
@@ -536,7 +537,7 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput: propGlassInput
                                         <div className="flex flex-col gap-2 mt-1.5">
                                             {c.text && <p className={`text-xs leading-relaxed ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>{<LinkifyText text={c.text} />}</p>}
                                             {c.imageUrl && <img src={c.imageUrl} loading="lazy" decoding="async" alt="Adjunto" onClick={() => setFullScreenImage(c.imageUrl)} className="w-20 h-20 rounded-xl border object-cover shadow-xs cursor-pointer hover:opacity-80 transition-opacity" onError={(e) => e.target.style.display = 'none'} />}
-                                            {c.audioUrl && <audio src={c.audioUrl} controls className="h-8 max-w-[200px] mt-1 outline-none" />}
+                                            {c.audioUrl && <div className="mt-1"><AudioPlayer src={c.audioUrl} title="Nota de voz" isDarkMode={isDarkMode} compact={true} /></div>}
                                             {c.fileUrl && (
                                                 <a href={c.fileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-2 rounded-xl border w-fit text-[11px] font-medium transition-colors bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
                                                     <FileDocIcon size={18} className="text-[#AD3333]" />
@@ -629,6 +630,17 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput: propGlassInput
                                 </div>
                             )}
 
+                            {recCom && (
+                                <div className="mb-1">
+                                    <AudioRecordingVisualizer 
+                                        recordingTime={recTimeCom} 
+                                        onStop={stopCom} 
+                                        onCancel={cancelCom} 
+                                        isDarkMode={isDarkMode} 
+                                    />
+                                </div>
+                            )}
+
                             <div className={`flex gap-1.5 items-center rounded-2xl px-2 py-1.5 border focus-within:ring-2 ${isDarkMode ? 'bg-gray-800 border-gray-700 focus-within:ring-blue-500/50' : 'bg-gray-50 border-gray-200 focus-within:ring-blue-400/50'}`}>
                               <div className="relative" ref={emojiPickerRef}>
                                   <button type="button" onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="p-1.5 text-gray-400 hover:text-blue-500 transition-colors">
@@ -643,7 +655,7 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput: propGlassInput
                                   )}
                               </div>
 
-                              <button type="button" onClick={() => recCom ? stopCom() : startCom()} className={`p-1.5 transition-colors ${recCom ? 'text-red-500 animate-pulse' : 'text-gray-400 hover:text-blue-500'}`} title={recCom ? 'Detener' : 'Nota de voz'}>
+                              <button type="button" onClick={() => recCom ? stopCom() : startCom()} className={`p-1.5 transition-colors ${recCom ? 'text-red-500 animate-pulse' : 'text-gray-400 hover:text-blue-500'}`} title={recCom ? 'Detener grabación' : 'Nota de voz'}>
                                   {recCom ? <Square size={16} /> : <Mic size={18} />}
                               </button>
 
@@ -687,10 +699,13 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput: propGlassInput
                                 <div className="flex items-center gap-2 pt-1">
                                     {upCom && <p className="text-[11px] text-gray-500 italic">Subiendo nota de voz...</p>}
                                     {audioCom && (
-                                        <div className="relative w-fit">
-                                            <audio src={audioCom} controls className="h-8 max-w-[200px] outline-none" />
-                                            <button type="button" onClick={cancelCom} className="absolute -top-1.5 -right-1.5 bg-red-600 text-white rounded-full p-0.5 shadow-xs"><X size={12} /></button>
-                                        </div>
+                                        <AudioPlayer 
+                                            src={audioCom} 
+                                            title="Nota de voz" 
+                                            onDelete={cancelCom} 
+                                            isDarkMode={isDarkMode} 
+                                            compact={true} 
+                                        />
                                     )}
                                 </div>
                             )}
@@ -714,8 +729,8 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput: propGlassInput
 
                             {role === 'teacher' && (
                               <div className="flex gap-1.5 justify-start pt-1">
-                                <button type="button" onClick={() => handleTranslate('Inglés')} disabled={isProcessing} className="px-2.5 py-1 rounded-lg text-[10px] font-bold border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800">🇺🇸 Traducir a Inglés</button>
-                                <button type="button" onClick={() => handleTranslate('Francés')} disabled={isProcessing} className="px-2.5 py-1 rounded-lg text-[10px] font-bold border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800">🇫🇷 Traducir a Francés</button>
+                                <button type="button" onClick={() => handleTranslate('Inglés')} disabled={isProcessing} className="px-2.5 py-1 rounded-lg text-[10px] font-bold border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">🇺🇸 Traducir a inglés</button>
+                                <button type="button" onClick={() => handleTranslate('Francés')} disabled={isProcessing} className="px-2.5 py-1 rounded-lg text-[10px] font-bold border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">🇫🇷 Traducir a francés</button>
                               </div>
                             )}
                           </form>
