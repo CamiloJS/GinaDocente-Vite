@@ -163,3 +163,11 @@ export const timeAgo = (timestamp) => {
   const mm = String(d.getMonth() + 1).padStart(2, '0')
   return `${dd}/${mm}/${d.getFullYear()}`
 }
+
+export const speakText = (text) => {
+  if (!('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'en-US';
+  window.speechSynthesis.speak(utterance);
+}

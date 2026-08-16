@@ -11,7 +11,7 @@ import {
 import {
   CHAT_GRADIENTS, CHAT_PATTERNS, COMMENT_EMOJIS, FALLBACK_MAP, SLIDE_GRADIENTS,
   TEACHER_NAME, compressImage, containsBadWords, checkBadWordsAsync, formatChatDate, formatTime,
-  uploadImageToStorage, uploadRawFileToStorage,
+  uploadImageToStorage, uploadRawFileToStorage, speakText
 } from './utils/helpers.js'
 import {
   glassCard, glassInput, outlineButton, redButton,
@@ -23,13 +23,32 @@ import {
   FileText, ImageIcon, Loader2, LogOutIcon, Mail, MessageCircle, Moon, NavCalendar,
   NavFile, NavNotebook, NavSlides, Palette, PaperclipIcon, Plus, ReplyIcon, SearchIcon,
   Send, SingleTick, SmileIcon, Sparkles, Sun, TeacherIcon, Trash2, UserIcon,
-  UsersGroupIcon, UsersIcon, Wand2, X, XLine, Copy, Mic, Square, Bell,
+  UsersGroupIcon, UsersIcon, Wand2, X, XLine, Copy, Mic, Square, Bell, Volume2
 } from './components/Icons.jsx'
-const GifPickerModal = React.lazy(() => import('./components/GifPickerModal.jsx'))
+
+// Helper para evitar el error "Failed to fetch dynamically imported module" (Chunks viejos tras deploys).
+// Si falla la carga del chunk, forzamos recarga dura de la página en lugar de lanzar ErrorBoundary.
+function lazyWithRetry(componentImport) {
+  return React.lazy(() => {
+    return new Promise((resolve) => {
+      componentImport()
+        .then(resolve)
+        .catch((error) => {
+          console.error("Chunk load error:", error);
+          if (!window.__hasRetriedChunk) {
+            window.__hasRetriedChunk = true;
+            window.location.reload();
+          }
+        });
+    });
+  });
+}
+
+const GifPickerModal = lazyWithRetry(() => import('./components/GifPickerModal.jsx'))
 import EmptyState from './components/EmptyState.jsx'
 import ScrollToTop from './components/ScrollToTop.jsx'
 import LinkifyText from './components/LinkifyText.jsx'
-const TasksTab = React.lazy(() => import('./components/TasksTab.jsx'))
+const TasksTab = lazyWithRetry(() => import('./components/TasksTab.jsx'))
 
 function App() {
           const [hasEntered, setHasEntered] = useState(false); 
@@ -2845,7 +2864,12 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                                   {chatHistory.map((m, i) => (
                                       <div key={i} className={`text-sm p-3 rounded-xl max-w-[85%] shadow-sm whitespace-pre-wrap leading-relaxed ${m.role === 'user' ? 'bg-gray-800 text-white ml-auto rounded-tr-none' : 'bg-blue-100 text-blue-900 rounded-tl-none'}`}>
                                           {formatBotText(m.text)}
-                                      {m.role === 'bot' && <button onClick={() => handleCopy(m.text)} className="ml-auto mt-1 opacity-60 hover:opacity-100 transition-opacity text-gray-400 hover:text-blue-500 p-1" title="Copiar"><Copy size={12} /></button>}
+                                      {m.role === 'bot' && (
+                                          <div className="flex justify-end gap-2 mt-1">
+                                              <button onClick={() => speakText(m.text)} className="opacity-60 hover:opacity-100 transition-opacity text-gray-400 hover:text-blue-500 p-1" title="Escuchar"><Volume2 size={12} /></button>
+                                              <button onClick={() => handleCopy(m.text)} className="opacity-60 hover:opacity-100 transition-opacity text-gray-400 hover:text-blue-500 p-1" title="Copiar"><Copy size={12} /></button>
+                                          </div>
+                                      )}
                                       </div>
                                   ))}
                                   {isChatLoading && (
@@ -3399,7 +3423,12 @@ tickIcon = (
                                                                       <div className="flex flex-col">
                                                                           {/* Texto y/o Imagen y/o Documento */}
 {m.text && <p className={isEmojiOnly ? "text-5xl md:text-6xl drop-shadow-lg leading-none" : "text-sm md:text-base leading-relaxed whitespace-pre-wrap pr-10"}>{<LinkifyText text={m.text} />}</p>}
-{m.text && !isEmojiOnly && <button onClick={() => handleCopy(m.text)} className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-blue-500 p-1" title="Copiar"><Copy size={14} /></button>}
+{m.text && !isEmojiOnly && (
+    <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+        <button onClick={() => speakText(m.text)} className="text-gray-400 hover:text-blue-500 p-1 bg-white/10 dark:bg-black/20 rounded-md backdrop-blur-sm" title="Escuchar"><Volume2 size={14} /></button>
+        <button onClick={() => handleCopy(m.text)} className="text-gray-400 hover:text-blue-500 p-1 bg-white/10 dark:bg-black/20 rounded-md backdrop-blur-sm" title="Copiar"><Copy size={14} /></button>
+    </div>
+)}
 {m.audioUrl && <audio src={m.audioUrl} controls className="h-10 max-w-[200px] mt-1 outline-none" />}
 {m.imageUrl && <img src={m.imageUrl} loading="lazy" decoding="async" alt="Adjunto" onLoad={() => chatMessagesEndRef.current?.scrollIntoView({ behavior: "smooth" })} onClick={() => setFullScreenImage(m.imageUrl)} className={isImageOnly ? "rounded-2xl max-h-72 object-contain cursor-pointer hover:opacity-90 transition-opacity drop-shadow-lg" : "mt-2 rounded-xl max-h-60 object-contain cursor-pointer hover:opacity-90 transition-opacity bg-black/10 border border-white/20"} />}
 {m.fileUrl && (

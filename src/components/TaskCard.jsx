@@ -3,10 +3,10 @@ import React, { useState } from 'react'
 import ReactDOM from 'react-dom'
 import confetti from 'canvas-confetti'
 import {
-  CheckCheck, CheckLine, Clock, Edit3, FileDocIcon, FileText, ImageIcon, Loader2, Lock, MessageSquareText, Mic, PaperclipIcon, Plus, ReplyIcon, Send, SmileIcon, Square, Star, Pin, Trash2, X, XLine,
+  CheckCheck, CheckLine, Clock, Edit3, FileDocIcon, FileText, ImageIcon, Loader2, Lock, MessageSquareText, Mic, PaperclipIcon, Plus, ReplyIcon, Send, SmileIcon, Square, Star, Pin, Trash2, X, XLine, Volume2
 } from './Icons.jsx'
 import {
-  compressImage, containsBadWords, checkBadWordsAsync, uploadImageToStorage, uploadRawFileToStorage, TEACHER_NAME, COMMENT_EMOJIS, REACTION_EMOJIS,
+  compressImage, containsBadWords, checkBadWordsAsync, uploadImageToStorage, uploadRawFileToStorage, TEACHER_NAME, COMMENT_EMOJIS, REACTION_EMOJIS, speakText
 } from '../utils/helpers.js'
 import { glassCard, glassInput } from '../utils/styles.js'
 import { useClickOutside } from '../utils/hooks.js'
@@ -263,7 +263,12 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput, callGemini, cu
             {isEditingTask ? (
                 <textarea value={editTaskData.description} onChange={e => setEditTaskData({...editTaskData, description: e.target.value})} className={`${glassInput} mt-4 min-h-[120px] resize-y p-3`} placeholder="Descripción..."/>
             ) : (
-                <p className={`mt-2.5 whitespace-pre-wrap leading-relaxed ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}>{<LinkifyText text={task.description} />}</p>
+                <div className="relative group/desc mt-2.5">
+                    <p className={`whitespace-pre-wrap leading-relaxed pr-8 ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}>{<LinkifyText text={task.description} />}</p>
+                    <button onClick={() => speakText(task.description)} className={`absolute top-0 right-0 p-1.5 rounded-full opacity-0 group-hover/desc:opacity-100 transition-opacity ${isDarkMode ? 'text-gray-400 hover:text-blue-400 hover:bg-gray-800' : 'text-gray-500 hover:text-blue-600 hover:bg-gray-100'}`} title="Escuchar">
+                        <Volume2 size={16} />
+                    </button>
+                </div>
             )}
             
             {task.audioUrl && <audio src={task.audioUrl} controls className="h-10 max-w-[240px] mt-2 outline-none" />}
