@@ -44,7 +44,7 @@ const TasksTab = React.memo(({
 
     return (
         <div className="space-y-6">
-            <h2 className="text-3xl font-bold text-gray-800 mb-6 flex items-center gap-2 drop-shadow-sm"><BookOpen className="text-[#AD3333]" /> Muro de Clase</h2>
+            <h2 className="text-3xl font-bold text-gray-800 mb-6 flex items-center gap-2 drop-shadow-sm"><BookOpen className="text-[#AD3333]" /> Muro de clase</h2>
             
             {role === 'teacher' && (
                 <div className={`${glassCard} !p-4 mb-5 flex flex-col gap-2.5`}>
@@ -64,7 +64,7 @@ const TasksTab = React.memo(({
     <div className={`absolute top-full left-0 w-full mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl rounded-2xl overflow-hidden transition-all duration-200 origin-top ${isGroupDropdownOpen ? 'scale-y-100 opacity-100' : 'scale-y-0 opacity-0 pointer-events-none'}`}>
         <div className="max-h-48 overflow-y-auto p-2 flex flex-col gap-1">
             <button type="button" onClick={() => { setPostTargetGroup('all'); setIsGroupDropdownOpen(false); }} className={`px-4 py-3 flex items-center gap-2 rounded-xl font-bold transition-all ${postTargetGroup === 'all' ? 'bg-blue-500 text-white shadow-md' : (isDarkMode ? 'text-gray-200 hover:bg-gray-700' : 'text-gray-800 hover:bg-gray-100')}`}><Globe size={18}/> Todos los estudiantes</button>
-            {academicGroups?.length === 0 && <p className="text-xs text-gray-500 p-3 italic">No hay materias creadas. Créalas en el Directorio.</p>}
+            {academicGroups?.length === 0 && <p className="text-xs text-gray-500 p-3 italic">No hay materias creadas. Créalas en el directorio.</p>}
             {academicGroups?.map(g => (
                 <button type="button" key={g.id} onClick={() => { setPostTargetGroup(g.id); setIsGroupDropdownOpen(false); }} className={`px-4 py-3 flex items-center gap-2 rounded-xl font-bold transition-all ${postTargetGroup === g.id ? 'bg-blue-500 text-white shadow-md' : (isDarkMode ? 'text-gray-200 hover:bg-gray-700' : 'text-gray-800 hover:bg-gray-100')}`}><Book size={18}/> {g.name}</button>
             ))}
@@ -162,7 +162,7 @@ const TasksTab = React.memo(({
                         )}
                         
                         <button type="button" onClick={async () => {
-    if(!postTargetGroup) return showMessage("⚠️ Debes seleccionar una Materia o Grupo para publicar.");
+    if(!postTargetGroup) return showMessage("⚠️ Debes seleccionar una materia o grupo para publicar.");
     if(taskTitle && taskDesc) {
         await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'tasks'), { 
             type: postType, title: taskTitle, description: taskDesc, 

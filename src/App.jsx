@@ -1737,10 +1737,10 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
             if (draftReview) {
               return (
                 <div className="space-y-6 pb-20 md:pb-0">
-                  <h2 className="text-3xl font-bold text-gray-800 mb-6 flex items-center gap-2 drop-shadow-sm"><Edit3 className="text-[#AD3333]" /> Edición de Diapositivas</h2>
+                  <h2 className="text-3xl font-bold text-gray-800 mb-6 flex items-center gap-2 drop-shadow-sm"><Edit3 className="text-[#AD3333]" /> Edición de diapositivas</h2>
                   <div className={`${glassCard} flex flex-col gap-8`}>
                     <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-sm">
-                       <label className="text-sm font-bold text-gray-800 mb-2 block">Título de la Presentación</label>
+                       <label className="text-sm font-bold text-gray-800 mb-2 block">Título de la presentación</label>
                        <input className={`${glassInput} font-extrabold text-xl`} value={draftReview.topic} onChange={e => setDraftReview({...draftReview, topic: e.target.value})} />
                     </div>
                     {draftReview.slides.map((slide, i) => (
@@ -1963,12 +1963,12 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
 
     return (
         <div className="space-y-6 max-w-3xl mx-auto pb-20 md:pb-0">
-            <h2 className="text-3xl font-bold text-gray-800 mb-6 flex items-center gap-2 drop-shadow-sm"><UsersIcon className="text-[#AD3333]" /> Directorio y Materias</h2>
+            <h2 className="text-3xl font-bold text-gray-800 mb-6 flex items-center gap-2 drop-shadow-sm"><UsersIcon className="text-[#AD3333]" /> Directorio y materias</h2>
             
             {/* PANEL DE MATERIAS / GRUPOS ACADÉMICOS */}
             <div className={`${glassCard} flex flex-col gap-4 mb-6 border-blue-500/30 shadow-[0_8px_32px_0_rgba(37,99,235,0.1)]`}>
                 <div className="flex justify-between items-center mb-2">
-                    <h3 className="font-bold text-blue-700 flex items-center gap-2"><BookOpen size={20}/> Gestión de Materias</h3>
+                    <h3 className="font-bold text-blue-700 flex items-center gap-2"><BookOpen size={20}/> Gestión de materias</h3>
                     <button onClick={() => setIsCreatingAcadGroup(!isCreatingAcadGroup)} className="bg-blue-600 text-white px-4 py-1.5 rounded-full text-xs font-bold hover:scale-105 transition-transform shadow-md">
                         {isCreatingAcadGroup ? 'Cancelar' : '+ Nueva materia'}
                     </button>
@@ -1976,7 +1976,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
 
                 {isCreatingAcadGroup && (
                     <form onSubmit={handleCreateAcademicGroup} className={`p-5 rounded-2xl border animate-in fade-in zoom-in-95 ${isDarkMode ? 'bg-gray-800 border-gray-600' : 'bg-white/60 border-blue-200'}`}>
-                        <label className="block text-xs font-bold mb-1 text-blue-600">Nombre de la Materia / Grupo</label>
+                        <label className="block text-xs font-bold mb-1 text-blue-600">Nombre de la materia / grupo</label>
                         <input value={newAcadGroupName} onChange={e => setNewAcadGroupName(e.target.value)} placeholder="Ej: Inglés Nivel 3 - Grupo A" className={`${glassInput} mb-4`} required />
                         
                         <label className="block text-xs font-bold mb-2 text-blue-600">Seleccionar estudiantes (múltiple)</label>
@@ -2028,7 +2028,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
             }} className={`${glassCard} flex flex-col gap-4 mb-6`}>
                 <p className="text-sm font-bold text-gray-700">Crea un nuevo estudiante. La contraseña se encriptará en Google.</p>
                 <input name="fullname" placeholder="Nombre real completo" className={glassInput} required />
-                <input name="username" placeholder="Nombre de Usuario (Ej: juanperez)" className={glassInput} required />
+                <input name="username" placeholder="Nombre de usuario (Ej: juanperez)" className={glassInput} required />
                 <input name="email" type="email" placeholder="Correo electrónico del estudiante" className={glassInput} required />
                 <input name="password" type="text" placeholder="Contraseña inicial" className={glassInput} required />
                 <button type="submit" className={redButton}><Plus size={18}/> Crear estudiante</button>
@@ -2036,7 +2036,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
 
             {/* DIRECTORIO */}
             <div className={glassCard}>
-                <h3 className="font-bold text-gray-800 mb-4">Directorio de Estudiantes</h3>
+                <h3 className="font-bold text-gray-800 mb-4">Directorio de estudiantes</h3>
                 <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
                     {Object.keys(userMappings).length === 0 && <p className="text-sm text-gray-500 italic">No hay estudiantes extra.</p>}
                     {Object.entries(userMappings).filter(([uk, ud]) => uk !== 'teacher' && ud?.email).map(([userKey, data]) => {
@@ -2145,7 +2145,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                           </div>
                           
                           <div className="flex justify-end pt-4 pb-8">
-                              <button onClick={() => confirmAction("¿Estás seguro de enviar la evaluación? No podrás modificarla después.", () => submitEvaluation(false))} className={`${redButton} px-10 py-4 text-lg w-full md:w-auto`}><Send size={20}/> Terminar y Enviar</button>
+                              <button onClick={() => confirmAction("¿Estás seguro de enviar la evaluación? No podrás modificarla después.", () => submitEvaluation(false))} className={`${redButton} px-10 py-4 text-lg w-full md:w-auto`}><Send size={20}/> Terminar y enviar</button>
                           </div>
                       </div>
                   );
@@ -2169,7 +2169,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                                       <tr>
                                           <th className="p-4 font-bold">Estudiante</th>
                                           <th className="p-4 font-bold text-center">Nota (0.0 - 5.0)</th>
-                                          <th className="p-4 font-bold">Fecha de Entrega</th>
+                                          <th className="p-4 font-bold">Fecha de entrega</th>
                                           <th className="p-4 font-bold text-center">Acciones</th>
                                       </tr>
                                   </thead>
@@ -2375,7 +2375,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
           const renderInbox = () => (
             <div className="space-y-8">
               <h2 className="text-3xl font-bold text-gray-800 mb-6 flex items-center gap-2 drop-shadow-sm">
-                  <Mail className="text-[#AD3333]" /> Buzón de Sugerencias
+                  <Mail className="text-[#AD3333]" /> Buzón de sugerencias
               </h2>
               <div className="grid md:grid-cols-2 gap-6">
                 <div className={glassCard}>
@@ -2392,7 +2392,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                   </div>
                 </div>
                 <div className={glassCard}>
-                  <h3 className="text-xl font-bold text-red-600 mb-4 flex items-center gap-2"><AlertTriangle /> Alertas de Conducta</h3>
+                  <h3 className="text-xl font-bold text-red-600 mb-4 flex items-center gap-2"><AlertTriangle /> Alertas de conducta</h3>
                   <div className="space-y-4">
                     {alerts.length === 0 ? <p className="text-sm text-gray-500">Sin incidentes.</p> : alerts.map(a => (
                       <div key={a.id} className="bg-red-50 p-4 rounded-xl border border-red-200 relative group">
@@ -3166,7 +3166,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                                   </div>
                                   <form onSubmit={handleCreateGroup} className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6">
                                       <div>
-                                          <label className={`block text-sm font-bold mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Nombre del Grupo</label>
+                                          <label className={`block text-sm font-bold mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Nombre del grupo</label>
                                           <input value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder="Ej: Equipo proyecto final" className={`w-full rounded-xl px-4 py-3 outline-none border focus:ring-2 transition-all ${isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-100 focus:ring-blue-500/50' : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-400/50'}`} required />
                                       </div>
                                       <div>
@@ -3317,7 +3317,7 @@ return <span className="text-xs font-medium text-gray-400">Desconectado</span>;
 
                                                   {showChatSettings && (
                                                       <div className={`absolute top-full right-0 mt-3 w-[280px] p-5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl rounded-xl z-[99999] animate-in fade-in slide-in-from-top-4`}>
-                                                          <h4 className={`text-sm font-bold mb-3 ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>Color del Chat</h4>
+                                                          <h4 className={`text-sm font-bold mb-3 ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>Color del chat</h4>
                                                           <div className="flex flex-wrap gap-2 mb-5">
                                                               {CHAT_GRADIENTS.map((grad, idx) => (
                                                                   <button 
@@ -3330,7 +3330,7 @@ return <span className="text-xs font-medium text-gray-400">Desconectado</span>;
                                                               ))}
                                                           </div>
                                                           
-                                                          <h4 className={`text-sm font-bold mb-3 ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>Patrón de Fondo</h4>
+                                                          <h4 className={`text-sm font-bold mb-3 ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>Patrón de fondo</h4>
                                                           <div className="grid grid-cols-2 gap-2">
                                                               {CHAT_PATTERNS.map(pat => (
                                                                   <button type="button" key={pat.id} onClick={() => handleUpdateChatPreference(activeChat.id, 'pattern', pat.id)} className={`px-2 py-2 rounded-xl text-xs font-bold border transition-colors ${currentPrefs.pattern === pat.id ? 'border-blue-500 bg-blue-500/10 text-blue-500' : (isDarkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-100')}`}>
@@ -3697,7 +3697,7 @@ tickIcon = (
                       <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                           <div className={`${glassCard} max-w-md w-full flex flex-col gap-4 relative bg-white`}>
                               <button onClick={() => setShowIAKnowledgeModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-red-500"><X size={20}/></button>
-                              <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Sparkles className="text-purple-600"/> Cerebro del Bot de Ayuda</h3>
+                              <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Sparkles className="text-purple-600"/> Cerebro del bot de ayuda</h3>
                               <p className="text-xs text-gray-500">Edwin, aquí puede escribir cómo funciona la página para que el robot se lo explique a la Profe Gina.</p>
                               
                               <div className="max-h-60 overflow-y-auto space-y-2 pr-2">
