@@ -4,6 +4,7 @@ import {
   Book, BookOpen, CheckCheck, ChevronRight, Globe, ImageIcon, PaperclipIcon, Plus, Sparkles, Target, Undo2, X,
 } from './Icons.jsx'
 import TaskCard from './TaskCard.jsx'
+import EmptyState from './EmptyState.jsx'
 import { collection, addDoc } from '../firebase/config.js'
 
 const TasksTab = React.memo(({
@@ -154,7 +155,7 @@ const TasksTab = React.memo(({
                     </div>
                 </div>
             )}
-            {visibleTasks.length === 0 ? <p className="text-gray-600 italic px-4">No hay publicaciones aún.</p> : null}
+            {visibleTasks.length === 0 ? <EmptyState icon={BookOpen} title="Todavía no hay publicaciones" message="Cuando la profesora publique una tarea o aviso, aparecerá aquí." isDarkMode={isDarkMode} /> : null}
 {visibleTasks.map(task => <TaskCard key={task.id} task={{...task, type: task.type || 'task'}} role={role} db={db} appId={appId} glassCard={glassCard} glassInput={glassInput} callGemini={callGemini} currentUser={user} showMessage={showMessage} loggedInName={loggedInName} isDarkMode={isDarkMode} confirmAction={confirmAction} handleOpenProfileByName={handleOpenProfileByName} setFullScreenImage={setFullScreenImage} />)}
         </div>
     );

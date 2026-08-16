@@ -25,6 +25,7 @@ import {
   UsersGroupIcon, UsersIcon, Wand2, X, XLine,
 } from './components/Icons.jsx'
 const GifPickerModal = React.lazy(() => import('./components/GifPickerModal.jsx'))
+import EmptyState from './components/EmptyState.jsx'
 const TasksTab = React.lazy(() => import('./components/TasksTab.jsx'))
 
 function App() {
@@ -1742,7 +1743,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {reviews.length === 0 ? <p className="text-gray-600 italic px-4 col-span-3">No hay repasos generados aún.</p> : null}
+                    {reviews.length === 0 ? <EmptyState icon={Sparkles} title="No hay repasos aún" message="La profesora puede generar repasos interactivos con IA en esta sección." isDarkMode={isDarkMode} /> : null}
                     {reviews.map((r, idx) => (
                       <div key={r.id} className={`cursor-pointer hover:scale-[1.03] transition-transform duration-300 relative overflow-hidden rounded-[1.5rem] border border-white/50 shadow-lg flex flex-col bg-gradient-to-br ${r.slides?.[0]?.gradient || SLIDE_GRADIENTS[0]} backdrop-blur-xl aspect-video`} onClick={() => { setActiveReview(r); setCurrentSlide(0); setShowQuizAnswer(false); }}>
                         <div className="relative z-10 flex-1 flex flex-col items-center justify-center p-5 text-center">
@@ -2213,7 +2214,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {evaluations.length === 0 ? <p className="text-gray-600 italic px-4 col-span-full">No hay evaluaciones programadas.</p> : null}
+                      {evaluations.length === 0 ? <EmptyState icon={FileText} title="No hay evaluaciones programadas" message="Las pruebas y exámenes aparecerán aquí cuando se creen." isDarkMode={isDarkMode} /> : null}
                       
                       {evaluations.map(ev => {
                           const deadline = new Date(`${ev.dueDate}T${ev.dueTime || '23:59'}`);
@@ -3004,7 +3005,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                               <div>
                                   <h3 className={`text-sm font-bold uppercase tracking-wider mb-3 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Contactos</h3>
                                   <div className="space-y-2">
-                                      {otherContactsUsers.length === 0 && <p className="text-sm italic text-gray-500">No hay contactos nuevos.</p>}
+                                      {otherContactsUsers.length === 0 && <EmptyState icon={UsersGroupIcon} title="No hay contactos nuevos" message="Los usuarios registrados en el directorio aparecerán aquí." isDarkMode={isDarkMode} />}
                                       {otherContactsUsers.map(u => {
                                         const chatId = `dm_${[myChatId, u.id].sort().join('_')}`;
                                         const isTyping = typingStatus[chatId]?.[u.id];

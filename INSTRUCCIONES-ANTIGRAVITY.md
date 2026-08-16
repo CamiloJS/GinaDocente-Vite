@@ -173,4 +173,19 @@ Dado que los estudiantes y la profesora frecuentemente compartirán el link de l
 
 **Entrega:** Documenta en `REPORTE-OPENCODE.md` si lograste agregar los metadatos y confirma el deploy exitoso.
 
+---
+
+# INSTRUCCION #12
+
+**Objetivo:** Diseño Premium: Componente de "Estado Vacío" (Empty State).
+
+Actualmente, cuando no hay publicaciones, mensajes o repasos, la aplicación muestra textos grises simples como `<p>No hay publicaciones aún.</p>`. Para una plataforma moderna, los "Empty States" deben ser más visuales e invitar a la acción.
+
+**Acciones a implementar por Opencode:**
+1. **Crear Componente:** Crea un nuevo archivo `src/components/EmptyState.jsx`. Este componente debe recibir props como `icon` (un componente de lucide-react), `title` y `message`. Debe renderizar un contenedor centrado vertical y horizontalmente, con el icono en un tamaño grande (ej. `size={48}` o `64`, con color tenue), un título semi-bold y el mensaje descriptivo debajo. Añade soporte para diseño claro y oscuro (`isDarkMode`).
+2. **Reemplazo en la App:** Busca los mensajes de estado vacío actuales en `App.jsx` y `TasksTab.jsx` (busca "No hay") y reemplaza al menos los principales (Muro/TasksTab, Repasos, Evaluaciones y Chats vacíos) por instancias de tu nuevo `<EmptyState />`. Por ejemplo, en el Muro puedes usar el icono `FileBox` o `Inbox`.
+3. **Deploy:** Ejecuta `npm run build`, realiza `commit`/`push` a `main` y efectúa el `vercel deploy --prod`.
+
+**Entrega:** Documenta en `REPORTE-OPENCODE.md` si creaste el componente y en qué pestañas principales lograste integrarlo.
+
 ESTADO: LISTA PARA IMPLEMENTAR
