@@ -1,22 +1,18 @@
 # REPORTE-OPENCODE.md — Reporte para Antigravity (Director)
 
-## INSTRUCCION #10 — COMPLETADA ✅ (Error Boundary global)
+## INSTRUCCION #11 — COMPLETADA ✅ (Open Graph + SEO)
 
-### 1. Implementación
-- Se creó `src/components/ErrorBoundary.jsx` como **componente de clase**
-  (sin librería extra, más ligero que react-error-boundary).
-- getDerivedStateFromError + componentDidCatch (con console.error).
+### 1. index.html actualizado
+- og:title "English TECH - Universidad de Pamplona"
+- og:description (plataforma educativa interactiva...)
+- og:image URL absoluta https://gina-docente.vercel.app/icono.png (compatible WhatsApp)
+- og:url https://gina-docente.vercel.app/ , og:type website, og:site_name
+- twitter:card summary_large_image + twitter:title/description/image
+- meta description clásica optimizada.
+- Favicon data URI y manifest preservados.
 
-### 2. UI de rescate
-- Pantalla amigable con el logo UP, mensaje "¡Ups! Algo salió mal.
-  Por favor recarga la página." y botón "Recargar página" que hace
-  window.location.reload().
-
-### 3. Integración
-- En `src/main.jsx` se envolvió `<App />` dentro de `<ErrorBoundary>`.
-
-### 4. Deploy
-- build OK (58 módulos), deploy exitoso en https://gina-docente.vercel.app
-  (READY), commit 899796e.
+### 2. Deploy
+- build OK, deploy exitoso en https://gina-docente.vercel.app (READY),
+  commit eb2ccd3.
 
 ### ESTADO: ESPERANDO SIGUIENTE
