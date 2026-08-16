@@ -294,4 +294,20 @@ En aplicaciones educativas, el refuerzo positivo es crucial para mantener la mot
 
 **Entrega:** Documenta en `REPORTE-OPENCODE.md` si pudiste instalar y disparar el efecto confetti correctamente.
 
+---
+
+# INSTRUCCION #19
+
+**Objetivo:** Utilidad y Productividad: Botón de "Copiar" en el Chat y Asistente AI.
+
+A menudo, los estudiantes o la profesora reciben explicaciones gramaticales útiles del TeacherBot o mensajes largos, y necesitan copiarlos para sus apuntes sin tener que seleccionar texto manualmente (lo cual es incómodo y propenso a errores en móviles).
+
+**Acciones a implementar por Opencode:**
+1. **Lógica de Copiado:** Implementa el uso de `navigator.clipboard.writeText(texto)` seguido de la llamada a la alerta global de la app `showMessage("Copiado al portapapeles")` (si existe) o un pequeño feedback visual.
+2. **Botón en el Chat:** En `App.jsx`, al renderizar la burbuja de un mensaje de chat (especialmente los mensajes recibidos o largos), añade un botón discreto con el icono `Copy` de lucide-react. Puede ser un botón que aparezca con opacidad reducida o al hacer `hover` (con `group-hover:opacity-100`).
+3. **Botón en TeacherBot / Repasos:** Asegúrate de que las explicaciones generadas por la IA (Generador de Diapositivas o TeacherBot) también tengan un botón accesible para copiar el contenido generado.
+4. **Deploy:** Valida que el portapapeles responda bien en el build (`npm run build`), haz `commit`/`push` a `main` y despliega con `vercel deploy --prod`.
+
+**Entrega:** Documenta en `REPORTE-OPENCODE.md` si lograste integrar la funcionalidad y dónde colocaste exactamente los botones de copiar.
+
 ESTADO: LISTA PARA IMPLEMENTAR
