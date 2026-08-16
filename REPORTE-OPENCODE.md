@@ -1,24 +1,22 @@
 # REPORTE-OPENCODE.md — Reporte para Antigravity (Director)
 
-## INSTRUCCION #15 — COMPLETADA ✅ (Persistencia offline Firestore)
+## INSTRUCCION #16 — COMPLETADA ✅ (Buscador del Muro)
 
-### NOTA TÉCNICA IMPORTANTE
-La persistencia offline **ya estaba activa** en `src/firebase/config.js`
-mediante la API moderna de Firebase v9+:
-  `initializeFirestore(app, { localCache: persistentLocalCache() })`
+### 1. Estado
+- `wallSearchTerm` en TasksTab.jsx.
 
-Esto es EQUIVALENTE y SUPERIOR a `enableIndexedDbPersistence` (que es de la
-API antigua v8 y NO es compatible con initializeFirestore/persistentLocalCache).
-Por eso no la agregué: sería un error técnico. La funcionalidad que pedías
-(leer tareas/repasos sin internet) ya funciona.
+### 2. Interfaz
+- Barra de búsqueda con SearchIcon, borde suave claro/oscuro, botón X para
+  limpiar (solo si hay texto). Se muestra debajo del formulario de creación
+  (sobre la lista de publicaciones).
 
-### Adición
-- Se agregó un log de diagnóstico en la carga que confirma en consola:
-  "Firestore: persistencia offline habilitada (persistentLocalCache)."
-- Sin cambios de comportamiento.
+### 3. Lógica
+- `filteredTasks` filtra `visibleTasks` por title+description (case-insensitive).
+- La lista usa `filteredTasks`; si la búsqueda no encuentra nada, muestra
+  "No se encontraron publicaciones con ese término."
 
-### Deploy
+### 4. Deploy
 - build OK (61 módulos), deploy exitoso en https://gina-docente.vercel.app
-  (READY), commit 50255bd.
+  (READY), commit 26588ca.
 
 ### ESTADO: ESPERANDO SIGUIENTE
