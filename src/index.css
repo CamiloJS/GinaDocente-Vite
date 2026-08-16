@@ -13,7 +13,8 @@
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
   transition: all 0.2s ease;
 }
-.dark-mode .nav-active-tab {
+.dark-mode .nav-active-tab,
+.dark .nav-active-tab {
   background-color: #1f2937 !important; /* gray-800 */
   color: #f9fafb !important; /* gray-50 */
   border: 1px solid #374151 !important; /* gray-700 */
@@ -22,8 +23,8 @@
 
 /* Scrollbar discreta */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -31,13 +32,74 @@
 ::-webkit-scrollbar-thumb {
   background-color: rgba(150, 150, 150, 0.35);
   border-radius: 20px;
-  border: 3px solid transparent;
+  border: 2px solid transparent;
   background-clip: padding-box;
 }
 ::-webkit-scrollbar-thumb:hover {
   background-color: rgba(150, 150, 150, 0.5);
 }
 .dark-mode::-webkit-scrollbar-thumb,
-.dark-mode ::-webkit-scrollbar-thumb {
+.dark-mode ::-webkit-scrollbar-thumb,
+.dark::-webkit-scrollbar-thumb,
+.dark ::-webkit-scrollbar-thumb {
   background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* ===== TEMAS ESTILO X / TWITTER ===== */
+/* 1. MODO DIM (Azulado / Gris Oscuro) */
+html.theme-dim.dark body,
+html.theme-dim.dark .bg-gray-900,
+html.theme-dim.dark .bg-gray-950,
+html.theme-dim.dark .bg-gray-900\/80,
+html.theme-dim.dark .bg-gray-900\/90,
+html.theme-dim.dark .bg-gray-900\/95 {
+  background-color: #15202b !important;
+}
+
+html.theme-dim.dark .bg-gray-800,
+html.theme-dim.dark .bg-gray-800\/80,
+html.theme-dim.dark .bg-gray-800\/90,
+html.theme-dim.dark .bg-gray-800\/50,
+html.theme-dim.dark .bg-gray-800\/60 {
+  background-color: #1e2732 !important;
+}
+
+html.theme-dim.dark .border-gray-800,
+html.theme-dim.dark .border-gray-700,
+html.theme-dim.dark .border-gray-700\/80 {
+  border-color: #2e3a47 !important;
+}
+
+html.theme-dim.dark .hover\:bg-gray-800:hover,
+html.theme-dim.dark .hover\:bg-gray-700:hover {
+  background-color: #273340 !important;
+}
+
+/* 2. MODO LIGHTS OUT (Negro Puro / AMOLED) */
+html.theme-lights-out.dark body,
+html.theme-lights-out.dark .bg-gray-900,
+html.theme-lights-out.dark .bg-gray-950,
+html.theme-lights-out.dark .bg-gray-900\/80,
+html.theme-lights-out.dark .bg-gray-900\/90,
+html.theme-lights-out.dark .bg-gray-900\/95 {
+  background-color: #000000 !important;
+}
+
+html.theme-lights-out.dark .bg-gray-800,
+html.theme-lights-out.dark .bg-gray-800\/80,
+html.theme-lights-out.dark .bg-gray-800\/90,
+html.theme-lights-out.dark .bg-gray-800\/50,
+html.theme-lights-out.dark .bg-gray-800\/60 {
+  background-color: #121212 !important;
+}
+
+html.theme-lights-out.dark .border-gray-800,
+html.theme-lights-out.dark .border-gray-700,
+html.theme-lights-out.dark .border-gray-700\/80 {
+  border-color: #27272a !important;
+}
+
+html.theme-lights-out.dark .hover\:bg-gray-800:hover,
+html.theme-lights-out.dark .hover\:bg-gray-700:hover {
+  background-color: #1c1c1f !important;
 }

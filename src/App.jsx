@@ -108,11 +108,21 @@ useEffect(() => {
           
           const [loginError, setLoginError] = useState("");
           
-          const [isDarkMode, setIsDarkMode] = useState(() => {
-    const saved = localStorage.getItem('englishTech_theme');
-    if (saved !== null) return saved === 'dark';
-    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-});
+          const [themeMode, setThemeMode] = useState(() => {
+              const saved = localStorage.getItem('englishTech_theme');
+              if (saved === 'dim' || saved === 'lights_out' || saved === 'light') return saved;
+              if (saved === 'dark') return 'lights_out';
+              const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+              return isDark ? 'dim' : 'light';
+          });
+          const isDarkMode = themeMode !== 'light';
+          const setIsDarkMode = (val) => {
+              if (typeof val === 'function') {
+                  setThemeMode(prev => (prev !== 'light' ? 'light' : 'dim'));
+              } else {
+                  setThemeMode(val ? 'dim' : 'light');
+              }
+          };
           const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, message: "", onConfirm: null });
           const [globalGifCallback, setGlobalGifCallback] = useState(null);
                 window.openGifPicker = (cb) => setGlobalGifCallback(() => cb);
@@ -131,19 +141,25 @@ useEffect(() => {
                 return () => window.removeEventListener('keydown', onKey);
             }, []);
             useEffect(() => {
-                localStorage.setItem('englishTech_theme', isDarkMode ? 'dark' : 'light');
-                if (isDarkMode) {
-                    document.documentElement.classList.add('dark');
-                    document.body.classList.add('bg-gray-900');
-                    document.body.classList.remove('bg-gray-100');
-                    document.documentElement.style.colorScheme = 'dark';
-                } else {
+                localStorage.setItem('englishTech_theme', themeMode);
+                document.documentElement.classList.remove('theme-dim', 'theme-lights-out');
+                if (themeMode === 'light') {
                     document.documentElement.classList.remove('dark');
                     document.body.classList.add('bg-gray-100');
                     document.body.classList.remove('bg-gray-900');
                     document.documentElement.style.colorScheme = 'light';
+                } else {
+                    document.documentElement.classList.add('dark');
+                    if (themeMode === 'dim') {
+                        document.documentElement.classList.add('theme-dim');
+                    } else {
+                        document.documentElement.classList.add('theme-lights-out');
+                    }
+                    document.body.classList.add('bg-gray-900');
+                    document.body.classList.remove('bg-gray-100');
+                    document.documentElement.style.colorScheme = 'dark';
                 }
-            }, [isDarkMode]);
+            }, [themeMode]);
 
 
           // --- INDICADOR OFF / ONLINE ---
@@ -2435,170 +2451,221 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
           );
 
           const renderSettings = () => (
-            <div className="space-y-6 animate-in fade-in duration-200">
-              <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-6 flex items-center gap-2 drop-shadow-sm">
-                  <Settings className="text-purple-600 dark:text-purple-400" /> Ajustes y preferencias
-              </h2>
+            <div className="space-y-4 animate-in fade-in duration-200 max-w-2xl mx-auto">
+              <div className="flex items-center gap-2 mb-1">
+                  <Settings className="text-purple-600 dark:text-purple-400" size={24} />
+                  <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 drop-shadow-sm">Ajustes y preferencias</h2>
+              </div>
 
-              <div className="grid gap-6">
-                {/* Tarjeta 1: Tema y Apariencia */}
-                <div className={`${glassCard} p-6 space-y-4`}>
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-md ${isDarkMode ? 'bg-purple-950/70 text-purple-300 border border-purple-800/40' : 'bg-amber-50 text-amber-500 border border-amber-100'}`}>
-                                {isDarkMode ? <Moon size={24} /> : <Sun size={24} />}
+              <div className="grid gap-3.5">
+                {/* Tarjeta 1: Tema y Apariencia estilo X / Twitter */}
+                <div className={`${glassCard} !p-4 sm:!p-5 space-y-3`}>
+                    <div>
+                        <h3 className={`text-sm font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Apariencia y tema</h3>
+                        <p className="text-[11px] text-gray-500">Personaliza la tonalidad visual y contraste de la plataforma</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                        {/* Opción Claro */}
+                        <button
+                            type="button"
+                            onClick={() => setThemeMode('light')}
+                            className={`p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between ${
+                                themeMode === 'light'
+                                    ? 'bg-blue-50/90 border-blue-500 ring-2 ring-blue-500/20 shadow-sm'
+                                    : 'bg-white dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
+                            }`}
+                        >
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-500 border border-amber-200/60 flex items-center justify-center shadow-xs">
+                                    <Sun size={18} />
+                                </div>
+                                {themeMode === 'light' && <div className="w-2.5 h-2.5 rounded-full bg-blue-600 ring-2 ring-blue-200"></div>}
                             </div>
                             <div>
-                                <h3 className={`text-base font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Modo de visualización</h3>
-                                <p className="text-xs text-gray-500">{isDarkMode ? 'Tema nocturno oscuro activo' : 'Tema diurno claro activo'}</p>
+                                <p className="text-xs font-bold text-gray-900 dark:text-gray-100">Modo Claro</p>
+                                <p className="text-[10px] text-gray-500">Blanco e iluminado</p>
                             </div>
-                        </div>
-                        <button 
-                            onClick={() => setIsDarkMode(!isDarkMode)} 
-                            className={`w-14 h-7 flex items-center rounded-full p-1 transition-colors duration-300 ${isDarkMode ? 'bg-blue-600 justify-end' : 'bg-gray-300 dark:bg-gray-700 justify-start'}`}
-                            title="Alternar modo oscuro y diurno"
+                        </button>
+
+                        {/* Opción Dim */}
+                        <button
+                            type="button"
+                            onClick={() => setThemeMode('dim')}
+                            className={`p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between ${
+                                themeMode === 'dim'
+                                    ? 'bg-blue-950/30 border-blue-400 ring-2 ring-blue-500/20 shadow-sm'
+                                    : 'bg-[#15202b]/40 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
+                            }`}
                         >
-                            <div className="bg-white w-5 h-5 rounded-full shadow-md transform transition-transform" />
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="w-8 h-8 rounded-lg bg-[#15202b] text-blue-400 border border-[#2e3a47] flex items-center justify-center shadow-xs">
+                                    <Moon size={18} />
+                                </div>
+                                {themeMode === 'dim' && <div className="w-2.5 h-2.5 rounded-full bg-blue-400 ring-2 ring-blue-800"></div>}
+                            </div>
+                            <div>
+                                <p className="text-xs font-bold text-gray-900 dark:text-gray-100">Modo Dim</p>
+                                <p className="text-[10px] text-gray-500">Grisáceo azulado (X)</p>
+                            </div>
+                        </button>
+
+                        {/* Opción Lights Out */}
+                        <button
+                            type="button"
+                            onClick={() => setThemeMode('lights_out')}
+                            className={`p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between ${
+                                themeMode === 'lights_out'
+                                    ? 'bg-purple-950/30 border-purple-500 ring-2 ring-purple-500/20 shadow-sm'
+                                    : 'bg-black/40 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
+                            }`}
+                        >
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="w-8 h-8 rounded-lg bg-black text-white border border-gray-800 flex items-center justify-center shadow-xs">
+                                    <Moon size={18} />
+                                </div>
+                                {themeMode === 'lights_out' && <div className="w-2.5 h-2.5 rounded-full bg-purple-500 ring-2 ring-purple-800"></div>}
+                            </div>
+                            <div>
+                                <p className="text-xs font-bold text-gray-900 dark:text-gray-100">Lights Out</p>
+                                <p className="text-[10px] text-gray-500">Negro puro AMOLED</p>
+                            </div>
                         </button>
                     </div>
                 </div>
 
                 {/* Tarjeta 2: Notificaciones y Sonidos */}
-                <div className={`${glassCard} p-6 space-y-5`}>
-                    <h3 className={`text-sm font-bold uppercase tracking-wider ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Notificaciones y Sonidos</h3>
+                <div className={`${glassCard} !p-4 sm:!p-5 space-y-3`}>
+                    <h3 className={`text-xs font-bold uppercase tracking-wider ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Notificaciones y Sonidos</h3>
                     
                     <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-md ${soundEnabled ? (isDarkMode ? 'bg-blue-950/70 text-blue-300 border border-blue-800/40' : 'bg-blue-50 text-blue-600 border border-blue-100') : 'bg-gray-100 dark:bg-gray-800 text-gray-400'}`}>
-                                {soundEnabled ? <Volume2 size={24} /> : <VolumeX size={24} />}
+                        <div className="flex items-center gap-3">
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-xs ${soundEnabled ? (isDarkMode ? 'bg-blue-950/70 text-blue-300 border border-blue-800/40' : 'bg-blue-50 text-blue-600 border border-blue-100') : 'bg-gray-100 dark:bg-gray-800 text-gray-400'}`}>
+                                {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
                             </div>
                             <div>
-                                <h4 className={`text-base font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Sonidos del chat</h4>
-                                <p className="text-xs text-gray-500">{soundEnabled ? 'Alertas sonoras activas al recibir mensajes' : 'Sonidos desactivados (modo silencio)'}</p>
+                                <h4 className={`text-xs font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Sonidos del chat</h4>
+                                <p className="text-[11px] text-gray-500">{soundEnabled ? 'Alertas sonoras activas' : 'Sonidos desactivados'}</p>
                             </div>
                         </div>
                         <button 
+                            type="button"
                             onClick={() => setSoundEnabled(!soundEnabled)} 
-                            className={`w-14 h-7 flex items-center rounded-full p-1 transition-colors duration-300 ${soundEnabled ? 'bg-blue-600 justify-end' : 'bg-gray-300 dark:bg-gray-700 justify-start'}`}
+                            className={`w-11 h-6 flex items-center rounded-full p-0.5 transition-colors duration-300 ${soundEnabled ? 'bg-blue-600 justify-end' : 'bg-gray-300 dark:bg-gray-700 justify-start'}`}
                         >
                             <div className="bg-white w-5 h-5 rounded-full shadow-md transform transition-transform" />
                         </button>
                     </div>
 
-                    <div className="pt-3 border-t border-gray-200/60 dark:border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div className="pt-2.5 border-t border-gray-200/60 dark:border-gray-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                         <div>
-                            <p className={`text-sm font-bold ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>Notificaciones del navegador</p>
-                            <p className="text-xs text-gray-500">Recibe alertas en segundo plano cuando te envíen mensajes o tareas.</p>
+                            <p className={`text-xs font-bold ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>Notificaciones del navegador</p>
+                            <p className="text-[11px] text-gray-500">Alertas cuando recibas mensajes o actividades.</p>
                         </div>
                         <button 
+                            type="button"
                             onClick={enableNotifications} 
-                            className={`w-full sm:w-auto py-2.5 px-4 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 border shadow-sm ${isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-200 hover:bg-gray-700' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+                            className={`w-full sm:w-auto py-1.5 px-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 border shadow-xs ${isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-200 hover:bg-gray-700' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}
                         >
-                            <Bell size={16} /> Activar notificaciones push
+                            <Bell size={14} /> Activar push
                         </button>
                     </div>
                 </div>
 
                 {/* Tarjeta 3: Estado de Disponibilidad */}
-                <div className={`${glassCard} p-6 space-y-4`}>
-                    <div className="flex items-center gap-3 mb-1">
-                        <div className="w-10 h-10 rounded-2xl bg-green-500/10 text-green-500 flex items-center justify-center">
-                            <Shield size={20} />
-                        </div>
-                        <div>
-                            <h3 className={`text-base font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Estado de conexión</h3>
-                            <p className="text-xs text-gray-500">Define cómo te ven otros usuarios en la barra de contactos.</p>
-                        </div>
+                <div className={`${glassCard} !p-4 sm:!p-5 space-y-2.5`}>
+                    <div className="flex items-center gap-2">
+                        <Shield size={16} className="text-green-500" />
+                        <h3 className={`text-xs font-bold uppercase tracking-wider ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Estado de conexión</h3>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                    <div className="grid grid-cols-3 gap-2 pt-1">
                         <button 
+                            type="button"
                             onClick={() => updatePresenceStatus('online')} 
-                            className={`p-4 rounded-2xl flex flex-col items-center justify-center gap-2 border transition-all text-center ${
+                            className={`py-2 px-2 rounded-xl flex items-center justify-center gap-1.5 border transition-all text-center ${
                                 (!userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status || userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'online') 
-                                    ? 'bg-green-500/15 border-green-500 text-green-600 dark:text-green-400 ring-2 ring-green-500/20 shadow-md font-bold' 
-                                    : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'
+                                    ? 'bg-green-500/15 border-green-500 text-green-600 dark:text-green-400 ring-2 ring-green-500/20 shadow-xs font-bold text-xs' 
+                                    : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 text-xs'
                             }`}
                         >
-                            <span className="w-3.5 h-3.5 rounded-full bg-green-500"></span>
-                            <span className="text-sm font-bold">En línea</span>
-                            <span className="text-[11px] opacity-75">Disponible</span>
+                            <span className="w-2 h-2 rounded-full bg-green-500 shrink-0"></span>
+                            <span className="truncate">En línea</span>
                         </button>
 
                         <button 
+                            type="button"
                             onClick={() => updatePresenceStatus('away')} 
-                            className={`p-4 rounded-2xl flex flex-col items-center justify-center gap-2 border transition-all text-center ${
+                            className={`py-2 px-2 rounded-xl flex items-center justify-center gap-1.5 border transition-all text-center ${
                                 userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'away' 
-                                    ? 'bg-orange-500/15 border-orange-500 text-orange-600 dark:text-orange-400 ring-2 ring-orange-500/20 shadow-md font-bold' 
-                                    : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'
+                                    ? 'bg-orange-500/15 border-orange-500 text-orange-600 dark:text-orange-400 ring-2 ring-orange-500/20 shadow-xs font-bold text-xs' 
+                                    : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 text-xs'
                             }`}
                         >
-                            <span className="w-3.5 h-3.5 rounded-full bg-orange-400"></span>
-                            <span className="text-sm font-bold">Ausente</span>
-                            <span className="text-[11px] opacity-75">Temporalmente inactivo</span>
+                            <span className="w-2 h-2 rounded-full bg-orange-400 shrink-0"></span>
+                            <span className="truncate">Ausente</span>
                         </button>
 
                         <button 
+                            type="button"
                             onClick={() => updatePresenceStatus('busy')} 
-                            className={`p-4 rounded-2xl flex flex-col items-center justify-center gap-2 border transition-all text-center ${
+                            className={`py-2 px-2 rounded-xl flex items-center justify-center gap-1.5 border transition-all text-center ${
                                 userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'busy' 
-                                    ? 'bg-red-500/15 border-red-500 text-red-600 dark:text-red-400 ring-2 ring-red-500/20 shadow-md font-bold' 
-                                    : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'
+                                    ? 'bg-red-500/15 border-red-500 text-red-600 dark:text-red-400 ring-2 ring-red-500/20 shadow-xs font-bold text-xs' 
+                                    : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 text-xs'
                             }`}
                         >
-                            <span className="w-3.5 h-3.5 rounded-full bg-red-500"></span>
-                            <span className="text-sm font-bold">Ocupado</span>
-                            <span className="text-[11px] opacity-75">No molestar</span>
+                            <span className="w-2 h-2 rounded-full bg-red-500 shrink-0"></span>
+                            <span className="truncate">Ocupado</span>
                         </button>
                     </div>
                 </div>
 
                 {/* Tarjeta 4: Configuración y Entrenamiento de IA (Solo Docente) */}
                 {role === 'teacher' && (
-                    <div className={`${glassCard} p-6 space-y-4 border-purple-500/30 bg-gradient-to-br from-purple-500/5 to-indigo-500/5`}>
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-2xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center">
-                                <Sparkles size={22} />
+                    <div className={`${glassCard} !p-4 sm:!p-5 space-y-2.5 border-purple-500/30 bg-gradient-to-br from-purple-500/5 to-indigo-500/5`}>
+                        <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+                                <Sparkles size={18} />
                             </div>
                             <div>
-                                <h3 className={`text-base font-bold ${isDarkMode ? 'text-purple-300' : 'text-purple-900'}`}>Asistente y entrenamiento de IA</h3>
-                                <p className="text-xs text-gray-500">Configuración personalizada del bot de ayuda técnica GinAI.</p>
+                                <h3 className={`text-xs font-bold ${isDarkMode ? 'text-purple-300' : 'text-purple-900'}`}>Asistente y entrenamiento</h3>
+                                <p className="text-[11px] text-gray-500">Instrucciones y conocimientos para el asistente técnico.</p>
                             </div>
                         </div>
-                        <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
-                            Aquí puedes ingresar y editar instrucciones, conocimientos y directrices personalizadas para el bot asistente que guía a la docente en el uso de la plataforma.
-                        </p>
-                        <div className="pt-2">
+                        <div className="pt-1">
                             <button 
+                                type="button"
                                 onClick={() => setShowIAKnowledgeModal(true)} 
-                                className="w-full sm:w-auto py-3 px-6 text-sm font-bold rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg shadow-purple-500/25 flex items-center justify-center gap-2 transition-all hover:scale-102"
+                                className="w-full sm:w-auto py-2 px-4 text-xs font-bold rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-md flex items-center justify-center gap-1.5 transition-all"
                             >
-                                <Sparkles size={18} /> Entrenar bot de ayuda
+                                <Sparkles size={14} /> Entrenar bot
                             </button>
                         </div>
                     </div>
                 )}
 
                 {/* Tarjeta 5: Información de la Cuenta */}
-                <div className={`${glassCard} p-6 space-y-4`}>
-                    <h3 className={`text-sm font-bold uppercase tracking-wider ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Información de la cuenta</h3>
-                    <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 rounded-2xl bg-blue-100 flex items-center justify-center text-blue-600 shrink-0 overflow-hidden border-2 border-white dark:border-gray-700 shadow-md">
-                            {userMappings[myChatId]?.profilePicUrl ? <img src={userMappings[myChatId].profilePicUrl} className="w-full h-full object-cover" /> : <UserIcon size={28} />}
+                <div className={`${glassCard} !p-4 sm:!p-5 space-y-3`}>
+                    <h3 className={`text-xs font-bold uppercase tracking-wider ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Cuenta institucional</h3>
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600 shrink-0 overflow-hidden border border-white dark:border-gray-700 shadow-xs">
+                                {userMappings[myChatId]?.profilePicUrl ? <img src={userMappings[myChatId].profilePicUrl} className="w-full h-full object-cover" /> : <UserIcon size={22} />}
+                            </div>
+                            <div className="overflow-hidden">
+                                <p className={`font-bold text-xs leading-tight ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{loggedInName}</p>
+                                <p className="text-[10px] text-blue-600 dark:text-blue-400 font-bold uppercase tracking-wider">{userMappings[myChatId]?.customLabel || (role === 'teacher' ? 'Docente' : 'Estudiante')}</p>
+                                <p className="text-[10px] text-gray-500 truncate mt-0.5">{loggedInUser} • Univ. de Pamplona</p>
+                            </div>
                         </div>
-                        <div className="overflow-hidden">
-                            <p className={`font-bold text-base ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{loggedInName}</p>
-                            <p className="text-xs text-blue-600 dark:text-blue-400 font-bold uppercase tracking-wider">{userMappings[myChatId]?.customLabel || (role === 'teacher' ? 'Docente' : 'Estudiante')}</p>
-                            <p className="text-xs text-gray-500 mt-0.5">{loggedInUser} • Universidad de Pamplona</p>
-                        </div>
-                    </div>
 
-                    <div className="pt-4 border-t border-gray-200/60 dark:border-gray-800 flex justify-end">
                         <button 
+                            type="button"
                             onClick={handleLogout} 
-                            className="w-full sm:w-auto py-3 px-6 rounded-2xl text-sm font-bold transition-all flex items-center justify-center gap-2 border bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900/60 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/40 shadow-sm"
+                            className="py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900/60 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/40 shadow-xs shrink-0"
                         >
-                            <LogOutIcon size={18} /> Cerrar sesión
+                            <LogOutIcon size={14} /> Salir
                         </button>
                     </div>
                 </div>
@@ -2845,7 +2912,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                               <NavNotebook size={24} className="text-blue-500" /> Asignaciones
                           </button>
                           <button onClick={() => changeTab('reviews')} className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-xl transition-colors ${activeTab === 'reviews' ? 'bg-gray-200 dark:bg-gray-700' : 'hover:bg-gray-200 dark:hover:bg-gray-800'}`}>
-                              <NavSlides size={24} className="text-purple-500" /> Repasos IA
+                              <NavSlides size={24} className="text-purple-500" /> Repasos
                           </button>
                           <button onClick={() => changeTab('syllabus')} className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-xl transition-colors ${activeTab === 'syllabus' ? 'bg-gray-200 dark:bg-gray-700' : 'hover:bg-gray-200 dark:hover:bg-gray-800'}`}>
                               <NavFile size={24} className="text-green-500" /> Programación
@@ -2979,10 +3046,9 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                                   </div>
                                   <div className="text-left flex-1 overflow-hidden">
                                       <div className="flex items-center gap-1.5">
-                                          <p className="font-bold text-xs text-purple-700 dark:text-purple-300 truncate">Bot de ayuda GinAI</p>
-                                          <span className="bg-purple-600 text-white text-[8px] font-black px-1.5 py-0.2 rounded uppercase tracking-wider">IA</span>
+                                          <p className="font-bold text-xs text-purple-700 dark:text-purple-300 truncate">Bot de ayuda</p>
                                       </div>
-                                      <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">Asistente técnico docente</p>
+                                      <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">Asistente técnico</p>
                                   </div>
                               </button>
                           </div>
@@ -3098,7 +3164,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                       <div className={`${glassCard} w-[92vw] sm:w-[420px] md:w-[480px] h-[520px] md:h-[600px] max-h-[80vh] flex flex-col p-4 animate-in slide-in-from-bottom-10 fade-in shadow-2xl ${isDarkMode ? 'bg-gray-900/95 border-gray-700' : 'bg-white/95 border-gray-200'}`}>
                           <div className={`flex justify-between items-center mb-3 border-b pb-3 ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
                               <h3 className={`font-bold flex items-center gap-2 ${isDarkMode ? 'text-gray-100' : 'text-gray-800'}`}>
-                                  <CuteBotIcon size={24} className={isDarkMode ? 'text-blue-400' : 'text-blue-600'} /> Bot de ayuda GinAI
+                                  <CuteBotIcon size={24} className={isDarkMode ? 'text-blue-400' : 'text-blue-600'} /> Bot de ayuda
                               </h3>
                               <button onClick={() => setIsTeacherBotOpen(false)} className={`p-1.5 rounded-full transition-colors ${isDarkMode ? 'text-gray-400 hover:text-red-400 hover:bg-gray-800' : 'text-gray-500 hover:text-red-500 hover:bg-gray-100'}`} title="Cerrar"><X size={18}/></button>
                           </div>

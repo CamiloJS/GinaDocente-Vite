@@ -46,8 +46,13 @@ const TasksTab = React.memo(({
     const teacherPic = userMappings?.[myChatId]?.profilePicUrl;
 
     return (
-        <div className="space-y-6">
-            <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-6 flex items-center gap-2 drop-shadow-sm"><BookOpen className="text-[#AD3333]" /> Muro de clase</h2>
+        <div className="space-y-5">
+            <div className="flex items-center gap-2.5 mb-4">
+                <div className="w-9 h-9 rounded-xl bg-red-500/10 flex items-center justify-center text-[#AD3333] shrink-0">
+                    <BookOpen size={20} />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 drop-shadow-sm">Muro de publicaciones y tareas</h2>
+            </div>
             
             {/* COMPOSER CARD (ALWAYS MOUNTED FOR FLUID 60FPS CSS ACCORDION EXPANSION) */}
             {role === 'teacher' && (
