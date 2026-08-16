@@ -144,23 +144,6 @@ useEffect(() => {
                 }
             }, [isDarkMode]);
 
-          // --- TÍTULOS DINÁMICOS DE PESTAÑA ---
-          useEffect(() => {
-              const tabNames = {
-                  tasks: 'Asignaciones',
-                  reviews: 'Repasos',
-                  syllabus: 'Contenidos',
-                  evaluations: 'Evaluaciones',
-                  directory: 'Directorio',
-                  inbox: 'Buzón',
-                  profile: 'Perfil',
-              };
-              if (isChatAppOpen) {
-                  document.title = 'Mensajes | English TECH';
-              } else {
-                  document.title = `${tabNames[activeTab] || 'Inicio'} | English TECH`;
-              }
-          }, [activeTab, isChatAppOpen]);
 
           // --- INDICADOR OFF / ONLINE ---
           useEffect(() => {
@@ -403,6 +386,24 @@ const handleOpenProfileByName = (name) => {
           const [suggestions, setSuggestions] = useState([]);
           const [alerts, setAlerts] = useState([]);
           const [reviews, setReviews] = useState([]); 
+
+          // --- TÍTULOS DINÁMICOS DE PESTAÑA ---
+          useEffect(() => {
+              const tabNames = {
+                  tasks: 'Asignaciones',
+                  reviews: 'Repasos',
+                  syllabus: 'Contenidos',
+                  evaluations: 'Evaluaciones',
+                  directory: 'Directorio',
+                  inbox: 'Buzón',
+                  profile: 'Perfil',
+              };
+              if (isChatAppOpen) {
+                  document.title = 'Mensajes | English TECH';
+              } else {
+                  document.title = `${tabNames[activeTab] || 'Inicio'} | English TECH`;
+              }
+          }, [activeTab, isChatAppOpen]);
 
           const confirmAction = (msg, action) => {
               setConfirmDialog({ isOpen: true, message: msg, onConfirm: action });
