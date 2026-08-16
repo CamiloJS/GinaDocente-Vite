@@ -10,9 +10,22 @@ Write-Host ""
 $workspace = "C:\Users\Equipo\OneDrive\Documentos\Default Project\gina-vite"
 $agy = "C:\Users\Equipo\AppData\Local\agy\bin\agy.exe"
 $conv = "13396f54-3ed3-45fd-a3ed-50c738c0bf59"
+$notif = Join-Path $workspace "notificar-telegram.ps1"
 
-if (!(Test-Path $agy)) { Write-Host "ERROR: agy.exe no encontrado" -ForegroundColor Red; exit 1 }
+function Notificar-Telegram($mensaje, $estado) {
+    if (Test-Path $notif) {
+        try {
+            & powershell -ExecutionPolicy Bypass -File $notif -Mensaje $mensaje -Estado $estado 2>$null | Out-Null
+        } catch {}
+    }
+}
+
+if (!(Test-Path $agy)) { Write-Host "ERROR: agy.exe no encontrado" -ForegroundColor Red; Notificar-Telegram "ERROR DE ARRANQUE: agy.exe no encontrado al iniciar la ronda autónoma." "error"; exit 1 }
 if (!(Test-Path $workspace)) { Write-Host "ERROR: workspace no encontrado" -ForegroundColor Red; exit 1 }
+
+# Notificar inicio de ronda
+$fecha = Get-Date -Format "dd/MM/yyyy HH:mm"
+Notificar-Telegram "Ronda de trabajo autónoma iniciada ($fecha). Antigravity está trabajando." ""
 
 Write-Host "Lanzando Antigravity en modo autonomo..." -ForegroundColor Yellow
 Write-Host "  (trabaja solo, commitea, despliega y verifica)" -ForegroundColor Yellow
@@ -24,16 +37,10 @@ $prompt = @"
 Eres el unico desarrollador de English TECH. Trabaja 100% SOLO en el workspace gina-vite.
 Lee BRIEFING.md COMPLETO: es tu contexto maestro (rutas, credenciales, reglas, estado).
 
-ESTADO ACTUAL (continuar desde aqui, NO empezar de cero):
-1. PRIORIDAD 1: investigar y corregir el bug de la pantalla "Ups! Algo salio mal"
-   (ErrorBoundary). El ErrorBoundary ahora muestra el stack trace en pantalla
-   (window.__ebError). Reproduce el error navegando la app o desplegando, lee el
-   stack trace, corrige la causa raiz, y cuando este resuelto elimina el <pre> de
-   diagnostico del ErrorBoundary.
-2. Terminar la INSTRUCCION #30 (TTS / lector de voz): ya existe el icono Volume2.
-   Crear speakText() y anadir botones junto a los de copiar en el chat.
-3. Despues, continuar mejorando por tu cuenta (sigue numerando INSTRUCCIONES en
-   INSTRUCCIONES-ANTIGRAVITY.md y reportando en REPORTE-OPENCODE.md).
+PRIORIDAD #1 (ABSOLUTA): que la pagina FUNCIONE. Antes de cualquier mejora nueva,
+verifica que la app cargue y navegue sin errores en produccion. Si encuentras
+cualquier bug que rompa la pagina, CORRIGELO PRIMERO. No agregues funciones nuevas
+si la pagina no esta estable.
 
 PROTOCOLO OBLIGATORIO (cada tarea):
 - Implementa en el codigo dentro de gina-vite.
@@ -42,19 +49,44 @@ PROTOCOLO OBLIGATORIO (cada tarea):
   edwincamilojaimes1-2302).
 - Commit + push: git add -A; git commit -m 'mensaje en espanol'; git push origin main
 - Actualiza REPORTE-OPENCODE.md con lo hecho.
-- Si algo requiere un clic o decision del usuario, escribelo en NOTAS-PARA-USUARIO.md
-  en gina-vite y detente para avisar.
+
+NOTIFICACIONES POR TELEGRAM (OBLIGATORIO): despues de CADA tarea completada
+(cada instruccion, cada bug corregido, cada deploy exitoso), ejecuta:
+  powershell -ExecutionPolicy Bypass -File "$notif" -Mensaje "Texto del avance" -Estado "deploy"
+  (o sin -Estado para un aviso normal, o -Estado "error" para errores).
+Informa al usuario por Telegram: qué hiciste, commit, y URL. Asi el usuario
+sigue el progreso sin abrir la consola.
+
+Si algo requiere un clic o decision del usuario, escribelo en NOTAS-PARA-USUARIO.md
+en gina-vite, notificalo por Telegram con -Estado "error", y detente.
 
 Tienes permiso total: instala dependencias (npm install), crea scripts auxiliares,
 corrige bugs, mejora lo que quieras, manteniendo las reglas del BRIEFING (100%
 gratis, no guardar contrasenas, desplegar siempre desde gina-vite).
 
-Cuando termines toda tu lista de tareas, responde con un resumen claro de lo hecho
+Cuando termines tu lista de tareas, responde con un resumen claro de lo hecho
 y el estado de la app. NO preguntes antes de actuar: actua, y si hay dudas decide
 tu con criterio conservador.
 "@
 
-& $agy --add-dir $workspace --conversation $conv --model gemini-3.1-pro-high --dangerously-skip-permissions --print $prompt --print-timeout 30m
+# Ejecutar Antigravity con deteccion de fallos/tiempo
+$salida = $null
+$fallo = $null
+try {
+    $salida = & $agy --add-dir $workspace --conversation $conv --model gemini-3.1-pro-high --dangerously-skip-permissions --print $prompt --print-timeout 60m 2>&1
+} catch {
+    $fallo = $_.Exception.Message
+}
+
+if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne $null -or $fallo) {
+    Notificar-Telegram "⚠️ Antigravity se DETUVO o fallo (exit=$LASTEXITCODE). Detalle: $fallo. Revisa la maquina o relanza trabajar-solo.ps1." "error"
+    Write-Host "Antigravity fallo. Notificado por Telegram." -ForegroundColor Red
+} else {
+    $resumen = ($salida | Out-String)
+    if ($resumen -match "(?s)\.{3}") { }
+    Notificar-Telegram "Ronda de trabajo de Antigravity TERMINADA. Revisa REPORTE-OPENCODE.md para el detalle. Puedes relanzar trabajar-solo.ps1 para otra ronda." "fin"
+    Write-Host "Ronda terminada sin fallos. Notificado por Telegram." -ForegroundColor Green
+}
 
 Write-Host ""
 Write-Host "======================================" -ForegroundColor Cyan
