@@ -23,7 +23,7 @@ import {
   FileText, ImageIcon, Loader2, LogOutIcon, Mail, MessageCircle, Moon, NavCalendar,
   NavFile, NavNotebook, NavSlides, Palette, PaperclipIcon, Plus, ReplyIcon, SearchIcon,
   Send, SingleTick, SmileIcon, Sparkles, Sun, TeacherIcon, Trash2, UserIcon,
-  UsersGroupIcon, UsersIcon, Wand2, X, XLine, Copy, Mic, Square,
+  UsersGroupIcon, UsersIcon, Wand2, X, XLine, Copy, Mic, Square, Bell,
 } from './components/Icons.jsx'
 const GifPickerModal = React.lazy(() => import('./components/GifPickerModal.jsx'))
 import EmptyState from './components/EmptyState.jsx'
@@ -200,6 +200,12 @@ useEffect(() => {
           
           const [toastMessage, setToastMessage] = useState("");
           const showMessage = (msg) => { setToastMessage(msg); setTimeout(() => setToastMessage(""), 5000); };
+          const enableNotifications = async () => {
+              if (!('Notification' in window)) { showMessage("Tu navegador no soporta notificaciones."); return; }
+              const perm = await Notification.requestPermission();
+              if (perm === 'granted') showMessage("✅ Notificaciones activadas");
+              else showMessage("Notificaciones no permitidas");
+          };
           const handleCopy = async (text) => {
               try {
                   await navigator.clipboard.writeText(text || '');
@@ -2633,6 +2639,10 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                     <Mail size={18} /> Sugerencias
                 </button>
             )}
+
+            <button onClick={() => { enableNotifications(); setShowUserMenu(false); }} className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-bold rounded-xl transition-colors ${isDarkMode ? 'text-gray-200 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`}>
+                <Bell size={18} /> Activar notificaciones
+            </button>
 
             {/* 👇 BOTÓN EXCLUSIVO DE EDWIN BLINDADO 👇 */}
             {role === 'teacher' && (

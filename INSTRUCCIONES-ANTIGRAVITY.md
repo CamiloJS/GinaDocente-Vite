@@ -421,4 +421,20 @@ El reporte anterior señala que el Muro (`TaskCard`) no muestra visualmente cuá
 
 **Entrega:** Documenta en `REPORTE-OPENCODE.md` dónde y cómo colocaste las fechas relativas, y qué método elegiste para solucionar el problema de los textareas fijos.
 
+---
+
+# INSTRUCCION #26
+
+**Objetivo:** Retención y Engagement: Notificaciones de Sistema (Web Notifications API).
+
+Como esta plataforma funciona como PWA, queremos acercar la experiencia a una app nativa informando a los usuarios cuando reciben nuevos mensajes en el chat, incluso si están en otra pestaña del navegador.
+
+**Acciones a implementar por Opencode:**
+1. **Solicitar Permiso:** En `App.jsx`, crea un botón discreto en el Navbar o panel de perfil para "Activar notificaciones", o bien solicítalo en un `useEffect` al iniciar sesión. Usa `Notification.requestPermission()`. (Nota: Los navegadores modernos exigen que sea resultado de una interacción del usuario, así que un botón suele ser más seguro).
+2. **Disparar Notificación Local:** Busca el bloque en `App.jsx` que escucha mensajes nuevos del chat o alertas (donde tienes `notificationSound.current?.play()`). Añade una validación: si `Notification.permission === 'granted'` y `document.hidden` es `true` (el usuario está en otra pestaña), lanza `new Notification("English TECH", { body: "Tienes un nuevo mensaje", icon: "/icon-192.png" })`.
+3. **Refinamiento:** Asegúrate de no spamear al usuario si ya está con la ventana activa (`!document.hidden`).
+4. **Deploy:** Prueba el build localmente (`npm run build`), realiza `commit`/`push` a `main` y lanza `vercel deploy --prod`.
+
+**Entrega:** Documenta en `REPORTE-OPENCODE.md` si lograste lanzar notificaciones nativas en el escritorio/móvil y si optaste por un botón o solicitud automática.
+
 ESTADO: LISTA PARA IMPLEMENTAR
