@@ -454,4 +454,22 @@ Para que la plataforma funcione como un verdadero LMS (Learning Management Syste
 
 **Entrega:** Documenta en `REPORTE-OPENCODE.md` cómo manejaste la actualización del comentario en Firestore y confirma que la insignia se muestra correctamente.
 
+---
+
+# INSTRUCCION #28
+
+**Objetivo:** Formateo de Texto: Soporte Básico de Markdown (Negritas y Cursivas).
+
+En la enseñanza de idiomas, es crítico poder resaltar estructuras gramaticales (ej. "She **goes** to the store"). Actualmente, la plataforma solo soporta texto plano (con enlaces). Vamos a permitir que docentes y alumnos usen formato básico de Markdown.
+
+**Acciones a implementar por Opencode:**
+1. **Mejorar `LinkifyText.jsx`:** Expande este componente para que, además de parsear URLs y videos de YouTube, detecte y formatee patrones de Markdown:
+   - Negritas: texto entre doble asterisco `**texto**` debe renderizarse como `<strong className="font-bold text-gray-900 dark:text-white">texto</strong>`.
+   - Cursivas: texto entre un asterisco `*texto*` debe renderizarse como `<em className="italic">texto</em>`.
+2. **Estrategia de Parseo:** Dado que combinar regex para URLs y Markdown puede ser complejo y frágil en React (crear arrays mezclados), te recomiendo usar una librería ligera si se complica. Si optas por Regex puro, asegúrate de procesar primero las negritas, luego cursivas y luego las URLs para no chocar (o al revés, según te parezca más seguro).
+3. **Prueba en Chat y Muro:** Al modificar `LinkifyText.jsx`, tanto el chat, como las tareas y los comentarios adquirirán este superpoder instantáneamente. Asegúrate de probarlo en tu entorno local.
+4. **Deploy:** Compila (`npm run build`), haz `commit`/`push` a `main` y lanza `vercel deploy --prod`.
+
+**Entrega:** Documenta en `REPORTE-OPENCODE.md` si lograste resolver el parseo con Regex manual o si preferiste integrar alguna librería pequeña como `react-markdown`. Confirma que el texto en negritas se ve bien.
+
 ESTADO: LISTA PARA IMPLEMENTAR

@@ -1,9 +1,33 @@
 // src/components/LinkifyText.jsx
-// Renderiza texto convirtiendo URLs en enlaces clicables y embeber YouTube
+// Renderiza texto con Markdown básico (**negritas**, *cursivas*), URLs clicables y embeds de YouTube.
 
 const extractYouTubeId = (url) => {
   const m = String(url).match(/(?:youtube\.com\/(?:[^/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?/\s]{11})/i)
   return m ? m[1] : null
+}
+
+const renderWithMarkdown = (text, keyPrefix) => {
+  const out = []
+  // Procesar negritas primero: **texto**
+  const boldParts = String(text).split(/(\*\*[^*]+\*\*)/g)
+  boldParts.forEach((bp, bi) => {
+    const boldMatch = bp.match(/^\*\*(.*)\*\*$/s)
+    if (boldMatch) {
+      out.push(<strong key={`${keyPrefix}-b${bi}`} className="font-bold text-gray-900 dark:text-white">{renderWithMarkdown(boldMatch[1], `${keyPrefix}-b${bi}`)}</strong>)
+      return
+    }
+    // Luego cursivas: *texto*
+    const emParts = bp.split(/(\*[^*]+\*)/g)
+    emParts.forEach((ep, ei) => {
+      const emMatch = ep.match(/^\*(.*)\*$/s)
+      if (emMatch) {
+        out.push(<em key={`${keyPrefix}-e${bi}-${ei}`} className="italic">{emMatch[1]}</em>)
+      } else {
+        out.push(<span key={`${keyPrefix}-t${bi}-${ei}`}>{ep}</span>)
+      }
+    })
+  })
+  return out
 }
 
 const LinkifyText = ({ text }) => {
@@ -22,7 +46,7 @@ const LinkifyText = ({ text }) => {
         </a>
       )
     }
-    return <span key={idx}>{part}</span>
+    return <span key={idx}>{renderWithMarkdown(part, idx)}</span>
   })
   return (
     <>
