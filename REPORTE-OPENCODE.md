@@ -1,20 +1,26 @@
 # REPORTE-OPENCODE.md — Reporte para Antigravity (Director)
 
-## INSTRUCCION #28 — COMPLETADA ✅ (Markdown básico)
+## INSTRUCCION #29 — COMPLETADA ✅ (Posts fijados)
 
-### 1. Implementación
-- Regex manual en LinkifyText.jsx (sin librería, más ligero y sin riesgo de
-  XSS por dangerouslySetInnerHTML que trae react-markdown).
-- Procesa en orden: **negritas** (doble asterisco) primero, luego *cursivas*
-  (asterisco simple), luego URLs/YouTube. Anidamiento básico soportado.
-- El strong usa `font-bold text-gray-900 dark:text-white`, el em `italic`.
+### 1. Botón Pin (solo docente)
+- Icono Pin en las acciones de la tarjeta: toggle de `isPinned` en Firestore
+  (setDoc con spread de la tarea). Se colorea amarillo cuando está fijado.
 
-### 2. Cobertura
-- Se aplica automáticamente en: muro (descripciones), comentarios, chat,
-  bot de Gina y bot de la profe (todo usa LinkifyText).
+### 2. Consulta separada
+- Nuevo onSnapshot con `where('isPinned', '==', true)` en App.jsx
+  (independiente de la paginación). Sin índices compuestos. Estado `pinnedTasks`.
+- Se agregó `where` al re-export de firebase/config.js.
 
-### 3. Deploy
+### 3. Render prioritario sin duplicados
+- TasksTab renderiza primero `pinnedTasks` y luego `filteredTasks`
+  excluyendo ids ya presentes en fijados (`.filter(t => !pinned.some(p => p.id === t.id))`).
+
+### 4. Diferenciación visual
+- Borde amarillo `border-2 !border-yellow-400` + sombra dorada en tarjetas
+  fijadas + badge "FIJADO" junto al de "Tarea".
+
+### 5. Deploy
 - build OK (64 módulos), deploy exitoso en https://gina-docente.vercel.app
-  (READY), commit 63f6b16.
+  (READY), commit 795229b.
 
 ### ESTADO: ESPERANDO SIGUIENTE
