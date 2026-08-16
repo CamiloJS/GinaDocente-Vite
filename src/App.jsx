@@ -1079,7 +1079,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                   const group = chatGroups.find(g => `group_${g.id}` === activeChat.id);
                   if (group) targetIds = group.members.filter(id => id !== myChatId);
               } else {
-                  targetIds = [activeChat.id.replace('dm_', '').replace(myChatId, '').replace('_', '')];
+                  targetIds = [activeChat.id.replace('dm_', '').split('_').find(id => id !== myChatId)];
               }
               targetIds.forEach(async tId => {
                   if(tId) {
@@ -1773,6 +1773,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                     }} className={`${glassCard} flex flex-wrap gap-4 items-end`}>
                       <input type="number" name="week" placeholder="Semana" className={`${glassInput} w-24`} required />
                       <input name="topic" placeholder="Tema..." className={`${glassInput} flex-1`} required />
+                      <input name="material" placeholder="URL del material (opcional)..." className={`${glassInput} flex-1`} />
                       <button type="submit" className={redButton}>Añadir</button>
                     </form>
                   )}
@@ -2338,7 +2339,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                       
                       <button onClick={() => setIsDarkMode(!isDarkMode)} className="absolute top-4 right-4 md:top-6 md:right-6 p-3 rounded-full bg-white/40 hover:bg-white/60 text-gray-800 transition-all shadow-sm border border-white/50 z-50" title="Alternar Modo Oscuro">
                           {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
-                      </button>
+                      </button>
                       
                       <div className="relative z-10 w-full max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-center gap-8 px-4 animate-in fade-in zoom-in duration-500 py-12">
                           
@@ -2351,7 +2352,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                                           <div key={acc.username} className="relative group">
                                               <button onClick={() => handleQuickLogin(acc)} className="bg-white/40 hover:bg-white/60 border border-white/60 shadow-md rounded-2xl p-4 flex flex-col items-center justify-center gap-3 transition-all hover:scale-105 w-28 h-32">
                                                   <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-sm ${acc.role === 'teacher' ? 'bg-gradient-to-br from-[#AD3333] to-[#8a2828]' : 'bg-gradient-to-br from-blue-500 to-indigo-600'}`}>
-                                                      {acc.role === 'teacher' ? 'G' : acc.name.charAt(0)}
+                                                      {acc.role === 'teacher' ? 'G' : (acc.name || 'U').charAt(0)}
                                                   </div>
                                                   <span className="text-xs font-bold text-gray-800 text-center leading-tight line-clamp-2">
                                                       {acc.role === 'teacher' ? 'Gina' : acc.name}
@@ -2378,14 +2379,14 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                                   <h2 className="text-xl font-bold text-center text-gray-700 mb-4">Acceder</h2>
                                   
                                   <button 
-                                      onClick={() => setLoginType('teacher')}
+                                      onClick={() => { setPrefillUsername(''); setLoginError(''); setLoginType('teacher'); }}
                                       className="w-full bg-[#AD3333]/90 backdrop-blur-md text-white px-4 py-2.5 rounded-xl font-bold shadow-md shadow-[#AD3333]/25 hover:bg-[#8a2828] transition-all duration-300 border border-white/20"
                                   >
                                       Soy docente
                                   </button>
                                   
                                   <button 
-                                      onClick={() => setLoginType('student')}
+                                      onClick={() => { setPrefillUsername(''); setLoginError(''); setLoginType('student'); }}
                                       className="w-full bg-blue-600/90 backdrop-blur-md text-white px-4 py-2.5 rounded-xl font-bold shadow-md shadow-blue-600/25 hover:bg-blue-700 transition-all duration-300 border border-white/20"
                                   >
                                       Soy estudiante
@@ -2477,7 +2478,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                 .dark .text-gray-400 { color: #9ca3af !important; }
                 .dark .text-gray-300 { color: #d1d5db !important; }
 `}</style>
-
+
 
               <nav className="sticky top-0 z-50 bg-white/20 backdrop-blur-xl border-b border-white/40 px-4 md:px-6 py-4 flex justify-between items-start md:items-center shadow-sm">
                 
@@ -2754,7 +2755,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                               </h2>
                               <button onClick={() => {
                                   setIsChatAppOpen(false); 
-                                  window.location.hash = activeTab === 'chat' ? 'tasks' : activeTab;
+                                  window.location.hash = (activeTab === 'chat' || activeTab === 'profile') ? 'tasks' : activeTab;
                               }} className={`p-3 rounded-full transition-all shadow-sm ${isDarkMode ? 'bg-gray-700 text-gray-300 hover:text-white hover:bg-gray-600' : 'bg-gray-100 text-gray-600 hover:text-gray-900 hover:bg-gray-200'}`}>
                                   <X size={24} />
                               </button>
