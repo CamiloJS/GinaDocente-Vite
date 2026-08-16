@@ -74,7 +74,7 @@ const TasksTab = React.memo(({
                             )}
                             {postImageUrl && (
                                 <div className="relative w-fit mt-3">
-                                    <img src={postImageUrl} alt="Preview" className="h-32 object-cover rounded-xl border border-white/50 bg-black/5 shadow-sm" onError={(e) => e.target.style.display = 'none'} />
+                                    <img src={postImageUrl} alt="Preview" loading="lazy" className="h-32 object-cover rounded-xl border border-white/50 bg-black/5 shadow-sm" onError={(e) => e.target.style.display = 'none'} />
                                     <button type="button" onClick={() => setPostImageUrl("")} className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1.5 hover:bg-red-700 transition shadow-md"><X size={14}/></button>
                                 </div>
                             )}

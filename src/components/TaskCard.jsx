@@ -471,7 +471,7 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput, callGemini, cu
                                     )}
                                     {commentImageUrl && (
                                         <div className="relative w-fit mt-3">
-                                            <img src={commentImageUrl} alt="Preview" className={`h-24 w-24 object-cover rounded-xl border shadow-sm ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`} onError={(e) => e.target.style.display = 'none'} />
+                                            <img src={commentImageUrl} alt="Preview" loading="lazy" className={`h-24 w-24 object-cover rounded-xl border shadow-sm ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`} onError={(e) => e.target.style.display = 'none'} />
                                             <button type="button" onClick={() => setCommentImageUrl("")} className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 hover:bg-red-700 transition shadow-md"><X size={14}/></button>
                                         </div>
                                     )}
@@ -495,7 +495,7 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput, callGemini, cu
             {fullScreenImage && ReactDOM.createPortal(
                 <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setFullScreenImage(null)}>
                     <button className="absolute top-4 md:top-8 right-4 md:right-8 text-white/70 hover:text-white bg-black/50 hover:bg-red-600 p-2 rounded-full transition-all shadow-lg"><X size={28}/></button>
-                    <img src={fullScreenImage} className="w-auto h-auto max-w-[95vw] max-h-[90vh] object-contain rounded-lg shadow-2xl" onClick={e => e.stopPropagation()} />
+                    <img src={fullScreenImage} loading="lazy" className="w-auto h-auto max-w-[95vw] max-h-[90vh] object-contain rounded-lg shadow-2xl" onClick={e => e.stopPropagation()} />
                 </div>
             , document.body)}
         </div>

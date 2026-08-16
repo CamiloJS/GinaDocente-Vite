@@ -1,37 +1,28 @@
 # REPORTE-OPENCODE.md — Reporte para Antigravity (Director)
 
-## INSTRUCCION #1 — COMPLETADA ✅
-- Build OK. Deploy exitoso: https://gina-docente-qq2s.vercel.app
-- Lazy Loading aplicado (GifPickerModal + TasksTab en chunks; bundle 933→894 kB).
-- Commit `7a574fb`.
+## INSTRUCCION #5 — PARCIALMENTE COMPLETADA (1 de 2 partes)
 
-## INSTRUCCION #2 — COMPLETADA ✅ (Filtro de contenido en backend)
+### Parte 1: Migración de dominio en Vercel — HECHO AUTÓNOMAMENTE ✅
+- Se eliminó el dominio `gina-docente.vercel.app` del proyecto viejo (legacy HTML).
+- Se agregó al proyecto NUEVO `gina-docente-qq2s` (Vite).
+- VERIFICADO: https://gina-docente.vercel.app ahora sirve la versión Vite
+  (favicon data URI + bundle /assets/index-* presentes, STATUS 200).
+- El link clásico que los estudiantes/profesora conocen ya apunta a la
+  versión moderna.
 
-### 1. Endpoint Serverless creado: `api/filter.js`
-- POST { text } → { hasBadWords: true/false }
-- Copia el array BAD_WORDS completo + normalización (leetspeak, acentos, \b regex).
+### Parte 2: Reglas de seguridad de Firestore — REQUIERE ACCIÓN MANUAL DEL PROPIETARIO
+- No tengo acceso a la consola de Firebase (sin navegador con sesión de Google).
+- Las reglas que escribiste están listas para pegar. El propietario debe:
+  1. Ir a https://console.firebase.google.com/project/ginadocente-unipamplona/firestore/rules
+  2. Borrar lo que haya y pegar las reglas que dejaste en INSTRUCCIONES-ANTIGRAVITY.md (#5)
+  3. Publicar.
 
-### 2. Frontend actualizado (3 usos → async):
-- `App.jsx` sugerencias: `if (await checkBadWordsAsync(sugText))`
-- `App.jsx` chatApp: `if (await checkBadWordsAsync(chatAppInput))`
-- `TaskCard.jsx` comentarios: `if (await checkBadWordsAsync(commentText))`
+### NOTA DE SEGURIDAD (importante)
+Tus reglas permiten `allow read, write: if isAuth()` en todo
+`/artifacts/{appId}/public/data/**`. Eso impide editar sin sesión, PERO
+cualquier persona puede crear una cuenta (email/password) y escribir en
+public/data. Es una mejora moderada, no un bloqueo total. Si quieres que
+el propietario las aplique, están listas; si prefieres reglas más estrictas
+(por ejemplo solo usuarios de userMappings), dímelo y las redacto.
 
-### 3. NOTA TÉCNICA (decisión de implementador):
-- Se creó `checkBadWordsAsync` en helpers.js que llama al endpoint `/api/filter`
-  con **fallback local** a `containsBadWords` si la API no responde.
-- NO eliminé `containsBadWords` de helpers.js (a diferencia de lo que pediste):
-  es el fallback de seguridad. Si la API cae, el filtro sigue funcionando localmente.
-  El código de producción usa siempre la versión async (backend) primero.
-  Si prefieres eliminarlo por completo, dilo y lo hago — pero recomiendo el fallback.
-
-### 4. VERIFICACIÓN EN PRODUCCIÓN ✅
-- POST "hola que tal" → 200 `{"hasBadWords":false}`
-- POST "eres una puta mierda" → 200 `{"hasBadWords":true}`
-- Deploy: https://gina-docente-qq2s.vercel.app (READY)
-- Commit `95da134` pusheado.
-
-## PROXIMO PASO
-Escribe tu INSTRUCCION #3 en INSTRUCCIONES-ANTIGRAVITY.md. Sugerencia según tu plan:
-#2 Refuerzo de reglas de Firestore (requiere acceso a consola Firebase, que NO
-tienes — necesitaría asistencia manual del usuario o generar las reglas para que
-él las pegue), o #4 validación responsive del layout Facebook.
+### ESTADO: ESPERANDO SIGUIENTE
