@@ -1,7 +1,7 @@
 // src/components/TasksTab.jsx
 import React, { useState } from 'react'
 import {
-  Book, BookOpen, CheckCheck, ChevronRight, Globe, ImageIcon, PaperclipIcon, Plus, Sparkles, Target, Undo2, X,
+  Book, BookOpen, CheckCheck, ChevronRight, Globe, ImageIcon, PaperclipIcon, Plus, SearchIcon, Sparkles, Target, Undo2, X,
 } from './Icons.jsx'
 import TaskCard from './TaskCard.jsx'
 import EmptyState from './EmptyState.jsx'
@@ -23,6 +23,7 @@ const TasksTab = React.memo(({
     // ESTADOS DEL MENÚ LIQUID GLASS
     const [postTargetGroup, setPostTargetGroup] = useState("");
     const [isGroupDropdownOpen, setIsGroupDropdownOpen] = useState(false);
+    const [wallSearchTerm, setWallSearchTerm] = useState("");
 
     // FILTRO: ¿Qué ve el estudiante?
     const visibleTasks = role === 'teacher' ? tasks : tasks.filter(t => {
@@ -30,6 +31,14 @@ const TasksTab = React.memo(({
         const group = academicGroups?.find(g => g.id === t.targetGroupId);
         return group && group.members.includes(myChatId);
     });
+
+    // Buscador de publicaciones
+    const filteredTasks = wallSearchTerm.trim()
+        ? visibleTasks.filter(t => {
+            const hay = (t.title || '') + ' ' + (t.description || '');
+            return hay.toLowerCase().includes(wallSearchTerm.trim().toLowerCase());
+          })
+        : visibleTasks;
 
     return (
         <div className="space-y-6">
@@ -158,8 +167,20 @@ const TasksTab = React.memo(({
             )}
             {tasksLoading ? (
                 <div className="space-y-4">{[0,1,2].map(i => <SkeletonCard key={i} isDarkMode={isDarkMode} />)}</div>
+            ) : (
+                <div className="mb-4 relative">
+                    <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border focus-within:ring-2 transition-all ${isDarkMode ? 'bg-gray-800 border-gray-700 focus-within:ring-blue-500/50' : 'bg-gray-50 border-gray-300 focus-within:ring-blue-400/50'}`}>
+                        <SearchIcon size={18} className={isDarkMode ? 'text-gray-400' : 'text-gray-500'} />
+                        <input value={wallSearchTerm} onChange={e => setWallSearchTerm(e.target.value)} placeholder="Buscar publicaciones..." className={`flex-1 bg-transparent border-none outline-none text-sm font-medium ${isDarkMode ? 'text-gray-100 placeholder-gray-500' : 'text-gray-900 placeholder-gray-500'}`} />
+                        {wallSearchTerm && <button onClick={() => setWallSearchTerm("")} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>}
+                    </div>
+                    {filteredTasks.length === 0 && <p className="text-gray-500 italic text-sm mt-2">No se encontraron publicaciones con ese término.</p>}
+                </div>
+            )}
+            {tasksLoading ? (
+                <div className="space-y-4">{[0,1,2].map(i => <SkeletonCard key={i} isDarkMode={isDarkMode} />)}</div>
             ) : visibleTasks.length === 0 ? <EmptyState icon={BookOpen} title="Todavía no hay publicaciones" message="Cuando la profesora publique una tarea o aviso, aparecerá aquí." isDarkMode={isDarkMode} /> : null}
-{visibleTasks.map(task => <TaskCard key={task.id} task={{...task, type: task.type || 'task'}} role={role} db={db} appId={appId} glassCard={glassCard} glassInput={glassInput} callGemini={callGemini} currentUser={user} showMessage={showMessage} loggedInName={loggedInName} isDarkMode={isDarkMode} confirmAction={confirmAction} handleOpenProfileByName={handleOpenProfileByName} setFullScreenImage={setFullScreenImage} />)}
+{filteredTasks.map(task => <TaskCard key={task.id} task={{...task, type: task.type || 'task'}} role={role} db={db} appId={appId} glassCard={glassCard} glassInput={glassInput} callGemini={callGemini} currentUser={user} showMessage={showMessage} loggedInName={loggedInName} isDarkMode={isDarkMode} confirmAction={confirmAction} handleOpenProfileByName={handleOpenProfileByName} setFullScreenImage={setFullScreenImage} />)}
         </div>
     );
 });

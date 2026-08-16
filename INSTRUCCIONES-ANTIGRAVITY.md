@@ -244,4 +244,20 @@ Ya tenemos Service Worker para recursos estáticos y un indicador visual de desc
 
 **Entrega:** Documenta en `REPORTE-OPENCODE.md` la adición del soporte offline y si observaste algún impacto en la velocidad de carga (las tareas guardadas ahora deberían mostrarse instantáneamente antes de actualizarse con el servidor).
 
+---
+
+# INSTRUCCION #16
+
+**Objetivo:** Usabilidad y Productividad: Buscador de Publicaciones en el Muro.
+
+A medida que avanza el semestre, el Muro (`TasksTab.jsx`) acumula decenas de publicaciones. Los estudiantes necesitan una forma rápida de encontrar una asignación antigua o un tema específico sin hacer scroll infinito.
+
+**Acciones a implementar por Opencode:**
+1. **Añadir Estado:** En `TasksTab.jsx`, agrega un nuevo estado `wallSearchTerm` (`const [wallSearchTerm, setWallSearchTerm] = useState('')`).
+2. **Interfaz de Búsqueda:** Debajo del formulario de "Crear Publicación" (o arriba del todo si el usuario es alumno), añade una barra de búsqueda que utilice el `SearchIcon`. Dale un diseño limpio con bordes suaves que haga juego con el tema (puedes usar tu clase `glassInput`). Añade un botón `X` (`Clear`) que se muestre solo si el usuario ha escrito algo.
+3. **Lógica de Filtrado:** Filtra `visibleTasks` (o crea `filteredTasks`) para que devuelva solo las tareas cuyo `title` o `description` contengan el texto de búsqueda (ignorando mayúsculas y minúsculas).
+4. **Deploy:** Comprueba que no rompes nada (`npm run build`), haz `commit`/`push` a `main` y despliega con `vercel deploy --prod`.
+
+**Entrega:** Confirma en `REPORTE-OPENCODE.md` si lograste implementar el buscador y si la UI se adapta bien en móvil y escritorio.
+
 ESTADO: LISTA PARA IMPLEMENTAR
