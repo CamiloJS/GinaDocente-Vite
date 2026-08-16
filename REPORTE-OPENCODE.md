@@ -1,28 +1,29 @@
 # REPORTE-OPENCODE.md — Reporte para Antigravity (Director)
 
-## INSTRUCCION #6 — COMPLETADA ✅ (UX Feedback + Lazy Loading)
+## INSTRUCCION #7 — COMPLETADA ✅ (PWA)
 
-### 1. Toasts/notificaciones
-- Se auditó todo el código: **no hay `alert()`** en el proyecto. La app ya usa
-  `showMessage()` (toast flotante con Tailwind) en todas las acciones
-  (copiar, errores de envío, éxito, etc.). No se requirió cambio.
-  (Nota: hay un `window.alert`? No. Confirmado 0 alert()).
+### 1. manifest.json
+Creado en `public/manifest.json`:
+- name: "English TECH Unipamplona", short_name: "English TECH"
+- start_url ".", scope ".", display standalone
+- background_color #ffffff, theme_color #AD3333
+- icons: /icon-192.png y /icon-512.png (generados desde icono.png con PIL, purpose any+maskable)
 
-### 2. Lazy Loading de imágenes — AGREGADO ✅
-Se añadió `loading="lazy"` en:
-- App.jsx: avatar del sidebar, avatares del menú de usuario (2), foto de
-  perfil (targetProfilePic), preview de post del perfil, preview de imagen
-  del chat, modal fullScreenImage.
-- TaskCard.jsx: preview de imagen del comentario, modal fullScreenImage.
-- TasksTab.jsx: preview de imagen de publicación.
-- (GifPickerModal ya carga GIFs bajo demanda por ser lazy por naturaleza)
-- No se pusieron lazy en: crop de avatar (necesita carga inmediata) y
-  fullScreenImage de TaskCard ya cubierto.
+### 2. index.html
+- `<link rel="manifest" href="/manifest.json" />`
+- `<meta name="theme-color" content="#AD3333" />`
+- metas de PWA (mobile-web-app-capable, apple-mobile-web-app-*)
+- favicon data URI y apple-touch-icon preservados.
 
-### 3. Deploy
-- `npm run build` OK (57 módulos, 894.89 kB).
-- Deploy exitoso: https://gina-docente.vercel.app (y gina-docente-qq2s)
-  READY.
-- Commit `93429ca` pusheado.
+### 3. Verificación en producción
+- https://gina-docente.vercel.app/manifest.json → 200 OK
+- /icon-192.png → 200 (35.5 kB)
+- Deploy READY, commit 2ba26c0.
+
+### Nota
+Para que aparezca el botón "Instalar" se requiere también un Service Worker
+(sw.js + registro). No lo agregué porque no estaba en la instrucción, pero si
+quieres instalabilidad completa (Lighthouse PWA installable), es el paso que
+falta. Dime en la #8 si lo agrego.
 
 ### ESTADO: ESPERANDO SIGUIENTE
