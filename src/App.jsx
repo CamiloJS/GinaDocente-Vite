@@ -373,7 +373,19 @@ const handleOpenProfileByName = (name) => {
           const [showChatSettings, setShowChatSettings] = useState(false);
             const [showGroupInfo, setShowGroupInfo] = useState(false);
           const [rightSidebarTab, setRightSidebarTab] = useState('chats'); // 'chats' | 'settings'
+          const [chatSearchQuery, setChatSearchQuery] = useState('');
           const [soundEnabled, setSoundEnabled] = useState(true);
+
+          const updatePresenceStatus = async (newStatus) => {
+              const finalPresenceId = role === 'teacher' ? 'teacher' : myChatId;
+              if (finalPresenceId) {
+                  await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'presence', finalPresenceId), {
+                      isOnline: true,
+                      status: newStatus,
+                      lastPing: Date.now()
+                  }, { merge: true }).catch(() => {});
+              }
+          };
 
           const notificationSound = useRef(typeof Audio !== "undefined" ? new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3') : null);
 
@@ -2638,34 +2650,63 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
               <div className="max-w-[1600px] mx-auto w-full flex justify-center items-start px-0 md:px-4 gap-6 relative z-10">
                   {/* LEFT SIDEBAR (Facebook style) */}
                   <aside className={`w-[300px] hidden lg:block sticky top-[90px] h-[calc(100vh-100px)] overflow-y-auto overflow-x-hidden pr-2 z-10 space-y-4 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                      {/* Teacher/User Profile Card */}
+                      {/* Teacher/User Profile Card con Estado de Conexión */}
                       <div className={`p-4 rounded-2xl border shadow-sm flex flex-col items-center text-center ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
-                          <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 mb-3 shrink-0 overflow-hidden border-4 border-white shadow-sm dark:border-gray-700">
-                              {userMappings[myChatId]?.profilePicUrl ? <img src={userMappings[myChatId].profilePicUrl} className="w-full h-full object-cover" /> : <UserIcon size={40} />}
+                          <div className="relative mb-2">
+                              <div className="w-18 h-18 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shrink-0 overflow-hidden border-4 border-white shadow-md dark:border-gray-700">
+                                  {userMappings[myChatId]?.profilePicUrl ? <img src={userMappings[myChatId].profilePicUrl} className="w-full h-full object-cover" /> : <UserIcon size={38} />}
+                              </div>
+                              {/* Indicador de Estado en la Foto */}
+                              <div className={`absolute bottom-0 right-1 w-4 h-4 rounded-full border-2 ${isDarkMode ? 'border-gray-800' : 'border-white'} shadow-sm ${
+                                  userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'away' ? 'bg-orange-400' :
+                                  userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'busy' ? 'bg-red-500' : 'bg-green-500'
+                              }`} />
                           </div>
-                          <p className={`font-bold text-lg w-full leading-tight ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>{loggedInName}</p>
-                          <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-3">{userMappings[myChatId]?.customLabel || (role === 'teacher' ? 'Docente' : 'Estudiante')}</p>
                           
-                          <div className="w-full space-y-1">
-                              <button onClick={() => { setViewingProfileId(null); changeTab('profile'); }} className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-xl transition-colors ${activeTab === 'profile' && !viewingProfileId ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : isDarkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`}>
-                                  <UserIcon size={20} /> Mi perfil
+                          <p className={`font-bold text-base w-full leading-tight truncate px-1 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>{loggedInName}</p>
+                          <p className="text-[11px] text-gray-500 font-bold uppercase tracking-wider mt-0.5 mb-3">{userMappings[myChatId]?.customLabel || (role === 'teacher' ? 'Docente' : 'Estudiante')}</p>
+
+                          {/* Selector de Estado de Conexión junto al Avatar */}
+                          <div className="w-full bg-gray-50 dark:bg-gray-900/60 p-1 rounded-xl border border-gray-200/80 dark:border-gray-700 flex items-center justify-between gap-1">
+                              <button 
+                                  onClick={() => updatePresenceStatus('online')} 
+                                  className={`flex-1 py-1 px-1 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition-all ${
+                                      (!userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status || userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'online') 
+                                          ? 'bg-green-500/20 text-green-600 dark:text-green-400 font-extrabold border border-green-500/30' 
+                                          : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+                                  }`}
+                                  title="En línea"
+                              >
+                                  <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span> En línea
                               </button>
-                              {role === 'teacher' ? (
-                                  <button onClick={() => { changeTab('inbox'); }} className={`w-full flex items-center justify-between px-3 py-2 text-sm font-bold rounded-xl transition-colors ${activeTab === 'inbox' ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : isDarkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`}>
-                                      <div className="flex items-center gap-3"><Mail size={20} /> Buzón</div>
-                                      {alerts.length > 0 && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>}
-                                  </button>
-                              ) : (
-                                  <button onClick={() => { setShowSugModal(true); }} className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-xl transition-colors ${isDarkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`}>
-                                      <Mail size={20} /> Sugerencias
-                                  </button>
-                              )}
+                              <button 
+                                  onClick={() => updatePresenceStatus('away')} 
+                                  className={`flex-1 py-1 px-1 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition-all ${
+                                      userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'away' 
+                                          ? 'bg-orange-500/20 text-orange-600 dark:text-orange-400 font-extrabold border border-orange-500/30' 
+                                          : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+                                  }`}
+                                  title="Ausente"
+                              >
+                                  <span className="w-1.5 h-1.5 rounded-full bg-orange-400"></span> Ausente
+                              </button>
+                              <button 
+                                  onClick={() => updatePresenceStatus('busy')} 
+                                  className={`flex-1 py-1 px-1 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition-all ${
+                                      userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'busy' 
+                                          ? 'bg-red-500/20 text-red-600 dark:text-red-400 font-extrabold border border-red-500/30' 
+                                          : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+                                  }`}
+                                  title="Ocupado"
+                              >
+                                  <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span> Ocupado
+                              </button>
                           </div>
                       </div>
 
                       {/* Navigation Links like Facebook */}
                       <div className="space-y-1">
-                          <h3 className={`px-3 py-2 text-xs font-bold uppercase tracking-wider ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Explorar</h3>
+                          <h3 className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Explorar</h3>
                           <button onClick={() => changeTab('tasks')} className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-xl transition-colors ${activeTab === 'tasks' ? 'bg-gray-200 dark:bg-gray-700' : 'hover:bg-gray-200 dark:hover:bg-gray-800'}`}>
                               <NavNotebook size={24} className="text-blue-500" /> Asignaciones
                           </button>
@@ -2683,19 +2724,28 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                                   <UsersIcon size={24} className="text-indigo-500" /> Directorio
                               </button>
                           )}
-                          <button onClick={() => setShowSettingsModal(true)} className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-xl transition-colors ${isDarkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-200 text-gray-700'}`}>
-                              <Settings size={24} className="text-purple-500" /> Ajustes
-                          </button>
                       </div>
 
-                      {role === 'teacher' && (
-                          <div className={`mt-3 p-4 rounded-xl border shadow-sm ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-purple-50 border-purple-100'}`}>
-                              <h3 className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-purple-400' : 'text-purple-600'}`}>Funciones IA</h3>
-                              <button onClick={() => setShowIAKnowledgeModal(true)} className="w-full flex items-center gap-2 px-3 py-2 text-sm font-bold rounded-xl transition-colors bg-purple-600 text-white hover:bg-purple-700 shadow-md">
-                                  <Sparkles size={18} /> Entrenar bot
+                      {/* Sección Independiente de Mi Cuenta y Buzón */}
+                      <div className="space-y-1 pt-2 border-t border-gray-200/80 dark:border-gray-800">
+                          <h3 className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Mi cuenta</h3>
+                          <button onClick={() => { setViewingProfileId(null); changeTab('profile'); }} className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-xl transition-colors ${activeTab === 'profile' && !viewingProfileId ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : isDarkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`}>
+                              <UserIcon size={20} className="text-blue-500" /> Mi perfil
+                          </button>
+                          {role === 'teacher' ? (
+                              <button onClick={() => { changeTab('inbox'); }} className={`w-full flex items-center justify-between px-3 py-2 text-sm font-bold rounded-xl transition-colors ${activeTab === 'inbox' ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : isDarkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`}>
+                                  <div className="flex items-center gap-3"><Mail size={20} className="text-amber-500" /> Buzón</div>
+                                  {alerts.length > 0 && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>}
                               </button>
-                          </div>
-                      )}
+                          ) : (
+                              <button onClick={() => { setShowSugModal(true); }} className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-xl transition-colors ${isDarkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`}>
+                                  <Mail size={20} className="text-amber-500" /> Sugerencias
+                              </button>
+                          )}
+                          <button onClick={() => setShowSettingsModal(true)} className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-xl transition-colors ${isDarkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-200 text-gray-700'}`}>
+                              <Settings size={20} className="text-purple-500" /> Ajustes
+                          </button>
+                      </div>
 
                       {/* Opción de Cerrar Sesión en la parte inferior */}
                       <div className="pt-2">
@@ -2755,56 +2805,148 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                           </button>
                       </div>
 
-                      {/* CONTENIDO: CHATS Y GRUPOS */}
+                      {/* CONTENIDO: CHATS Y GRUPOS (ESTILO FACEBOOK) */}
                       {rightSidebarTab === 'chats' && (
-                          <div className="space-y-6 animate-in fade-in duration-200">
-                              <div>
-                                  <div className="flex justify-between items-center mb-3">
-                                      <h3 className={`text-xs font-bold uppercase tracking-wider ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Grupos</h3>
-                                      <button onClick={() => { setIsCreatingGroup(true); setIsChatAppOpen(true); }} className="text-blue-500 font-bold text-xs bg-blue-500/10 px-2 py-1 rounded-lg hover:bg-blue-500/20 transition-colors">+ Crear</button>
-                                  </div>
-                                  <div className="space-y-1">
-                                      {myGroups && myGroups.length === 0 && <p className="text-xs italic text-gray-500 p-2">No hay grupos creados.</p>}
-                                      {myGroups && myGroups.map(g => {
-                                          const chatId = `group_${g.id}`;
-                                          const isUnread = unreadChats[chatId];
-                                          return (
-                                              <button key={g.id} onClick={() => { handleOpenChat({ id: chatId, name: g.name, type: 'group' }); setIsChatAppOpen(true); }} className={`w-full flex items-center gap-3 p-2 rounded-xl transition-colors ${isDarkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-200'}`}>
-                                                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white shrink-0 shadow-sm"><UsersGroupIcon size={18}/></div>
-                                                  <div className="text-left flex-1 overflow-hidden">
-                                                      <p className={`font-bold text-sm truncate ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>{g.name}</p>
-                                                  </div>
-                                                  {isUnread && <span className="w-2 h-2 bg-red-500 rounded-full absolute right-2"></span>}
-                                              </button>
-                                          );
-                                      })}
-                                  </div>
+                          <div className="space-y-4 animate-in fade-in duration-200">
+                              {/* Barra de Búsqueda de Chats */}
+                              <div className="relative">
+                                  <SearchIcon size={16} className={`absolute left-3 top-2.5 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`} />
+                                  <input 
+                                      value={chatSearchQuery} 
+                                      onChange={e => setChatSearchQuery(e.target.value)} 
+                                      placeholder="Buscar chats o personas..." 
+                                      className={`w-full pl-9 pr-8 py-2 text-xs font-medium rounded-xl border outline-none transition-all ${
+                                          isDarkMode 
+                                              ? 'bg-gray-800/90 border-gray-700 text-gray-100 placeholder-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30' 
+                                              : 'bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-400 focus:border-blue-400 focus:bg-white focus:ring-1 focus:ring-blue-400/30 shadow-sm'
+                                      }`}
+                                  />
+                                  {chatSearchQuery && (
+                                      <button 
+                                          onClick={() => setChatSearchQuery('')} 
+                                          className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-0.5"
+                                          title="Limpiar búsqueda"
+                                      >
+                                          <X size={13} />
+                                      </button>
+                                  )}
                               </div>
 
-                              <div>
-                                  <h3 className={`text-xs font-bold uppercase tracking-wider mb-3 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Contactos</h3>
-                                  <div className="space-y-1">
-                                      {allChatUsers && allChatUsers.map(u => {
-                                          const chatId = `dm_${[myChatId, u.id].sort().join('_')}`;
-                                          const isUnread = unreadChats[chatId];
-                                          const isOnline = userPresence[u.id]?.status === 'online';
-                                          return (
-                                              <button key={u.id} onClick={() => { handleOpenChat({ id: chatId, name: u.name, type: 'dm', role: u.role }); setIsChatAppOpen(true); }} className={`w-full flex items-center gap-3 p-2 rounded-xl transition-colors relative ${isDarkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-200'}`}>
-                                                  <div className="relative shrink-0">
-                                                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white shadow-sm transition-all duration-300 ${u.role === 'teacher' ? 'bg-gradient-to-br from-[#AD3333] to-[#8a2828]' : 'bg-gradient-to-br from-blue-400 to-indigo-500'}`}>
-                                                          {u.role === 'teacher' ? <TeacherIcon size={18}/> : <UserIcon size={18}/>}
-                                                      </div>
-                                                      <div className={`absolute bottom-0 right-0 w-3 h-3 border-2 rounded-full ${isDarkMode ? 'border-gray-900' : 'border-gray-100'} ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-                                                  </div>
-                                                  <div className="text-left flex-1 overflow-hidden">
-                                                      <p className={`font-bold text-sm truncate leading-tight ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>{u.name}</p>
-                                                  </div>
-                                                  {isUnread && <span className="w-2 h-2 bg-blue-500 rounded-full"></span>}
-                                              </button>
-                                          );
-                                      })}
+                              {/* Chat con IA (GinAI / Asistente) - ÚNICAMENTE VISIBLE PARA EL ROL DE DOCENTE */}
+                              {role === 'teacher' && (!chatSearchQuery || 'ginai asistente bot ia ayuda'.includes(chatSearchQuery.toLowerCase())) && (
+                                  <div className="pb-3 border-b border-gray-200/80 dark:border-gray-800">
+                                      <button 
+                                          onClick={() => setIsTeacherBotOpen(true)} 
+                                          className={`w-full flex items-center gap-3 p-2.5 rounded-2xl transition-all relative group border ${
+                                              isDarkMode 
+                                                  ? 'bg-gradient-to-r from-purple-950/30 to-indigo-950/30 border-purple-800/40 hover:border-purple-600/60' 
+                                                  : 'bg-gradient-to-r from-purple-50/80 to-indigo-50/80 border-purple-200 hover:border-purple-300 shadow-sm'
+                                          }`}
+                                      >
+                                          <div className="relative shrink-0">
+                                              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform">
+                                                  <CuteBotIcon size={22} className="text-white" />
+                                              </div>
+                                              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white dark:border-gray-900 rounded-full"></div>
+                                          </div>
+                                          <div className="text-left flex-1 overflow-hidden">
+                                              <div className="flex items-center gap-1.5">
+                                                  <p className="font-bold text-xs text-purple-700 dark:text-purple-300 truncate">Bot de ayuda GinAI</p>
+                                                  <span className="bg-purple-600 text-white text-[8px] font-black px-1.5 py-0.2 rounded uppercase tracking-wider">IA</span>
+                                              </div>
+                                              <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">Asistente técnico docente</p>
+                                          </div>
+                                      </button>
                                   </div>
-                              </div>
+                              )}
+
+                              {/* Sección de Grupos y Contactos */}
+                              {(() => {
+                                  const filteredGroups = myGroups?.filter(g => g.name?.toLowerCase().includes(chatSearchQuery.toLowerCase())) || [];
+                                  const filteredUsers = allChatUsers?.filter(u => u.name?.toLowerCase().includes(chatSearchQuery.toLowerCase())) || [];
+                                  const isBotMatch = role === 'teacher' && (!chatSearchQuery || 'ginai asistente bot ia ayuda'.includes(chatSearchQuery.toLowerCase()));
+                                  const isTotalEmpty = !isBotMatch && filteredGroups.length === 0 && filteredUsers.length === 0;
+
+                                  if (isTotalEmpty) {
+                                      return (
+                                          <div className="py-8 px-4 text-center space-y-2 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700/80">
+                                              <div className="w-11 h-11 rounded-2xl bg-gray-100 dark:bg-gray-800 text-gray-400 flex items-center justify-center mx-auto mb-1">
+                                                  <SearchIcon size={20} />
+                                              </div>
+                                              <p className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                                                  {chatSearchQuery ? 'Sin resultados' : 'Sin conversaciones'}
+                                              </p>
+                                              <p className="text-[11px] text-gray-500 leading-relaxed">
+                                                  {chatSearchQuery ? `No encontramos chats con "${chatSearchQuery}"` : 'Los chats recientes y contactos aparecerán aquí.'}
+                                              </p>
+                                          </div>
+                                      );
+                                  }
+
+                                  return (
+                                      <>
+                                          {/* Grupos */}
+                                          {filteredGroups.length > 0 && (
+                                              <div>
+                                                  <div className="flex justify-between items-center mb-2 px-1">
+                                                      <h3 className={`text-[11px] font-bold uppercase tracking-wider ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Grupos ({filteredGroups.length})</h3>
+                                                      <button onClick={() => { setIsCreatingGroup(true); setIsChatAppOpen(true); }} className="text-blue-500 font-bold text-[11px] bg-blue-500/10 px-2 py-0.5 rounded-lg hover:bg-blue-500/20 transition-colors">+ Crear</button>
+                                                  </div>
+                                                  <div className="space-y-1">
+                                                      {filteredGroups.map(g => {
+                                                          const chatId = `group_${g.id}`;
+                                                          const isUnread = unreadChats[chatId];
+                                                          return (
+                                                              <button key={g.id} onClick={() => { handleOpenChat({ id: chatId, name: g.name, type: 'group' }); setIsChatAppOpen(true); }} className={`w-full flex items-center gap-3 p-2 rounded-xl transition-colors ${isDarkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}>
+                                                                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white shrink-0 shadow-sm"><UsersGroupIcon size={16}/></div>
+                                                                  <div className="text-left flex-1 overflow-hidden">
+                                                                      <p className={`font-bold text-xs truncate ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>{g.name}</p>
+                                                                  </div>
+                                                                  {isUnread && <span className="w-2 h-2 bg-red-500 rounded-full"></span>}
+                                                              </button>
+                                                          );
+                                                      })}
+                                                  </div>
+                                              </div>
+                                          )}
+
+                                          {/* Contactos */}
+                                          {filteredUsers.length > 0 && (
+                                              <div>
+                                                  <h3 className={`text-[11px] font-bold uppercase tracking-wider mb-2 px-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Contactos ({filteredUsers.length})</h3>
+                                                  <div className="space-y-1">
+                                                      {filteredUsers.map(u => {
+                                                          const chatId = `dm_${[myChatId, u.id].sort().join('_')}`;
+                                                          const isUnread = unreadChats[chatId];
+                                                          const presenceStatus = userPresence[u.id]?.status;
+                                                          const isOnline = presenceStatus === 'online';
+                                                          const isAway = presenceStatus === 'away';
+                                                          const isBusy = presenceStatus === 'busy';
+                                                          
+                                                          const statusDotColor = isOnline ? 'bg-green-500' : isAway ? 'bg-orange-400' : isBusy ? 'bg-red-500' : 'bg-gray-400';
+
+                                                          return (
+                                                              <button key={u.id} onClick={() => { handleOpenChat({ id: chatId, name: u.name, type: 'dm', role: u.role }); setIsChatAppOpen(true); }} className={`w-full flex items-center gap-2.5 p-2 rounded-xl transition-colors relative ${isDarkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}>
+                                                                  <div className="relative shrink-0">
+                                                                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white shadow-sm transition-all duration-300 ${u.role === 'teacher' ? 'bg-gradient-to-br from-[#AD3333] to-[#8a2828]' : 'bg-gradient-to-br from-blue-400 to-indigo-500'}`}>
+                                                                          {u.role === 'teacher' ? <TeacherIcon size={16}/> : <UserIcon size={16}/>}
+                                                                      </div>
+                                                                      <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 border-2 rounded-full ${isDarkMode ? 'border-gray-900' : 'border-white'} ${statusDotColor}`}></div>
+                                                                  </div>
+                                                                  <div className="text-left flex-1 overflow-hidden">
+                                                                      <p className={`font-bold text-xs truncate leading-tight ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>{u.name}</p>
+                                                                      <p className="text-[10px] text-gray-500 truncate">{u.customLabel || (u.role === 'teacher' ? 'Docente' : 'Estudiante')}</p>
+                                                                  </div>
+                                                                  {isUnread && <span className="w-2 h-2 bg-blue-500 rounded-full"></span>}
+                                                              </button>
+                                                          );
+                                                      })}
+                                                  </div>
+                                              </div>
+                                          )}
+                                      </>
+                                  );
+                              })()}
                           </div>
                       )}
 
@@ -2871,34 +3013,19 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                                   </div>
                                   <div className="grid grid-cols-3 gap-1.5 text-[11px] font-bold">
                                       <button 
-                                          onClick={() => {
-                                              const finalPresenceId = role === 'teacher' ? 'teacher' : myChatId;
-                                              if (finalPresenceId) {
-                                                  setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'presence', finalPresenceId), { isOnline: true, status: 'online', lastPing: Date.now() }, { merge: true }).catch(()=>{});
-                                              }
-                                          }} 
-                                          className={`py-1.5 px-2 rounded-xl flex items-center justify-center gap-1 border transition-all ${userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'online' ? 'bg-green-500/15 border-green-500 text-green-600 dark:text-green-400 shadow-sm' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                                          onClick={() => updatePresenceStatus('online')} 
+                                          className={`py-1.5 px-2 rounded-xl flex items-center justify-center gap-1 border transition-all ${(!userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status || userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'online') ? 'bg-green-500/15 border-green-500 text-green-600 dark:text-green-400 shadow-sm' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
                                       >
                                           <span className="w-2 h-2 rounded-full bg-green-500"></span> En línea
                                       </button>
                                       <button 
-                                          onClick={() => {
-                                              const finalPresenceId = role === 'teacher' ? 'teacher' : myChatId;
-                                              if (finalPresenceId) {
-                                                  setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'presence', finalPresenceId), { isOnline: true, status: 'away', lastPing: Date.now() }, { merge: true }).catch(()=>{});
-                                              }
-                                          }} 
+                                          onClick={() => updatePresenceStatus('away')} 
                                           className={`py-1.5 px-2 rounded-xl flex items-center justify-center gap-1 border transition-all ${userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'away' ? 'bg-orange-500/15 border-orange-500 text-orange-600 dark:text-orange-400 shadow-sm' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
                                       >
                                           <span className="w-2 h-2 rounded-full bg-orange-400"></span> Ausente
                                       </button>
                                       <button 
-                                          onClick={() => {
-                                              const finalPresenceId = role === 'teacher' ? 'teacher' : myChatId;
-                                              if (finalPresenceId) {
-                                                  setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'presence', finalPresenceId), { isOnline: true, status: 'busy', lastPing: Date.now() }, { merge: true }).catch(()=>{});
-                                              }
-                                          }} 
+                                          onClick={() => updatePresenceStatus('busy')} 
                                           className={`py-1.5 px-2 rounded-xl flex items-center justify-center gap-1 border transition-all ${userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'busy' ? 'bg-red-500/15 border-red-500 text-red-600 dark:text-red-400 shadow-sm' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
                                       >
                                           <span className="w-2 h-2 rounded-full bg-red-500"></span> Ocupado
@@ -2906,7 +3033,24 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                                   </div>
                               </div>
 
-                              {/* Tarjeta 4: Perfil institucional */}
+                              {/* Tarjeta 4: Funciones de IA (Solo docente) */}
+                              {role === 'teacher' && (
+                                  <div className={`p-4 rounded-2xl border space-y-2.5 transition-all ${isDarkMode ? 'bg-purple-950/20 border-purple-800/40' : 'bg-purple-50/70 border-purple-200 shadow-sm'}`}>
+                                      <div className="flex items-center gap-2">
+                                          <Sparkles size={16} className="text-purple-500" />
+                                          <p className={`text-xs font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>Entrenamiento del bot</p>
+                                      </div>
+                                      <p className="text-[11px] text-gray-500">Configura instrucciones personalizadas para el asistente IA.</p>
+                                      <button 
+                                          onClick={() => setShowIAKnowledgeModal(true)} 
+                                          className="w-full py-2 px-3 text-xs font-bold rounded-xl bg-purple-600 hover:bg-purple-700 text-white shadow-md flex items-center justify-center gap-2 transition-all"
+                                      >
+                                          <Sparkles size={14} /> Entrenar bot
+                                      </button>
+                                  </div>
+                              )}
+
+                              {/* Tarjeta 5: Perfil institucional */}
                               <div className={`p-4 rounded-2xl border space-y-2 transition-all ${isDarkMode ? 'bg-gray-800/80 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
                                   <div className="flex items-center gap-3">
                                       <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shrink-0 overflow-hidden border border-blue-200 dark:border-gray-700">
@@ -2952,160 +3096,73 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                 </button>
               </nav>
 
-             {/* BOTÓN DEL BOT DE ESTUDIANTES (También visible para Camilo) */}
-              {(role === 'student') && hasEntered && (
-                  <div className="fixed bottom-[180px] md:bottom-28 right-4 md:right-6 z-[100] flex flex-col items-end">
-                      {isChatOpen && (
-                          <div className={`${glassCard} w-[90vw] sm:w-[400px] md:w-[480px] h-[500px] md:h-[600px] max-h-[75vh] mb-4 flex flex-col p-4 animate-in slide-in-from-bottom-10 fade-in border border-white/60 shadow-2xl`}>
-                              <div className="flex justify-between items-center mb-3 border-b border-gray-300/30 pb-3">
-                                  <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                                      <CuteBotIcon size={24} className="text-gray-700" /> GinAI
-                                  </h3>
-                                  <button onClick={() => setIsChatOpen(false)} className="text-gray-500 hover:text-gray-800 bg-gray-100 dark:bg-gray-800 p-1.5 rounded-full transition-colors"><X size={16}/></button>
-                              </div>
-                              
-                              <div className="flex-1 overflow-y-auto space-y-3 pr-2 mb-3">
-                                  <div className="bg-blue-100 text-blue-900 text-sm p-3 rounded-xl rounded-tl-none w-10/12 shadow-sm whitespace-pre-wrap leading-relaxed">
-                                      Hola, soy el asistente de la profesora Gina, estoy aquí para resolver tus dudas sobre las materias que estás viendo con ella.
-                                  </div>
-                                  {chatHistory.map((m, i) => (
-                                      <div key={i} className={`text-sm p-3 rounded-xl max-w-[85%] shadow-sm whitespace-pre-wrap leading-relaxed ${m.role === 'user' ? 'bg-gray-800 text-white ml-auto rounded-tr-none' : 'bg-blue-100 text-blue-900 rounded-tl-none'}`}>
-                                          {formatBotText(m.text)}
-                                      {m.role === 'bot' && (
-                                          <div className="flex justify-end gap-2 mt-1">
-                                              <button onClick={() => handleTranslateMessage(m.text)} className="opacity-60 hover:opacity-100 transition-opacity text-gray-400 hover:text-blue-500 p-1" title="Traducir"><Languages size={12} /></button>
-                                              <button onClick={() => speakText(m.text)} className="opacity-60 hover:opacity-100 transition-opacity text-gray-400 hover:text-blue-500 p-1" title="Escuchar"><Volume2 size={12} /></button>
-                                              <button onClick={() => handleCopy(m.text)} className="opacity-60 hover:opacity-100 transition-opacity text-gray-400 hover:text-blue-500 p-1" title="Copiar"><Copy size={12} /></button>
-                                          </div>
-                                      )}
-                                      </div>
-                                  ))}
-                                  {isChatLoading && (
-                                      <div className="bg-blue-100/50 p-3 rounded-xl rounded-tl-none w-fit flex gap-1 items-center">
-                                          <span className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce"></span>
-                                          <span className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></span>
-                                          <span className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></span>
-                                      </div>
-                                  )}
-                              </div>
-
-                              <form onSubmit={sendChatMessage} className="flex gap-2">
-                                  <input 
-                                      value={chatInput} onChange={e => setChatInput(e.target.value)} 
-                                      placeholder="Escribe tu mensaje..." 
-                                      className={`${glassInput} py-2 px-3 text-sm`}
-                                  />
-                                  <button type="submit" disabled={isChatLoading} className="bg-gray-800 text-white p-2.5 rounded-xl hover:bg-black disabled:opacity-50 transition shadow-md">
-                                      <ArrowRightIcon size={16}/>
-                                  </button>
-                              </form>
+              {/* MODAL / POPUP DEL BOT DE LA PROFESORA (Abierto desde el panel derecho) */}
+              {role === 'teacher' && hasEntered && isTeacherBotOpen && (
+                  <div className="fixed bottom-6 right-6 z-[150] flex flex-col items-end">
+                      <div className={`${glassCard} w-[92vw] sm:w-[420px] md:w-[480px] h-[520px] md:h-[600px] max-h-[80vh] flex flex-col p-4 animate-in slide-in-from-bottom-10 fade-in shadow-2xl ${isDarkMode ? 'bg-gray-900/95 border-gray-700' : 'bg-white/95 border-gray-200'}`}>
+                          <div className={`flex justify-between items-center mb-3 border-b pb-3 ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                              <h3 className={`font-bold flex items-center gap-2 ${isDarkMode ? 'text-gray-100' : 'text-gray-800'}`}>
+                                  <CuteBotIcon size={24} className={isDarkMode ? 'text-blue-400' : 'text-blue-600'} /> Bot de ayuda GinAI
+                              </h3>
+                              <button onClick={() => setIsTeacherBotOpen(false)} className={`p-1.5 rounded-full transition-colors ${isDarkMode ? 'text-gray-400 hover:text-red-400 hover:bg-gray-800' : 'text-gray-500 hover:text-red-500 hover:bg-gray-100'}`} title="Cerrar"><X size={18}/></button>
                           </div>
-                      )}
-                      
-                      <button
-                          onClick={() => setIsChatOpen(!isChatOpen)} 
-                          className="w-14 h-14 rounded-full flex items-center justify-center focus:outline-none transition-all duration-300 bg-gradient-to-tr from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-xl hover:shadow-2xl hover:scale-105 border-2 border-white/40 shadow-purple-500/30"
-                          title="Asistente GinAI"
-                      >
-                          <CuteBotIcon size={32} className="text-white drop-shadow-sm" />
-                      </button>
-                  </div>
-              )}
-
-              {/* 👇 AQUÍ EMPIEZA EL BOT DE LA PROFESORA 👇 */}
-              {role === 'teacher' && hasEntered && (
-                  <div className="fixed bottom-[180px] md:bottom-28 right-4 md:right-6 z-[100] flex flex-col items-end">
-                      {isTeacherBotOpen && (
-                          <div className={`${glassCard} w-[90vw] sm:w-[400px] md:w-[480px] h-[500px] md:h-[600px] max-h-[75vh] mb-4 flex flex-col p-4 animate-in slide-in-from-bottom-10 fade-in shadow-2xl ${isDarkMode ? 'bg-gray-900/95 border-gray-700' : 'bg-white/95 border-gray-200'}`}>
-                              <div className={`flex justify-between items-center mb-3 border-b pb-3 ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-                                  <h3 className={`font-bold flex items-center gap-2 ${isDarkMode ? 'text-gray-100' : 'text-gray-800'}`}>
-                                      <CuteBotIcon size={24} className={isDarkMode ? 'text-blue-400' : 'text-blue-600'} /> Bot de ayuda
-                                  </h3>
-                                  <button onClick={() => setIsTeacherBotOpen(false)} className={`p-1.5 rounded-full transition-colors ${isDarkMode ? 'text-gray-400 hover:text-red-400 hover:bg-gray-800' : 'text-gray-500 hover:text-red-500 hover:bg-gray-100'}`}><X size={16}/></button>
+                          
+                          <div className="flex-1 overflow-y-auto space-y-3 pr-2 mb-3">
+                              <div className={`text-sm p-3 rounded-xl rounded-tl-none shadow-sm font-medium whitespace-pre-wrap leading-relaxed border ${isDarkMode ? 'bg-gray-800 text-blue-300 border-gray-700' : 'bg-blue-50 text-blue-900 border-blue-100'}`}>
+                                  Hola amorcito, este bot lo programé para que te ayude por si te pierdes con la página. ❤️
                               </div>
-                              
-                              <div className="flex-1 overflow-y-auto space-y-3 pr-2 mb-3">
-                                  <div className={`text-sm p-3 rounded-xl rounded-tl-none shadow-sm font-medium whitespace-pre-wrap leading-relaxed border ${isDarkMode ? 'bg-gray-800 text-blue-300 border-gray-700' : 'bg-blue-50 text-blue-900 border-blue-100'}`}>
-                                      Hola amorcito, este bot lo programé para que te ayude por si te pierdes con la página. ❤️
+                              {teacherBotHistory.map((m, i) => (
+                                  <div key={i} className={`text-sm p-3 rounded-xl max-w-[85%] shadow-sm whitespace-pre-wrap leading-relaxed ${m.role === 'user' ? (isDarkMode ? 'bg-blue-600 text-white ml-auto rounded-tr-none' : 'bg-gray-800 text-white ml-auto rounded-tr-none') : (isDarkMode ? 'bg-gray-800 text-blue-300 rounded-tl-none border border-gray-700' : 'bg-blue-50 text-blue-900 rounded-tl-none border border-blue-100')}`}>
+                                      {formatBotText(m.text)}
                                   </div>
-                                  {teacherBotHistory.map((m, i) => (
-                                      <div key={i} className={`text-sm p-3 rounded-xl max-w-[85%] shadow-sm whitespace-pre-wrap leading-relaxed ${m.role === 'user' ? (isDarkMode ? 'bg-blue-600 text-white ml-auto rounded-tr-none' : 'bg-gray-800 text-white ml-auto rounded-tr-none') : (isDarkMode ? 'bg-gray-800 text-blue-300 rounded-tl-none border border-gray-700' : 'bg-blue-50 text-blue-900 rounded-tl-none border border-blue-100')}`}>
-                                          {formatBotText(m.text)}
-                                      </div>
-                                  ))}
-                                  {isTeacherBotLoading && <Loader2 className={`animate-spin mx-auto ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`} size={20} />}
-                                  <div ref={teacherBotEndRef} />
-                              </div>
-
-                              <form onSubmit={async (e) => {
-                                  e.preventDefault();
-                                  if (!teacherBotInput.trim()) return;
-                                  const userMsg = teacherBotInput; setTeacherBotInput("");
-                                  setIsTeacherBotLoading(true);
-                                  const newHistory = [...teacherBotHistory, { role: 'user', text: userMsg }];
-                                  setTeacherBotHistory(newHistory);
-
-                                  const prompt = `Eres el "Bot de ayuda", asistente técnico EXCLUSIVO de la Profesora Gina. Tu creador es Edwin Camilo Jaimes Castañeda.
-
-                                  REGLAS ESTRICTAS DE COMPORTAMIENTO (¡DEBES CUMPLIRLAS TODAS!):
-                                  1. SÉ EXTREMADAMENTE BREVE Y CONCISO. Ve directo al grano sin rodeos.
-                                  2. NO INVENTES FUNCIONES. Eres un bot técnico. Si Gina pregunta por algo que NO está detallado en este manual (por ejemplo: subir videos, cambiar colores de la página, hacer videollamadas), DEBES DECIR TAJANTEMENTE QUE NO SE PUEDE. Es preferible decir "No es posible en esta versión" a inventar una mentira por ser amable.
-                                  3. OBEDECE A EDWIN: Las "Instrucciones extra de Edwin" son tu máxima prioridad.
-                                  4. Háblale con cariño a Gina y usa emojis.
-
-                                  MANUAL TÉCNICO DE LA PLATAFORMA (LÍMITES REALES):
-                                  1. ASIGNACIONES (Muro): Crea Tareas o Publicaciones. Se pueden adjuntar imágenes, GIFs o documentos (PDF, Word). NO SE PUEDEN SUBIR VIDEOS EN NINGUNA PARTE.
-                                  2. REPASOS: Genera diapositivas interactivas con IA.
-                                  3. CONTENIDOS PROGRAMÁTICOS: Aquí SOLO se puede agregar texto (Semana, Tema) y pegar una URL (link externo) para material de apoyo. AQUÍ NO SE PUEDE SUBIR NINGÚN TIPO DE ARCHIVO LOCAL. También aquí hay una caja de texto para entrenar al bot de los estudiantes.
-                                  4. EVALUACIONES: Exámenes automáticos. Notas de 0.0 a 5.0.
-                                  5. DIRECTORIO: Crea Materias, cambia etiquetas a estudiantes.
-                                  6. BUZÓN: Lee sugerencias y alertas de groserías.
-                                  7. MENSAJES: Chat de texto con opción de adjuntar imágenes y documentos.
-                                  8. PERFIL: Muro de fotos/texto. Edwin es el único con el botón "Conocimientos de IA".
-
-                                  INSTRUCCIONES EXTRA DE EDWIN (¡LEY ABSOLUTA!):
-                                  ${teacherBotInfoList.length > 0 ? teacherBotInfoList.map(i => "- " + i.text).join('\n') : "Sin instrucciones extra."}
-
-                                  HISTORIAL DE LA CONVERSACIÓN:
-                                  ${newHistory.map(m => `${m.role === 'user' ? 'Gina' : 'Tú'}: ${m.text}`).join('\n')}
-                                  
-                                  Por favor, responde al último mensaje de Gina teniendo en cuenta todo el historial anterior.
-                                  Pregunta técnica de Gina: ${userMsg}`;
-
-                                  const reply = await callGemini(prompt);
-                                  setTeacherBotHistory([...newHistory, { role: 'bot', text: reply || "Perdón amor, me desconecté un segundo." }]);
-                                  setIsTeacherBotLoading(false);
-                              }} className="flex gap-2">
-                                  <input value={teacherBotInput} onChange={e => setTeacherBotInput(e.target.value)} placeholder="¿En qué te ayudo, Gina?" className={`flex-1 py-2 px-3 text-sm rounded-xl outline-none border focus:ring-2 transition-all ${isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-100 focus:ring-blue-500/50 placeholder-gray-500' : 'bg-gray-100 border-gray-300 text-gray-900 focus:ring-blue-400/50 placeholder-gray-500'}`} />
-                                  <button type="submit" disabled={isTeacherBotLoading} className={`p-2.5 rounded-xl transition-all shadow-md flex items-center justify-center disabled:opacity-50 ${isDarkMode ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-800 text-white hover:bg-black'}`}><ArrowRightIcon size={16}/></button>
-                              </form>
+                              ))}
+                              {isTeacherBotLoading && <Loader2 className={`animate-spin mx-auto ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`} size={20} />}
+                              <div ref={teacherBotEndRef} />
                           </div>
-                      )}
-                      
-                      <button 
-                          onClick={() => setIsTeacherBotOpen(!isTeacherBotOpen)} 
-                          className="w-14 h-14 rounded-full flex items-center justify-center focus:outline-none transition-all duration-300 bg-gradient-to-tr from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-xl hover:shadow-2xl hover:scale-105 border-2 border-white/40 shadow-purple-500/30"
-                          title="Bot de ayuda"
-                      >
-                          <CuteBotIcon size={32} className="text-white drop-shadow-sm" />
-                      </button>
-                  </div>
-              )}
-              {/* 👆 AQUÍ TERMINA EL BOT DE LA PROFESORA 👆 */}
 
-              {/* BOTÓN Y MODAL DE CHAT DIRECTO Y GRUPOS */}
-              {hasEntered && (
-                  <div className="fixed bottom-[100px] md:bottom-8 right-4 md:right-6 z-[90]">
-                      <button
-                          onClick={openChatApp}
-                          className={`w-14 h-14 rounded-full flex items-center justify-center focus:outline-none transition-all duration-300 bg-blue-600 hover:bg-blue-700 text-white shadow-xl hover:shadow-2xl hover:-translate-y-1 ${hasUnreadChat ? 'ring-2 ring-red-500 ring-offset-2 ring-offset-white dark:ring-offset-gray-900' : ''}`}
-                          title="Mensajes directos"
-                      >
-                          <MessageCircle size={28} />
-                          {hasUnreadChat && (
-                              <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 border-2 border-white rounded-full shadow-md z-20"></span>
-                          )}
-                      </button>
+                          <form onSubmit={async (e) => {
+                              e.preventDefault();
+                              if (!teacherBotInput.trim()) return;
+                              const userMsg = teacherBotInput; setTeacherBotInput("");
+                              setIsTeacherBotLoading(true);
+                              const newHistory = [...teacherBotHistory, { role: 'user', text: userMsg }];
+                              setTeacherBotHistory(newHistory);
+
+                              const prompt = `Eres el "Bot de ayuda", asistente técnico EXCLUSIVO de la Profesora Gina. Tu creador es Edwin Camilo Jaimes Castañeda.
+
+                              REGLAS ESTRICTAS DE COMPORTAMIENTO (¡DEBES CUMPLIRLAS TODAS!):
+                              1. SÉ EXTREMADAMENTE BREVE Y CONCISO. Ve directo al grano sin rodeos.
+                              2. NO INVENTES FUNCIONES. Eres un bot técnico. Si Gina pregunta por algo que NO está detallado en este manual (por ejemplo: subir videos, cambiar colores de la página, hacer videollamadas), DEBES DECIR TAJANTEMENTE QUE NO SE PUEDE. Es preferible decir "No es posible en esta versión" a inventar una mentira por ser amable.
+                              3. OBEDECE A EDWIN: Las "Instrucciones extra de Edwin" son tu máxima prioridad.
+                              4. Háblale con cariño a Gina y usa emojis.
+
+                              MANUAL TÉCNICO DE LA PLATAFORMA (LÍMITES REALES):
+                              1. ASIGNACIONES (Muro): Crea Tareas o Publicaciones. Se pueden adjuntar imágenes, GIFs o documentos (PDF, Word). NO SE PUEDEN SUBIR VIDEOS EN NINGUNA PARTE.
+                              2. REPASOS: Genera diapositivas interactivas con IA.
+                              3. CONTENIDOS PROGRAMÁTICOS: Aquí SOLO se puede agregar texto (Semana, Tema) y pegar una URL (link externo) para material de apoyo. AQUÍ NO SE PUEDE SUBIR NINGÚN TIPO DE ARCHIVO LOCAL. También aquí hay una caja de texto para entrenar al bot de los estudiantes.
+                              4. EVALUACIONES: Exámenes automáticos. Notas de 0.0 a 5.0.
+                              5. DIRECTORIO: Crea Materias, cambia etiquetas a estudiantes.
+                              6. BUZÓN: Lee sugerencias y alertas de groserías.
+                              7. MENSAJES: Chat de texto con opción de adjuntar imágenes y documentos.
+                              8. PERFIL: Muro de fotos/texto. Edwin es el único con el botón "Conocimientos de IA".
+
+                              INSTRUCCIONES EXTRA DE EDWIN (¡LEY ABSOLUTA!):
+                              ${teacherBotInfoList.length > 0 ? teacherBotInfoList.map(i => "- " + i.text).join('\n') : "Sin instrucciones extra."}
+
+                              HISTORIAL DE LA CONVERSACIÓN:
+                              ${newHistory.map(m => `${m.role === 'user' ? 'Gina' : 'Tú'}: ${m.text}`).join('\n')}
+                              
+                              Por favor, responde al último mensaje de Gina teniendo en cuenta todo el historial anterior.
+                              Pregunta técnica de Gina: ${userMsg}`;
+
+                              const reply = await callGemini(prompt);
+                              setTeacherBotHistory([...newHistory, { role: 'bot', text: reply || "Perdón amor, me desconecté un segundo." }]);
+                              setIsTeacherBotLoading(false);
+                          }} className="flex gap-2">
+                              <input value={teacherBotInput} onChange={e => setTeacherBotInput(e.target.value)} placeholder="¿En qué te ayudo, Gina?" className={`flex-1 py-2 px-3 text-sm rounded-xl outline-none border focus:ring-2 transition-all ${isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-100 focus:ring-blue-500/50 placeholder-gray-500' : 'bg-gray-100 border-gray-300 text-gray-900 focus:ring-blue-400/50 placeholder-gray-500'}`} />
+                              <button type="submit" disabled={isTeacherBotLoading} className={`p-2.5 rounded-xl transition-all shadow-md flex items-center justify-center disabled:opacity-50 ${isDarkMode ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-800 text-white hover:bg-black'}`}><ArrowRightIcon size={16}/></button>
+                          </form>
+                      </div>
                   </div>
               )}
 
@@ -3918,40 +3975,42 @@ tickIcon = (
                                       </div>
                                       <div className="grid grid-cols-3 gap-1.5 text-[11px] font-bold">
                                           <button 
-                                              onClick={() => {
-                                                  const finalPresenceId = role === 'teacher' ? 'teacher' : myChatId;
-                                                  if (finalPresenceId) {
-                                                      setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'presence', finalPresenceId), { isOnline: true, status: 'online', lastPing: Date.now() }, { merge: true }).catch(()=>{});
-                                                  }
-                                              }} 
-                                              className={`py-1.5 px-2 rounded-xl flex items-center justify-center gap-1 border transition-all ${userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'online' ? 'bg-green-500/15 border-green-500 text-green-600 dark:text-green-400' : 'border-gray-200 dark:border-gray-700 text-gray-500'}`}
+                                              onClick={() => updatePresenceStatus('online')} 
+                                              className={`py-1.5 px-2 rounded-xl flex items-center justify-center gap-1 border transition-all ${(!userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status || userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'online') ? 'bg-green-500/15 border-green-500 text-green-600 dark:text-green-400' : 'border-gray-200 dark:border-gray-700 text-gray-500'}`}
                                           >
                                               <span className="w-2 h-2 rounded-full bg-green-500"></span> En línea
                                           </button>
                                           <button 
-                                              onClick={() => {
-                                                  const finalPresenceId = role === 'teacher' ? 'teacher' : myChatId;
-                                                  if (finalPresenceId) {
-                                                      setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'presence', finalPresenceId), { isOnline: true, status: 'away', lastPing: Date.now() }, { merge: true }).catch(()=>{});
-                                                  }
-                                              }} 
+                                              onClick={() => updatePresenceStatus('away')} 
                                               className={`py-1.5 px-2 rounded-xl flex items-center justify-center gap-1 border transition-all ${userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'away' ? 'bg-orange-500/15 border-orange-500 text-orange-600 dark:text-orange-400' : 'border-gray-200 dark:border-gray-700 text-gray-500'}`}
                                           >
                                               <span className="w-2 h-2 rounded-full bg-orange-400"></span> Ausente
                                           </button>
                                           <button 
-                                              onClick={() => {
-                                                  const finalPresenceId = role === 'teacher' ? 'teacher' : myChatId;
-                                                  if (finalPresenceId) {
-                                                      setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'presence', finalPresenceId), { isOnline: true, status: 'busy', lastPing: Date.now() }, { merge: true }).catch(()=>{});
-                                                  }
-                                              }} 
+                                              onClick={() => updatePresenceStatus('busy')} 
                                               className={`py-1.5 px-2 rounded-xl flex items-center justify-center gap-1 border transition-all ${userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'busy' ? 'bg-red-500/15 border-red-500 text-red-600 dark:text-red-400' : 'border-gray-200 dark:border-gray-700 text-gray-500'}`}
                                           >
                                               <span className="w-2 h-2 rounded-full bg-red-500"></span> Ocupado
                                           </button>
                                       </div>
                                   </div>
+
+                                  {/* Funciones de IA (Solo docente) */}
+                                  {role === 'teacher' && (
+                                      <div className={`p-3.5 rounded-2xl border space-y-2.5 transition-all ${isDarkMode ? 'bg-purple-950/20 border-purple-800/40' : 'bg-purple-50/70 border-purple-200 shadow-sm'}`}>
+                                          <div className="flex items-center gap-2">
+                                              <Sparkles size={16} className="text-purple-500" />
+                                              <p className={`text-xs font-bold ${isDarkMode ? 'text-purple-300' : 'text-purple-700'}`}>Asistente y entrenamiento de IA</p>
+                                          </div>
+                                          <p className="text-[11px] text-gray-500 dark:text-gray-400">Personaliza y entrena las instrucciones técnicas y respuestas del bot de ayuda.</p>
+                                          <button 
+                                              onClick={() => { setShowSettingsModal(false); setShowIAKnowledgeModal(true); }}
+                                              className="w-full py-2 px-3 text-xs font-bold rounded-xl bg-purple-600 hover:bg-purple-700 text-white shadow-md flex items-center justify-center gap-2 transition-all"
+                                          >
+                                              <Sparkles size={14} /> Entrenar bot de ayuda
+                                          </button>
+                                      </div>
+                                  )}
 
                                   {/* Cuenta institucional */}
                                   <div className={`p-3.5 rounded-2xl border transition-all ${isDarkMode ? 'bg-gray-800/80 border-gray-700' : 'bg-gray-50 border-gray-200 shadow-sm'}`}>
