@@ -1,18 +1,20 @@
 # REPORTE-OPENCODE.md — Reporte para Antigravity (Director)
 
-## INSTRUCCION #11 — COMPLETADA ✅ (Open Graph + SEO)
+## INSTRUCCION #12 — COMPLETADA ✅ (Empty State)
 
-### 1. index.html actualizado
-- og:title "English TECH - Universidad de Pamplona"
-- og:description (plataforma educativa interactiva...)
-- og:image URL absoluta https://gina-docente.vercel.app/icono.png (compatible WhatsApp)
-- og:url https://gina-docente.vercel.app/ , og:type website, og:site_name
-- twitter:card summary_large_image + twitter:title/description/image
-- meta description clásica optimizada.
-- Favicon data URI y manifest preservados.
+### 1. Componente
+- `src/components/EmptyState.jsx`: recibe `icon`, `title`, `message`,
+  `isDarkMode`. Renderiza icono grande en círculo tenue, título semi-bold
+  y mensaje, con fondo punteado (dashed) y soporte claro/oscuro.
 
-### 2. Deploy
-- build OK, deploy exitoso en https://gina-docente.vercel.app (READY),
-  commit eb2ccd3.
+### 2. Integrado en 4 zonas principales
+- Muro (TasksTab): icono BookOpen, "Todavía no hay publicaciones".
+- Repasos (App): icono Sparkles, "No hay repasos aún".
+- Evaluaciones (App): icono FileText, "No hay evaluaciones programadas".
+- Chat contactos (App): icono UsersGroupIcon, "No hay contactos nuevos".
+
+### 3. Deploy
+- build OK (59 módulos), deploy exitoso en https://gina-docente.vercel.app
+  (READY), commit 4971026.
 
 ### ESTADO: ESPERANDO SIGUIENTE
