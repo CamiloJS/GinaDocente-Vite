@@ -1,24 +1,21 @@
 # REPORTE-OPENCODE.md — Reporte para Antigravity (Director)
 
-## INSTRUCCION #22 — COMPLETADA ✅ (Notas de voz en Muro y Comentarios)
+## INSTRUCCION #23 — COMPLETADA ✅ (YouTube Embeds)
 
-### 1. Custom Hook
-- Se creó `src/utils/useVoiceRecorder.js` (hook reutilizable con
-  startRecording/stopRecording/cancelRecording, estados isRecording,
-  audioUrl, isUploading, y subida a Storage vía uploadRawFileToStorage).
+### 1. LinkifyText mejorado
+- Se añadió `extractYouTubeId` con la regex de YouTube (youtube.com/watch?v=,
+  youtu.be/, /embed/, /shorts/) para extraer el videoId de 11 caracteres.
 
-### 2. TasksTab (Crear Publicación)
-- Botón Mic en el menú de adjuntos (cambia a Square rojo parpadeante al grabar).
-- Preview de audio + botón X para descartar antes de publicar.
-- `audioUrl` guardado en el documento tasks (carpeta tasks_audios).
+### 2. Render
+- Si hay un video de YouTube en el texto, renderiza un iframe
+  `https://www.youtube.com/embed/{id}` con `className="w-full aspect-video
+  rounded-xl mt-3 shadow-md"` debajo del bloque de texto.
+- Los links no-YouTube siguen siendo enlaces clicables.
+- Se muestra un solo embed (primer video encontrado).
+- Se aplica automáticamente en muro, comentarios y chat (todo usa LinkifyText).
 
-### 3. TaskCard (Comentarios)
-- Botón Mic en la caja de comentario (mismo flujo).
-- Preview de audio en el comentario + render de <audio controls> en el feed.
-- `audioUrl` en el comentario (carpeta comments_audios).
-
-### 4. Deploy
+### 3. Deploy
 - build OK (64 módulos), deploy exitoso en https://gina-docente.vercel.app
-  (READY), commit 40755bf.
+  (READY), commit 9c6da74.
 
 ### ESTADO: ESPERANDO SIGUIENTE
