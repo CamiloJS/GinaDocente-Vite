@@ -9,6 +9,7 @@ import {
 } from '../utils/helpers.js'
 import { glassCard, glassInput } from '../utils/styles.js'
 import { useClickOutside } from '../utils/hooks.js'
+import LinkifyText from './LinkifyText.jsx'
 import { doc, setDoc, updateDoc, deleteDoc } from '../firebase/config.js'
 
 const TaskCard = React.memo(({ task, role, db, appId, glassInput, callGemini, currentUser, showMessage, loggedInName, isDarkMode, confirmAction, handleOpenProfileByName }) => {
@@ -235,7 +236,7 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput, callGemini, cu
             {isEditingTask ? (
                 <textarea value={editTaskData.description} onChange={e => setEditTaskData({...editTaskData, description: e.target.value})} className={`${glassInput} mt-4 min-h-[120px] resize-none p-3`} placeholder="Descripción..."/>
             ) : (
-                <p className={`mt-2.5 whitespace-pre-wrap leading-relaxed ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}>{task.description}</p>
+                <p className={`mt-2.5 whitespace-pre-wrap leading-relaxed ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}>{<LinkifyText text={task.description} />}</p>
             )}
             
             {task.imageUrl && (
@@ -301,7 +302,7 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput, callGemini, cu
                                             </div>
                                             {role === 'teacher' && revealedComments[cid] && (
                                               <div className="flex flex-col gap-2 mt-1">
-                                                  {c.text && <p className={`p-2 rounded line-through not-italic ${isDarkMode ? 'bg-gray-800 text-gray-400' : 'bg-white text-gray-700'}`}>{c.text}</p>}
+                                                  {c.text && <p className={`p-2 rounded line-through not-italic ${isDarkMode ? 'bg-gray-800 text-gray-400' : 'bg-white text-gray-700'}`}>{<LinkifyText text={c.text} />}</p>}
                                                   {c.imageUrl && <img src={c.imageUrl} loading="lazy" decoding="async" alt="Adjunto" onClick={() => setFullScreenImage(c.imageUrl)} className={`w-20 h-20 rounded-xl border object-cover shadow-sm cursor-pointer hover:opacity-80 transition-opacity bg-black/5 opacity-70 ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`} onError={(e) => e.target.style.display = 'none'} />}
                                                   {c.fileUrl && <a href={c.fileUrl} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-2 p-2 rounded-xl border w-fit transition-colors opacity-70 ${isDarkMode ? 'bg-gray-700/50 border-gray-600 hover:bg-gray-700' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}><FileDocIcon size={20} className="text-red-500" /><span className={`text-xs font-medium truncate max-w-[150px] md:max-w-[200px] ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>{c.fileName || 'Documento'}</span></a>}
                                               </div>
@@ -360,7 +361,7 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput, callGemini, cu
                                         </div>
                                     ) : (
                                         <div className="flex flex-col gap-3 mt-2">
-                                            {c.text && <p className={`text-base leading-relaxed ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}>{c.text}</p>}
+                                            {c.text && <p className={`text-base leading-relaxed ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}>{<LinkifyText text={c.text} />}</p>}
                                             {c.imageUrl && <img src={c.imageUrl} loading="lazy" decoding="async" alt="Adjunto" onClick={() => setFullScreenImage(c.imageUrl)} className={`w-20 h-20 rounded-xl border object-cover mt-1 shadow-sm cursor-pointer hover:opacity-80 transition-opacity bg-black/5 ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`} onError={(e) => e.target.style.display = 'none'} />}
                                             {c.fileUrl && <a href={c.fileUrl} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-2 p-3 rounded-xl border mt-2 w-fit transition-colors ${isDarkMode ? 'bg-gray-700/50 border-gray-600 hover:bg-gray-700' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}><FileDocIcon size={24} className="text-red-500" /><span className={`text-sm font-medium truncate max-w-[150px] md:max-w-[200px] ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>{c.fileName || 'Documento'}</span></a>}
                                         </div>

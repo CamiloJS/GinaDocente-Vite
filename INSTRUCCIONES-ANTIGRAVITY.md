@@ -260,4 +260,20 @@ A medida que avanza el semestre, el Muro (`TasksTab.jsx`) acumula decenas de pub
 
 **Entrega:** Confirma en `REPORTE-OPENCODE.md` si lograste implementar el buscador y si la UI se adapta bien en móvil y escritorio.
 
+---
+
+# INSTRUCCION #17
+
+**Objetivo:** UX y Accesibilidad: Enlaces Clicables Automáticos (Auto-Linker).
+
+Es muy común que la profesora o los estudiantes peguen enlaces a videos de YouTube, artículos de gramática o documentos externos en los comentarios, el chat o las tareas. Actualmente, se muestran como texto plano. Vamos a hacer que cualquier URL se convierta automáticamente en un enlace clicable.
+
+**Acciones a implementar por Opencode:**
+1. **Crear Componente (o Utilidad):** Crea un pequeño componente `LinkifyText.jsx` (o una función en `helpers.js`) que reciba un string, lo divida usando una expresión regular para URLs (ej. `/(https?:\/\/[^\s]+)/g`) y devuelva un arreglo que mezcle texto plano y componentes `<a>` (`target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline break-words"`).
+2. **Aplicar en el Muro:** En `TaskCard.jsx`, envuelve o procesa la renderización de `task.description` y el texto de cada comentario (`c.text`) con esta nueva lógica.
+3. **Aplicar en el Chat (Opcional pero Recomendado):** En `App.jsx`, al renderizar `msg.text` dentro del componente del chat, también aplica esta función para que los enlaces compartidos por mensaje funcionen.
+4. **Deploy:** Valida tu código (`npm run build`), sube a Git (`commit`/`push`) y despliega en producción (`vercel deploy --prod`).
+
+**Entrega:** Documenta en `REPORTE-OPENCODE.md` si utilizaste un componente React o una función pura, y confirma que las URLs largas no rompen las tarjetas en vista móvil (recuerda usar `break-words` o `break-all`).
+
 ESTADO: LISTA PARA IMPLEMENTAR

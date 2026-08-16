@@ -27,6 +27,7 @@ import {
 const GifPickerModal = React.lazy(() => import('./components/GifPickerModal.jsx'))
 import EmptyState from './components/EmptyState.jsx'
 import ScrollToTop from './components/ScrollToTop.jsx'
+import LinkifyText from './components/LinkifyText.jsx'
 const TasksTab = React.lazy(() => import('./components/TasksTab.jsx'))
 
 function App() {
@@ -3326,7 +3327,7 @@ tickIcon = (
                                                                   ) : (
                                                                       <div className="flex flex-col">
                                                                           {/* Texto y/o Imagen y/o Documento */}
-{m.text && <p className={isEmojiOnly ? "text-5xl md:text-6xl drop-shadow-lg leading-none" : "text-sm md:text-base leading-relaxed whitespace-pre-wrap pr-10"}>{m.text}</p>}
+{m.text && <p className={isEmojiOnly ? "text-5xl md:text-6xl drop-shadow-lg leading-none" : "text-sm md:text-base leading-relaxed whitespace-pre-wrap pr-10"}>{<LinkifyText text={m.text} />}</p>}
 {m.imageUrl && <img src={m.imageUrl} loading="lazy" decoding="async" alt="Adjunto" onLoad={() => chatMessagesEndRef.current?.scrollIntoView({ behavior: "smooth" })} onClick={() => setFullScreenImage(m.imageUrl)} className={isImageOnly ? "rounded-2xl max-h-72 object-contain cursor-pointer hover:opacity-90 transition-opacity drop-shadow-lg" : "mt-2 rounded-xl max-h-60 object-contain cursor-pointer hover:opacity-90 transition-opacity bg-black/10 border border-white/20"} />}
 {m.fileUrl && (
     <a href={m.fileUrl} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-2 p-3 rounded-xl mt-1 w-fit transition-colors border ${isMe ? (currentPrefs.gradient ? 'bg-white/20 border-white/30 hover:bg-white/30' : 'bg-blue-700 border-blue-500 hover:bg-blue-800') : (currentPrefs.gradient ? 'bg-black/20 border-white/20 hover:bg-black/30' : (isDarkMode ? 'bg-gray-700 border-gray-600 hover:bg-gray-600' : 'bg-gray-100 border-gray-300 hover:bg-gray-200'))}`}>
