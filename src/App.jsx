@@ -26,6 +26,7 @@ import {
 } from './components/Icons.jsx'
 const GifPickerModal = React.lazy(() => import('./components/GifPickerModal.jsx'))
 import EmptyState from './components/EmptyState.jsx'
+import ScrollToTop from './components/ScrollToTop.jsx'
 const TasksTab = React.lazy(() => import('./components/TasksTab.jsx'))
 
 function App() {
@@ -3560,7 +3561,9 @@ tickIcon = (
                       </div>
                   , document.body)}
 
-                  {/* 👇 AQUÍ VA EL CEREBRO DEL BOT PARA EDWIN 👇 */}
+                  <ScrollToTop isDarkMode={isDarkMode} />
+
+              {/* 👇 AQUÍ VA EL CEREBRO DEL BOT PARA EDWIN 👇 */}
                   {showIAKnowledgeModal && ReactDOM.createPortal(
                       <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                           <div className={`${glassCard} max-w-md w-full flex flex-col gap-4 relative bg-white`}>

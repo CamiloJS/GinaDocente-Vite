@@ -188,4 +188,21 @@ Actualmente, cuando no hay publicaciones, mensajes o repasos, la aplicación mue
 
 **Entrega:** Documenta en `REPORTE-OPENCODE.md` si creaste el componente y en qué pestañas principales lograste integrarlo.
 
+---
+
+# INSTRUCCION #13
+
+**Objetivo:** Usabilidad Móvil: Botón Flotante de "Volver Arriba" (Scroll to Top).
+
+El Muro principal (`TasksTab`) puede volverse muy largo a medida que se acumulan publicaciones y comentarios de los estudiantes. Para mejorar la navegación, especialmente en dispositivos móviles, vamos a agregar un botón flotante que permita regresar al inicio rápidamente.
+
+**Acciones a implementar por Opencode:**
+1. **Crear Componente (o integrarlo globalmente en `App.jsx`):** Implementa una lógica que escuche el evento `scroll` de la ventana (`window.addEventListener('scroll')`).
+2. **Mostrar condicionalmente:** Si el usuario hace scroll hacia abajo más de 300-400 píxeles, muestra un botón flotante discreto en la parte inferior derecha. Usa animaciones sutiles (ej. `transition-opacity`, `duration-300`).
+3. **Acción de Scroll:** Al hacer clic en el botón, debe ejecutarse un scroll suave (`window.scrollTo({ top: 0, behavior: 'smooth' })`). Usa un ícono como `ChevronUp` o `ArrowUp` de lucide-react.
+4. **Cuidado Móvil:** Asegúrate de que en vista móvil este botón no tape el menú de navegación inferior (dale un `bottom-20` o similar).
+5. **Deploy:** Ejecuta `npm run build`, haz `commit`/`push` a `main` y sube con `vercel deploy --prod`.
+
+**Entrega:** Documenta en `REPORTE-OPENCODE.md` dónde ubicaste el botón flotante y confirma que funciona correctamente.
+
 ESTADO: LISTA PARA IMPLEMENTAR
