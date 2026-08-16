@@ -490,4 +490,21 @@ En cualquier plataforma educativa, la docente necesita que ciertos comunicados (
 
 **Entrega:** Documenta en `REPORTE-OPENCODE.md` cómo gestionaste la filtración de duplicados y si los posts fijados se visualizan correctamente en la parte superior.
 
+---
+
+# INSTRUCCION #30
+
+**Objetivo:** Habilidad de Listening: Lector de Voz Nativo (Text-to-Speech).
+
+En una plataforma de aprendizaje de inglés, poder escuchar cómo se pronuncian las frases es una de las características más solicitadas. Vamos a utilizar la Web Speech API nativa del navegador para leer los mensajes.
+
+**Acciones a implementar por Opencode:**
+1. **Crear Lógica TTS:** En `App.jsx` (o `helpers.js`), crea una función `speakText(text)`. Debe detener lecturas previas (`window.speechSynthesis.cancel()`), crear un `new SpeechSynthesisUtterance(text)` y forzar el idioma a inglés (`utterance.lang = 'en-US'`), para luego reproducirlo (`window.speechSynthesis.speak(utterance)`).
+2. **Icono Altavoz:** En `src/components/Icons.jsx`, añade y exporta un componente `Volume2` (puedes buscar el SVG en Lucide o crear uno simple de un altavoz). 
+3. **Añadir Botón en Chat y Bot:** En `App.jsx`, busca los lugares donde recién agregaste el botón de copiar (`<Copy />`). Justo a su lado, añade el nuevo botón de `Volume2` con `onClick={() => speakText(m.text)}`.
+4. **(Opcional) En el Muro:** Si lo consideras útil, puedes añadir este mismo botón en el `TaskCard.jsx` para que los estudiantes escuchen las instrucciones de las tareas.
+5. **Deploy:** Revisa el build (`npm run build`), haz `commit`/`push` a `main` y realiza `vercel deploy --prod`.
+
+**Entrega:** Documenta en `REPORTE-OPENCODE.md` si la voz del navegador respeta el idioma `en-US` y si implementaste el botón solo en chat o también en el muro.
+
 ESTADO: LISTA PARA IMPLEMENTAR

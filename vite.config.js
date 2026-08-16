@@ -7,6 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: false,
       includeAssets: ['favicon.ico', 'icono.png', 'icon-192.png', 'icon-512.png'],
       manifest: {
         name: 'English TECH Unipamplona',
