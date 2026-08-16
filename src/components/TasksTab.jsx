@@ -101,9 +101,6 @@ const TasksTab = React.memo(({
                                     <PaperclipIcon size={15} /> Adjuntar
                                 </button>
                             </div>
-                            <div className="flex items-center gap-1.5 text-purple-600 dark:text-purple-400 text-xs font-bold bg-purple-50 dark:bg-purple-950/30 px-2.5 py-1 rounded-full border border-purple-200 dark:border-purple-800">
-                                <Sparkles size={13} className="animate-pulse" /> Asistente IA activo
-                            </div>
                         </div>
                     </div>
 

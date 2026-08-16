@@ -80,7 +80,6 @@ const [teacherBotInput, setTeacherBotInput] = useState("");
 const [teacherBotInfoList, setTeacherBotInfoList] = useState([]);
 const [isTeacherBotLoading, setIsTeacherBotLoading] = useState(false);
 const [showIAKnowledgeModal, setShowIAKnowledgeModal] = useState(false);
-const [showSettingsModal, setShowSettingsModal] = useState(false);
 const [newIAKnowledge, setNewIAKnowledge] = useState("");
 const [editingIAId, setEditingIAId] = useState(null);
 const [editIAText, setEditIAText] = useState("");
@@ -105,7 +104,7 @@ useEffect(() => {
           
           // --- INICIALIZACIÓN DE PESTAÑA CON HASH ---
           const initialHash = window.location.hash ? window.location.hash.replace('#', '') : 'tasks';
-          const [activeTab, setActiveTab] = useState(['tasks', 'reviews', 'syllabus', 'evaluations', 'directory', 'inbox'].includes(initialHash) ? initialHash : 'tasks');
+          const [activeTab, setActiveTab] = useState(['tasks', 'reviews', 'syllabus', 'evaluations', 'directory', 'inbox', 'profile', 'settings'].includes(initialHash) ? initialHash : 'tasks');
           
           const [loginError, setLoginError] = useState("");
           
@@ -167,7 +166,7 @@ useEffect(() => {
                       setIsChatAppOpen(true);
                   } else {
                       setIsChatAppOpen(false);
-                      if (hash && ['tasks', 'reviews', 'syllabus', 'evaluations', 'directory', 'inbox'].includes(hash)) {
+                      if (hash && ['tasks', 'reviews', 'syllabus', 'evaluations', 'directory', 'inbox', 'profile', 'settings'].includes(hash)) {
                           setActiveTab(hash);
                       } else if (!hash) {
                           setActiveTab('tasks');
@@ -2435,6 +2434,178 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
             </div>
           );
 
+          const renderSettings = () => (
+            <div className="space-y-6 animate-in fade-in duration-200">
+              <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-6 flex items-center gap-2 drop-shadow-sm">
+                  <Settings className="text-purple-600 dark:text-purple-400" /> Ajustes y preferencias
+              </h2>
+
+              <div className="grid gap-6">
+                {/* Tarjeta 1: Tema y Apariencia */}
+                <div className={`${glassCard} p-6 space-y-4`}>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-md ${isDarkMode ? 'bg-purple-950/70 text-purple-300 border border-purple-800/40' : 'bg-amber-50 text-amber-500 border border-amber-100'}`}>
+                                {isDarkMode ? <Moon size={24} /> : <Sun size={24} />}
+                            </div>
+                            <div>
+                                <h3 className={`text-base font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Modo de visualización</h3>
+                                <p className="text-xs text-gray-500">{isDarkMode ? 'Tema nocturno oscuro activo' : 'Tema diurno claro activo'}</p>
+                            </div>
+                        </div>
+                        <button 
+                            onClick={() => setIsDarkMode(!isDarkMode)} 
+                            className={`w-14 h-7 flex items-center rounded-full p-1 transition-colors duration-300 ${isDarkMode ? 'bg-blue-600 justify-end' : 'bg-gray-300 dark:bg-gray-700 justify-start'}`}
+                            title="Alternar modo oscuro y diurno"
+                        >
+                            <div className="bg-white w-5 h-5 rounded-full shadow-md transform transition-transform" />
+                        </button>
+                    </div>
+                </div>
+
+                {/* Tarjeta 2: Notificaciones y Sonidos */}
+                <div className={`${glassCard} p-6 space-y-5`}>
+                    <h3 className={`text-sm font-bold uppercase tracking-wider ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Notificaciones y Sonidos</h3>
+                    
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-md ${soundEnabled ? (isDarkMode ? 'bg-blue-950/70 text-blue-300 border border-blue-800/40' : 'bg-blue-50 text-blue-600 border border-blue-100') : 'bg-gray-100 dark:bg-gray-800 text-gray-400'}`}>
+                                {soundEnabled ? <Volume2 size={24} /> : <VolumeX size={24} />}
+                            </div>
+                            <div>
+                                <h4 className={`text-base font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Sonidos del chat</h4>
+                                <p className="text-xs text-gray-500">{soundEnabled ? 'Alertas sonoras activas al recibir mensajes' : 'Sonidos desactivados (modo silencio)'}</p>
+                            </div>
+                        </div>
+                        <button 
+                            onClick={() => setSoundEnabled(!soundEnabled)} 
+                            className={`w-14 h-7 flex items-center rounded-full p-1 transition-colors duration-300 ${soundEnabled ? 'bg-blue-600 justify-end' : 'bg-gray-300 dark:bg-gray-700 justify-start'}`}
+                        >
+                            <div className="bg-white w-5 h-5 rounded-full shadow-md transform transition-transform" />
+                        </button>
+                    </div>
+
+                    <div className="pt-3 border-t border-gray-200/60 dark:border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+                        <div>
+                            <p className={`text-sm font-bold ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>Notificaciones del navegador</p>
+                            <p className="text-xs text-gray-500">Recibe alertas en segundo plano cuando te envíen mensajes o tareas.</p>
+                        </div>
+                        <button 
+                            onClick={enableNotifications} 
+                            className={`w-full sm:w-auto py-2.5 px-4 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 border shadow-sm ${isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-200 hover:bg-gray-700' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+                        >
+                            <Bell size={16} /> Activar notificaciones push
+                        </button>
+                    </div>
+                </div>
+
+                {/* Tarjeta 3: Estado de Disponibilidad */}
+                <div className={`${glassCard} p-6 space-y-4`}>
+                    <div className="flex items-center gap-3 mb-1">
+                        <div className="w-10 h-10 rounded-2xl bg-green-500/10 text-green-500 flex items-center justify-center">
+                            <Shield size={20} />
+                        </div>
+                        <div>
+                            <h3 className={`text-base font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Estado de conexión</h3>
+                            <p className="text-xs text-gray-500">Define cómo te ven otros usuarios en la barra de contactos.</p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                        <button 
+                            onClick={() => updatePresenceStatus('online')} 
+                            className={`p-4 rounded-2xl flex flex-col items-center justify-center gap-2 border transition-all text-center ${
+                                (!userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status || userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'online') 
+                                    ? 'bg-green-500/15 border-green-500 text-green-600 dark:text-green-400 ring-2 ring-green-500/20 shadow-md font-bold' 
+                                    : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'
+                            }`}
+                        >
+                            <span className="w-3.5 h-3.5 rounded-full bg-green-500"></span>
+                            <span className="text-sm font-bold">En línea</span>
+                            <span className="text-[11px] opacity-75">Disponible</span>
+                        </button>
+
+                        <button 
+                            onClick={() => updatePresenceStatus('away')} 
+                            className={`p-4 rounded-2xl flex flex-col items-center justify-center gap-2 border transition-all text-center ${
+                                userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'away' 
+                                    ? 'bg-orange-500/15 border-orange-500 text-orange-600 dark:text-orange-400 ring-2 ring-orange-500/20 shadow-md font-bold' 
+                                    : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'
+                            }`}
+                        >
+                            <span className="w-3.5 h-3.5 rounded-full bg-orange-400"></span>
+                            <span className="text-sm font-bold">Ausente</span>
+                            <span className="text-[11px] opacity-75">Temporalmente inactivo</span>
+                        </button>
+
+                        <button 
+                            onClick={() => updatePresenceStatus('busy')} 
+                            className={`p-4 rounded-2xl flex flex-col items-center justify-center gap-2 border transition-all text-center ${
+                                userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'busy' 
+                                    ? 'bg-red-500/15 border-red-500 text-red-600 dark:text-red-400 ring-2 ring-red-500/20 shadow-md font-bold' 
+                                    : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'
+                            }`}
+                        >
+                            <span className="w-3.5 h-3.5 rounded-full bg-red-500"></span>
+                            <span className="text-sm font-bold">Ocupado</span>
+                            <span className="text-[11px] opacity-75">No molestar</span>
+                        </button>
+                    </div>
+                </div>
+
+                {/* Tarjeta 4: Configuración y Entrenamiento de IA (Solo Docente) */}
+                {role === 'teacher' && (
+                    <div className={`${glassCard} p-6 space-y-4 border-purple-500/30 bg-gradient-to-br from-purple-500/5 to-indigo-500/5`}>
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-2xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+                                <Sparkles size={22} />
+                            </div>
+                            <div>
+                                <h3 className={`text-base font-bold ${isDarkMode ? 'text-purple-300' : 'text-purple-900'}`}>Asistente y entrenamiento de IA</h3>
+                                <p className="text-xs text-gray-500">Configuración personalizada del bot de ayuda técnica GinAI.</p>
+                            </div>
+                        </div>
+                        <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
+                            Aquí puedes ingresar y editar instrucciones, conocimientos y directrices personalizadas para el bot asistente que guía a la docente en el uso de la plataforma.
+                        </p>
+                        <div className="pt-2">
+                            <button 
+                                onClick={() => setShowIAKnowledgeModal(true)} 
+                                className="w-full sm:w-auto py-3 px-6 text-sm font-bold rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg shadow-purple-500/25 flex items-center justify-center gap-2 transition-all hover:scale-102"
+                            >
+                                <Sparkles size={18} /> Entrenar bot de ayuda
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Tarjeta 5: Información de la Cuenta */}
+                <div className={`${glassCard} p-6 space-y-4`}>
+                    <h3 className={`text-sm font-bold uppercase tracking-wider ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Información de la cuenta</h3>
+                    <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 rounded-2xl bg-blue-100 flex items-center justify-center text-blue-600 shrink-0 overflow-hidden border-2 border-white dark:border-gray-700 shadow-md">
+                            {userMappings[myChatId]?.profilePicUrl ? <img src={userMappings[myChatId].profilePicUrl} className="w-full h-full object-cover" /> : <UserIcon size={28} />}
+                        </div>
+                        <div className="overflow-hidden">
+                            <p className={`font-bold text-base ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{loggedInName}</p>
+                            <p className="text-xs text-blue-600 dark:text-blue-400 font-bold uppercase tracking-wider">{userMappings[myChatId]?.customLabel || (role === 'teacher' ? 'Docente' : 'Estudiante')}</p>
+                            <p className="text-xs text-gray-500 mt-0.5">{loggedInUser} • Universidad de Pamplona</p>
+                        </div>
+                    </div>
+
+                    <div className="pt-4 border-t border-gray-200/60 dark:border-gray-800 flex justify-end">
+                        <button 
+                            onClick={handleLogout} 
+                            className="w-full sm:w-auto py-3 px-6 rounded-2xl text-sm font-bold transition-all flex items-center justify-center gap-2 border bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900/60 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/40 shadow-sm"
+                        >
+                            <LogOutIcon size={18} /> Cerrar sesión
+                        </button>
+                    </div>
+                </div>
+              </div>
+            </div>
+          );
+
           if (!hasEntered) {
               return (
                   <div className={`min-h-screen flex items-center justify-center bg-gradient-to-br ${isDarkMode ? 'from-gray-900 via-slate-900 to-black' : 'from-red-50/80 via-gray-100/90 to-blue-50/80'} transition-colors duration-500 relative overflow-hidden ${isDarkMode ? 'dark' : ''}`}>
@@ -2647,61 +2818,24 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                 </div>
               </nav>
 
-              <div className="max-w-[1600px] mx-auto w-full flex justify-center items-start px-0 md:px-4 gap-6 relative z-10">
+              <div className="max-w-[1600px] mx-auto w-full flex justify-center items-start px-2 md:px-4 gap-4 xl:gap-6 relative z-10">
                   {/* LEFT SIDEBAR (Facebook style) */}
-                  <aside className={`w-[300px] hidden lg:block sticky top-[90px] h-[calc(100vh-100px)] overflow-y-auto overflow-x-hidden pr-2 z-10 space-y-4 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                      {/* Teacher/User Profile Card con Estado de Conexión */}
+                  <aside className={`w-[260px] xl:w-[280px] hidden lg:block sticky top-[90px] h-[calc(100vh-100px)] overflow-y-auto overflow-x-hidden pr-2 z-10 space-y-4 shrink-0 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      {/* Teacher/User Profile Card con Estado de Conexión en el Avatar */}
                       <div className={`p-4 rounded-2xl border shadow-sm flex flex-col items-center text-center ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
                           <div className="relative mb-2">
-                              <div className="w-18 h-18 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shrink-0 overflow-hidden border-4 border-white shadow-md dark:border-gray-700">
-                                  {userMappings[myChatId]?.profilePicUrl ? <img src={userMappings[myChatId].profilePicUrl} className="w-full h-full object-cover" /> : <UserIcon size={38} />}
+                              <div className="w-14 h-14 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shrink-0 overflow-hidden border-2 border-white shadow-md dark:border-gray-700">
+                                  {userMappings[myChatId]?.profilePicUrl ? <img src={userMappings[myChatId].profilePicUrl} className="w-full h-full object-cover" /> : <UserIcon size={30} />}
                               </div>
-                              {/* Indicador de Estado en la Foto */}
-                              <div className={`absolute bottom-0 right-1 w-4 h-4 rounded-full border-2 ${isDarkMode ? 'border-gray-800' : 'border-white'} shadow-sm ${
+                              {/* Indicador de Estado en la Foto (Badge) */}
+                              <div className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 ${isDarkMode ? 'border-gray-800' : 'border-white'} shadow-sm ${
                                   userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'away' ? 'bg-orange-400' :
                                   userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'busy' ? 'bg-red-500' : 'bg-green-500'
                               }`} />
                           </div>
                           
-                          <p className={`font-bold text-base w-full leading-tight truncate px-1 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>{loggedInName}</p>
-                          <p className="text-[11px] text-gray-500 font-bold uppercase tracking-wider mt-0.5 mb-3">{userMappings[myChatId]?.customLabel || (role === 'teacher' ? 'Docente' : 'Estudiante')}</p>
-
-                          {/* Selector de Estado de Conexión junto al Avatar */}
-                          <div className="w-full bg-gray-50 dark:bg-gray-900/60 p-1 rounded-xl border border-gray-200/80 dark:border-gray-700 flex items-center justify-between gap-1">
-                              <button 
-                                  onClick={() => updatePresenceStatus('online')} 
-                                  className={`flex-1 py-1 px-1 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition-all ${
-                                      (!userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status || userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'online') 
-                                          ? 'bg-green-500/20 text-green-600 dark:text-green-400 font-extrabold border border-green-500/30' 
-                                          : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
-                                  }`}
-                                  title="En línea"
-                              >
-                                  <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span> En línea
-                              </button>
-                              <button 
-                                  onClick={() => updatePresenceStatus('away')} 
-                                  className={`flex-1 py-1 px-1 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition-all ${
-                                      userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'away' 
-                                          ? 'bg-orange-500/20 text-orange-600 dark:text-orange-400 font-extrabold border border-orange-500/30' 
-                                          : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
-                                  }`}
-                                  title="Ausente"
-                              >
-                                  <span className="w-1.5 h-1.5 rounded-full bg-orange-400"></span> Ausente
-                              </button>
-                              <button 
-                                  onClick={() => updatePresenceStatus('busy')} 
-                                  className={`flex-1 py-1 px-1 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition-all ${
-                                      userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'busy' 
-                                          ? 'bg-red-500/20 text-red-600 dark:text-red-400 font-extrabold border border-red-500/30' 
-                                          : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
-                                  }`}
-                                  title="Ocupado"
-                              >
-                                  <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span> Ocupado
-                              </button>
-                          </div>
+                          <p className={`font-bold text-sm w-full leading-tight truncate px-1 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>{loggedInName}</p>
+                          <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mt-0.5">{userMappings[myChatId]?.customLabel || (role === 'teacher' ? 'Docente' : 'Estudiante')}</p>
                       </div>
 
                       {/* Navigation Links like Facebook */}
@@ -2742,7 +2876,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                                   <Mail size={20} className="text-amber-500" /> Sugerencias
                               </button>
                           )}
-                          <button onClick={() => setShowSettingsModal(true)} className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-xl transition-colors ${isDarkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-200 text-gray-700'}`}>
+                          <button onClick={() => changeTab('settings')} className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-xl transition-colors ${activeTab === 'settings' ? 'bg-purple-50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 font-bold' : isDarkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-200 text-gray-700'}`}>
                               <Settings size={20} className="text-purple-500" /> Ajustes
                           </button>
                       </div>
@@ -2756,7 +2890,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                   </aside>
 
                   {/* CENTER CONTENT */}
-                  <main className="flex-1 max-w-[680px] w-full p-4 md:p-8 pb-28 md:pb-8 relative z-10 shrink-0 mx-auto">
+                  <main className="flex-1 max-w-[680px] min-w-0 w-full p-2 md:p-6 pb-28 md:pb-8 relative z-10 shrink-0 mx-auto">
                       {activeTab === 'tasks' && (
                           <React.Suspense fallback={<p className="text-gray-500 p-8 text-center">Cargando muro...</p>}>
                           <TasksTab 
@@ -2765,319 +2899,181 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                               userMappings={userMappings}
                               handleOpenProfileByName={handleOpenProfileByName}
                               role={role} glassCard={glassCard} glassInput={glassInput} redButton={redButton}
-                              postType={postType} setPostType={setPostType} taskTitle={taskTitle} setTaskTitle={setTaskTitle} // ... el resto sigue igualito hacia abajo
-                            taskDesc={taskDesc} setTaskDesc={setTaskDesc} showImageInput={showImageInput} setShowImageInput={setShowImageInput}
-                            postImageUrl={postImageUrl} setPostImageUrl={setPostImageUrl} postFileUrl={postFileUrl} setPostFileUrl={setPostFileUrl}
-                            postFileName={postFileName} setPostFileName={setPostFileName} showPostAttachmentMenu={showPostAttachmentMenu}
-                            setShowPostAttachmentMenu={setShowPostAttachmentMenu} handlePostLocalFileUpload={handlePostLocalFileUpload}
-                            isAiLoading={isAiLoading} setIsAiLoading={setIsAiLoading} prevTaskTitle={prevTaskTitle} setPrevTaskTitle={setPrevTaskTitle}
-                            prevTaskDesc={prevTaskDesc} setPrevTaskDesc={setPrevTaskDesc} hasAiModified={hasAiModified} setHasAiModified={setHasAiModified}
-                            callGemini={callGemini} showMessage={showMessage} handleAiTranslate={handleAiTranslate} taskDate={taskDate}
-                            setTaskDate={setTaskDate} taskTime={taskTime} setTaskTime={setTaskTime} allowLate={allowLate} setAllowLate={setAllowLate}
-                            db={db} appId={appId} loggedInName={loggedInName} getToday={getToday} tasks={tasks} user={user} isDarkMode={isDarkMode}
-                            confirmAction={confirmAction} setFullScreenImage={setFullScreenImage} tasksLoading={tasksLoading} taskLimit={taskLimit} loadMoreTasks={loadMoreTasks} pinnedTasks={pinnedTasks}
-                        />
+                              postType={postType} setPostType={setPostType} taskTitle={taskTitle} setTaskTitle={setTaskTitle}
+                              taskDesc={taskDesc} setTaskDesc={setTaskDesc} showImageInput={showImageInput} setShowImageInput={setShowImageInput}
+                              postImageUrl={postImageUrl} setPostImageUrl={setPostImageUrl} postFileUrl={postFileUrl} setPostFileUrl={setPostFileUrl}
+                              postFileName={postFileName} setPostFileName={setPostFileName} showPostAttachmentMenu={showPostAttachmentMenu}
+                              setShowPostAttachmentMenu={setShowPostAttachmentMenu} handlePostLocalFileUpload={handlePostLocalFileUpload}
+                              isAiLoading={isAiLoading} setIsAiLoading={setIsAiLoading} prevTaskTitle={prevTaskTitle} setPrevTaskTitle={setPrevTaskTitle}
+                              prevTaskDesc={prevTaskDesc} setPrevTaskDesc={setPrevTaskDesc} hasAiModified={hasAiModified} setHasAiModified={setHasAiModified}
+                              callGemini={callGemini} showMessage={showMessage} handleAiTranslate={handleAiTranslate} taskDate={taskDate}
+                              setTaskDate={setTaskDate} taskTime={taskTime} setTaskTime={setTaskTime} allowLate={allowLate} setAllowLate={setAllowLate}
+                              db={db} appId={appId} loggedInName={loggedInName} getToday={getToday} tasks={tasks} user={user} isDarkMode={isDarkMode}
+                              confirmAction={confirmAction} setFullScreenImage={setFullScreenImage} tasksLoading={tasksLoading} taskLimit={taskLimit} loadMoreTasks={loadMoreTasks} pinnedTasks={pinnedTasks}
+                          />
                           </React.Suspense>
-                    )}
-                    {activeTab === 'reviews' && renderReviews()}
-                    {activeTab === 'syllabus' && renderSyllabus()}
-                    {activeTab === 'evaluations' && renderEvaluations()}
-                    {activeTab === 'directory' && role === 'teacher' && renderDirectory()}
-                    {activeTab === 'inbox' && role === 'teacher' && renderInbox()}
-                    {activeTab === 'profile' && renderProfile()}
+                      )}
+                      {activeTab === 'reviews' && renderReviews()}
+                      {activeTab === 'syllabus' && renderSyllabus()}
+                      {activeTab === 'evaluations' && renderEvaluations()}
+                      {activeTab === 'directory' && role === 'teacher' && renderDirectory()}
+                      {activeTab === 'inbox' && role === 'teacher' && renderInbox()}
+                      {activeTab === 'profile' && renderProfile()}
+                      {activeTab === 'settings' && renderSettings()}
                   </main>
 
-                  {/* RIGHT SIDEBAR (Chats y Ajustes estilo Facebook) */}
-                  <aside className={`w-[320px] hidden xl:block sticky top-[90px] h-[calc(100vh-100px)] overflow-y-auto overflow-x-hidden pl-4 border-l z-10 space-y-4 ${isDarkMode ? 'border-gray-800 text-gray-300' : 'border-gray-200 text-gray-700'}`}>
-                      {/* Selector de Pestañas (Chats vs Ajustes) */}
-                      <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-2xl border border-gray-200 dark:border-gray-700 mb-2">
+                  {/* RIGHT SIDEBAR (Barra lateral de Chats fija estilo Facebook) */}
+                  <aside className={`w-[280px] xl:w-[320px] hidden lg:block sticky top-[90px] h-[calc(100vh-100px)] overflow-y-auto overflow-x-hidden pl-3 border-l z-10 space-y-4 shrink-0 ${isDarkMode ? 'border-gray-800 text-gray-300' : 'border-gray-200 text-gray-700'}`}>
+                      {/* Encabezado de Chats */}
+                      <div className="flex items-center justify-between px-1">
+                          <h3 className={`text-xs font-bold uppercase tracking-wider ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Mensajes y Chats</h3>
                           <button 
-                              onClick={() => setRightSidebarTab('chats')} 
-                              className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${rightSidebarTab === 'chats' ? 'bg-white dark:bg-gray-900 shadow-md text-blue-600 dark:text-blue-400 scale-102' : 'text-gray-500 hover:text-gray-800 dark:hover:text-gray-200'}`}
+                              onClick={() => { setIsCreatingGroup(true); setIsChatAppOpen(true); }} 
+                              className="text-blue-500 hover:text-blue-600 font-bold text-xs bg-blue-500/10 hover:bg-blue-500/20 px-2.5 py-1 rounded-xl transition-all flex items-center gap-1"
+                              title="Crear nuevo grupo"
                           >
-                              <MessageCircle size={15} /> Chats
-                          </button>
-                          <button 
-                              onClick={() => setRightSidebarTab('settings')} 
-                              className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${rightSidebarTab === 'settings' ? 'bg-white dark:bg-gray-900 shadow-md text-purple-600 dark:text-purple-400 scale-102' : 'text-gray-500 hover:text-gray-800 dark:hover:text-gray-200'}`}
-                          >
-                              <Settings size={15} /> Ajustes
+                              <Plus size={14} /> Grupo
                           </button>
                       </div>
 
-                      {/* CONTENIDO: CHATS Y GRUPOS (ESTILO FACEBOOK) */}
-                      {rightSidebarTab === 'chats' && (
-                          <div className="space-y-4 animate-in fade-in duration-200">
-                              {/* Barra de Búsqueda de Chats */}
-                              <div className="relative">
-                                  <SearchIcon size={16} className={`absolute left-3 top-2.5 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`} />
-                                  <input 
-                                      value={chatSearchQuery} 
-                                      onChange={e => setChatSearchQuery(e.target.value)} 
-                                      placeholder="Buscar chats o personas..." 
-                                      className={`w-full pl-9 pr-8 py-2 text-xs font-medium rounded-xl border outline-none transition-all ${
-                                          isDarkMode 
-                                              ? 'bg-gray-800/90 border-gray-700 text-gray-100 placeholder-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30' 
-                                              : 'bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-400 focus:border-blue-400 focus:bg-white focus:ring-1 focus:ring-blue-400/30 shadow-sm'
-                                      }`}
-                                  />
-                                  {chatSearchQuery && (
-                                      <button 
-                                          onClick={() => setChatSearchQuery('')} 
-                                          className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-0.5"
-                                          title="Limpiar búsqueda"
-                                      >
-                                          <X size={13} />
-                                      </button>
+                      {/* Barra de Búsqueda de Chats */}
+                      <div className="relative">
+                          <SearchIcon size={15} className={`absolute left-3 top-2.5 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`} />
+                          <input 
+                              value={chatSearchQuery} 
+                              onChange={e => setChatSearchQuery(e.target.value)} 
+                              placeholder="Buscar conversaciones..." 
+                              className={`w-full pl-9 pr-8 py-2 text-xs font-medium rounded-xl border outline-none transition-all ${
+                                  isDarkMode 
+                                      ? 'bg-gray-800/90 border-gray-700 text-gray-100 placeholder-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30' 
+                                      : 'bg-white border-gray-200 text-gray-800 placeholder-gray-400 focus:border-blue-400 focus:ring-1 focus:ring-blue-400/30 shadow-sm'
+                              }`}
+                          />
+                          {chatSearchQuery && (
+                              <button 
+                                  onClick={() => setChatSearchQuery('')} 
+                                  className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-0.5"
+                                  title="Limpiar búsqueda"
+                              >
+                                  <X size={13} />
+                              </button>
+                          )}
+                      </div>
+
+                      {/* Chat con IA (GinAI / Asistente) - ÚNICAMENTE VISIBLE PARA EL ROL DE DOCENTE */}
+                      {role === 'teacher' && (!chatSearchQuery || 'ginai asistente bot ia ayuda'.includes(chatSearchQuery.toLowerCase())) && (
+                          <div className="pb-3 border-b border-gray-200/80 dark:border-gray-800">
+                              <button 
+                                  onClick={() => setIsTeacherBotOpen(true)} 
+                                  className={`w-full flex items-center gap-3 p-2.5 rounded-2xl transition-all relative group border text-left ${
+                                      isDarkMode 
+                                          ? 'bg-gradient-to-r from-purple-950/30 to-indigo-950/30 border-purple-800/40 hover:border-purple-600/60 shadow-sm' 
+                                          : 'bg-gradient-to-r from-purple-50/90 to-indigo-50/90 border-purple-200 hover:border-purple-300 shadow-sm'
+                                  }`}
+                              >
+                                  <div className="relative shrink-0">
+                                      <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform">
+                                          <CuteBotIcon size={22} className="text-white" />
+                                      </div>
+                                      <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white dark:border-gray-900 rounded-full"></div>
+                                  </div>
+                                  <div className="text-left flex-1 overflow-hidden">
+                                      <div className="flex items-center gap-1.5">
+                                          <p className="font-bold text-xs text-purple-700 dark:text-purple-300 truncate">Bot de ayuda GinAI</p>
+                                          <span className="bg-purple-600 text-white text-[8px] font-black px-1.5 py-0.2 rounded uppercase tracking-wider">IA</span>
+                                      </div>
+                                      <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">Asistente técnico docente</p>
+                                  </div>
+                              </button>
+                          </div>
+                      )}
+
+                      {/* Sección de Grupos y Contactos */}
+                      {(() => {
+                          const filteredGroups = myGroups?.filter(g => g.name?.toLowerCase().includes(chatSearchQuery.toLowerCase())) || [];
+                          const filteredUsers = allChatUsers?.filter(u => u.name?.toLowerCase().includes(chatSearchQuery.toLowerCase())) || [];
+                          const isBotMatch = role === 'teacher' && (!chatSearchQuery || 'ginai asistente bot ia ayuda'.includes(chatSearchQuery.toLowerCase()));
+                          const isTotalEmpty = !isBotMatch && filteredGroups.length === 0 && filteredUsers.length === 0;
+
+                          if (isTotalEmpty) {
+                              return (
+                                  <div className="py-8 px-4 text-center space-y-2 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700/80">
+                                      <div className="w-11 h-11 rounded-2xl bg-gray-100 dark:bg-gray-800 text-gray-400 flex items-center justify-center mx-auto mb-1">
+                                          <SearchIcon size={20} />
+                                      </div>
+                                      <p className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                                          {chatSearchQuery ? 'Sin resultados' : 'Sin conversaciones'}
+                                      </p>
+                                      <p className="text-[11px] text-gray-500 leading-relaxed">
+                                          {chatSearchQuery ? `No encontramos chats con "${chatSearchQuery}"` : 'Los chats recientes y contactos aparecerán aquí.'}
+                                      </p>
+                                  </div>
+                              );
+                          }
+
+                          return (
+                              <div className="space-y-4">
+                                  {/* Grupos */}
+                                  {filteredGroups.length > 0 && (
+                                      <div>
+                                          <div className="flex justify-between items-center mb-1.5 px-1">
+                                              <h4 className={`text-[11px] font-bold uppercase tracking-wider ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Grupos ({filteredGroups.length})</h4>
+                                          </div>
+                                          <div className="space-y-1">
+                                              {filteredGroups.map(g => {
+                                                  const chatId = `group_${g.id}`;
+                                                  const isUnread = unreadChats[chatId];
+                                                  return (
+                                                      <button key={g.id} onClick={() => { handleOpenChat({ id: chatId, name: g.name, type: 'group' }); setIsChatAppOpen(true); }} className={`w-full flex items-center gap-3 p-2 rounded-xl transition-colors ${isDarkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}>
+                                                          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white shrink-0 shadow-sm"><UsersGroupIcon size={16}/></div>
+                                                          <div className="text-left flex-1 overflow-hidden">
+                                                              <p className={`font-bold text-xs truncate ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>{g.name}</p>
+                                                          </div>
+                                                          {isUnread && <span className="w-2 h-2 bg-red-500 rounded-full"></span>}
+                                                      </button>
+                                                  );
+                                              })}
+                                          </div>
+                                      </div>
+                                  )}
+
+                                  {/* Contactos */}
+                                  {filteredUsers.length > 0 && (
+                                      <div>
+                                          <h4 className={`text-[11px] font-bold uppercase tracking-wider mb-1.5 px-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Contactos ({filteredUsers.length})</h4>
+                                          <div className="space-y-1">
+                                              {filteredUsers.map(u => {
+                                                  const chatId = `dm_${[myChatId, u.id].sort().join('_')}`;
+                                                  const isUnread = unreadChats[chatId];
+                                                  const presenceStatus = userPresence[u.id]?.status;
+                                                  const isOnline = presenceStatus === 'online';
+                                                  const isAway = presenceStatus === 'away';
+                                                  const isBusy = presenceStatus === 'busy';
+                                                  
+                                                  const statusDotColor = isOnline ? 'bg-green-500' : isAway ? 'bg-orange-400' : isBusy ? 'bg-red-500' : 'bg-gray-400';
+
+                                                  return (
+                                                      <button key={u.id} onClick={() => { handleOpenChat({ id: chatId, name: u.name, type: 'dm', role: u.role }); setIsChatAppOpen(true); }} className={`w-full flex items-center gap-2.5 p-2 rounded-xl transition-colors relative ${isDarkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}>
+                                                          <div className="relative shrink-0">
+                                                              <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white shadow-sm transition-all duration-300 ${u.role === 'teacher' ? 'bg-gradient-to-br from-[#AD3333] to-[#8a2828]' : 'bg-gradient-to-br from-blue-400 to-indigo-500'}`}>
+                                                                  {u.role === 'teacher' ? <TeacherIcon size={16}/> : <UserIcon size={16}/>}
+                                                              </div>
+                                                              <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 border-2 rounded-full ${isDarkMode ? 'border-gray-900' : 'border-white'} ${statusDotColor}`}></div>
+                                                          </div>
+                                                          <div className="text-left flex-1 overflow-hidden">
+                                                              <p className={`font-bold text-xs truncate leading-tight ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>{u.name}</p>
+                                                              <p className="text-[10px] text-gray-500 truncate">{u.customLabel || (u.role === 'teacher' ? 'Docente' : 'Estudiante')}</p>
+                                                          </div>
+                                                          {isUnread && <span className="w-2 h-2 bg-blue-500 rounded-full"></span>}
+                                                      </button>
+                                                  );
+                                              })}
+                                          </div>
+                                      </div>
                                   )}
                               </div>
-
-                              {/* Chat con IA (GinAI / Asistente) - ÚNICAMENTE VISIBLE PARA EL ROL DE DOCENTE */}
-                              {role === 'teacher' && (!chatSearchQuery || 'ginai asistente bot ia ayuda'.includes(chatSearchQuery.toLowerCase())) && (
-                                  <div className="pb-3 border-b border-gray-200/80 dark:border-gray-800">
-                                      <button 
-                                          onClick={() => setIsTeacherBotOpen(true)} 
-                                          className={`w-full flex items-center gap-3 p-2.5 rounded-2xl transition-all relative group border ${
-                                              isDarkMode 
-                                                  ? 'bg-gradient-to-r from-purple-950/30 to-indigo-950/30 border-purple-800/40 hover:border-purple-600/60' 
-                                                  : 'bg-gradient-to-r from-purple-50/80 to-indigo-50/80 border-purple-200 hover:border-purple-300 shadow-sm'
-                                          }`}
-                                      >
-                                          <div className="relative shrink-0">
-                                              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform">
-                                                  <CuteBotIcon size={22} className="text-white" />
-                                              </div>
-                                              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white dark:border-gray-900 rounded-full"></div>
-                                          </div>
-                                          <div className="text-left flex-1 overflow-hidden">
-                                              <div className="flex items-center gap-1.5">
-                                                  <p className="font-bold text-xs text-purple-700 dark:text-purple-300 truncate">Bot de ayuda GinAI</p>
-                                                  <span className="bg-purple-600 text-white text-[8px] font-black px-1.5 py-0.2 rounded uppercase tracking-wider">IA</span>
-                                              </div>
-                                              <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">Asistente técnico docente</p>
-                                          </div>
-                                      </button>
-                                  </div>
-                              )}
-
-                              {/* Sección de Grupos y Contactos */}
-                              {(() => {
-                                  const filteredGroups = myGroups?.filter(g => g.name?.toLowerCase().includes(chatSearchQuery.toLowerCase())) || [];
-                                  const filteredUsers = allChatUsers?.filter(u => u.name?.toLowerCase().includes(chatSearchQuery.toLowerCase())) || [];
-                                  const isBotMatch = role === 'teacher' && (!chatSearchQuery || 'ginai asistente bot ia ayuda'.includes(chatSearchQuery.toLowerCase()));
-                                  const isTotalEmpty = !isBotMatch && filteredGroups.length === 0 && filteredUsers.length === 0;
-
-                                  if (isTotalEmpty) {
-                                      return (
-                                          <div className="py-8 px-4 text-center space-y-2 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700/80">
-                                              <div className="w-11 h-11 rounded-2xl bg-gray-100 dark:bg-gray-800 text-gray-400 flex items-center justify-center mx-auto mb-1">
-                                                  <SearchIcon size={20} />
-                                              </div>
-                                              <p className="text-xs font-bold text-gray-700 dark:text-gray-300">
-                                                  {chatSearchQuery ? 'Sin resultados' : 'Sin conversaciones'}
-                                              </p>
-                                              <p className="text-[11px] text-gray-500 leading-relaxed">
-                                                  {chatSearchQuery ? `No encontramos chats con "${chatSearchQuery}"` : 'Los chats recientes y contactos aparecerán aquí.'}
-                                              </p>
-                                          </div>
-                                      );
-                                  }
-
-                                  return (
-                                      <>
-                                          {/* Grupos */}
-                                          {filteredGroups.length > 0 && (
-                                              <div>
-                                                  <div className="flex justify-between items-center mb-2 px-1">
-                                                      <h3 className={`text-[11px] font-bold uppercase tracking-wider ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Grupos ({filteredGroups.length})</h3>
-                                                      <button onClick={() => { setIsCreatingGroup(true); setIsChatAppOpen(true); }} className="text-blue-500 font-bold text-[11px] bg-blue-500/10 px-2 py-0.5 rounded-lg hover:bg-blue-500/20 transition-colors">+ Crear</button>
-                                                  </div>
-                                                  <div className="space-y-1">
-                                                      {filteredGroups.map(g => {
-                                                          const chatId = `group_${g.id}`;
-                                                          const isUnread = unreadChats[chatId];
-                                                          return (
-                                                              <button key={g.id} onClick={() => { handleOpenChat({ id: chatId, name: g.name, type: 'group' }); setIsChatAppOpen(true); }} className={`w-full flex items-center gap-3 p-2 rounded-xl transition-colors ${isDarkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}>
-                                                                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white shrink-0 shadow-sm"><UsersGroupIcon size={16}/></div>
-                                                                  <div className="text-left flex-1 overflow-hidden">
-                                                                      <p className={`font-bold text-xs truncate ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>{g.name}</p>
-                                                                  </div>
-                                                                  {isUnread && <span className="w-2 h-2 bg-red-500 rounded-full"></span>}
-                                                              </button>
-                                                          );
-                                                      })}
-                                                  </div>
-                                              </div>
-                                          )}
-
-                                          {/* Contactos */}
-                                          {filteredUsers.length > 0 && (
-                                              <div>
-                                                  <h3 className={`text-[11px] font-bold uppercase tracking-wider mb-2 px-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Contactos ({filteredUsers.length})</h3>
-                                                  <div className="space-y-1">
-                                                      {filteredUsers.map(u => {
-                                                          const chatId = `dm_${[myChatId, u.id].sort().join('_')}`;
-                                                          const isUnread = unreadChats[chatId];
-                                                          const presenceStatus = userPresence[u.id]?.status;
-                                                          const isOnline = presenceStatus === 'online';
-                                                          const isAway = presenceStatus === 'away';
-                                                          const isBusy = presenceStatus === 'busy';
-                                                          
-                                                          const statusDotColor = isOnline ? 'bg-green-500' : isAway ? 'bg-orange-400' : isBusy ? 'bg-red-500' : 'bg-gray-400';
-
-                                                          return (
-                                                              <button key={u.id} onClick={() => { handleOpenChat({ id: chatId, name: u.name, type: 'dm', role: u.role }); setIsChatAppOpen(true); }} className={`w-full flex items-center gap-2.5 p-2 rounded-xl transition-colors relative ${isDarkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}>
-                                                                  <div className="relative shrink-0">
-                                                                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white shadow-sm transition-all duration-300 ${u.role === 'teacher' ? 'bg-gradient-to-br from-[#AD3333] to-[#8a2828]' : 'bg-gradient-to-br from-blue-400 to-indigo-500'}`}>
-                                                                          {u.role === 'teacher' ? <TeacherIcon size={16}/> : <UserIcon size={16}/>}
-                                                                      </div>
-                                                                      <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 border-2 rounded-full ${isDarkMode ? 'border-gray-900' : 'border-white'} ${statusDotColor}`}></div>
-                                                                  </div>
-                                                                  <div className="text-left flex-1 overflow-hidden">
-                                                                      <p className={`font-bold text-xs truncate leading-tight ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>{u.name}</p>
-                                                                      <p className="text-[10px] text-gray-500 truncate">{u.customLabel || (u.role === 'teacher' ? 'Docente' : 'Estudiante')}</p>
-                                                                  </div>
-                                                                  {isUnread && <span className="w-2 h-2 bg-blue-500 rounded-full"></span>}
-                                                              </button>
-                                                          );
-                                                      })}
-                                                  </div>
-                                              </div>
-                                          )}
-                                      </>
-                                  );
-                              })()}
-                          </div>
-                      )}
-
-                      {/* CONTENIDO: AJUSTES GENERALES (TIPO FACEBOOK) */}
-                      {rightSidebarTab === 'settings' && (
-                          <div className="space-y-4 animate-in fade-in duration-200">
-                              <h3 className={`text-xs font-bold uppercase tracking-wider ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Preferencias de cuenta</h3>
-
-                              {/* Tarjeta 1: Modo Oscuro / Modo Diurno */}
-                              <div className={`p-4 rounded-2xl border transition-all ${isDarkMode ? 'bg-gray-800/80 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
-                                  <div className="flex items-center justify-between">
-                                      <div className="flex items-center gap-3">
-                                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-sm ${isDarkMode ? 'bg-purple-950/70 text-purple-300 border border-purple-800/40' : 'bg-amber-50 text-amber-500 border border-amber-100'}`}>
-                                              {isDarkMode ? <Moon size={18} /> : <Sun size={18} />}
-                                          </div>
-                                          <div>
-                                              <p className={`text-xs font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>Modo oscuro</p>
-                                              <p className="text-[11px] text-gray-500">{isDarkMode ? 'Tema nocturno activo' : 'Tema diurno activo'}</p>
-                                          </div>
-                                      </div>
-                                      <button 
-                                          onClick={() => setIsDarkMode(!isDarkMode)} 
-                                          className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-300 ${isDarkMode ? 'bg-blue-600 justify-end' : 'bg-gray-300 dark:bg-gray-700 justify-start'}`}
-                                          title="Alternar modo oscuro y diurno"
-                                      >
-                                          <div className="bg-white w-4 h-4 rounded-full shadow-md transform transition-transform" />
-                                      </button>
-                                  </div>
-                              </div>
-
-                              {/* Tarjeta 2: Notificaciones y Sonidos */}
-                              <div className={`p-4 rounded-2xl border space-y-3 transition-all ${isDarkMode ? 'bg-gray-800/80 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
-                                  <div className="flex items-center justify-between">
-                                      <div className="flex items-center gap-3">
-                                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-sm ${soundEnabled ? (isDarkMode ? 'bg-blue-950/70 text-blue-300 border border-blue-800/40' : 'bg-blue-50 text-blue-600 border border-blue-100') : 'bg-gray-100 text-gray-400'}`}>
-                                              {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
-                                          </div>
-                                          <div>
-                                              <p className={`text-xs font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>Sonidos de chat</p>
-                                              <p className="text-[11px] text-gray-500">{soundEnabled ? 'Alertas sonoras activas' : 'En silencio'}</p>
-                                          </div>
-                                      </div>
-                                      <button 
-                                          onClick={() => setSoundEnabled(!soundEnabled)} 
-                                          className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-300 ${soundEnabled ? 'bg-blue-600 justify-end' : 'bg-gray-300 dark:bg-gray-700 justify-start'}`}
-                                      >
-                                          <div className="bg-white w-4 h-4 rounded-full shadow-md transform transition-transform" />
-                                      </button>
-                                  </div>
-
-                                  <button 
-                                      onClick={enableNotifications} 
-                                      className={`w-full py-2 px-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 border ${isDarkMode ? 'bg-gray-700/60 border-gray-600 text-gray-200 hover:bg-gray-700' : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'}`}
-                                  >
-                                      <Bell size={14} /> Activar notificaciones push
-                                  </button>
-                              </div>
-
-                              {/* Tarjeta 3: Estado de Disponibilidad */}
-                              <div className={`p-4 rounded-2xl border space-y-2.5 transition-all ${isDarkMode ? 'bg-gray-800/80 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
-                                  <div className="flex items-center gap-2 mb-1">
-                                      <Shield size={16} className="text-green-500" />
-                                      <p className={`text-xs font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>Estado de conexión</p>
-                                  </div>
-                                  <div className="grid grid-cols-3 gap-1.5 text-[11px] font-bold">
-                                      <button 
-                                          onClick={() => updatePresenceStatus('online')} 
-                                          className={`py-1.5 px-2 rounded-xl flex items-center justify-center gap-1 border transition-all ${(!userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status || userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'online') ? 'bg-green-500/15 border-green-500 text-green-600 dark:text-green-400 shadow-sm' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
-                                      >
-                                          <span className="w-2 h-2 rounded-full bg-green-500"></span> En línea
-                                      </button>
-                                      <button 
-                                          onClick={() => updatePresenceStatus('away')} 
-                                          className={`py-1.5 px-2 rounded-xl flex items-center justify-center gap-1 border transition-all ${userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'away' ? 'bg-orange-500/15 border-orange-500 text-orange-600 dark:text-orange-400 shadow-sm' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
-                                      >
-                                          <span className="w-2 h-2 rounded-full bg-orange-400"></span> Ausente
-                                      </button>
-                                      <button 
-                                          onClick={() => updatePresenceStatus('busy')} 
-                                          className={`py-1.5 px-2 rounded-xl flex items-center justify-center gap-1 border transition-all ${userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'busy' ? 'bg-red-500/15 border-red-500 text-red-600 dark:text-red-400 shadow-sm' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
-                                      >
-                                          <span className="w-2 h-2 rounded-full bg-red-500"></span> Ocupado
-                                      </button>
-                                  </div>
-                              </div>
-
-                              {/* Tarjeta 4: Funciones de IA (Solo docente) */}
-                              {role === 'teacher' && (
-                                  <div className={`p-4 rounded-2xl border space-y-2.5 transition-all ${isDarkMode ? 'bg-purple-950/20 border-purple-800/40' : 'bg-purple-50/70 border-purple-200 shadow-sm'}`}>
-                                      <div className="flex items-center gap-2">
-                                          <Sparkles size={16} className="text-purple-500" />
-                                          <p className={`text-xs font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>Entrenamiento del bot</p>
-                                      </div>
-                                      <p className="text-[11px] text-gray-500">Configura instrucciones personalizadas para el asistente IA.</p>
-                                      <button 
-                                          onClick={() => setShowIAKnowledgeModal(true)} 
-                                          className="w-full py-2 px-3 text-xs font-bold rounded-xl bg-purple-600 hover:bg-purple-700 text-white shadow-md flex items-center justify-center gap-2 transition-all"
-                                      >
-                                          <Sparkles size={14} /> Entrenar bot
-                                      </button>
-                                  </div>
-                              )}
-
-                              {/* Tarjeta 5: Perfil institucional */}
-                              <div className={`p-4 rounded-2xl border space-y-2 transition-all ${isDarkMode ? 'bg-gray-800/80 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
-                                  <div className="flex items-center gap-3">
-                                      <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shrink-0 overflow-hidden border border-blue-200 dark:border-gray-700">
-                                          {userMappings[myChatId]?.profilePicUrl ? <img src={userMappings[myChatId].profilePicUrl} className="w-full h-full object-cover" /> : <UserIcon size={20} />}
-                                      </div>
-                                      <div className="overflow-hidden">
-                                          <p className={`font-bold text-xs truncate leading-tight ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>{loggedInName}</p>
-                                          <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">{userMappings[myChatId]?.customLabel || (role === 'teacher' ? 'Docente' : 'Estudiante')}</p>
-                                      </div>
-                                  </div>
-                                  <div className="pt-2 border-t border-gray-200/50 dark:border-gray-700/50 text-[11px] text-gray-500 space-y-1">
-                                      <p><span className="font-semibold text-gray-700 dark:text-gray-300">Institución:</span> Universidad de Pamplona</p>
-                                      <p><span className="font-semibold text-gray-700 dark:text-gray-300">Cuenta:</span> {loggedInUser}</p>
-                                  </div>
-                              </div>
-
-                              {/* Botón de Cerrar Sesión */}
-                              <div className="pt-1">
-                                  <button 
-                                      onClick={handleLogout} 
-                                      className={`w-full py-3 px-4 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-2 border ${isDarkMode ? 'bg-red-950/20 border-red-900/60 text-red-400 hover:bg-red-950/40' : 'bg-red-50 border-red-200 text-red-600 hover:bg-red-100 shadow-sm'}`}
-                                  >
-                                      <LogOutIcon size={16} /> Cerrar sesión
-                                  </button>
-                              </div>
-                          </div>
-                      )}
+                          );
+                      })()}
                   </aside>
               </div>
 
@@ -3908,136 +3904,6 @@ tickIcon = (
                       </div>
                   , document.body)}
 
-                  {/* MODAL DE AJUSTES GENERALES DE LA CUENTA (TIPO FACEBOOK) */}
-                  {showSettingsModal && ReactDOM.createPortal(
-                      <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-200">
-                          <div className={`max-w-md w-full rounded-3xl p-6 relative border shadow-2xl space-y-4 animate-in zoom-in-95 duration-200 ${isDarkMode ? 'bg-gray-900 border-gray-700 text-gray-100' : 'bg-white border-gray-200 text-gray-800'}`}>
-                              <button onClick={() => setShowSettingsModal(false)} className="absolute top-5 right-5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors p-1"><X size={20}/></button>
-                              
-                              <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 rounded-2xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center">
-                                      <Settings size={22} />
-                                  </div>
-                                  <div>
-                                      <h3 className="text-lg font-bold">Ajustes y preferencias</h3>
-                                      <p className="text-xs text-gray-500">Configuración general de tu cuenta y experiencia</p>
-                                  </div>
-                              </div>
-
-                              <div className="space-y-3 pt-2">
-                                  {/* Modo Oscuro */}
-                                  <div className={`p-3.5 rounded-2xl border transition-all ${isDarkMode ? 'bg-gray-800/80 border-gray-700' : 'bg-gray-50 border-gray-200 shadow-sm'}`}>
-                                      <div className="flex items-center justify-between">
-                                          <div className="flex items-center gap-3">
-                                              <div className={`w-8 h-8 rounded-xl flex items-center justify-center shadow-sm ${isDarkMode ? 'bg-purple-950/70 text-purple-300' : 'bg-amber-50 text-amber-500'}`}>
-                                                  {isDarkMode ? <Moon size={16} /> : <Sun size={16} />}
-                                              </div>
-                                              <div>
-                                                  <p className="text-xs font-bold">Modo oscuro</p>
-                                                  <p className="text-[11px] text-gray-500">{isDarkMode ? 'Tema nocturno activo' : 'Tema diurno activo'}</p>
-                                              </div>
-                                          </div>
-                                          <button 
-                                              onClick={() => setIsDarkMode(!isDarkMode)} 
-                                              className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors duration-300 ${isDarkMode ? 'bg-blue-600 justify-end' : 'bg-gray-300 justify-start'}`}
-                                          >
-                                              <div className="bg-white w-4 h-4 rounded-full shadow-md transform transition-transform" />
-                                          </button>
-                                      </div>
-                                  </div>
-
-                                  {/* Sonidos */}
-                                  <div className={`p-3.5 rounded-2xl border transition-all ${isDarkMode ? 'bg-gray-800/80 border-gray-700' : 'bg-gray-50 border-gray-200 shadow-sm'}`}>
-                                      <div className="flex items-center justify-between">
-                                          <div className="flex items-center gap-3">
-                                              <div className={`w-8 h-8 rounded-xl flex items-center justify-center shadow-sm ${soundEnabled ? 'bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-300' : 'bg-gray-100 text-gray-400'}`}>
-                                                  {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
-                                              </div>
-                                              <div>
-                                                  <p className="text-xs font-bold">Sonidos de notificaciones</p>
-                                                  <p className="text-[11px] text-gray-500">{soundEnabled ? 'Alertas activas' : 'En silencio'}</p>
-                                              </div>
-                                          </div>
-                                          <button 
-                                              onClick={() => setSoundEnabled(!soundEnabled)} 
-                                              className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors duration-300 ${soundEnabled ? 'bg-blue-600 justify-end' : 'bg-gray-300 justify-start'}`}
-                                          >
-                                              <div className="bg-white w-4 h-4 rounded-full shadow-md transform transition-transform" />
-                                          </button>
-                                      </div>
-                                  </div>
-
-                                  {/* Estado de conexión */}
-                                  <div className={`p-3.5 rounded-2xl border space-y-2 transition-all ${isDarkMode ? 'bg-gray-800/80 border-gray-700' : 'bg-gray-50 border-gray-200 shadow-sm'}`}>
-                                      <div className="flex items-center gap-2">
-                                          <Shield size={15} className="text-green-500" />
-                                          <p className="text-xs font-bold">Estado de conexión</p>
-                                      </div>
-                                      <div className="grid grid-cols-3 gap-1.5 text-[11px] font-bold">
-                                          <button 
-                                              onClick={() => updatePresenceStatus('online')} 
-                                              className={`py-1.5 px-2 rounded-xl flex items-center justify-center gap-1 border transition-all ${(!userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status || userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'online') ? 'bg-green-500/15 border-green-500 text-green-600 dark:text-green-400' : 'border-gray-200 dark:border-gray-700 text-gray-500'}`}
-                                          >
-                                              <span className="w-2 h-2 rounded-full bg-green-500"></span> En línea
-                                          </button>
-                                          <button 
-                                              onClick={() => updatePresenceStatus('away')} 
-                                              className={`py-1.5 px-2 rounded-xl flex items-center justify-center gap-1 border transition-all ${userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'away' ? 'bg-orange-500/15 border-orange-500 text-orange-600 dark:text-orange-400' : 'border-gray-200 dark:border-gray-700 text-gray-500'}`}
-                                          >
-                                              <span className="w-2 h-2 rounded-full bg-orange-400"></span> Ausente
-                                          </button>
-                                          <button 
-                                              onClick={() => updatePresenceStatus('busy')} 
-                                              className={`py-1.5 px-2 rounded-xl flex items-center justify-center gap-1 border transition-all ${userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'busy' ? 'bg-red-500/15 border-red-500 text-red-600 dark:text-red-400' : 'border-gray-200 dark:border-gray-700 text-gray-500'}`}
-                                          >
-                                              <span className="w-2 h-2 rounded-full bg-red-500"></span> Ocupado
-                                          </button>
-                                      </div>
-                                  </div>
-
-                                  {/* Funciones de IA (Solo docente) */}
-                                  {role === 'teacher' && (
-                                      <div className={`p-3.5 rounded-2xl border space-y-2.5 transition-all ${isDarkMode ? 'bg-purple-950/20 border-purple-800/40' : 'bg-purple-50/70 border-purple-200 shadow-sm'}`}>
-                                          <div className="flex items-center gap-2">
-                                              <Sparkles size={16} className="text-purple-500" />
-                                              <p className={`text-xs font-bold ${isDarkMode ? 'text-purple-300' : 'text-purple-700'}`}>Asistente y entrenamiento de IA</p>
-                                          </div>
-                                          <p className="text-[11px] text-gray-500 dark:text-gray-400">Personaliza y entrena las instrucciones técnicas y respuestas del bot de ayuda.</p>
-                                          <button 
-                                              onClick={() => { setShowSettingsModal(false); setShowIAKnowledgeModal(true); }}
-                                              className="w-full py-2 px-3 text-xs font-bold rounded-xl bg-purple-600 hover:bg-purple-700 text-white shadow-md flex items-center justify-center gap-2 transition-all"
-                                          >
-                                              <Sparkles size={14} /> Entrenar bot de ayuda
-                                          </button>
-                                      </div>
-                                  )}
-
-                                  {/* Cuenta institucional */}
-                                  <div className={`p-3.5 rounded-2xl border transition-all ${isDarkMode ? 'bg-gray-800/80 border-gray-700' : 'bg-gray-50 border-gray-200 shadow-sm'}`}>
-                                      <div className="flex items-center gap-3">
-                                          <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shrink-0 overflow-hidden border border-blue-200 dark:border-gray-700">
-                                              {userMappings[myChatId]?.profilePicUrl ? <img src={userMappings[myChatId].profilePicUrl} className="w-full h-full object-cover" /> : <UserIcon size={20} />}
-                                          </div>
-                                          <div className="overflow-hidden flex-1">
-                                              <p className="font-bold text-xs truncate leading-tight">{loggedInName}</p>
-                                              <p className="text-[10px] text-gray-500 font-bold uppercase">{userMappings[myChatId]?.customLabel || (role === 'teacher' ? 'Docente' : 'Estudiante')}</p>
-                                              <p className="text-[11px] text-gray-500 truncate mt-0.5">{loggedInUser}</p>
-                                          </div>
-                                      </div>
-                                  </div>
-                              </div>
-
-                              <div className="pt-2 flex gap-3">
-                                  <button onClick={enableNotifications} className={`flex-1 py-2.5 px-3 text-xs font-bold rounded-xl border flex items-center justify-center gap-1.5 ${isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-200 hover:bg-gray-700' : 'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200'}`}>
-                                      <Bell size={14} /> Push
-                                  </button>
-                                  <button onClick={() => { setShowSettingsModal(false); handleLogout(); }} className="flex-1 py-2.5 px-3 text-xs font-bold rounded-xl bg-red-600 hover:bg-red-700 text-white shadow-md flex items-center justify-center gap-1.5 transition-all">
-                                      <LogOutIcon size={14} /> Cerrar sesión
-                                  </button>
-                              </div>
-                          </div>
-                      </div>
-                  , document.body)}
                   {/* 👆 HASTA AQUÍ 👆 */}
 
             </div>
