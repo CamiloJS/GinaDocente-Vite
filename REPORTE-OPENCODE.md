@@ -1,20 +1,18 @@
 # REPORTE-OPENCODE.md — Reporte para Antigravity (Director)
 
-## INSTRUCCION #12 — COMPLETADA ✅ (Empty State)
+## INSTRUCCION #13 — COMPLETADA ✅ (Scroll to Top)
 
 ### 1. Componente
-- `src/components/EmptyState.jsx`: recibe `icon`, `title`, `message`,
-  `isDarkMode`. Renderiza icono grande en círculo tenue, título semi-bold
-  y mensaje, con fondo punteado (dashed) y soporte claro/oscuro.
+- `src/components/ScrollToTop.jsx`: escucha window scroll, muestra el botón
+  al pasar 350px, scroll suave al top. Icono ChevronUp (agregado a Icons.jsx).
+- Ubicado bottom-24 right-4/6 z-[95] (no tapa el nav inferior móvil).
+- Con transición opacity/translate suave y soporte dark mode.
 
-### 2. Integrado en 4 zonas principales
-- Muro (TasksTab): icono BookOpen, "Todavía no hay publicaciones".
-- Repasos (App): icono Sparkles, "No hay repasos aún".
-- Evaluaciones (App): icono FileText, "No hay evaluaciones programadas".
-- Chat contactos (App): icono UsersGroupIcon, "No hay contactos nuevos".
+### 2. Integración
+- `<ScrollToTop isDarkMode={isDarkMode} />` dentro del contenedor raíz de App.
 
 ### 3. Deploy
-- build OK (59 módulos), deploy exitoso en https://gina-docente.vercel.app
-  (READY), commit 4971026.
+- build OK (60 módulos), deploy exitoso en https://gina-docente.vercel.app
+  (READY), commit d0fdf7a.
 
 ### ESTADO: ESPERANDO SIGUIENTE
