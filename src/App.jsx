@@ -1892,41 +1892,6 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
           const renderSyllabus = () => (
             <div className="space-y-6 pb-20 md:pb-0">
               <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-6 flex items-center gap-2"><CalendarEmoji className="text-[#AD3333]" /> Contenidos programáticos</h2>
-              
-              {role === 'teacher' && (
-                  <div className={`${glassCard} flex flex-col gap-4 mb-6`}>
-                      <h3 className="font-bold text-gray-800 flex items-center gap-2"><CuteBotIcon size={20} className="text-gray-500" /> Entrenamiento del asistente virtual</h3>
-                      <div className="flex-1 max-h-40 overflow-y-auto space-y-2 pr-1">
-                          {botInfoList.length === 0 && <p className="text-xs text-gray-500 italic">No hay información guardada. Escribe algo para que el bot lo aprenda.</p>}
-                          {botInfoList.map(item => (
-                              <div key={item.id} className="bg-gray-50 dark:bg-gray-800 p-3 rounded-xl text-xs flex justify-between items-start gap-2 border border-gray-200 dark:border-gray-700 shadow-sm">
-                                  <span className="text-gray-800 break-words flex-1 font-medium">{item.text}</span>
-                                  <button onClick={() => {
-                                      confirmAction("¿Seguro que desea eliminar esta instrucción del bot?", () => {
-                                          const newList = botInfoList.filter(i => i.id !== item.id);
-                                          setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'bot'), { infoList: newList });
-                                      });
-                                  }} className="text-gray-400 hover:text-red-600 shrink-0 transition-colors" title="Eliminar regla"><Trash2 size={16}/></button>
-                              </div>
-                          ))}
-                      </div>
-                      <div className="flex gap-2">
-                          <textarea 
-                              value={botTrainingInfo} onChange={e => setBotTrainingInfo(e.target.value)} 
-                              placeholder="Ej: El parcial de verbos es el 25 de mayo y vale el 30%..." 
-                              className={`${glassInput} h-12 py-3 resize-none text-sm flex-1`}
-                          />
-                          <button onClick={() => {
-                              if(!botTrainingInfo.trim()) return;
-                              const newItem = { id: Date.now().toString(), text: botTrainingInfo.trim() };
-                              const newList = [...botInfoList, newItem];
-                              setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'bot'), { infoList: newList });
-                              setBotTrainingInfo("");
-                              showMessage("✅ Entrenamiento añadido con éxito.");
-                          }} className={`${redButton} h-12 px-6 whitespace-nowrap`}><Plus size={16}/> Añadir info</button>
-                      </div>
-                  </div>
-              )}
 
               <div className="w-full space-y-6">
                   {role === 'teacher' && (

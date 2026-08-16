@@ -46,8 +46,18 @@ export const useVoiceRecorder = (folderName, showMessage) => {
 
   const cancelRecording = () => {
     setAudioUrl('')
+    setIsRecording(false)
+    setIsUploading(false)
+    if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+      try {
+        recorderRef.current.onstop = null
+        recorderRef.current.stop()
+      } catch (e) {}
+    }
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop())
+      try {
+        streamRef.current.getTracks().forEach(t => t.stop())
+      } catch (e) {}
       streamRef.current = null
     }
     recorderRef.current = null
