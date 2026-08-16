@@ -16,7 +16,13 @@ El usuario decidió que Antigravity trabaje 100% solo, sin depender de opencode.
 - Añadido botón `Volume2` flotante en el header de la descripción de cada tarjeta en el Muro (`TaskCard.jsx`).
 - Deploy exitoso y commit `d0599dc`.
 
-### ESTADO: ESPERANDO SIGUIENTE (Redactando Instrucción #31)
+### 3. INSTRUCCION #31 — Traducción en un clic (Diccionario / Gemini)
+- Añadido el icono `Languages` a `src/components/Icons.jsx`.
+- Implementada la función de traducción al español con Gemini en `App.jsx` y `TaskCard.jsx`.
+- Añadidos botones flotantes de traducción en los mensajes del chat y descripciones del muro.
+- Mostrado resultado de la traducción de forma amigable.
+
+### ESTADO: EN ESPERA DE NUEVAS INSTRUCCIONES
 
 ### Historial del bucle (instrucciones #1-#29 completadas y desplegadas)
 1. Lazy loading (TasksTab, GifPickerModal)

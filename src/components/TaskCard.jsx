@@ -3,7 +3,7 @@ import React, { useState } from 'react'
 import ReactDOM from 'react-dom'
 import confetti from 'canvas-confetti'
 import {
-  CheckCheck, CheckLine, Clock, Edit3, FileDocIcon, FileText, ImageIcon, Loader2, Lock, MessageSquareText, Mic, PaperclipIcon, Plus, ReplyIcon, Send, SmileIcon, Square, Star, Pin, Trash2, X, XLine, Volume2
+  CheckCheck, CheckLine, Clock, Edit3, FileDocIcon, FileText, ImageIcon, Loader2, Lock, MessageSquareText, Mic, PaperclipIcon, Plus, ReplyIcon, Send, SmileIcon, Square, Star, Pin, Trash2, X, XLine, Volume2, Languages
 } from './Icons.jsx'
 import {
   compressImage, containsBadWords, checkBadWordsAsync, uploadImageToStorage, uploadRawFileToStorage, TEACHER_NAME, COMMENT_EMOJIS, REACTION_EMOJIS, speakText
@@ -23,6 +23,16 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput, callGemini, cu
     const [commentFileName, setCommentFileName] = useState("");
     const [showCommentImageInput, setShowCommentImageInput] = useState(false);
     const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
+
+    const handleTranslateText = async (text) => {
+        showMessage("⏳ Traduciendo...");
+        const result = await callGemini(`Traduce este texto al español de forma natural. Devuelve ÚNICAMENTE la traducción:\n\n${text}`);
+        if (result) {
+            alert(`🌐 Traducción:\n\n${result.replace(/```json/gi, '').replace(/```/gi, '').trim()}`);
+        } else {
+            showMessage("❌ No se pudo traducir.");
+        }
+    };
     const [isProcessing, setIsProcessing] = useState(false);
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [activeReactionCommentId, setActiveReactionCommentId] = useState(null);
@@ -265,9 +275,14 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput, callGemini, cu
             ) : (
                 <div className="relative group/desc mt-2.5">
                     <p className={`whitespace-pre-wrap leading-relaxed pr-8 ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}>{<LinkifyText text={task.description} />}</p>
-                    <button onClick={() => speakText(task.description)} className={`absolute top-0 right-0 p-1.5 rounded-full opacity-0 group-hover/desc:opacity-100 transition-opacity ${isDarkMode ? 'text-gray-400 hover:text-blue-400 hover:bg-gray-800' : 'text-gray-500 hover:text-blue-600 hover:bg-gray-100'}`} title="Escuchar">
-                        <Volume2 size={16} />
-                    </button>
+                    <div className="absolute top-0 right-0 flex gap-1 opacity-0 group-hover/desc:opacity-100 transition-opacity">
+                        <button onClick={() => handleTranslateText(task.description)} className={`p-1.5 rounded-full ${isDarkMode ? 'text-gray-400 hover:text-blue-400 hover:bg-gray-800' : 'text-gray-500 hover:text-blue-600 hover:bg-gray-100'}`} title="Traducir">
+                            <Languages size={16} />
+                        </button>
+                        <button onClick={() => speakText(task.description)} className={`p-1.5 rounded-full ${isDarkMode ? 'text-gray-400 hover:text-blue-400 hover:bg-gray-800' : 'text-gray-500 hover:text-blue-600 hover:bg-gray-100'}`} title="Escuchar">
+                            <Volume2 size={16} />
+                        </button>
+                    </div>
                 </div>
             )}
             

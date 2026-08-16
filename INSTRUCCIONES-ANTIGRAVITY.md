@@ -522,4 +522,4 @@ Para ayudar a los alumnos cuando no entienden una frase en el chat o en las tare
 2. **Botón Traducir:** Al lado de los botones de Copiar y Escuchar (`Volume2`), añade el nuevo botón.
 3. **Integración con Gemini:** Al pulsar el botón, muestra un Toast de "Traduciendo..." y llama a `callGemini(text, 'traducir esto al español de forma natural')`. Muestra el resultado en una alerta bonita o expandiendo el mensaje.
 
-ESTADO: LISTA PARA IMPLEMENTAR
+ESTADO: COMPLETADA

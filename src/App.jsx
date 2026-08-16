@@ -23,7 +23,7 @@ import {
   FileText, ImageIcon, Loader2, LogOutIcon, Mail, MessageCircle, Moon, NavCalendar,
   NavFile, NavNotebook, NavSlides, Palette, PaperclipIcon, Plus, ReplyIcon, SearchIcon,
   Send, SingleTick, SmileIcon, Sparkles, Sun, TeacherIcon, Trash2, UserIcon,
-  UsersGroupIcon, UsersIcon, Wand2, X, XLine, Copy, Mic, Square, Bell, Volume2
+  UsersGroupIcon, UsersIcon, Wand2, X, XLine, Copy, Mic, Square, Bell, Volume2, Languages
 } from './components/Icons.jsx'
 
 // Helper para evitar el error "Failed to fetch dynamically imported module" (Chunks viejos tras deploys).
@@ -619,6 +619,16 @@ const handleOpenProfileByName = (name) => {
                 showMessage("Hubo un error al procesar la traducción. Intenta de nuevo.");
             }
             setIsAiLoading(false);
+          };
+
+          const handleTranslateMessage = async (text) => {
+            showMessage("⏳ Traduciendo...");
+            const result = await callGemini(`Traduce este texto al español de forma natural. Devuelve ÚNICAMENTE la traducción:\n\n${text}`);
+            if (result) {
+                alert(`🌐 Traducción:\n\n${result.replace(/```json/gi, '').replace(/```/gi, '').trim()}`);
+            } else {
+                showMessage("❌ No se pudo traducir.");
+            }
           };
 
           const handleLogout = async () => {
@@ -2866,6 +2876,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                                           {formatBotText(m.text)}
                                       {m.role === 'bot' && (
                                           <div className="flex justify-end gap-2 mt-1">
+                                              <button onClick={() => handleTranslateMessage(m.text)} className="opacity-60 hover:opacity-100 transition-opacity text-gray-400 hover:text-blue-500 p-1" title="Traducir"><Languages size={12} /></button>
                                               <button onClick={() => speakText(m.text)} className="opacity-60 hover:opacity-100 transition-opacity text-gray-400 hover:text-blue-500 p-1" title="Escuchar"><Volume2 size={12} /></button>
                                               <button onClick={() => handleCopy(m.text)} className="opacity-60 hover:opacity-100 transition-opacity text-gray-400 hover:text-blue-500 p-1" title="Copiar"><Copy size={12} /></button>
                                           </div>
@@ -3425,6 +3436,7 @@ tickIcon = (
 {m.text && <p className={isEmojiOnly ? "text-5xl md:text-6xl drop-shadow-lg leading-none" : "text-sm md:text-base leading-relaxed whitespace-pre-wrap pr-10"}>{<LinkifyText text={m.text} />}</p>}
 {m.text && !isEmojiOnly && (
     <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+        <button onClick={() => handleTranslateMessage(m.text)} className="text-gray-400 hover:text-blue-500 p-1 bg-white/10 dark:bg-black/20 rounded-md backdrop-blur-sm" title="Traducir"><Languages size={14} /></button>
         <button onClick={() => speakText(m.text)} className="text-gray-400 hover:text-blue-500 p-1 bg-white/10 dark:bg-black/20 rounded-md backdrop-blur-sm" title="Escuchar"><Volume2 size={14} /></button>
         <button onClick={() => handleCopy(m.text)} className="text-gray-400 hover:text-blue-500 p-1 bg-white/10 dark:bg-black/20 rounded-md backdrop-blur-sm" title="Copiar"><Copy size={14} /></button>
     </div>
