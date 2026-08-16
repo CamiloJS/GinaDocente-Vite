@@ -18,7 +18,7 @@ const TasksTab = React.memo(({
     setHasAiModified, callGemini, showMessage, handleAiTranslate, taskDate, setTaskDate,
     taskTime, setTaskTime, allowLate, setAllowLate, db, appId, loggedInName, getToday,
     tasks, user, isDarkMode, confirmAction, setFullScreenImage, handleOpenProfileByName,
-    academicGroups, myChatId, tasksLoading, taskLimit, loadMoreTasks
+    academicGroups, myChatId, tasksLoading, taskLimit, loadMoreTasks, pinnedTasks
 }) => {
 
     // ESTADOS DEL MENÚ LIQUID GLASS

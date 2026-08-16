@@ -15,6 +15,10 @@ class ErrorBoundary extends React.Component {
     console.error('Error capturado por ErrorBoundary:', error, errorInfo)
     try {
       window.__ebError = (error && (error.stack || error.message || String(error))) + ' | INFO: ' + JSON.stringify(errorInfo)
+      fetch('http://localhost:4000/log', {
+        method: 'POST',
+        body: String(error) + "\n\n" + (error.stack || "") + "\n\n" + (errorInfo ? errorInfo.componentStack : "")
+      }).catch(e => console.error(e));
     } catch (e) {}
   }
 
