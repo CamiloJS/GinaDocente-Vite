@@ -335,7 +335,7 @@ const handleOpenProfileByName = (name) => {
           };
 
           const getTabClass = (tabName) => {
-              return activeTab === tabName ? 'nav-active-tab' : 'hover:bg-white/40 font-medium text-gray-800';
+              return activeTab === tabName ? 'nav-active-tab' : 'hover:bg-gray-100 dark:hover:bg-gray-800 font-medium text-gray-700 dark:text-gray-300';
           };
 
           const getMobileTabClass = (tabName) => {
@@ -1216,8 +1216,11 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
               return (correct / evalData.questions.length) * 5.0;
           };
 
+          const submittingEvalRef = React.useRef(false);
           const submitEvaluation = async (autoSubmit = false) => {
               if(!activeTakingEval) return;
+              if (submittingEvalRef.current) return; // evitar doble envío
+              submittingEvalRef.current = true;
               const score = calculateScore(activeTakingEval, studentAnswers);
               await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'grades'), {
                   evaluationId: activeTakingEval.id,
@@ -1229,6 +1232,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
               });
               setActiveTakingEval(null);
               setStudentAnswers({});
+              submittingEvalRef.current = false;
               showMessage(autoSubmit ? "⏳ Tiempo agotado. Evaluación enviada automáticamente." : "✅ Evaluación completada y enviada.");
           };
 
@@ -1766,10 +1770,15 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
 
               <div className="w-full space-y-6">
                   {role === 'teacher' && (
-                    <form onSubmit={(e) => {
+                    <form onSubmit={async (e) => {
                       e.preventDefault();
-                      addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'syllabus'), { week: Number(e.target.week.value), topic: e.target.topic.value, material: e.target.material.value });
-                      e.target.reset();
+                      try {
+                        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'syllabus'), { week: Number(e.target.week.value), topic: e.target.topic.value, material: (e.target.material && e.target.material.value) || '' });
+                        e.target.reset();
+                        showMessage("✅ Tema añadido.");
+                      } catch (err) {
+                        showMessage("❌ No se pudo guardar el tema. Intenta de nuevo.");
+                      }
                     }} className={`${glassCard} flex flex-wrap gap-4 items-end`}>
                       <input type="number" name="week" placeholder="Semana" className={`${glassInput} w-24`} required />
                       <input name="topic" placeholder="Tema..." className={`${glassInput} flex-1`} required />
@@ -2019,10 +2028,10 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                       <div className="space-y-6 max-w-4xl mx-auto pb-20 md:pb-0">
                           <div className="flex items-center justify-between mb-6">
                               <h2 className={`text-3xl font-bold flex items-center gap-2 drop-shadow-sm ${isDarkMode ? 'text-gray-100' : 'text-gray-800'}`}>
-                                  <button onClick={() => setViewingResultsFor(null)} className="mr-2 p-2 hover:bg-white/20 rounded-full transition-colors"><ArrowLeftIcon size={24}/></button>
+                                  <button onClick={() => setViewingResultsFor(null)} className="mr-2 p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"><ArrowLeftIcon size={24}/></button>
                                   Resultados
                               </h2>
-                              <span className="bg-white/40 px-4 py-2 rounded-xl font-bold text-sm border border-white/50">{viewingResultsFor.title}</span>
+                              <span className="bg-gray-100 dark:bg-gray-800 px-4 py-2 rounded-xl font-bold text-sm border border-gray-200 dark:border-gray-700">{viewingResultsFor.title}</span>
                           </div>
 
                           <div className={`bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-x-auto shadow-sm`}>
@@ -2067,7 +2076,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                   return (
                       <div className="space-y-6 max-w-3xl mx-auto pb-20 md:pb-0">
                           <div className="flex items-center gap-4 mb-6">
-                              <button onClick={() => setIsCreatingEval(false)} className={`p-2 hover:bg-white/20 rounded-full transition-colors ${isDarkMode ? 'text-white' : 'text-gray-800'}`}><ArrowLeftIcon size={24}/></button>
+                              <button onClick={() => setIsCreatingEval(false)} className={`p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors ${isDarkMode ? 'text-white' : 'text-gray-800'}`}><ArrowLeftIcon size={24}/></button>
                               <h2 className={`text-3xl font-bold drop-shadow-sm ${isDarkMode ? 'text-gray-100' : 'text-gray-800'}`}>Crear Nueva Evaluación</h2>
                           </div>
                           
@@ -2337,7 +2346,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                 .dark .text-gray-300 { color: #d1d5db !important; }
 `}</style>
                       
-                      <button onClick={() => setIsDarkMode(!isDarkMode)} className="absolute top-4 right-4 md:top-6 md:right-6 p-3 rounded-full bg-white/40 hover:bg-white/60 text-gray-800 transition-all shadow-sm border border-white/50 z-50" title="Alternar Modo Oscuro">
+                      <button onClick={() => setIsDarkMode(!isDarkMode)} className="absolute top-4 right-4 md:top-6 md:right-6 p-3 rounded-full bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 transition-all shadow-sm border border-gray-200 dark:border-gray-700 z-50" title="Alternar Modo Oscuro">
                           {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
                       </button>
                       
@@ -2350,7 +2359,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                                   <div className="flex flex-wrap justify-center gap-4 max-h-64 overflow-y-auto p-2">
                                       {savedAccounts.map(acc => (
                                           <div key={acc.username} className="relative group">
-                                              <button onClick={() => handleQuickLogin(acc)} className="bg-white/40 hover:bg-white/60 border border-white/60 shadow-md rounded-2xl p-4 flex flex-col items-center justify-center gap-3 transition-all hover:scale-105 w-28 h-32">
+                                              <button onClick={() => handleQuickLogin(acc)} className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 shadow-md rounded-2xl p-4 flex flex-col items-center justify-center gap-3 transition-all hover:scale-105 w-28 h-32">
                                                   <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-sm ${acc.role === 'teacher' ? 'bg-gradient-to-br from-[#AD3333] to-[#8a2828]' : 'bg-gradient-to-br from-blue-500 to-indigo-600'}`}>
                                                       {acc.role === 'teacher' ? 'G' : (acc.name || 'U').charAt(0)}
                                                   </div>
@@ -2410,7 +2419,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                                       {showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}
                                   </button>
                               </div>
-                              {loginError && <p className="text-[#AD3333] text-sm text-center font-bold bg-white/50 py-2 rounded-lg">{loginError}</p>}
+                              {loginError && <p className="text-red-600 dark:text-red-400 text-sm text-center font-bold bg-red-50 dark:bg-red-900/20 py-2 rounded-lg">{loginError}</p>}
                               
                               <div className="flex gap-3 mt-2">
                                   <button type="button" onClick={() => {setLoginType(null); setLoginError("");}} className={`${outlineButton} flex-1`}>Volver</button>
@@ -2480,7 +2489,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
 `}</style>
 
 
-              <nav className="sticky top-0 z-50 bg-white/20 backdrop-blur-xl border-b border-white/40 px-4 md:px-6 py-4 flex justify-between items-start md:items-center shadow-sm">
+              <nav className="sticky top-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 px-4 md:px-6 py-4 flex justify-between items-start md:items-center shadow-sm">
                 
                 <div className="flex flex-col items-start gap-1">
                   <div className="flex items-center gap-3">
@@ -2490,7 +2499,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                       <p className="text-xs text-[#AD3333] font-bold">Universidad de Pamplona</p>
                     </div>
                   </div>
-                  <button onClick={handleLogout} className="flex items-center gap-1 text-xs text-gray-600 hover:text-red-600 font-bold transition-all ml-1 mt-1 bg-white/40 px-2 py-1 rounded-full border border-white/50 shadow-sm">
+                  <button onClick={handleLogout} className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300 hover:text-red-600 font-bold transition-all ml-1 mt-1 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-full border border-gray-200 dark:border-gray-700 shadow-sm">
                     <LogOutIcon size={12} /> Volver
                   </button>
                 </div>
@@ -2505,7 +2514,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                     <div className="w-px h-6 bg-gray-400 mx-2"></div>
                   </div>
                   
-                  <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 rounded-full bg-white/40 hover:bg-white/60 text-gray-800 transition-all shadow-sm border border-white/50" title="Alternar Modo Oscuro">
+                  <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 rounded-full bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 transition-all shadow-sm border border-gray-200 dark:border-gray-700" title="Alternar Modo Oscuro">
                     {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
                   </button>
                   
@@ -2608,7 +2617,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                                   <h3 className="font-bold text-gray-800 flex items-center gap-2">
                                       <CuteBotIcon size={24} className="text-gray-700" /> GinAI
                                   </h3>
-                                  <button onClick={() => setIsChatOpen(false)} className="text-gray-500 hover:text-gray-800 bg-white/40 p-1.5 rounded-full transition-colors"><X size={16}/></button>
+                                  <button onClick={() => setIsChatOpen(false)} className="text-gray-500 hover:text-gray-800 bg-gray-100 dark:bg-gray-800 p-1.5 rounded-full transition-colors"><X size={16}/></button>
                               </div>
                               
                               <div className="flex-1 overflow-y-auto space-y-3 pr-2 mb-3">
@@ -2633,7 +2642,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                                   <input 
                                       value={chatInput} onChange={e => setChatInput(e.target.value)} 
                                       placeholder="Escribe tu mensaje..." 
-                                      className={`${glassInput} py-2 px-3 text-sm bg-white/60`}
+                                      className={`${glassInput} py-2 px-3 text-sm`}
                                   />
                                   <button type="submit" disabled={isChatLoading} className="bg-gray-800 text-white p-2.5 rounded-xl hover:bg-black disabled:opacity-50 transition shadow-md">
                                       <ArrowRightIcon size={16}/>
