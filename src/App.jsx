@@ -366,6 +366,8 @@ const handleOpenProfileByName = (name) => {
 
           const [tasks, setTasks] = useState([]);
           const [tasksLoading, setTasksLoading] = useState(true);
+          const [taskLimit, setTaskLimit] = useState(20);
+          const loadMoreTasks = () => setTaskLimit(prev => prev + 20);
           const [syllabus, setSyllabus] = useState([]);
           const [evaluations, setEvaluations] = useState([]);
           const [grades, setGrades] = useState([]);
@@ -747,10 +749,10 @@ useEffect(() => {
 // 2. PESTAÑA: ASIGNACIONES (Muro de clase)
 useEffect(() => {
     if (!user || !myChatId || activeTab !== 'tasks') return;
-    const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'tasks'), orderBy('createdAt', 'desc'), limit(20));
+    const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'tasks'), orderBy('createdAt', 'desc'), limit(taskLimit));
     const uTasks = onSnapshot(q, s => { setTasks(s.docs.map(d => ({ id: d.id, ...d.data() }))); setTasksLoading(false); });
     return () => uTasks();
-}, [user, myChatId, activeTab]);
+}, [user, myChatId, activeTab, taskLimit]);
 
 // 3. PESTAÑA: PERFIL (Muro de Pinterest)
 useEffect(() => {
@@ -2688,7 +2690,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                             callGemini={callGemini} showMessage={showMessage} handleAiTranslate={handleAiTranslate} taskDate={taskDate}
                             setTaskDate={setTaskDate} taskTime={taskTime} setTaskTime={setTaskTime} allowLate={allowLate} setAllowLate={setAllowLate}
                             db={db} appId={appId} loggedInName={loggedInName} getToday={getToday} tasks={tasks} user={user} isDarkMode={isDarkMode}
-                            confirmAction={confirmAction} setFullScreenImage={setFullScreenImage} tasksLoading={tasksLoading}
+                            confirmAction={confirmAction} setFullScreenImage={setFullScreenImage} tasksLoading={tasksLoading} taskLimit={taskLimit} loadMoreTasks={loadMoreTasks}
                         />
                           </React.Suspense>
                     )}

@@ -310,4 +310,21 @@ A menudo, los estudiantes o la profesora reciben explicaciones gramaticales úti
 
 **Entrega:** Documenta en `REPORTE-OPENCODE.md` si lograste integrar la funcionalidad y dónde colocaste exactamente los botones de copiar.
 
+---
+
+# INSTRUCCION #20
+
+**Objetivo:** Arquitectura y Escalabilidad: Paginación (Cargar Más) en el Muro.
+
+Actualmente, la consulta de Firebase en `App.jsx` para la colección `tasks` (las publicaciones del Muro) tiene un `limit(20)` rígido. Esto significa que las publicaciones antiguas desaparecen permanentemente de la vista a medida que se crean nuevas, impidiendo que los alumnos repasen temas de meses anteriores.
+
+**Acciones a implementar por Opencode:**
+1. **Estado de Paginación:** En `App.jsx`, añade un estado numérico para el límite: `const [taskLimit, setTaskLimit] = useState(20)`.
+2. **Consulta Dinámica:** Modifica el `useEffect` que carga las tareas para que la consulta use `limit(taskLimit)`. **Cuidado:** asegúrate de añadir `taskLimit` a las dependencias de ese `useEffect` y limpiar (`return unsubscribe`) correctamente para que, al aumentar el límite, se desuscriba del snapshot anterior y cree uno nuevo ampliado.
+3. **Botón en TasksTab:** Pasa la función `loadMoreTasks` (que hace `setTaskLimit(prev => prev + 20)`) como prop a `TasksTab.jsx`.
+4. **Interfaz:** Al final de la iteración de `visibleTasks` en el Muro, añade un botón "Cargar publicaciones anteriores". Haz que el botón sea visualmente atractivo. Opcional: ocúltalo si `tasks.length < taskLimit` (indicador de que no hay más datos antiguos en Firebase).
+5. **Deploy:** Verifica cuidadosamente que no haya renders infinitos (`npm run build`). Realiza `commit`/`push` a `main` y sube con `vercel deploy --prod`.
+
+**Entrega:** Documenta en `REPORTE-OPENCODE.md` la modificación del `useEffect` de las tareas y confirma que el botón funciona como se espera (cargando las siguientes 20).
+
 ESTADO: LISTA PARA IMPLEMENTAR
