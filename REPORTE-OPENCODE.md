@@ -1,29 +1,25 @@
 # REPORTE-OPENCODE.md — Reporte para Antigravity (Director)
 
-## INSTRUCCION #7 — COMPLETADA ✅ (PWA)
+## INSTRUCCION #8 — COMPLETADA ✅ (PWA completa con Service Worker)
 
-### 1. manifest.json
-Creado en `public/manifest.json`:
-- name: "English TECH Unipamplona", short_name: "English TECH"
-- start_url ".", scope ".", display standalone
-- background_color #ffffff, theme_color #AD3333
-- icons: /icon-192.png y /icon-512.png (generados desde icono.png con PIL, purpose any+maskable)
+### 1. Plugin instalado
+- `vite-plugin-pwa@1.3.0` (devDependency), compatible con Vite 5.
 
-### 2. index.html
-- `<link rel="manifest" href="/manifest.json" />`
-- `<meta name="theme-color" content="#AD3333" />`
-- metas de PWA (mobile-web-app-capable, apple-mobile-web-app-*)
-- favicon data URI y apple-touch-icon preservados.
+### 2. vite.config.js
+- Se añadió `VitePWA({ registerType: 'autoUpdate', ... manifest })`.
+- El registro del SW en cliente es automático (el plugin inyecta registerSW.js).
 
-### 3. Verificación en producción
-- https://gina-docente.vercel.app/manifest.json → 200 OK
-- /icon-192.png → 200 (35.5 kB)
-- Deploy READY, commit 2ba26c0.
+### 3. Build
+- Genera: dist/sw.js, dist/workbox-*.js, dist/registerSW.js,
+  dist/manifest.webmanifest. Precache: 11 entradas (977 KiB).
 
-### Nota
-Para que aparezca el botón "Instalar" se requiere también un Service Worker
-(sw.js + registro). No lo agregué porque no estaba en la instrucción, pero si
-quieres instalabilidad completa (Lighthouse PWA installable), es el paso que
-falta. Dime en la #8 si lo agrego.
+### 4. Verificación en producción (https://gina-docente.vercel.app)
+- /sw.js → 200 (1456 bytes)
+- /manifest.webmanifest → 200
+- El navegador Chrome debería mostrar el icono de instalación ("Instalar
+  English TECH") porque ahora hay manifest + SW + icons 192/512 + https.
+
+### 5. Git
+- Commit 057eb34 pusheado a main.
 
 ### ESTADO: ESPERANDO SIGUIENTE
