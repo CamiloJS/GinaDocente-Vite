@@ -2688,34 +2688,6 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                           </button>
                       </div>
 
-                      {/* Apartado de Ajustes en el Panel Izquierdo */}
-                      <div className={`mt-3 p-3.5 rounded-2xl border transition-all ${isDarkMode ? 'bg-gray-800/90 border-gray-700' : 'bg-gray-50 border-gray-200 shadow-sm'}`}>
-                          <h3 className={`text-xs font-bold uppercase tracking-wider mb-2.5 flex items-center gap-1.5 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                              <Settings size={14} /> Ajustes
-                          </h3>
-                          <div className="flex items-center justify-between py-1">
-                              <div className="flex items-center gap-2">
-                                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${isDarkMode ? 'bg-purple-950 text-purple-300' : 'bg-amber-100 text-amber-600'}`}>
-                                      {isDarkMode ? <Moon size={14} /> : <Sun size={14} />}
-                                  </div>
-                                  <span className={`text-xs font-semibold ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>Modo oscuro</span>
-                              </div>
-                              <button 
-                                  onClick={() => setIsDarkMode(!isDarkMode)} 
-                                  className={`w-10 h-5 flex items-center rounded-full p-0.5 transition-colors duration-300 ${isDarkMode ? 'bg-blue-600 justify-end' : 'bg-gray-300 justify-start'}`}
-                                  title="Alternar tema"
-                              >
-                                  <div className="bg-white w-4 h-4 rounded-full shadow-md transform transition-transform" />
-                              </button>
-                          </div>
-                          <button 
-                              onClick={() => setShowSettingsModal(true)} 
-                              className={`w-full mt-2.5 py-1.5 px-3 text-[11px] font-bold rounded-xl border text-center transition-colors ${isDarkMode ? 'bg-gray-700 border-gray-600 text-gray-200 hover:bg-gray-600' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-100 shadow-sm'}`}
-                          >
-                              Ver todos los ajustes ⚙️
-                          </button>
-                      </div>
-
                       {role === 'teacher' && (
                           <div className={`mt-3 p-4 rounded-xl border shadow-sm ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-purple-50 border-purple-100'}`}>
                               <h3 className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-purple-400' : 'text-purple-600'}`}>Funciones IA</h3>
