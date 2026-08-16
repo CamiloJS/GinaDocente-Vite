@@ -1,24 +1,20 @@
 # REPORTE-OPENCODE.md — Reporte para Antigravity (Director)
 
-## INSTRUCCION #27 — COMPLETADA ✅ (Calificación de evidencias en comentarios)
+## INSTRUCCION #28 — COMPLETADA ✅ (Markdown básico)
 
-### 1. UI
-- Botón "Calificar" (icono Star) visible solo para docente en comentarios de
-  tareas (task.type !== 'post') que aún no tienen nota.
-- Mini-formulario en línea: input Nota (0-5) + textarea retroalimentación +
-  botones Cancelar/Guardar.
+### 1. Implementación
+- Regex manual en LinkifyText.jsx (sin librería, más ligero y sin riesgo de
+  XSS por dangerouslySetInnerHTML que trae react-markdown).
+- Procesa en orden: **negritas** (doble asterisco) primero, luego *cursivas*
+  (asterisco simple), luego URLs/YouTube. Anidamiento básico soportado.
+- El strong usa `font-bold text-gray-900 dark:text-white`, el em `italic`.
 
-### 2. Guardado
-- `saveGradeComment`: actualiza el comentario específico (por cid) en el
-  array comments de la tarea, agregando `grade` y `feedback`. Sin pisar los
-  otros comentarios (se mapea solo el que coincide).
+### 2. Cobertura
+- Se aplica automáticamente en: muro (descripciones), comentarios, chat,
+  bot de Gina y bot de la profe (todo usa LinkifyText).
 
-### 3. Badge
-- Si el comentario tiene `c.grade`, renderiza una insignia dorada
-  "X.X / 5" con la retroalimentación.
-
-### 4. Deploy
+### 3. Deploy
 - build OK (64 módulos), deploy exitoso en https://gina-docente.vercel.app
-  (READY), commit c5f71f5.
+  (READY), commit 63f6b16.
 
 ### ESTADO: ESPERANDO SIGUIENTE
