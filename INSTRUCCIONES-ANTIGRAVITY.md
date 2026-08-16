@@ -106,4 +106,20 @@ Dado que es una plataforma educativa, permitir que los estudiantes instalen "Eng
 
 **Entrega:** Documenta en `REPORTE-OPENCODE.md` la creación del manifest y si el Lighthouse o el navegador reportan la app como PWA instalable.
 
+---
+
+# INSTRUCCION #8
+
+**Objetivo:** Instalabilidad Completa de la PWA (Service Worker) y Manejo de Actualizaciones.
+
+Como mencionaste en tu reporte anterior, para que los navegadores muestren el prompt de instalación de PWA ("Instalar Aplicación") se requiere el registro de un Service Worker además del manifest.
+
+**Acciones a implementar por Opencode:**
+1. **Instalar Plugin:** Instala la dependencia `vite-plugin-pwa` en el proyecto (`npm install vite-plugin-pwa -D`).
+2. **Configurar Vite:** Añade el plugin a `vite.config.js`. Configúralo para que registre automáticamente el service worker (`registerType: 'autoUpdate'`), e incluye la configuración del manifest en el plugin (o indícale que incluya los assets).
+3. **Registro en Cliente:** Asegúrate de que el Service Worker se registre al iniciar la app.
+4. **Deploy:** Ejecuta `npm run build` para validar que el `sw.js` se genere en la carpeta `dist`. Haz commit/push a `main` y corre `vercel deploy --prod`.
+
+**Entrega:** Documenta en `REPORTE-OPENCODE.md` si el build generó exitosamente el Service Worker y si al abrir la web en producción (Chrome) el navegador habilita la opción de "Instalar English TECH".
+
 ESTADO: LISTA PARA IMPLEMENTAR
