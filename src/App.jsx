@@ -1560,7 +1560,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                          onTouchEnd={() => setIsDraggingCrop(false)}
                     >
                         <div className={`w-full max-w-sm flex flex-col p-6 rounded-3xl shadow-2xl ${isDarkMode ? 'bg-gray-900 border border-gray-700' : 'bg-white'}`}>
-                            <h3 className={`text-xl font-bold mb-4 text-center ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>Ajustar Foto</h3>
+                            <h3 className={`text-xl font-bold mb-4 text-center ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>Ajustar foto</h3>
                             
                             <div className="flex flex-col items-center mb-6">
                                 <div 
@@ -1610,7 +1610,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                     </div>
                 , document.body)}
 
-                {/* Crear Publicación */}
+                {/* Crear publicación */}
                 {isMyProfile && (
                     <form onSubmit={publishProfilePost} className={`${glassCard} flex flex-col gap-3 mb-8`}>
                         <h3 className={`font-bold flex items-center gap-2 ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>Crear nueva publicación</h3>
@@ -1780,7 +1780,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                     ))}
                     <div className="flex gap-4 pt-4 border-t border-white/40">
                        <button onClick={() => setDraftReview(null)} className="px-6 py-3 rounded-full font-bold bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-red-600 transition flex items-center gap-2 shadow-sm"><X size={20}/> Descartar</button>
-                       <button onClick={handlePublishDraft} className={`${redButton} ml-auto`}><Send size={20}/> Publicar Presentación</button>
+                       <button onClick={handlePublishDraft} className={`${redButton} ml-auto`}><Send size={20}/> Publicar presentación</button>
                     </div>
                   </div>
                 </div>
@@ -1794,7 +1794,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                 <h2 className="text-3xl font-bold text-gray-800 mb-6 flex items-center gap-2 drop-shadow-sm">Repasos</h2>
                 {role === 'teacher' && !activeReview && (
                   <form onSubmit={handleGenerateReview} className={`${glassCard} mb-8 flex flex-col gap-4`}>
-                    <h3 className="font-bold text-gray-800 flex items-center gap-2"><Wand2 size={20}/> Generador Inteligente de Diapositivas</h3>
+                    <h3 className="font-bold text-gray-800 flex items-center gap-2"><Wand2 size={20}/> Generador inteligente de diapositivas</h3>
                     <textarea value={reviewTopic} onChange={(e) => setReviewTopic(e.target.value)} placeholder="Ej. Present Simple con ejemplos de comidas..." className={`${glassInput} h-24 resize-none`} required />
                     <div className="flex justify-between items-center mt-2">
                       <select value={reviewCount} onChange={(e) => setReviewCount(Number(e.target.value))} className={`${glassInput} py-2 w-auto`}>{[2, 3, 4, 5, 6].map(n => <option key={n} value={n}>{n} diapositivas</option>)}</select>
@@ -1824,7 +1824,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                                 </button>
                               </form>
                             ) : (
-                              <div className="w-full bg-green-100/80 border border-green-300 p-6 rounded-3xl"><span className="block text-sm font-black text-green-700 uppercase mb-2">Respuesta Correcta</span><p className="text-xl font-medium text-gray-800">{activeSlide.answer}</p></div>
+                              <div className="w-full bg-green-100/80 border border-green-300 p-6 rounded-3xl"><span className="block text-sm font-black text-green-700 uppercase mb-2">Respuesta correcta</span><p className="text-xl font-medium text-gray-800">{activeSlide.answer}</p></div>
                             )}
                             {quizFeedback && <div className={`mt-4 p-4 rounded-2xl border w-full font-medium ${showQuizAnswer ? 'bg-green-50/90 text-green-800' : 'bg-indigo-50/90 text-indigo-800'}`}>{quizFeedback}</div>}
                           </div>
@@ -1864,7 +1864,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
               
               {role === 'teacher' && (
                   <div className={`${glassCard} flex flex-col gap-4 mb-6`}>
-                      <h3 className="font-bold text-gray-800 flex items-center gap-2"><CuteBotIcon size={20} className="text-gray-500" /> Entrenamiento del Asistente Virtual</h3>
+                      <h3 className="font-bold text-gray-800 flex items-center gap-2"><CuteBotIcon size={20} className="text-gray-500" /> Entrenamiento del asistente virtual</h3>
                       <div className="flex-1 max-h-40 overflow-y-auto space-y-2 pr-1">
                           {botInfoList.length === 0 && <p className="text-xs text-gray-500 italic">No hay información guardada. Escribe algo para que el bot lo aprenda.</p>}
                           {botInfoList.map(item => (
@@ -1892,7 +1892,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                               setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'bot'), { infoList: newList });
                               setBotTrainingInfo("");
                               showMessage("✅ Entrenamiento añadido con éxito.");
-                          }} className={`${redButton} h-12 px-6 whitespace-nowrap`}><Plus size={16}/> Añadir Info</button>
+                          }} className={`${redButton} h-12 px-6 whitespace-nowrap`}><Plus size={16}/> Añadir info</button>
                       </div>
                   </div>
               )}
@@ -1970,7 +1970,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                 <div className="flex justify-between items-center mb-2">
                     <h3 className="font-bold text-blue-700 flex items-center gap-2"><BookOpen size={20}/> Gestión de Materias</h3>
                     <button onClick={() => setIsCreatingAcadGroup(!isCreatingAcadGroup)} className="bg-blue-600 text-white px-4 py-1.5 rounded-full text-xs font-bold hover:scale-105 transition-transform shadow-md">
-                        {isCreatingAcadGroup ? 'Cancelar' : '+ Nueva Materia'}
+                        {isCreatingAcadGroup ? 'Cancelar' : '+ Nueva materia'}
                     </button>
                 </div>
 
@@ -1979,7 +1979,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                         <label className="block text-xs font-bold mb-1 text-blue-600">Nombre de la Materia / Grupo</label>
                         <input value={newAcadGroupName} onChange={e => setNewAcadGroupName(e.target.value)} placeholder="Ej: Inglés Nivel 3 - Grupo A" className={`${glassInput} mb-4`} required />
                         
-                        <label className="block text-xs font-bold mb-2 text-blue-600">Seleccionar Estudiantes (Múltiple)</label>
+                        <label className="block text-xs font-bold mb-2 text-blue-600">Seleccionar estudiantes (múltiple)</label>
                         <div className={`max-h-48 overflow-y-auto rounded-xl border p-2 grid grid-cols-1 sm:grid-cols-2 gap-2 ${isDarkMode ? 'bg-gray-900/50 border-gray-700' : 'bg-white border-gray-200'}`}>
                             {Object.entries(userMappings).filter(([uk, ud]) => uk !== 'teacher' && ud?.email).map(([uKey, data]) => (
                                 <label key={uKey} className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${selectedAcadMembers.includes(uKey) ? 'bg-blue-500/10 border border-blue-300' : (isDarkMode ? 'hover:bg-gray-700 border border-transparent' : 'hover:bg-gray-50 border border-transparent')}`}>
@@ -1993,7 +1993,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                         </div>
                         <button type="submit" disabled={isSavingMateria} className={`${redButton} w-full mt-4 !bg-blue-600 hover:!bg-blue-700 shadow-blue-600/30 disabled:opacity-50`}>
                             {isSavingMateria ? <Loader2 className="animate-spin" size={20}/> : <CheckLine size={20}/>} 
-                            {isSavingMateria ? 'Guardando...' : 'Guardar Materia'}
+                            {isSavingMateria ? 'Guardando...' : 'Guardar materia'}
                         </button>
                     </form>
                 )}
@@ -2027,11 +2027,11 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                 } catch(err) { showMessage("❌ Error: " + (err.message.includes('email-already') ? 'El correo ya existe' : err.message)); }
             }} className={`${glassCard} flex flex-col gap-4 mb-6`}>
                 <p className="text-sm font-bold text-gray-700">Crea un nuevo estudiante. La contraseña se encriptará en Google.</p>
-                <input name="fullname" placeholder="Nombre Real Completo" className={glassInput} required />
+                <input name="fullname" placeholder="Nombre real completo" className={glassInput} required />
                 <input name="username" placeholder="Nombre de Usuario (Ej: juanperez)" className={glassInput} required />
                 <input name="email" type="email" placeholder="Correo electrónico del estudiante" className={glassInput} required />
-                <input name="password" type="text" placeholder="Contraseña Inicial" className={glassInput} required />
-                <button type="submit" className={redButton}><Plus size={18}/> Crear Estudiante</button>
+                <input name="password" type="text" placeholder="Contraseña inicial" className={glassInput} required />
+                <button type="submit" className={redButton}><Plus size={18}/> Crear estudiante</button>
             </form>
 
             {/* DIRECTORIO */}
@@ -2074,7 +2074,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                             
                             <div className="flex gap-3 items-start shrink-0">
                                 {!editingUserLabelId && (
-                                    <button onClick={() => { setEditingUserLabelId(userKey); setEditUserLabelValue(data.customLabel || ""); }} className="text-gray-500 hover:text-blue-600 transition-colors mt-1" title="Cambiar Etiqueta"><Edit3 size={16}/></button>
+                                    <button onClick={() => { setEditingUserLabelId(userKey); setEditUserLabelValue(data.customLabel || ""); }} className="text-gray-500 hover:text-blue-600 transition-colors mt-1" title="Cambiar etiqueta"><Edit3 size={16}/></button>
                                 )}
                                 <button onClick={() => confirmAction("¿Desea eliminar a este estudiante del directorio?", () => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userMappings', userKey)))} className="text-gray-500 hover:text-red-600 transition-colors mt-1"><Trash2 size={16}/></button>
                             </div>
@@ -2190,7 +2190,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                                               </td>
                                               <td className="p-4 text-sm text-gray-500">{new Date(grade.submittedAt).toLocaleString()}</td>
                                               <td className="p-4 text-center">
-                                                  {!editingGrade.id && <button onClick={() => setEditingGrade({id: grade.id, score: grade.score})} className="text-gray-500 hover:text-blue-600 transition-colors" title="Modificar Nota"><Edit3 size={18}/></button>}
+                                                  {!editingGrade.id && <button onClick={() => setEditingGrade({id: grade.id, score: grade.score})} className="text-gray-500 hover:text-blue-600 transition-colors" title="Modificar nota"><Edit3 size={18}/></button>}
                                               </td>
                                           </tr>
                                       ))}
@@ -2206,18 +2206,18 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                       <div className="space-y-6 max-w-3xl mx-auto pb-20 md:pb-0">
                           <div className="flex items-center gap-4 mb-6">
                               <button onClick={() => setIsCreatingEval(false)} className={`p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors ${isDarkMode ? 'text-white' : 'text-gray-800'}`}><ArrowLeftIcon size={24}/></button>
-                              <h2 className={`text-3xl font-bold drop-shadow-sm ${isDarkMode ? 'text-gray-100' : 'text-gray-800'}`}>Crear Nueva Evaluación</h2>
+                              <h2 className={`text-3xl font-bold drop-shadow-sm ${isDarkMode ? 'text-gray-100' : 'text-gray-800'}`}>Crear nueva evaluación</h2>
                           </div>
                           
                           <form onSubmit={handleSaveEval} className="space-y-6">
                               <div className={`${glassCard} space-y-4`}>
-                                  <h3 className={`font-bold border-b pb-2 ${isDarkMode ? 'text-gray-200 border-gray-700' : 'text-gray-700 border-white/50'}`}>Configuración General</h3>
-                                  <div><label className="text-xs font-bold text-gray-500 ml-1">Título de la Evaluación</label><input value={evalFormData.title} onChange={e => setEvalFormData({...evalFormData, title: e.target.value})} placeholder="Ej: Quiz de Verbos Irregulares..." className={glassInput} required /></div>
+                                  <h3 className={`font-bold border-b pb-2 ${isDarkMode ? 'text-gray-200 border-gray-700' : 'text-gray-700 border-white/50'}`}>Configuración general</h3>
+                                  <div><label className="text-xs font-bold text-gray-500 ml-1">Título de la evaluación</label><input value={evalFormData.title} onChange={e => setEvalFormData({...evalFormData, title: e.target.value})} placeholder="Ej: Quiz de Verbos Irregulares..." className={glassInput} required /></div>
                                   <div><label className="text-xs font-bold text-gray-500 ml-1">Descripción / Instrucciones</label><textarea value={evalFormData.description} onChange={e => setEvalFormData({...evalFormData, description: e.target.value})} placeholder="Instrucciones para los estudiantes..." className={`${glassInput} h-24 resize-none`} required /></div>
                                   
                                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                      <div><label className="text-xs font-bold text-gray-500 ml-1">Fecha Límite</label><input type="date" value={evalFormData.dueDate} onChange={e => setEvalFormData({...evalFormData, dueDate: e.target.value})} className={glassInput} required /></div>
-                                      <div><label className="text-xs font-bold text-gray-500 ml-1">Hora Límite</label><input type="time" value={evalFormData.dueTime} onChange={e => setEvalFormData({...evalFormData, dueTime: e.target.value})} className={glassInput} required /></div>
+                                      <div><label className="text-xs font-bold text-gray-500 ml-1">Fecha límite</label><input type="date" value={evalFormData.dueDate} onChange={e => setEvalFormData({...evalFormData, dueDate: e.target.value})} className={glassInput} required /></div>
+                                      <div><label className="text-xs font-bold text-gray-500 ml-1">Hora límite</label><input type="time" value={evalFormData.dueTime} onChange={e => setEvalFormData({...evalFormData, dueTime: e.target.value})} className={glassInput} required /></div>
                                       <div><label className="text-xs font-bold text-gray-500 ml-1">Tiempo (minutos)</label><input type="number" min="1" max="180" value={evalFormData.timeLimit} onChange={e => setEvalFormData({...evalFormData, timeLimit: parseInt(e.target.value)})} className={glassInput} required /></div>
                                   </div>
                               </div>
@@ -2241,8 +2241,8 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                                               <select value={q.type} onChange={(e) => {
                                                   const newQ = [...evalFormData.questions]; newQ[qIndex].type = e.target.value; setEvalFormData({...evalFormData, questions: newQ});
                                               }} className={`${glassInput} !py-2 w-auto font-bold text-blue-600 cursor-pointer`}>
-                                                  <option value="multiple">Selección Múltiple</option>
-                                                  <option value="text">Escribir Respuesta</option>
+                                                  <option value="multiple">Selección múltiple</option>
+                                                  <option value="text">Escribir respuesta</option>
                                               </select>
                                           </div>
                                           
@@ -2288,13 +2288,13 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                                       <button type="button" onClick={() => {
                                           setEvalFormData({...evalFormData, questions: [...evalFormData.questions, { type: 'multiple', text: '', options: [{text: '', isCorrect: false}, {text: '', isCorrect: false}], correctAnswer: '' }]});
                                       }} className={`w-full py-4 border-2 border-dashed rounded-2xl font-bold flex items-center justify-center gap-2 transition-colors ${isDarkMode ? 'border-gray-600 text-gray-400 hover:border-blue-500 hover:text-blue-500' : 'border-gray-400 text-gray-600 hover:border-blue-600 hover:text-blue-600'}`}>
-                                          <Plus size={20} /> Añadir Pregunta
+                                          <Plus size={20} /> Añadir pregunta
                                       </button>
                                   )}
                               </div>
 
                               <div className="flex justify-end pt-6 border-t border-white/20">
-                                  <button type="submit" className={`${redButton} px-10 py-4 text-lg w-full md:w-auto shadow-xl`}><CheckCircle2 size={20}/> Guardar Evaluación</button>
+                                  <button type="submit" className={`${redButton} px-10 py-4 text-lg w-full md:w-auto shadow-xl`}><CheckCircle2 size={20}/> Guardar evaluación</button>
                               </div>
                           </form>
                       </div>
@@ -2343,7 +2343,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                                                       showMessage("Evaluación eliminada.");
                                                   })} className="text-gray-400 hover:text-red-600 p-2"><Trash2 size={18}/></button>
                                               </div>
-                                              <button onClick={() => setViewingResultsFor(ev)} className="bg-white dark:bg-gray-800 text-blue-700 dark:text-blue-400 font-bold py-2 px-4 rounded-xl shadow-sm border border-blue-200 dark:border-blue-800 transition-all text-sm">Ver Resultados</button>
+                                              <button onClick={() => setViewingResultsFor(ev)} className="bg-white dark:bg-gray-800 text-blue-700 dark:text-blue-400 font-bold py-2 px-4 rounded-xl shadow-sm border border-blue-200 dark:border-blue-800 transition-all text-sm">Ver resultados</button>
                                           </>
                                       ) : (
                                           isDone ? (
@@ -2352,7 +2352,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                                                   <span className={`text-xl font-black ${studentGrade.score >= 3.0 ? 'text-green-600' : 'text-red-600'}`}>{studentGrade.score.toFixed(1)} <span className="text-sm text-gray-400">/ 5.0</span></span>
                                               </div>
                                           ) : isExpired ? (
-                                              <button disabled className="w-full bg-gray-300 text-gray-500 font-bold py-3 rounded-xl cursor-not-allowed">Evaluación Cerrada</button>
+                                              <button disabled className="w-full bg-gray-300 text-gray-500 font-bold py-3 rounded-xl cursor-not-allowed">Evaluación cerrada</button>
                                           ) : (
                                               <button onClick={() => {
                                                   confirmAction(`Tienes ${ev.timeLimit} minutos para completarla y no podrás pausar. ¿Empezar ahora?`, () => {
@@ -2360,7 +2360,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                                                       setTimeRemaining(ev.timeLimit * 60);
                                                       setStudentAnswers({});
                                                   });
-                                              }} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-md transition-all">Empezar Prueba</button>
+                                              }} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-md transition-all">Empezar prueba</button>
                                           )
                                       )}
                                   </div>
@@ -2475,7 +2475,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                 .dark .text-gray-300 { color: #d1d5db !important; }
 `}</style>
                       
-                      <button onClick={() => setIsDarkMode(!isDarkMode)} className="absolute top-4 right-4 md:top-6 md:right-6 p-3 rounded-full bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 transition-all shadow-sm border border-gray-200 dark:border-gray-700 z-50" title="Alternar Modo Oscuro">
+                      <button onClick={() => setIsDarkMode(!isDarkMode)} className="absolute top-4 right-4 md:top-6 md:right-6 p-3 rounded-full bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 transition-all shadow-sm border border-gray-200 dark:border-gray-700 z-50" title="Alternar modo oscuro">
                           {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
                       </button>
                       
@@ -2538,7 +2538,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                             <form onSubmit={handleLogin} className={`${glassCard} max-w-sm w-full flex flex-col gap-5 relative animate-in fade-in zoom-in duration-200`}>
                               <button type="button" onClick={() => {setLoginType(null); setLoginError("");}} className="absolute top-4 right-4 text-gray-500 hover:text-gray-800 transition-colors"><X size={24}/></button>
                               <h3 className="text-2xl font-bold text-center text-gray-800 mb-2 drop-shadow-sm">
-                                {loginType === 'teacher' ? 'Acceso Docente' : 'Acceso Estudiante'}
+                                {loginType === 'teacher' ? 'Acceso docente' : 'Acceso estudiante'}
                               </h3>
                               <div><label className="text-xs font-bold text-gray-700 ml-2">Usuario</label><input type="text" name="username" placeholder="Ej: @Usuario" defaultValue={prefillUsername} className={glassInput} required /></div>
                               <div className="relative">
@@ -2643,7 +2643,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                     <div className="w-px h-6 bg-gray-400 mx-2"></div>
                   </div>
                   
-                  <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 rounded-full bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 transition-all shadow-sm border border-gray-200 dark:border-gray-700" title="Alternar Modo Oscuro">
+                  <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 rounded-full bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 transition-all shadow-sm border border-gray-200 dark:border-gray-700" title="Alternar modo oscuro">
                     {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
                   </button>
                   
@@ -2711,7 +2711,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                           
                           <div className="w-full space-y-1">
                               <button onClick={() => { setViewingProfileId(null); changeTab('profile'); }} className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-xl transition-colors ${activeTab === 'profile' && !viewingProfileId ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : isDarkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`}>
-                                  <UserIcon size={20} /> Mi Perfil
+                                  <UserIcon size={20} /> Mi perfil
                               </button>
                               {role === 'teacher' ? (
                                   <button onClick={() => { changeTab('inbox'); }} className={`w-full flex items-center justify-between px-3 py-2 text-sm font-bold rounded-xl transition-colors ${activeTab === 'inbox' ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : isDarkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`}>
@@ -2752,7 +2752,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                           <div className={`mt-4 p-4 rounded-xl border shadow-sm ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-purple-50 border-purple-100'}`}>
                               <h3 className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-purple-400' : 'text-purple-600'}`}>Funciones IA</h3>
                               <button onClick={() => setShowIAKnowledgeModal(true)} className="w-full flex items-center gap-2 px-3 py-2 text-sm font-bold rounded-xl transition-colors bg-purple-600 text-white hover:bg-purple-700 shadow-md">
-                                  <Sparkles size={18} /> Entrenar Bot
+                                  <Sparkles size={18} /> Entrenar bot
                               </button>
                           </div>
                       )}
@@ -2998,7 +2998,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                       <button
                           onClick={openChatApp}
                           className={`w-14 h-14 rounded-full flex items-center justify-center focus:outline-none transition-all duration-300 bg-blue-600 hover:bg-blue-700 text-white shadow-xl hover:shadow-2xl hover:-translate-y-1 ${hasUnreadChat ? 'ring-2 ring-red-500 ring-offset-2 ring-offset-white dark:ring-offset-gray-900' : ''}`}
-                          title="Mensajes Directos"
+                          title="Mensajes directos"
                       >
                           <MessageCircle size={28} />
                           {hasUnreadChat && (
@@ -3045,7 +3045,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                               <div className="mb-6">
                                   <div className="flex justify-between items-center mb-3">
                                       <h3 className={`text-sm font-bold uppercase tracking-wider ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Grupos</h3>
-                                      <button onClick={() => setIsCreatingGroup(true)} className="text-blue-500 font-bold text-xs bg-blue-500/10 px-3 py-1 rounded-full hover:bg-blue-500/20 transition-colors">+ Crear Grupo</button>
+                                      <button onClick={() => setIsCreatingGroup(true)} className="text-blue-500 font-bold text-xs bg-blue-500/10 px-3 py-1 rounded-full hover:bg-blue-500/20 transition-colors">+ Crear grupo</button>
                                   </div>
                                   <div className="space-y-2">
                                       {filteredGroups.length === 0 && <p className="text-sm italic text-gray-500">No se encontraron grupos.</p>}
@@ -3073,9 +3073,9 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                                   </div>
                               </div>
 
-                              {/* Chats Activos */}
+                              {/* Chats activos */}
                               <div className="mb-6">
-                                  <h3 className={`text-sm font-bold uppercase tracking-wider mb-3 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Chats Activos</h3>
+                                  <h3 className={`text-sm font-bold uppercase tracking-wider mb-3 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Chats activos</h3>
                                   <div className="space-y-2">
                                       {activeChatsUsers.length === 0 && <p className="text-sm italic text-gray-500">No hay chats recientes.</p>}
                                       {activeChatsUsers.map(u => {
@@ -3152,17 +3152,17 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                           {!activeChat && !isCreatingGroup && (
                               <div className={`hidden md:flex flex-col items-center justify-center text-center p-8 h-full ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
                                   <MessageCircle size={80} className="mb-6 opacity-20" />
-                                  <h3 className="text-2xl font-bold mb-2">Tus Mensajes</h3>
+                                  <h3 className="text-2xl font-bold mb-2">Tus mensajes</h3>
                                   <p className="text-sm">Selecciona un chat o grupo del menú lateral para comenzar.</p>
                               </div>
                           )}
 
-                          {/* Crear Grupo */}
+                          {/* Crear grupo */}
                           {isCreatingGroup && (
                               <div className="flex flex-col h-full w-full">
                                   <div className={`flex items-center p-4 md:p-6 border-b shadow-sm shrink-0 gap-4 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
                                       <button onClick={() => {setIsCreatingGroup(false); setNewGroupName(""); setNewGroupMembers([]);}} className={`p-2 rounded-full transition-all ${isDarkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-100'}`}><ArrowLeftIcon size={24} /></button>
-                                      <h2 className={`text-xl font-extrabold flex items-center gap-2 ${isDarkMode ? 'text-gray-100' : 'text-gray-800'}`}>Crear Nuevo Grupo</h2>
+                                      <h2 className={`text-xl font-extrabold flex items-center gap-2 ${isDarkMode ? 'text-gray-100' : 'text-gray-800'}`}>Crear nuevo grupo</h2>
                                   </div>
                                   <form onSubmit={handleCreateGroup} className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6">
                                       <div>
@@ -3170,7 +3170,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                                           <input value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder="Ej: Equipo Proyecto Final" className={`w-full rounded-xl px-4 py-3 outline-none border focus:ring-2 transition-all ${isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-100 focus:ring-blue-500/50' : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-400/50'}`} required />
                                       </div>
                                       <div>
-                                          <label className={`block text-sm font-bold mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Seleccionar Miembros</label>
+                                          <label className={`block text-sm font-bold mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Seleccionar miembros</label>
                                           <div className={`border rounded-2xl overflow-hidden ${isDarkMode ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-white'}`}>
                                               {allChatUsers.map(u => (
                                                   <label key={u.id} className={`flex items-center gap-3 p-4 border-b last:border-0 cursor-pointer transition-colors ${isDarkMode ? 'border-gray-700 hover:bg-gray-700' : 'border-gray-100 hover:bg-gray-50'}`}>
@@ -3183,7 +3183,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                                               ))}
                                           </div>
                                       </div>
-                                      <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg transition-all">Crear Grupo</button>
+                                      <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg transition-all">Crear grupo</button>
                                   </form>
                               </div>
                           )}

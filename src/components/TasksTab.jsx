@@ -56,7 +56,7 @@ const TasksTab = React.memo(({
                     <div className="relative z-[60] mb-2">
     <button type="button" onClick={() => setIsGroupDropdownOpen(!isGroupDropdownOpen)} className={`w-full flex justify-between items-center bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 font-bold transition-all shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 ${postTargetGroup ? (isDarkMode ? 'text-blue-400' : 'text-blue-700') : (isDarkMode ? 'text-gray-300' : 'text-gray-700')}`}>
         <span className="flex items-center gap-2">
-            {postTargetGroup === 'all' ? <><Globe size={18}/> Todos los estudiantes</> : (postTargetGroup ? <><Book size={18}/> {academicGroups?.find(g => g.id === postTargetGroup)?.name}</> : <><Target size={18}/> Seleccionar Materia / Grupo (Obligatorio)</>)}
+            {postTargetGroup === 'all' ? <><Globe size={18}/> Todos los estudiantes</> : (postTargetGroup ? <><Book size={18}/> {academicGroups?.find(g => g.id === postTargetGroup)?.name}</> : <><Target size={18}/> Seleccionar materia / grupo (obligatorio)</>)}
         </span>
         <ChevronRight size={18} className={`transition-transform duration-300 ${isGroupDropdownOpen ? 'rotate-90' : ''}`} />
     </button>
@@ -135,7 +135,7 @@ const TasksTab = React.memo(({
                                         <span className="font-black border border-current px-1 rounded text-[10px] flex items-center justify-center h-4">GIF</span> GIF
                                     </button>
                                     <label className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold cursor-pointer transition-colors ${isDarkMode ? 'hover:bg-gray-700 text-gray-200' : 'hover:bg-gray-100 text-gray-700'}`}>
-                                        <PaperclipIcon size={16} /> Adjuntar Documento
+                                        <PaperclipIcon size={16} /> Adjuntar documento
                                         <input type="file" accept=".pdf,.doc,.docx,.ppt,.pptx" className="hidden" onChange={(e) => { handlePostLocalFileUpload(e); setShowPostAttachmentMenu(false); }} />
                                     </label>
                                 </div>
