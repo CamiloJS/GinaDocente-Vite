@@ -2475,9 +2475,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                 .dark .text-gray-300 { color: #d1d5db !important; }
 `}</style>
                       
-                      <button onClick={() => setIsDarkMode(!isDarkMode)} className="absolute top-4 right-4 md:top-6 md:right-6 p-3 rounded-full bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 transition-all shadow-sm border border-gray-200 dark:border-gray-700 z-50" title="Alternar modo oscuro">
-                          {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
-                      </button>
+
                       
                       <div className="relative z-10 w-full max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-center gap-8 px-4 animate-in fade-in zoom-in duration-500 py-12">
                           
@@ -2634,21 +2632,6 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                 </div>
 
                 <div className="flex gap-2 items-center mt-2 md:mt-0">
-                  <div className="hidden md:flex gap-2 items-center">
-                    <button onClick={() => changeTab('tasks')} className={`px-4 py-2 rounded-full transition-all text-sm ${getTabClass('tasks')}`}>Asignaciones</button>
-                    <button onClick={() => changeTab('reviews')} className={`px-4 py-2 rounded-full transition-all text-sm flex items-center gap-1 ${getTabClass('reviews')}`}>Repasos</button>
-                    <button onClick={() => changeTab('syllabus')} className={`px-4 py-2 rounded-full transition-all text-sm ${getTabClass('syllabus')}`}>Contenidos programáticos</button>
-                    <button onClick={() => changeTab('evaluations')} className={`px-4 py-2 rounded-full transition-all text-sm ${getTabClass('evaluations')}`}>Evaluaciones</button>
-                    {role === 'teacher' && <button onClick={() => changeTab('directory')} className={`px-4 py-2 rounded-full transition-all text-sm ${getTabClass('directory')}`}>Directorio</button>}
-                    <div className="w-px h-6 bg-gray-400 mx-2"></div>
-                  </div>
-                  
-                  <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 rounded-full bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 transition-all shadow-sm border border-gray-200 dark:border-gray-700" title="Alternar modo oscuro">
-                    {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
-                  </button>
-                  
-                  {/* ESTO FUE ELIMINADO PARA PASARLO AL MENÚ DEL PERFIL, ASÍ QUEDA MÁS LIMPIO */}
-  
   {/* MENÚ DE PERFIL EN LA ESQUINA SUPERIOR DERECHA */}
   <div className="relative ml-2">
       <button onClick={() => setShowUserMenu(!showUserMenu)} className="w-10 h-10 rounded-full flex items-center justify-center text-white shadow-md transition-transform hover:scale-105 bg-gradient-to-br from-blue-600 to-indigo-700 border-2 border-white/40 z-50 relative overflow-hidden">
@@ -2669,10 +2652,15 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                 <UserIcon size={18} /> Perfil
             </button>
             {role === 'teacher' ? (
-                <button onClick={() => { changeTab('inbox'); setShowUserMenu(false); }} className={`w-full flex items-center justify-between px-3 py-2 text-sm font-bold rounded-xl transition-colors ${isDarkMode ? 'text-gray-200 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`}>
-                    <div className="flex items-center gap-2"><Mail size={18} /> Buzón</div>
-                    {alerts.length > 0 && <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>}
-                </button>
+                <>
+                    <button onClick={() => { changeTab('directory'); setShowUserMenu(false); }} className={`w-full flex lg:hidden items-center gap-2 px-3 py-2 text-sm font-bold rounded-xl transition-colors ${isDarkMode ? 'text-gray-200 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`}>
+                        <UsersIcon size={18} /> Directorio
+                    </button>
+                    <button onClick={() => { changeTab('inbox'); setShowUserMenu(false); }} className={`w-full flex items-center justify-between px-3 py-2 text-sm font-bold rounded-xl transition-colors ${isDarkMode ? 'text-gray-200 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`}>
+                        <div className="flex items-center gap-2"><Mail size={18} /> Buzón</div>
+                        {alerts.length > 0 && <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>}
+                    </button>
+                </>
             ) : (
                 <button onClick={() => { setShowSugModal(true); setShowUserMenu(false); }} className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-bold rounded-xl transition-colors ${isDarkMode ? 'text-gray-200 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`}>
                     <Mail size={18} /> Sugerencias
