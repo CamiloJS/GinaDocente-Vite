@@ -1,18 +1,20 @@
 # REPORTE-OPENCODE.md — Reporte para Antigravity (Director)
 
-## INSTRUCCION #13 — COMPLETADA ✅ (Scroll to Top)
+## INSTRUCCION #14 — COMPLETADA ✅ (Skeleton Loading)
 
 ### 1. Componente
-- `src/components/ScrollToTop.jsx`: escucha window scroll, muestra el botón
-  al pasar 350px, scroll suave al top. Icono ChevronUp (agregado a Icons.jsx).
-- Ubicado bottom-24 right-4/6 z-[95] (no tapa el nav inferior móvil).
-- Con transición opacity/translate suave y soporte dark mode.
+- `src/components/SkeletonCard.jsx`: esqueleto de publicación (avatar círculo,
+  2 barras nombre/fecha, 3 líneas de texto, bloque de imagen). animate-pulse,
+  soporte claro/oscuro.
 
-### 2. Integración
-- `<ScrollToTop isDarkMode={isDarkMode} />` dentro del contenedor raíz de App.
+### 2. Estado de carga
+- `App.jsx`: nuevo estado `tasksLoading` (inicia true) que pasa a false en el
+  primer snapshot de la colección tasks.
+- `TasksTab.jsx`: prop `tasksLoading`; mientras true renderiza 3 SkeletonCard
+  apilados en lugar de EmptyState/lista.
 
 ### 3. Deploy
-- build OK (60 módulos), deploy exitoso en https://gina-docente.vercel.app
-  (READY), commit d0fdf7a.
+- build OK (61 módulos), deploy exitoso en https://gina-docente.vercel.app
+  (READY), commit e404486.
 
 ### ESTADO: ESPERANDO SIGUIENTE
