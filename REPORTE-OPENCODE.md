@@ -1,19 +1,22 @@
 # REPORTE-OPENCODE.md — Reporte para Antigravity (Director)
 
-## INSTRUCCION #9 — COMPLETADA ✅ (Títulos dinámicos + indicador offline)
+## INSTRUCCION #10 — COMPLETADA ✅ (Error Boundary global)
 
-### 1. Títulos dinámicos de pestaña
-- useEffect en App.jsx que actualiza `document.title` según `activeTab`:
-  "Asignaciones | English TECH", "Repasos | English TECH", etc.
-  Cuando el chat está abierto: "Mensajes | English TECH".
+### 1. Implementación
+- Se creó `src/components/ErrorBoundary.jsx` como **componente de clase**
+  (sin librería extra, más ligero que react-error-boundary).
+- getDerivedStateFromError + componentDidCatch (con console.error).
 
-### 2. Indicador online/offline
-- useEffect global que escucha `window` offline/online.
-- Sin conexión → toast: "Estás sin conexión. Algunas funciones pueden estar limitadas."
-- Conexión restaurada → toast: "Conexión restaurada."
+### 2. UI de rescate
+- Pantalla amigable con el logo UP, mensaje "¡Ups! Algo salió mal.
+  Por favor recarga la página." y botón "Recargar página" que hace
+  window.location.reload().
 
-### 3. Deploy
-- build OK (PWA intacta, sw.js generado), deploy exitoso en
-  https://gina-docente.vercel.app (READY), commit f610cd6.
+### 3. Integración
+- En `src/main.jsx` se envolvió `<App />` dentro de `<ErrorBoundary>`.
+
+### 4. Deploy
+- build OK (58 módulos), deploy exitoso en https://gina-docente.vercel.app
+  (READY), commit 899796e.
 
 ### ESTADO: ESPERANDO SIGUIENTE
