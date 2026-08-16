@@ -2212,7 +2212,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                           <form onSubmit={handleSaveEval} className="space-y-6">
                               <div className={`${glassCard} space-y-4`}>
                                   <h3 className={`font-bold border-b pb-2 ${isDarkMode ? 'text-gray-200 border-gray-700' : 'text-gray-700 border-white/50'}`}>Configuración general</h3>
-                                  <div><label className="text-xs font-bold text-gray-500 ml-1">Título de la evaluación</label><input value={evalFormData.title} onChange={e => setEvalFormData({...evalFormData, title: e.target.value})} placeholder="Ej: Quiz de Verbos Irregulares..." className={glassInput} required /></div>
+                                  <div><label className="text-xs font-bold text-gray-500 ml-1">Título de la evaluación</label><input value={evalFormData.title} onChange={e => setEvalFormData({...evalFormData, title: e.target.value})} placeholder="Ej: Quiz de verbos irregulares..." className={glassInput} required /></div>
                                   <div><label className="text-xs font-bold text-gray-500 ml-1">Descripción / Instrucciones</label><textarea value={evalFormData.description} onChange={e => setEvalFormData({...evalFormData, description: e.target.value})} placeholder="Instrucciones para los estudiantes..." className={`${glassInput} h-24 resize-none`} required /></div>
                                   
                                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -3167,7 +3167,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                                   <form onSubmit={handleCreateGroup} className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6">
                                       <div>
                                           <label className={`block text-sm font-bold mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Nombre del Grupo</label>
-                                          <input value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder="Ej: Equipo Proyecto Final" className={`w-full rounded-xl px-4 py-3 outline-none border focus:ring-2 transition-all ${isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-100 focus:ring-blue-500/50' : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-400/50'}`} required />
+                                          <input value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder="Ej: Equipo proyecto final" className={`w-full rounded-xl px-4 py-3 outline-none border focus:ring-2 transition-all ${isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-100 focus:ring-blue-500/50' : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-400/50'}`} required />
                                       </div>
                                       <div>
                                           <label className={`block text-sm font-bold mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Seleccionar miembros</label>
@@ -3669,7 +3669,7 @@ tickIcon = (
               {fullScreenImage && ReactDOM.createPortal(
                   <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setFullScreenImage(null)}>
                       <button className="absolute top-4 md:top-8 right-4 md:right-8 text-white/70 hover:text-white bg-black/50 hover:bg-red-600 p-2 rounded-full transition-all shadow-lg"><X size={28}/></button>
-                      <img src={fullScreenImage} loading="lazy" className="w-auto h-auto max-w-[95vw] max-h-[90vh] object-contain rounded-lg shadow-2xl" onClick={e => e.stopPropagation()} />
+<img src={fullScreenImage} loading="lazy" className="w-auto h-auto max-w-[95vw] max-h-[90vh] object-contain rounded-lg shadow-2xl" onClick={e => e.stopPropagation()} />
                   </div>
               , document.body)}
 
@@ -3679,7 +3679,7 @@ tickIcon = (
                   <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                       <div className={`max-w-sm w-full flex flex-col gap-4 p-6 rounded-3xl animate-in fade-in zoom-in duration-200 shadow-2xl ${isDarkMode ? 'bg-gray-900 border border-gray-700' : 'bg-white border border-gray-200'}`}>
                           <h3 className={`text-xl font-bold flex items-center gap-2 ${isDarkMode ? 'text-gray-100' : 'text-gray-800'}`}>
-                              <AlertTriangle className="text-red-500" /> Confirmar Acción
+                              <AlertTriangle className="text-red-500" /> Confirmar acción
                           </h3>
                           <p className={`text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>{confirmDialog.message}</p>
                           <div className="flex gap-3 mt-4">
