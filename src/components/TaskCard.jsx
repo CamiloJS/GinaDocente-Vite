@@ -3,7 +3,7 @@ import React, { useState } from 'react'
 import ReactDOM from 'react-dom'
 import confetti from 'canvas-confetti'
 import {
-  CheckCheck, CheckLine, Clock, Edit3, FileDocIcon, FileText, ImageIcon, Loader2, Lock, MessageSquareText, Mic, PaperclipIcon, Plus, ReplyIcon, Send, SmileIcon, Square, Star, Trash2, X, XLine,
+  CheckCheck, CheckLine, Clock, Edit3, FileDocIcon, FileText, ImageIcon, Loader2, Lock, MessageSquareText, Mic, PaperclipIcon, Plus, ReplyIcon, Send, SmileIcon, Square, Star, Pin, Trash2, X, XLine,
 } from './Icons.jsx'
 import {
   compressImage, containsBadWords, checkBadWordsAsync, uploadImageToStorage, uploadRawFileToStorage, TEACHER_NAME, COMMENT_EMOJIS, REACTION_EMOJIS,
@@ -106,6 +106,11 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput, callGemini, cu
         showMessage("✅ Calificación guardada");
     };
 
+    const togglePin = async () => {
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), { ...task, isPinned: !task.isPinned });
+        showMessage(task.isPinned ? "Publicación desfijada" : "✅ Publicación fijada al inicio del muro");
+    };
+
     const handleDeleteComment = async (commentId, authorName) => {
         let updatedComments;
         if (role === 'teacher') updatedComments = task.comments.filter((c, i) => (c.id || `old-${i}`) !== commentId);
@@ -200,11 +205,12 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput, callGemini, cu
     };
 
     return (
-        <div className={`${cardStyle} !p-4 group ${!isLocked && 'hover:bg-white/30'}`}>
+        <div className={`${cardStyle} !p-4 group ${task.isPinned ? 'border-2 !border-yellow-400 dark:!border-yellow-500 shadow-[0_0_20px_rgba(250,204,21,0.15)]' : ''} ${!isLocked && 'hover:bg-white/30'}`}>
             <div className="flex justify-between items-start">
                 <div className="flex-1 pr-4">
                     <div className="flex items-center gap-2 mb-1">
                         {task.type !== 'post' && <span className="text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 border border-red-100 dark:border-red-500/20">Tarea</span>}
+                        {task.isPinned && <span className="text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md bg-yellow-50 dark:bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border border-yellow-200 dark:border-yellow-500/30 flex items-center gap-1"><Pin size={10} /> Fijado</span>}
                     </div>
                     {isEditingTask ? (
                         <input value={editTaskData.title} onChange={e => setEditTaskData({...editTaskData, title: e.target.value})} className={`${glassInput} text-xl font-bold mb-2 p-2`} placeholder="Título..." />
@@ -245,6 +251,7 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput, callGemini, cu
                             </>
                         ) : (
                             <>
+                                <button onClick={togglePin} className={`transition ${task.isPinned ? 'text-yellow-500 hover:text-yellow-600' : 'text-gray-400 hover:text-yellow-500'}`} title={task.isPinned ? 'Desfijar' : 'Fijar al inicio del muro'}><Pin size={20} /></button>
                                 <button onClick={() => setIsEditingTask(true)} className="text-gray-400 hover:text-blue-600 transition" title="Editar"><Edit3 size={20} /></button>
                                 <button onClick={() => confirmAction("¿Desea eliminar esta publicación definitivamente?", () => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id)))} className="text-gray-400 hover:text-red-600 transition"><Trash2 size={20} /></button>
                             </>

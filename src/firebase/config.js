@@ -24,6 +24,7 @@ import {
   updateDoc,
   getDoc,
   query,
+  where,
   orderBy,
   limit,
 } from 'firebase/firestore'
@@ -93,6 +94,7 @@ export {
   updateDoc,
   getDoc,
   query,
+  where,
   orderBy,
   limit,
   // Re-exportaciones de storage

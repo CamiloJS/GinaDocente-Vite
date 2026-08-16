@@ -472,4 +472,22 @@ En la enseñanza de idiomas, es crítico poder resaltar estructuras gramaticales
 
 **Entrega:** Documenta en `REPORTE-OPENCODE.md` si lograste resolver el parseo con Regex manual o si preferiste integrar alguna librería pequeña como `react-markdown`. Confirma que el texto en negritas se ve bien.
 
+---
+
+# INSTRUCCION #29
+
+**Objetivo:** Organización del Feed: Mensajes Fijados (Pinned Posts).
+
+En cualquier plataforma educativa, la docente necesita que ciertos comunicados (reglas, anuncios de exámenes, material clave) permanezcan visibles en la parte superior del muro, independientemente de la paginación y de los posts más recientes.
+
+**Acciones a implementar por Opencode:**
+1. **Botón Fijar (Solo Docente):** En `TaskCard.jsx`, si el usuario actual es la docente (`role === 'teacher'`), añade un botón/icono `Pin` (chincheta) en las opciones de la tarjeta. Al pulsarlo, debe hacer toggle de una propiedad booleana `isPinned` en el documento de la publicación en Firestore.
+2. **Consulta Separada (`App.jsx`):** Para no requerir índices compuestos en Firebase y mantener intacta la paginación actual por fecha, crea un nuevo `onSnapshot` que consulte la misma colección `tasks` pero filtrada (`where('isPinned', '==', true)`). Guarda este resultado en un estado `pinnedTasks`.
+3. **Pasar al Muro:** Pasa `pinnedTasks` como prop a `TasksTab.jsx`.
+4. **Renderizado Prioritario y Sin Duplicados:** En `TasksTab.jsx`, primero mapea y renderiza los componentes `<TaskCard />` del array `pinnedTasks`. Luego, mapea el array normal `visibleTasks`, pero **filtrando** aquellos cuyo `id` ya esté en `pinnedTasks` para evitar que se muestre el post dos veces.
+5. **Diferenciación Visual:** Asegúrate de que las tarjetas fijadas tengan un pequeño distintivo visual, como un icono `Pin` en el header o un sutil borde amarillo/azul (`border-2 border-yellow-400`), para que el estudiante note la prioridad.
+6. **Deploy:** Valida rigurosamente la consola local por posibles renderizados repetidos (`npm run build`), haz `commit`/`push` a `main` y sube con `vercel deploy --prod`.
+
+**Entrega:** Documenta en `REPORTE-OPENCODE.md` cómo gestionaste la filtración de duplicados y si los posts fijados se visualizan correctamente en la parte superior.
+
 ESTADO: LISTA PARA IMPLEMENTAR

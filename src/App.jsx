@@ -4,7 +4,7 @@ import ReactDOM from 'react-dom'
 import confetti from 'canvas-confetti'
 import {
   auth, db, appId, secondaryAuth, collection, onSnapshot, doc, setDoc, getDocs,
-  deleteDoc, addDoc, updateDoc, getDoc, query, orderBy, limit,
+  deleteDoc, addDoc, updateDoc, getDoc, query, where, orderBy, limit,
   signInWithEmailAndPassword, onAuthStateChanged, createUserWithEmailAndPassword,
   signOut,
 } from './firebase/config.js'
@@ -374,6 +374,7 @@ const handleOpenProfileByName = (name) => {
           const myChatId = role === 'teacher' ? 'teacher' : (loggedInUser ? loggedInUser.replace('@', '') : '');
 
           const [tasks, setTasks] = useState([]);
+    const [pinnedTasks, setPinnedTasks] = useState([]);
           const [tasksLoading, setTasksLoading] = useState(true);
           const [taskLimit, setTaskLimit] = useState(20);
           const loadMoreTasks = () => setTaskLimit(prev => prev + 20);
@@ -762,6 +763,14 @@ useEffect(() => {
     const uTasks = onSnapshot(q, s => { setTasks(s.docs.map(d => ({ id: d.id, ...d.data() }))); setTasksLoading(false); });
     return () => uTasks();
 }, [user, myChatId, activeTab, taskLimit]);
+
+// 2b. POSTS FIJADOS (independiente de la paginación)
+useEffect(() => {
+    if (!user || !myChatId || activeTab !== 'tasks') return;
+    const qPinned = query(collection(db, 'artifacts', appId, 'public', 'data', 'tasks'), where('isPinned', '==', true), orderBy('createdAt', 'desc'));
+    const uPinned = onSnapshot(qPinned, s => setPinnedTasks(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    return () => uPinned();
+}, [user, myChatId, activeTab]);
 
 // 3. PESTAÑA: PERFIL (Muro de Pinterest)
 useEffect(() => {
@@ -2738,7 +2747,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                             callGemini={callGemini} showMessage={showMessage} handleAiTranslate={handleAiTranslate} taskDate={taskDate}
                             setTaskDate={setTaskDate} taskTime={taskTime} setTaskTime={setTaskTime} allowLate={allowLate} setAllowLate={setAllowLate}
                             db={db} appId={appId} loggedInName={loggedInName} getToday={getToday} tasks={tasks} user={user} isDarkMode={isDarkMode}
-                            confirmAction={confirmAction} setFullScreenImage={setFullScreenImage} tasksLoading={tasksLoading} taskLimit={taskLimit} loadMoreTasks={loadMoreTasks}
+                            confirmAction={confirmAction} setFullScreenImage={setFullScreenImage} tasksLoading={tasksLoading} taskLimit={taskLimit} loadMoreTasks={loadMoreTasks} pinnedTasks={pinnedTasks}
                         />
                           </React.Suspense>
                     )}
