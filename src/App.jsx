@@ -3311,7 +3311,7 @@ return <span className="text-xs font-medium text-gray-400">Desconectado</span>;
                                               </div>
 
                                               <div className="ml-auto flex gap-2 relative shrink-0">
-                                                  <button onClick={() => setShowChatSettings(!showChatSettings)} className={`p-2 rounded-full transition-colors ${showChatSettings ? (isDarkMode ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-500/10 text-blue-600') : (isDarkMode ? 'text-gray-400 hover:bg-gray-700/50' : 'text-gray-500 hover:bg-gray-200/50')}`} title="Personalizar Chat">
+                                                  <button onClick={() => setShowChatSettings(!showChatSettings)} className={`p-2 rounded-full transition-colors ${showChatSettings ? (isDarkMode ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-500/10 text-blue-600') : (isDarkMode ? 'text-gray-400 hover:bg-gray-700/50' : 'text-gray-500 hover:bg-gray-200/50')}`} title="Personalizar chat">
                                                       <Palette size={20}/>
                                                   </button>
 
@@ -3343,12 +3343,12 @@ return <span className="text-xs font-medium text-gray-400">Desconectado</span>;
 
                                                   {activeChat.type === 'group' ? (
                                                       chatGroups.find(g => `group_${g.id}` === activeChat.id)?.createdBy === myChatId ? (
-                                                          <button onClick={() => confirmAction("¿Eliminar este grupo definitivamente?", handleDeleteGroup)} className={`p-2 rounded-full transition-colors ${isDarkMode ? 'text-red-400 hover:bg-red-900/50' : 'text-red-500 hover:bg-red-50'}`} title="Eliminar Grupo"><Trash2 size={20}/></button>
+                                                          <button onClick={() => confirmAction("¿Eliminar este grupo definitivamente?", handleDeleteGroup)} className={`p-2 rounded-full transition-colors ${isDarkMode ? 'text-red-400 hover:bg-red-900/50' : 'text-red-500 hover:bg-red-50'}`} title="Eliminar grupo"><Trash2 size={20}/></button>
                                                       ) : (
-                                                          <button onClick={() => confirmAction("¿Seguro que deseas abandonar este grupo?", handleLeaveGroup)} className={`p-2 rounded-full transition-colors ${isDarkMode ? 'text-orange-400 hover:bg-orange-900/50' : 'text-orange-500 hover:bg-orange-50'}`} title="Abandonar Grupo"><LogOutIcon size={20}/></button>
+                                                          <button onClick={() => confirmAction("¿Seguro que deseas abandonar este grupo?", handleLeaveGroup)} className={`p-2 rounded-full transition-colors ${isDarkMode ? 'text-orange-400 hover:bg-orange-900/50' : 'text-orange-500 hover:bg-orange-50'}`} title="Abandonar grupo"><LogOutIcon size={20}/></button>
                                                       )
                                                   ) : (
-                                                      <button onClick={() => confirmAction("¿Seguro que deseas vaciar todo el historial de este chat?", handleDeleteEntireChat)} className={`p-2 rounded-full transition-colors ${isDarkMode ? 'text-red-400 hover:bg-red-900/50' : 'text-red-500 hover:bg-red-50'}`} title="Vaciar Chat"><Trash2 size={20}/></button>
+                                                      <button onClick={() => confirmAction("¿Seguro que deseas vaciar todo el historial de este chat?", handleDeleteEntireChat)} className={`p-2 rounded-full transition-colors ${isDarkMode ? 'text-red-400 hover:bg-red-900/50' : 'text-red-500 hover:bg-red-50'}`} title="Vaciar chat"><Trash2 size={20}/></button>
                                                   )}
                                               </div>
                                           </div>
