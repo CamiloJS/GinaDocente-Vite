@@ -73,7 +73,7 @@ const TasksTab = React.memo(({
 </div>
 
 <input value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} placeholder={postType === 'task' ? "Título de la tarea..." : "Título de la publicación..."} className={`${glassInput} !py-2`} required />
-                    <textarea value={taskDesc} onChange={(e) => setTaskDesc(e.target.value)} placeholder="Instrucciones detalladas o escribe una idea y usa la IA para potenciarla..." className={`${glassInput} h-20 resize-none`} required />
+                    <textarea value={taskDesc} onChange={(e) => setTaskDesc(e.target.value)} placeholder="Instrucciones detalladas o escribe una idea y usa la IA para potenciarla..." className={`${glassInput} min-h-[80px] resize-y`} required />
                     
                     {(showImageInput || postImageUrl) && (
                         <div className="animate-in fade-in slide-in-from-top-2 relative">

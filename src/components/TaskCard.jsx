@@ -238,7 +238,7 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput, callGemini, cu
             </div>
             
             {isEditingTask ? (
-                <textarea value={editTaskData.description} onChange={e => setEditTaskData({...editTaskData, description: e.target.value})} className={`${glassInput} mt-4 min-h-[120px] resize-none p-3`} placeholder="Descripción..."/>
+                <textarea value={editTaskData.description} onChange={e => setEditTaskData({...editTaskData, description: e.target.value})} className={`${glassInput} mt-4 min-h-[120px] resize-y p-3`} placeholder="Descripción..."/>
             ) : (
                 <p className={`mt-2.5 whitespace-pre-wrap leading-relaxed ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}>{<LinkifyText text={task.description} />}</p>
             )}

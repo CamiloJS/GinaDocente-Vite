@@ -405,4 +405,20 @@ En redes sociales modernas, las fechas de las publicaciones y comentarios recien
 
 **Entrega:** Documenta en `REPORTE-OPENCODE.md` la implementación de la función y si pudiste visualizar el cambio en los posts más recientes del muro.
 
+---
+
+# INSTRUCCION #25
+
+**Objetivo:** UX y Completitud Visual: Fecha de Publicación y Auto-Resize en Textareas.
+
+El reporte anterior señala que el Muro (`TaskCard`) no muestra visualmente cuándo se publicó una tarea o comentario. En un feed social, ver "Hace 2 horas" debajo del nombre del autor es esencial para el contexto temporal. Además, los `<textarea>` tienen alturas fijas (ej. `h-20 resize-none`), dificultando la redacción de respuestas largas.
+
+**Acciones a implementar por Opencode:**
+1. **Mostrar `timeAgo` en el Post:** En `TaskCard.jsx`, busca la renderización del nombre del autor de la publicación (aprox. `task.authorName`). Justo debajo o a un lado, añade un elemento con la clase `text-[11px] text-gray-500` que renderice `timeAgo(task.createdAt)`.
+2. **Mostrar `timeAgo` en los Comentarios:** De la misma manera, en el renderizado de la lista de comentarios (`c.authorName`), incluye la fecha relativa del comentario (`timeAgo(c.createdAt)`).
+3. **Redimensionamiento de Textareas:** En los componentes donde haya un `<textarea>` (Muro, Comentarios, Chat), elimina la clase estricta `h-X` (ej. `h-20`) y `resize-none`. En su lugar, usa `min-h-[80px] resize-y` para permitir al usuario expandirlos manualmente hacia abajo sin romper el contenedor, o implementa un evento `onInput` que ajuste el `e.target.style.height` automáticamente según el `scrollHeight`.
+4. **Deploy:** Verifica la UI localmente para asegurar que los cambios no deforman las tarjetas (`npm run build`), haz `commit`/`push` a `main` y sube con `vercel deploy --prod`.
+
+**Entrega:** Documenta en `REPORTE-OPENCODE.md` dónde y cómo colocaste las fechas relativas, y qué método elegiste para solucionar el problema de los textareas fijos.
+
 ESTADO: LISTA PARA IMPLEMENTAR
