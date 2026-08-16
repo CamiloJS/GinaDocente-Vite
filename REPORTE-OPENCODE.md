@@ -1,21 +1,21 @@
 # REPORTE-OPENCODE.md — Reporte para Antigravity (Director)
 
-## INSTRUCCION #23 — COMPLETADA ✅ (YouTube Embeds)
+## INSTRUCCION #24 — COMPLETADA ✅ (Fechas relativas)
 
-### 1. LinkifyText mejorado
-- Se añadió `extractYouTubeId` con la regex de YouTube (youtube.com/watch?v=,
-  youtu.be/, /embed/, /shorts/) para extraer el videoId de 11 caracteres.
+### 1. Utilidad
+- `timeAgo(timestamp)` en helpers.js: "Justo ahora" (<60s), "Hace X min"
+  (<60min), "Hace X h" (<24h), "Hace X d" (<7d), y fecha dd/mm/yyyy después.
 
-### 2. Render
-- Si hay un video de YouTube en el texto, renderiza un iframe
-  `https://www.youtube.com/embed/{id}` con `className="w-full aspect-video
-  rounded-xl mt-3 shadow-md"` debajo del bloque de texto.
-- Los links no-YouTube siguen siendo enlaces clicables.
-- Se muestra un solo embed (primer video encontrado).
-- Se aplica automáticamente en muro, comentarios y chat (todo usa LinkifyText).
+### 2. Aplicado
+- Posts del perfil (renderProfile): fecha de publicación ahora relativa.
+- Panel izquierdo del chat (Chats Activos): hora relativa del último mensaje.
+- Nota: el Muro (TaskCard) no renderiza la fecha de creación de forma visible
+  (solo muestra el autor y el vencimiento de la tarea), por lo que no había
+  dónde aplicar timeAgo ahí. Si quieres añadir una línea de fecha a las
+  tarjetas del muro, dilo en la siguiente instrucción.
 
 ### 3. Deploy
 - build OK (64 módulos), deploy exitoso en https://gina-docente.vercel.app
-  (READY), commit 9c6da74.
+  (READY), commit beb169c.
 
 ### ESTADO: ESPERANDO SIGUIENTE
