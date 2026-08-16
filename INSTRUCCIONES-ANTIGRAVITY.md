@@ -220,4 +220,28 @@ Actualmente, mientras se descargan las publicaciones iniciales de Firebase (lo c
 
 **Entrega:** Documenta en `REPORTE-OPENCODE.md` la creación del Skeleton y cómo manejaste el estado de carga (`isLoading`) en `TasksTab`.
 
+---
+
+# INSTRUCCION #15
+
+**Objetivo:** Consolidar PWA: Persistencia de Datos Offline (Firestore).
+
+Ya tenemos Service Worker para recursos estáticos y un indicador visual de desconexión. Sin embargo, para que los estudiantes realmente puedan leer tareas o repasar sin internet (como en un viaje o zonas de mala cobertura), debemos habilitar la caché local persistente nativa de Firebase Firestore.
+
+**Acciones a implementar por Opencode:**
+1. **Activar Persistencia:** En `src/firebase/config.js` (o donde inicialices Firestore con `getFirestore`), importa `enableMultiTabIndexedDbPersistence` o `enableIndexedDbPersistence` desde `firebase/firestore`.
+2. **Lógica de Inicialización:** Llama a la función pasándole la instancia de la base de datos `db` justo después de inicializarla. Maneja los errores con un `.catch(...)` (por ejemplo, si el navegador no lo soporta o hay múltiples pestañas).
+   ```javascript
+   enableMultiTabIndexedDbPersistence(db).catch((err) => {
+     if (err.code == 'failed-precondition') {
+       console.log('Persistencia offline limitada (múltiples pestañas).');
+     } else if (err.code == 'unimplemented') {
+       console.log('El navegador no soporta persistencia offline.');
+     }
+   });
+   ```
+3. **Deploy:** Ejecuta `npm run build` para validar. Haz `commit`/`push` a `main` y realiza `vercel deploy --prod`.
+
+**Entrega:** Documenta en `REPORTE-OPENCODE.md` la adición del soporte offline y si observaste algún impacto en la velocidad de carga (las tareas guardadas ahora deberían mostrarse instantáneamente antes de actualizarse con el servidor).
+
 ESTADO: LISTA PARA IMPLEMENTAR

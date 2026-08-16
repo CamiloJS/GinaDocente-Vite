@@ -52,6 +52,12 @@ const auth = getAuth(app)
 const db = initializeFirestore(app, {
   localCache: persistentLocalCache(),
 })
+// Diagnóstico de persistencia offline (persistentLocalCache ya la habilita)
+if (typeof window !== 'undefined') {
+  window.addEventListener('load', () => {
+    console.log('Firestore: persistencia offline habilitada (persistentLocalCache).')
+  })
+}
 
 const storage = getStorage(app)
 
