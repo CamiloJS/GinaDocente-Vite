@@ -327,4 +327,26 @@ Actualmente, la consulta de Firebase en `App.jsx` para la colección `tasks` (la
 
 **Entrega:** Documenta en `REPORTE-OPENCODE.md` la modificación del `useEffect` de las tareas y confirma que el botón funciona como se espera (cargando las siguientes 20).
 
+---
+
+# INSTRUCCION #21
+
+**Objetivo:** Funcionalidad Educativa: Notas de Voz (Audios) en el Chat.
+
+Al ser una plataforma para aprender inglés, la práctica oral (speaking) es fundamental. Actualmente, el chat solo permite texto e imágenes. Vamos a enriquecerlo permitiendo enviar notas de voz de forma sencilla.
+
+**Acciones a implementar por Opencode:**
+1. **Interfaz de Grabación:** En el input inferior del chat (`App.jsx`), añade un botón con el icono `Mic` (de lucide-react). Al pulsarlo, debe iniciar la grabación, cambiar a un icono `Square` (stop) y mostrar un indicador visual parpadeante rojo indicando que está grabando.
+2. **Lógica MediaRecorder:**
+   - Usa `navigator.mediaDevices.getUserMedia({ audio: true })` para obtener el stream y pásalo a `new MediaRecorder(stream)`.
+   - Escucha el evento `ondataavailable` para recolectar los chunks.
+   - En el evento `onstop`, une los chunks en un `Blob` (con type `audio/webm` o `audio/mp3`).
+3. **Subida a Firebase:**
+   - Crea una nueva función o reutiliza la existente en `helpers.js` para subir este archivo crudo (`uploadRawFileToStorage(file, folderName)` pasándole el Blob como File) a Storage en una carpeta como `chat_audios`.
+   - Una vez obtenida la URL, envía el mensaje a Firestore agregando la propiedad `audioUrl`.
+4. **Renderizado del Audio:** Al iterar sobre los mensajes del chat, si existe `m.audioUrl`, renderiza el reproductor nativo de HTML5: `<audio src={m.audioUrl} controls className="h-10 max-w-[200px] mt-1 outline-none" />`. (Asegúrate de estilizarlo para que no se vea roto).
+5. **Deploy:** Prueba el build localmente (`npm run build`). Si todo está bien, haz `commit`/`push` a `main` y lanza `vercel deploy --prod`.
+
+**Entrega:** Documenta en `REPORTE-OPENCODE.md` cómo resolviste la lógica del `MediaRecorder` y confirma si fue posible grabar y escuchar notas de voz.
+
 ESTADO: LISTA PARA IMPLEMENTAR

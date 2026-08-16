@@ -23,7 +23,7 @@ import {
   FileText, ImageIcon, Loader2, LogOutIcon, Mail, MessageCircle, Moon, NavCalendar,
   NavFile, NavNotebook, NavSlides, Palette, PaperclipIcon, Plus, ReplyIcon, SearchIcon,
   Send, SingleTick, SmileIcon, Sparkles, Sun, TeacherIcon, Trash2, UserIcon,
-  UsersGroupIcon, UsersIcon, Wand2, X, XLine, Copy,
+  UsersGroupIcon, UsersIcon, Wand2, X, XLine, Copy, Mic, Square,
 } from './components/Icons.jsx'
 const GifPickerModal = React.lazy(() => import('./components/GifPickerModal.jsx'))
 import EmptyState from './components/EmptyState.jsx'
@@ -343,6 +343,9 @@ const handleOpenProfileByName = (name) => {
           const [chatAppImageUrl, setChatAppImageUrl] = useState("");
           const [chatAppFileUrl, setChatAppFileUrl] = useState("");
           const [chatAppFileName, setChatAppFileName] = useState("");
+          const [isRecording, setIsRecording] = useState(false);
+          const [chatAppAudioUrl, setChatAppAudioUrl] = useState("");
+          const recordingRef = React.useRef(null);
           const [showChatAppAttachmentMenu, setShowChatAppAttachmentMenu] = useState(false);
           const [showChatAppImageInput, setShowChatAppImageInput] = useState(false);
           const [showChatAppEmojiPicker, setShowChatAppEmojiPicker] = useState(false);
@@ -1088,7 +1091,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
             
           const handleSendAppMessage = async (e) => {
               e.preventDefault();
-              if (!chatAppInput.trim() && !chatAppImageUrl.trim() && !chatAppFileUrl) return;
+              if (!chatAppInput.trim() && !chatAppImageUrl.trim() && !chatAppFileUrl && !chatAppAudioUrl) return;
 
               if (await checkBadWordsAsync(chatAppInput)) {
                   showMessage("⚠️ Mensaje bloqueado: Lenguaje inapropiado.");
@@ -1104,6 +1107,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                   imageUrl: chatAppImageUrl.trim(),
                   fileUrl: chatAppFileUrl,
                   fileName: chatAppFileName,
+                  audioUrl: chatAppAudioUrl,
                   author: authorName,
                   authorId: myChatId,
                   uid: user.uid,
@@ -1140,6 +1144,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
 
               setChatAppInput("");
               setChatAppImageUrl("");
+              setChatAppAudioUrl("");
               setChatAppFileUrl("");
               setChatAppFileName("");
               setShowChatAppAttachmentMenu(false);
@@ -1168,6 +1173,39 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
               setNewGroupName("");
               setNewGroupMembers([]);
               showMessage("✅ Grupo creado.");
+          };
+
+          const toggleVoiceRecording = async () => {
+              if (isRecording) {
+                  recordingRef.current?.stop();
+                  return;
+              }
+              try {
+                  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                  const mediaRecorder = new MediaRecorder(stream);
+                  recordingRef.current = mediaRecorder;
+                  const chunks = [];
+                  mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+                  mediaRecorder.onstop = async () => {
+                      const blob = new Blob(chunks, { type: 'audio/webm' });
+                      stream.getTracks().forEach(t => t.stop());
+                      setIsRecording(false);
+                      try {
+                          showMessage("⏳ Subiendo audio...");
+                          const file = new File([blob], `nota-${Date.now()}.webm`, { type: 'audio/webm' });
+                          const url = await uploadRawFileToStorage(file, 'chat_audios');
+                          setChatAppAudioUrl(url);
+                          showMessage("✅ Nota lista para enviar");
+                      } catch (err) {
+                          showMessage("Hubo un error al subir el audio.");
+                      }
+                  };
+                  mediaRecorder.start();
+                  setIsRecording(true);
+                  showMessage("🎙️ Grabando...");
+              } catch (err) {
+                  showMessage("No se pudo acceder al micrófono.");
+              }
           };
 
           const handleChatAppLocalFileUpload = async (e) => {
@@ -3342,6 +3380,7 @@ tickIcon = (
                                                                           {/* Texto y/o Imagen y/o Documento */}
 {m.text && <p className={isEmojiOnly ? "text-5xl md:text-6xl drop-shadow-lg leading-none" : "text-sm md:text-base leading-relaxed whitespace-pre-wrap pr-10"}>{<LinkifyText text={m.text} />}</p>}
 {m.text && !isEmojiOnly && <button onClick={() => handleCopy(m.text)} className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-blue-500 p-1" title="Copiar"><Copy size={14} /></button>}
+{m.audioUrl && <audio src={m.audioUrl} controls className="h-10 max-w-[200px] mt-1 outline-none" />}
 {m.imageUrl && <img src={m.imageUrl} loading="lazy" decoding="async" alt="Adjunto" onLoad={() => chatMessagesEndRef.current?.scrollIntoView({ behavior: "smooth" })} onClick={() => setFullScreenImage(m.imageUrl)} className={isImageOnly ? "rounded-2xl max-h-72 object-contain cursor-pointer hover:opacity-90 transition-opacity drop-shadow-lg" : "mt-2 rounded-xl max-h-60 object-contain cursor-pointer hover:opacity-90 transition-opacity bg-black/10 border border-white/20"} />}
 {m.fileUrl && (
     <a href={m.fileUrl} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-2 p-3 rounded-xl mt-1 w-fit transition-colors border ${isMe ? (currentPrefs.gradient ? 'bg-white/20 border-white/30 hover:bg-white/30' : 'bg-blue-700 border-blue-500 hover:bg-blue-800') : (currentPrefs.gradient ? 'bg-black/20 border-white/20 hover:bg-black/30' : (isDarkMode ? 'bg-gray-700 border-gray-600 hover:bg-gray-600' : 'bg-gray-100 border-gray-300 hover:bg-gray-200'))}`}>
@@ -3483,6 +3522,12 @@ tickIcon = (
                                                       )}
                                                   </div>
 
+                                                  <div className="relative">
+                                                      <button type="button" onClick={toggleVoiceRecording} className={`p-2 rounded-full transition-all ${isRecording ? 'text-red-500 animate-pulse' : (isDarkMode ? 'text-gray-400 hover:text-blue-400' : 'text-gray-500 hover:text-blue-600')}`} title="Nota de voz">
+                                                          {isRecording ? <Square size={20} /> : <Mic size={20} />}
+                                                      </button>
+                                                  </div>
+
                                                   {/* INPUT CON min-w-0 PARA EVITAR QUE SE DESBORDE EN MÓVIL */}
                                                   <input 
                                                       value={chatAppInput} 
@@ -3500,12 +3545,18 @@ tickIcon = (
                                                   />
                                                   
                                                   {/* BOTON CON EL ICONO Y LAS MEDIDAS EXACTAS DE TU IMAGEN */}
-<button type="submit" disabled={!chatAppInput.trim() && !chatAppImageUrl && !chatAppFileUrl} className={`w-10 h-10 mr-[8px] rounded-[14px] shrink-0 transition-all flex items-center justify-center shadow-sm disabled:shadow-none disabled:opacity-60 ${(chatAppInput.trim() || chatAppImageUrl || chatAppFileUrl) ? 'bg-blue-600 text-white hover:bg-blue-700' : (isDarkMode ? 'bg-gray-800 text-gray-500' : 'bg-gray-200 text-gray-400')}`}>
+<button type="submit" disabled={!chatAppInput.trim() && !chatAppImageUrl && !chatAppFileUrl && !chatAppAudioUrl} className={`w-10 h-10 mr-[8px] rounded-[14px] shrink-0 transition-all flex items-center justify-center shadow-sm disabled:shadow-none disabled:opacity-60 ${(chatAppInput.trim() || chatAppImageUrl || chatAppFileUrl || chatAppAudioUrl) ? 'bg-blue-600 text-white hover:bg-blue-700' : (isDarkMode ? 'bg-gray-800 text-gray-500' : 'bg-gray-200 text-gray-400')}`}>
     <Send size={20} />
 </button>
                                               </div>
 
-                                              {(showChatAppImageInput || chatAppImageUrl) && (
+                                              {chatAppAudioUrl && (
+                <div className="relative w-fit mt-3">
+                    <audio src={chatAppAudioUrl} controls className="h-10 max-w-[220px] outline-none" />
+                    <button type="button" onClick={() => setChatAppAudioUrl("")} className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 hover:bg-red-700 transition shadow-md"><X size={14} /></button>
+                </div>
+            )}
+            {(showChatAppImageInput || chatAppImageUrl) && (
                                                   <div className="px-1 animate-in fade-in slide-in-from-top-2 relative">
                                                       {showChatAppImageInput && (
                                                           <input 
