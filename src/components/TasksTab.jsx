@@ -1,7 +1,7 @@
 // src/components/TasksTab.jsx
 import React, { useState } from 'react'
 import {
-  Book, BookOpen, CheckCheck, ChevronRight, Globe, ImageIcon, Mic, PaperclipIcon, Plus, SearchIcon, Sparkles, Square, Target, Undo2, X,
+  Book, BookOpen, CheckCheck, ChevronRight, Globe, ImageIcon, Mic, NavNotebook, PaperclipIcon, Plus, SearchIcon, Sparkles, Square, Target, Undo2, X,
 } from './Icons.jsx'
 import TaskCard from './TaskCard.jsx'
 import EmptyState from './EmptyState.jsx'
@@ -22,6 +22,7 @@ const TasksTab = React.memo(({
 }) => {
 
     // ESTADOS DEL MENÚ LIQUID GLASS
+    const [isFormExpanded, setIsFormExpanded] = useState(false);
     const [postTargetGroup, setPostTargetGroup] = useState("");
     const [isGroupDropdownOpen, setIsGroupDropdownOpen] = useState(false);
     const [wallSearchTerm, setWallSearchTerm] = useState("");
@@ -46,33 +47,89 @@ const TasksTab = React.memo(({
         <div className="space-y-6">
             <h2 className="text-3xl font-bold text-gray-800 mb-6 flex items-center gap-2 drop-shadow-sm"><BookOpen className="text-[#AD3333]" /> Muro de clase</h2>
             
-            {role === 'teacher' && (
-                <div className={`${glassCard} !p-4 mb-5 flex flex-col gap-2.5`}>
-                    <div className="flex gap-1 mb-2 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg w-fit border border-gray-200 dark:border-gray-700">
-                        <button onClick={() => setPostType('task')} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${postType === 'task' ? 'bg-white shadow-sm text-[#AD3333]' : 'text-gray-600 hover:text-gray-900'}`}>Tarea nueva</button>
-                        <button onClick={() => setPostType('post')} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${postType === 'post' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-600 hover:text-gray-900'}`}>Nueva publicación</button>
+            {/* VISTA COMPRIMIDA (MINIMALISTA) */}
+            {role === 'teacher' && !isFormExpanded && (
+                <div 
+                    onClick={() => setIsFormExpanded(true)} 
+                    className={`${glassCard} !p-4 mb-6 transition-all duration-300 hover:shadow-lg cursor-pointer border border-gray-200/90 dark:border-gray-700/90 rounded-2xl group`}
+                >
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#AD3333] to-[#8a2828] text-white flex items-center justify-center font-bold text-sm shadow-md shrink-0">
+                            {loggedInName?.charAt(0) || 'G'}
+                        </div>
+                        <div className={`flex-1 px-4 py-2.5 rounded-full border text-sm font-medium transition-all ${isDarkMode ? 'bg-gray-800/80 border-gray-700 text-gray-400 group-hover:bg-gray-800' : 'bg-gray-100/80 border-gray-200 text-gray-500 group-hover:bg-gray-100 group-hover:border-gray-300'}`}>
+                            ¿Qué deseas asignar o publicar hoy?
+                        </div>
+                        <button type="button" className="p-2 rounded-full bg-red-50 dark:bg-red-950/40 text-[#AD3333] group-hover:scale-110 transition-transform" title="Crear">
+                            <Plus size={20} />
+                        </button>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-between gap-2 mt-3 pt-3 border-t border-gray-200/60 dark:border-gray-700/60 text-xs font-semibold text-gray-600 dark:text-gray-400">
+                        <div className="flex gap-2">
+                            <button 
+                                type="button" 
+                                onClick={(e) => { e.stopPropagation(); setPostType('task'); setIsFormExpanded(true); }} 
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 text-[#AD3333] transition-colors"
+                            >
+                                <NavNotebook size={16} /> Tarea nueva
+                            </button>
+                            <button 
+                                type="button" 
+                                onClick={(e) => { e.stopPropagation(); setPostType('post'); setIsFormExpanded(true); }} 
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950/30 text-blue-600 dark:text-blue-400 transition-colors"
+                            >
+                                <BookOpen size={16} /> Publicación
+                            </button>
+                            <button 
+                                type="button" 
+                                onClick={(e) => { e.stopPropagation(); setIsFormExpanded(true); setShowPostAttachmentMenu(true); }} 
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                            >
+                                <PaperclipIcon size={16} /> Adjuntar
+                            </button>
+                        </div>
+                        <div className="flex items-center gap-1 text-purple-600 dark:text-purple-400 text-xs font-bold">
+                            <Sparkles size={14} /> Asistente IA activo
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* VISTA EXPANDIDA (FORMULARIO COMPLETO) */}
+            {role === 'teacher' && isFormExpanded && (
+                <div className={`${glassCard} !p-5 mb-6 flex flex-col gap-3 transition-all duration-300 animate-in fade-in zoom-in-95 origin-top border border-gray-300 dark:border-gray-700 shadow-xl rounded-2xl`}>
+                    <div className="flex justify-between items-center pb-2 border-b border-gray-200 dark:border-gray-700">
+                        <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg w-fit border border-gray-200 dark:border-gray-700">
+                            <button type="button" onClick={() => setPostType('task')} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${postType === 'task' ? 'bg-white dark:bg-gray-900 shadow-sm text-[#AD3333]' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'}`}>Tarea nueva</button>
+                            <button type="button" onClick={() => setPostType('post')} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${postType === 'post' ? 'bg-white dark:bg-gray-900 shadow-sm text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'}`}>Nueva publicación</button>
+                        </div>
+                        
+                        <button type="button" onClick={() => setIsFormExpanded(false)} className="p-1.5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors" title="Minimizar formulario">
+                            <X size={18} />
+                        </button>
                     </div>
 
                     <div className="relative z-[60] mb-2">
-    <button type="button" onClick={() => setIsGroupDropdownOpen(!isGroupDropdownOpen)} className={`w-full flex justify-between items-center bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 font-bold transition-all shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 ${postTargetGroup ? (isDarkMode ? 'text-blue-400' : 'text-blue-700') : (isDarkMode ? 'text-gray-300' : 'text-gray-700')}`}>
-        <span className="flex items-center gap-2">
-            {postTargetGroup === 'all' ? <><Globe size={18}/> Todos los estudiantes</> : (postTargetGroup ? <><Book size={18}/> {academicGroups?.find(g => g.id === postTargetGroup)?.name}</> : <><Target size={18}/> Seleccionar materia / grupo (obligatorio)</>)}
-        </span>
-        <ChevronRight size={18} className={`transition-transform duration-300 ${isGroupDropdownOpen ? 'rotate-90' : ''}`} />
-    </button>
-    
-    <div className={`absolute top-full left-0 w-full mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl rounded-2xl overflow-hidden transition-all duration-200 origin-top ${isGroupDropdownOpen ? 'scale-y-100 opacity-100' : 'scale-y-0 opacity-0 pointer-events-none'}`}>
-        <div className="max-h-48 overflow-y-auto p-2 flex flex-col gap-1">
-            <button type="button" onClick={() => { setPostTargetGroup('all'); setIsGroupDropdownOpen(false); }} className={`px-4 py-3 flex items-center gap-2 rounded-xl font-bold transition-all ${postTargetGroup === 'all' ? 'bg-blue-500 text-white shadow-md' : (isDarkMode ? 'text-gray-200 hover:bg-gray-700' : 'text-gray-800 hover:bg-gray-100')}`}><Globe size={18}/> Todos los estudiantes</button>
-            {academicGroups?.length === 0 && <p className="text-xs text-gray-500 p-3 italic">No hay materias creadas. Créalas en el directorio.</p>}
-            {academicGroups?.map(g => (
-                <button type="button" key={g.id} onClick={() => { setPostTargetGroup(g.id); setIsGroupDropdownOpen(false); }} className={`px-4 py-3 flex items-center gap-2 rounded-xl font-bold transition-all ${postTargetGroup === g.id ? 'bg-blue-500 text-white shadow-md' : (isDarkMode ? 'text-gray-200 hover:bg-gray-700' : 'text-gray-800 hover:bg-gray-100')}`}><Book size={18}/> {g.name}</button>
-            ))}
-        </div>
-    </div>
-</div>
+                        <button type="button" onClick={() => setIsGroupDropdownOpen(!isGroupDropdownOpen)} className={`w-full flex justify-between items-center bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 font-bold transition-all shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 ${postTargetGroup ? (isDarkMode ? 'text-blue-400' : 'text-blue-700') : (isDarkMode ? 'text-gray-300' : 'text-gray-700')}`}>
+                            <span className="flex items-center gap-2">
+                                {postTargetGroup === 'all' ? <><Globe size={18}/> Todos los estudiantes</> : (postTargetGroup ? <><Book size={18}/> {academicGroups?.find(g => g.id === postTargetGroup)?.name}</> : <><Target size={18}/> Seleccionar materia / grupo (obligatorio)</>)}
+                            </span>
+                            <ChevronRight size={18} className={`transition-transform duration-300 ${isGroupDropdownOpen ? 'rotate-90' : ''}`} />
+                        </button>
+                        
+                        <div className={`absolute top-full left-0 w-full mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl rounded-2xl overflow-hidden transition-all duration-200 origin-top ${isGroupDropdownOpen ? 'scale-y-100 opacity-100' : 'scale-y-0 opacity-0 pointer-events-none'}`}>
+                            <div className="max-h-48 overflow-y-auto p-2 flex flex-col gap-1">
+                                <button type="button" onClick={() => { setPostTargetGroup('all'); setIsGroupDropdownOpen(false); }} className={`px-4 py-3 flex items-center gap-2 rounded-xl font-bold transition-all ${postTargetGroup === 'all' ? 'bg-blue-500 text-white shadow-md' : (isDarkMode ? 'text-gray-200 hover:bg-gray-700' : 'text-gray-800 hover:bg-gray-100')}`}><Globe size={18}/> Todos los estudiantes</button>
+                                {academicGroups?.length === 0 && <p className="text-xs text-gray-500 p-3 italic">No hay materias creadas. Créalas en el directorio.</p>}
+                                {academicGroups?.map(g => (
+                                    <button type="button" key={g.id} onClick={() => { setPostTargetGroup(g.id); setIsGroupDropdownOpen(false); }} className={`px-4 py-3 flex items-center gap-2 rounded-xl font-bold transition-all ${postTargetGroup === g.id ? 'bg-blue-500 text-white shadow-md' : (isDarkMode ? 'text-gray-200 hover:bg-gray-700' : 'text-gray-800 hover:bg-gray-100')}`}><Book size={18}/> {g.name}</button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
 
-<input value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} placeholder={postType === 'task' ? "Título de la tarea..." : "Título de la publicación..."} className={`${glassInput} !py-2`} required />
+                    <input value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} placeholder={postType === 'task' ? "Título de la tarea..." : "Título de la publicación..."} className={`${glassInput} !py-2`} required />
                     <textarea value={taskDesc} onChange={(e) => setTaskDesc(e.target.value)} placeholder="Instrucciones detalladas o escribe una idea y usa la IA para potenciarla..." className={`${glassInput} min-h-[80px] resize-y`} required />
                     
                     {(showImageInput || postImageUrl) && (
@@ -152,28 +209,35 @@ const TasksTab = React.memo(({
                         </div>
                     )}
                     {upPub && <p className="text-sm text-gray-500 italic">Subiendo audio...</p>}
-                    <div className="flex flex-wrap gap-4 items-center bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
+                    
+                    <div className="flex flex-wrap gap-4 items-center justify-between bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-200 dark:border-gray-700 mt-1">
                         {postType === 'task' && (
-                            <>
-                                <div><label className="text-xs font-bold text-gray-700 block">Fecha límite</label><input type="date" value={taskDate} onChange={(e) => setTaskDate(e.target.value)} className={`${glassInput} py-2`} required /></div>
-                                <div><label className="text-xs font-bold text-gray-700 block">Hora límite</label><input type="time" value={taskTime} onChange={(e) => setTaskTime(e.target.value)} className={`${glassInput} py-2`} required /></div>
-                                <label className="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" checked={allowLate} onChange={(e) => setAllowLate(e.target.checked)} className="w-4 h-4 accent-[#AD3333]" /><span className="text-xs font-bold text-gray-800">Permitir entregas tardías</span></label>
-                            </>
+                            <div className="flex flex-wrap gap-4 items-center">
+                                <div><label className="text-xs font-bold text-gray-700 dark:text-gray-300 block">Fecha límite</label><input type="date" value={taskDate} onChange={(e) => setTaskDate(e.target.value)} className={`${glassInput} py-2`} required /></div>
+                                <div><label className="text-xs font-bold text-gray-700 dark:text-gray-300 block">Hora límite</label><input type="time" value={taskTime} onChange={(e) => setTaskTime(e.target.value)} className={`${glassInput} py-2`} required /></div>
+                                <label className="flex items-center gap-1.5 cursor-pointer pt-4"><input type="checkbox" checked={allowLate} onChange={(e) => setAllowLate(e.target.checked)} className="w-4 h-4 accent-[#AD3333]" /><span className="text-xs font-bold text-gray-800 dark:text-gray-300">Permitir entregas tardías</span></label>
+                            </div>
                         )}
                         
-                        <button type="button" onClick={async () => {
-    if(!postTargetGroup) return showMessage("⚠️ Debes seleccionar una materia o grupo para publicar.");
-    if(taskTitle && taskDesc) {
-        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'tasks'), { 
-            type: postType, title: taskTitle, description: taskDesc, 
-            authorName: loggedInName, 
-            targetGroupId: postTargetGroup, // <-- Guardamos el grupo aquí
-            imageUrl: postImageUrl.trim(), fileUrl: postFileUrl, fileName: postFileName, audioUrl: audioPub,
-            dueDate: postType === 'task' ? taskDate : null, dueTime: postType === 'task' ? taskTime : null, allowLate: postType === 'task' ? allowLate : true, createdAt: Date.now(), comments: [], reactions: {} 
-        });
-        setTaskTitle(""); setTaskDesc(""); setPostImageUrl(""); setPostFileUrl(""); setPostFileName(""); setAudioPub(""); setShowImageInput(false); setShowPostAttachmentMenu(false); setTaskDate(getToday()); setTaskTime("23:59"); setHasAiModified(false); setAllowLate(false); setPostTargetGroup("");
-    } else showMessage("Llena título y descripción.");
-}} className={`${redButton} ml-auto`}>Publicar</button>
+                        <div className="flex items-center gap-2 ml-auto">
+                            <button type="button" onClick={() => setIsFormExpanded(false)} className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-200/60 dark:hover:bg-gray-700 rounded-xl transition-colors">
+                                Cancelar
+                            </button>
+                            <button type="button" onClick={async () => {
+                                if(!postTargetGroup) return showMessage("⚠️ Debes seleccionar una materia o grupo para publicar.");
+                                if(taskTitle && taskDesc) {
+                                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'tasks'), { 
+                                        type: postType, title: taskTitle, description: taskDesc, 
+                                        authorName: loggedInName, 
+                                        targetGroupId: postTargetGroup,
+                                        imageUrl: postImageUrl.trim(), fileUrl: postFileUrl, fileName: postFileName, audioUrl: audioPub,
+                                        dueDate: postType === 'task' ? taskDate : null, dueTime: postType === 'task' ? taskTime : null, allowLate: postType === 'task' ? allowLate : true, createdAt: Date.now(), comments: [], reactions: {} 
+                                    });
+                                    setTaskTitle(""); setTaskDesc(""); setPostImageUrl(""); setPostFileUrl(""); setPostFileName(""); setAudioPub(""); setShowImageInput(false); setShowPostAttachmentMenu(false); setTaskDate(getToday()); setTaskTime("23:59"); setHasAiModified(false); setAllowLate(false); setPostTargetGroup("");
+                                    setIsFormExpanded(false);
+                                } else showMessage("Llena título y descripción.");
+                            }} className={`${redButton}`}>Publicar</button>
+                        </div>
                     </div>
                 </div>
             )}
