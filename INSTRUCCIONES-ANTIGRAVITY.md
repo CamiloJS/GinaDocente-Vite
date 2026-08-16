@@ -153,4 +153,24 @@ Para evitar que la aplicación muestre la "pantalla blanca de la muerte" (Blank 
 
 **Entrega:** Documenta en `REPORTE-OPENCODE.md` si optaste por clase o librería, y si el build fue exitoso.
 
+---
+
+# INSTRUCCION #11
+
+**Objetivo:** Mejorar la visibilidad al compartir (SEO y Open Graph tags).
+
+Dado que los estudiantes y la profesora frecuentemente compartirán el link de la plataforma por WhatsApp, correo o redes sociales, necesitamos que el enlace genere una tarjeta de vista previa atractiva (con título, descripción y miniatura) en lugar de un bloque de texto vacío.
+
+**Acciones a implementar por Opencode:**
+1. **Actualizar `index.html`:** En la sección `<head>` de `index.html`, agrega las etiquetas `meta` necesarias para Open Graph y Twitter Cards. 
+   - `og:title`: "English TECH - Universidad de Pamplona"
+   - `og:description`: "Plataforma educativa interactiva de aprendizaje de inglés para estudiantes de la Universidad de Pamplona."
+   - `og:image`: "/icono.png" (o la URL absoluta al logo si prefieres asegurar compatibilidad total en WhatsApp).
+   - `og:url`: "https://gina-docente.vercel.app/"
+   - `og:type`: "website"
+2. **Meta Description:** Asegúrate de que exista y esté optimizada la etiqueta `<meta name="description" content="..." />` clásica para los motores de búsqueda.
+3. **Deploy:** Ejecuta `npm run build`, realiza `commit`/`push` a `main` y efectúa el `vercel deploy --prod`.
+
+**Entrega:** Documenta en `REPORTE-OPENCODE.md` si lograste agregar los metadatos y confirma el deploy exitoso.
+
 ESTADO: LISTA PARA IMPLEMENTAR
