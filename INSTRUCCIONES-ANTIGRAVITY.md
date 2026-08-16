@@ -437,4 +437,21 @@ Como esta plataforma funciona como PWA, queremos acercar la experiencia a una ap
 
 **Entrega:** Documenta en `REPORTE-OPENCODE.md` si lograste lanzar notificaciones nativas en el escritorio/móvil y si optaste por un botón o solicitud automática.
 
+---
+
+# INSTRUCCION #27
+
+**Objetivo:** Funcionalidad LMS: Sistema de Calificación de Tareas en Comentarios.
+
+Para que la plataforma funcione como un verdadero LMS (Learning Management System), la profesora debe poder evaluar las evidencias (audios, documentos, textos) que los estudiantes dejan en los comentarios de las tareas.
+
+**Acciones a implementar por Opencode:**
+1. **Botón de Calificar (Docente):** En `TaskCard.jsx`, al renderizar cada comentario, si el usuario actual es profesora (`role === 'teacher'`) y el post es una tarea (`task.type !== 'post'`), añade un botón "Calificar" (ej. con icono `Star` o `CheckCircle`).
+2. **Mini-Formulario:** Al pulsar el botón, despliega un pequeño formulario en línea para ese comentario con un input de Nota (ej. 1 al 5) y un input/textarea opcional para Retroalimentación ("Feedback").
+3. **Guardado en Firebase:** Al confirmar, actualiza ese comentario específico dentro del array `comments` de la tarea actual en Firestore, agregándole los campos `grade` y `feedback`.
+4. **Insignia de Calificación:** Si un comentario ya tiene `c.grade`, renderiza de forma muy visual y atractiva una insignia (Badge) junto al comentario que muestre la nota y la retroalimentación de la profesora. Puedes usar colores como verde o dorado para darle un toque premium.
+5. **Deploy:** Verifica cuidadosamente que la modificación del array de comentarios no sobrescriba accidentalmente otros comentarios (`npm run build`). Haz `commit`/`push` a `main` y efectúa `vercel deploy --prod`.
+
+**Entrega:** Documenta en `REPORTE-OPENCODE.md` cómo manejaste la actualización del comentario en Firestore y confirma que la insignia se muestra correctamente.
+
 ESTADO: LISTA PARA IMPLEMENTAR

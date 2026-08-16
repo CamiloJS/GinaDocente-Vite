@@ -3,7 +3,7 @@ import React, { useState } from 'react'
 import ReactDOM from 'react-dom'
 import confetti from 'canvas-confetti'
 import {
-  CheckCheck, CheckLine, Clock, Edit3, FileDocIcon, FileText, ImageIcon, Loader2, Lock, MessageSquareText, Mic, PaperclipIcon, Plus, ReplyIcon, Send, SmileIcon, Square, Trash2, X, XLine,
+  CheckCheck, CheckLine, Clock, Edit3, FileDocIcon, FileText, ImageIcon, Loader2, Lock, MessageSquareText, Mic, PaperclipIcon, Plus, ReplyIcon, Send, SmileIcon, Square, Star, Trash2, X, XLine,
 } from './Icons.jsx'
 import {
   compressImage, containsBadWords, checkBadWordsAsync, uploadImageToStorage, uploadRawFileToStorage, TEACHER_NAME, COMMENT_EMOJIS, REACTION_EMOJIS,
@@ -33,6 +33,9 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput, callGemini, cu
     const [showCommentModal, setShowCommentModal] = useState(false); 
     const [fullScreenImage, setFullScreenImage] = useState(null);
     const [replyingTo, setReplyingTo] = useState(null);
+    const [gradingCid, setGradingCid] = useState(null);
+    const [gradeValue, setGradeValue] = useState("");
+    const [gradeFeedback, setGradeFeedback] = useState("");
 
     const { isRecording: recCom, audioUrl: audioCom, isUploading: upCom, setAudioUrl: setAudioCom, startRecording: startCom, stopRecording: stopCom, cancelRecording: cancelCom } = useVoiceRecorder('comments_audios', showMessage);
     const emojiPickerRef = React.useRef(null);
@@ -88,6 +91,19 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput, callGemini, cu
             return c; 
         });
         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), { ...task, comments: updatedComments });
+    };
+
+    const saveGradeComment = async (cid, i) => {
+        const grade = parseFloat(gradeValue);
+        if (isNaN(grade) || grade < 0 || grade > 5) return showMessage("Nota inválida (0-5).");
+        const updatedComments = (task.comments || []).map((c, idx) => {
+            const currentCid = c.id || `old-${idx}`;
+            if (currentCid === cid) return { ...c, grade, feedback: gradeFeedback.trim() };
+            return c;
+        });
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), { ...task, comments: updatedComments });
+        setGradingCid(null); setGradeValue(""); setGradeFeedback("");
+        showMessage("✅ Calificación guardada");
     };
 
     const handleDeleteComment = async (commentId, authorName) => {
@@ -370,6 +386,36 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput, callGemini, cu
                                             {c.imageUrl && <img src={c.imageUrl} loading="lazy" decoding="async" alt="Adjunto" onClick={() => setFullScreenImage(c.imageUrl)} className={`w-20 h-20 rounded-xl border object-cover mt-1 shadow-sm cursor-pointer hover:opacity-80 transition-opacity bg-black/5 ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`} onError={(e) => e.target.style.display = 'none'} />}
             {c.audioUrl && <audio src={c.audioUrl} controls className="h-10 max-w-[200px] mt-2 outline-none" />}
                                             {c.fileUrl && <a href={c.fileUrl} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-2 p-3 rounded-xl border mt-2 w-fit transition-colors ${isDarkMode ? 'bg-gray-700/50 border-gray-600 hover:bg-gray-700' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}><FileDocIcon size={24} className="text-red-500" /><span className={`text-sm font-medium truncate max-w-[150px] md:max-w-[200px] ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>{c.fileName || 'Documento'}</span></a>}
+                                        </div>
+                                    )}
+
+                                    {c.grade !== undefined && c.grade !== null && (
+                                        <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-50 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700">
+                                            <Star size={14} className="text-amber-500" />
+                                            <span className="text-sm font-black text-amber-700 dark:text-amber-400">{Number(c.grade).toFixed(1)} / 5</span>
+                                            {c.feedback && <span className="text-xs text-gray-600 dark:text-gray-300 ml-1 italic">- {c.feedback}</span>}
+                                        </div>
+                                    )}
+
+                                    {role === 'teacher' && task.type !== 'post' && c.grade === undefined && (
+                                        <div className="mt-3">
+                                            {gradingCid === cid ? (
+                                                <div className="flex flex-col gap-2 p-3 rounded-xl border bg-white/60 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700">
+                                                    <div className="flex items-center gap-2">
+                                                        <label className="text-xs font-bold text-gray-600 dark:text-gray-300">Nota (0-5):</label>
+                                                        <input type="number" min="0" max="5" step="0.1" value={gradeValue} onChange={e => setGradeValue(e.target.value)} className={`${glassInput} !py-1 w-20`} placeholder="5.0" />
+                                                    </div>
+                                                    <textarea value={gradeFeedback} onChange={e => setGradeFeedback(e.target.value)} placeholder="Retroalimentación (opcional)..." className={`${glassInput} !py-1 min-h-[50px] text-xs resize-y`} />
+                                                    <div className="flex gap-2 justify-end">
+                                                        <button onClick={() => setGradingCid(null)} className="text-xs font-bold text-gray-500 hover:text-gray-700 px-3 py-1">Cancelar</button>
+                                                        <button onClick={() => saveGradeComment(cid)} className="text-xs font-bold text-white bg-green-600 hover:bg-green-700 px-4 py-1 rounded-lg transition">Guardar</button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <button onClick={() => { setGradingCid(cid); setGradeValue(""); setGradeFeedback(""); }} className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-600 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-700 px-3 py-1.5 rounded-full transition">
+                                                    <Star size={12} /> Calificar
+                                                </button>
+                                            )}
                                         </div>
                                     )}
 
