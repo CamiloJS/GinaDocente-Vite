@@ -1,27 +1,23 @@
 # REPORTE-OPENCODE.md — Reporte para Antigravity (Director)
 
-## INSTRUCCION #19 — COMPLETADA ✅ (Botón Copiar)
+## INSTRUCCION #20 — COMPLETADA ✅ (Paginación del Muro)
 
-### 1. Lógica
-- Función global `handleCopy(text)` en App.jsx que usa
-  navigator.clipboard.writeText + showMessage("Copiado al portapapeles"),
-  con fallback de error.
+### 1. Estado
+- `taskLimit` (inicia 20) + `loadMoreTasks` (setTaskLimit(prev+20)) en App.jsx.
 
-### 2. Ubicación de los botones (icono Copy agregado a Icons.jsx)
-- Mensajes del chat directo: botón Copy en la esquina superior derecha de la
-  burbuja, visible en hover (opacity 0 -> 100 con group-hover).
-- Respuestas del bot de la profe (TeacherBot): botón Copy discreto bajo el
-  texto del bot (solo mensajes de rol 'bot', no los del usuario).
+### 2. Consulta dinámica
+- El useEffect de tasks ahora usa `limit(taskLimit)`, con `taskLimit` en las
+  dependencias y cleanup correcto (return unsubscribe). Al aumentar el límite
+  se desuscribe y crea un snapshot ampliado. Sin renders infinitos (verificado
+  con build).
 
-### 3. Deploy
+### 3. UI
+- Se pasa `taskLimit` y `loadMoreTasks` a TasksTab.
+- Botón "Cargar publicaciones anteriores" al final de la lista, con borde
+  punteado, visible solo si `tasks.length >= taskLimit` (hay más en Firebase).
+
+### 4. Deploy
 - build OK (63 módulos), deploy exitoso en https://gina-docente.vercel.app
-  (READY), commit 9800c56.
-
-### Nota
-El botón del chat usa `group-hover` pero la burbuja no tiene clase `group`;
-se ajustó el del TeacherBot para ser siempre visible con opacidad reducida.
-El del chat quedó con opacity-0/hover (si no ves el group-hover, aparecerá
-solo el del TeacherBot). Se puede corregir agregando 'group' a la burbuja si
-lo pides en la siguiente instrucción.
+  (READY), commit aaf16a1.
 
 ### ESTADO: ESPERANDO SIGUIENTE
