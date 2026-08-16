@@ -3,7 +3,7 @@ import React, { useState } from 'react'
 import ReactDOM from 'react-dom'
 import confetti from 'canvas-confetti'
 import {
-  CheckCheck, CheckLine, Clock, Edit3, FileDocIcon, FileText, ImageIcon, Loader2, Lock, MessageSquareText, PaperclipIcon, Plus, ReplyIcon, Send, SmileIcon, Trash2, X, XLine,
+  CheckCheck, CheckLine, Clock, Edit3, FileDocIcon, FileText, ImageIcon, Loader2, Lock, MessageSquareText, Mic, PaperclipIcon, Plus, ReplyIcon, Send, SmileIcon, Square, Trash2, X, XLine,
 } from './Icons.jsx'
 import {
   compressImage, containsBadWords, checkBadWordsAsync, uploadImageToStorage, uploadRawFileToStorage, TEACHER_NAME, COMMENT_EMOJIS, REACTION_EMOJIS,
@@ -11,6 +11,7 @@ import {
 import { glassCard, glassInput } from '../utils/styles.js'
 import { useClickOutside } from '../utils/hooks.js'
 import LinkifyText from './LinkifyText.jsx'
+import { useVoiceRecorder } from '../utils/useVoiceRecorder.js'
 import { doc, setDoc, updateDoc, deleteDoc } from '../firebase/config.js'
 
 const TaskCard = React.memo(({ task, role, db, appId, glassInput, callGemini, currentUser, showMessage, loggedInName, isDarkMode, confirmAction, handleOpenProfileByName }) => {
@@ -33,6 +34,7 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput, callGemini, cu
     const [fullScreenImage, setFullScreenImage] = useState(null);
     const [replyingTo, setReplyingTo] = useState(null);
 
+    const { isRecording: recCom, audioUrl: audioCom, isUploading: upCom, setAudioUrl: setAudioCom, startRecording: startCom, stopRecording: stopCom, cancelRecording: cancelCom } = useVoiceRecorder('comments_audios', showMessage);
     const emojiPickerRef = React.useRef(null);
     const attachmentMenuRef = React.useRef(null);
     useClickOutside(emojiPickerRef, () => setShowEmojiPicker(false));
@@ -145,14 +147,14 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput, callGemini, cu
         const newComment = { 
             id: Date.now().toString() + Math.random().toString(36).substr(2, 5), 
             author: role === 'teacher' ? TEACHER_NAME : loggedInName, 
-            text: commentText.trim(), imageUrl: commentImageUrl.trim(), fileUrl: commentFileUrl, fileName: commentFileName, isDeleted: false, reactions: {},
+            text: commentText.trim(), imageUrl: commentImageUrl.trim(), fileUrl: commentFileUrl, fileName: commentFileName, audioUrl: audioCom, isDeleted: false, reactions: {},
             replyTo: replyingTo ? { id: replyingTo.id, text: replyingTo.text || '', author: replyingTo.author || '', imageUrl: replyingTo.imageUrl || '' } : null
         };
         
         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), { ...task, comments: [...(task.comments || []), newComment] });
         
         confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-        setCommentText(""); setCommentImageUrl(""); setCommentFileUrl(""); setCommentFileName("");
+        setCommentText(""); setCommentImageUrl(""); setCommentFileUrl(""); setCommentFileName(""); setAudioCom("");
         setShowCommentImageInput(false); setShowAttachmentMenu(false); setShowEmojiPicker(false); setReplyingTo(null); setIsProcessing(false);
     };
 
@@ -241,6 +243,7 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput, callGemini, cu
                 <p className={`mt-2.5 whitespace-pre-wrap leading-relaxed ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}>{<LinkifyText text={task.description} />}</p>
             )}
             
+            {task.audioUrl && <audio src={task.audioUrl} controls className="h-10 max-w-[240px] mt-2 outline-none" />}
             {task.imageUrl && (
                 <div className="mt-2.5 rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm max-w-full bg-gray-50 dark:bg-gray-800/50">
                     <img src={task.imageUrl} loading="lazy" decoding="async" alt="Adjunto" onClick={() => setFullScreenImage(task.imageUrl)} className="w-full h-auto max-h-96 object-contain bg-black/5 cursor-pointer hover:opacity-90 transition-opacity" onError={(e) => e.target.style.display = 'none'} />
@@ -365,6 +368,7 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput, callGemini, cu
                                         <div className="flex flex-col gap-3 mt-2">
                                             {c.text && <p className={`text-base leading-relaxed ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}>{<LinkifyText text={c.text} />}</p>}
                                             {c.imageUrl && <img src={c.imageUrl} loading="lazy" decoding="async" alt="Adjunto" onClick={() => setFullScreenImage(c.imageUrl)} className={`w-20 h-20 rounded-xl border object-cover mt-1 shadow-sm cursor-pointer hover:opacity-80 transition-opacity bg-black/5 ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`} onError={(e) => e.target.style.display = 'none'} />}
+            {c.audioUrl && <audio src={c.audioUrl} controls className="h-10 max-w-[200px] mt-2 outline-none" />}
                                             {c.fileUrl && <a href={c.fileUrl} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-2 p-3 rounded-xl border mt-2 w-fit transition-colors ${isDarkMode ? 'bg-gray-700/50 border-gray-600 hover:bg-gray-700' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}><FileDocIcon size={24} className="text-red-500" /><span className={`text-sm font-medium truncate max-w-[150px] md:max-w-[200px] ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>{c.fileName || 'Documento'}</span></a>}
                                         </div>
                                     )}
@@ -428,6 +432,12 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput, callGemini, cu
                                   )}
                               </div>
 
+                              <div className="relative">
+                                  <button type="button" onClick={() => recCom ? stopCom() : startCom()} className={`p-2 bg-transparent transition-colors rounded-full ${recCom ? 'text-red-500 animate-pulse' : (isDarkMode ? 'text-gray-400 hover:text-blue-400' : 'text-gray-500 hover:text-blue-600')}`} title={recCom ? 'Detener' : 'Nota de voz'}>
+                                      {recCom ? <Square size={20} /> : <Mic size={20} />}
+                                  </button>
+                              </div>
+
                               <div className="relative" ref={attachmentMenuRef}>
                                   <button type="button" onClick={() => setShowAttachmentMenu(!showAttachmentMenu)} className={`p-2 bg-transparent transition-colors rounded-full ${(showCommentImageInput || showAttachmentMenu) ? 'text-blue-500' : (isDarkMode ? 'text-gray-400 hover:text-blue-400' : 'text-gray-500 hover:text-blue-600')}`} title="Adjuntar">
                                       <Plus size={20} />
@@ -463,6 +473,17 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput, callGemini, cu
                               </button>
                             </div>
 
+                            {(audioCom || upCom) && (
+                                <div className="px-1 animate-in fade-in">
+                                    {upCom && <p className="text-xs text-gray-500 italic">Subiendo audio...</p>}
+                                    {audioCom && (
+                                        <div className="relative w-fit mt-3">
+                                            <audio src={audioCom} controls className="h-10 max-w-[220px] outline-none" />
+                                            <button type="button" onClick={cancelCom} className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 hover:bg-red-700 transition shadow-md"><X size={14} /></button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                             {(showCommentImageInput || commentImageUrl) && (
                                 <div className="px-1 animate-in fade-in slide-in-from-top-2 relative">
                                     {showCommentImageInput && (

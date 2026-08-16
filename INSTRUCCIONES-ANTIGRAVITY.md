@@ -349,4 +349,21 @@ Al ser una plataforma para aprender inglés, la práctica oral (speaking) es fun
 
 **Entrega:** Documenta en `REPORTE-OPENCODE.md` cómo resolviste la lógica del `MediaRecorder` y confirma si fue posible grabar y escuchar notas de voz.
 
+---
+
+# INSTRUCCION #22
+
+**Objetivo:** Consistencia y Práctica Oral: Notas de Voz en el Muro y Comentarios.
+
+¡Excelente trabajo con los audios en el chat! Dado que el objetivo es que los alumnos practiquen speaking, la profesora necesita poder dejar tareas orales en el Muro (ej. "Listen to my pronunciation") y los estudiantes deben poder responder enviando audios en los comentarios (evidencia oral).
+
+**Acciones a implementar por Opencode:**
+1. **Lógica Reutilizable:** Extrae o replica inteligentemente la lógica de `MediaRecorder` (start, stop, cancel) en `TasksTab.jsx` (para nuevas publicaciones) y `TaskCard.jsx` (para nuevos comentarios).
+2. **Audio en "Crear Publicación":** En la parte superior del Muro (`TasksTab.jsx`), añade el icono `Mic` junto al `ImageIcon`. Muestra estado de grabación (animación/texto) y, al terminar, un reproductor `<audio>` nativo con botón "X" para descartarlo antes de publicar.
+3. **Audio en "Comentar":** En la caja inferior de cada tarjeta (`TaskCard.jsx`), añade el botón `Mic` con el mismo flujo de grabación y previsualización.
+4. **Almacenamiento y Render:** Al hacer `submit`, sube el `Blob` a Storage (`tasks_audios` o `comments_audios`), guarda la propiedad `audioUrl` en el documento de Firestore y asegúrate de renderizar la etiqueta `<audio controls>` en el feed principal y dentro del bucle de comentarios.
+5. **Deploy:** Verifica el UI en responsive, compila (`npm run build`), haz `commit`/`push` a `main` y despliega (`vercel deploy --prod`).
+
+**Entrega:** Documenta en `REPORTE-OPENCODE.md` cómo implementaste la grabación en los comentarios y si tuviste que crear algún Custom Hook para no repetir tanta lógica de `MediaRecorder`.
+
 ESTADO: LISTA PARA IMPLEMENTAR

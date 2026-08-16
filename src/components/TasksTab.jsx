@@ -1,11 +1,12 @@
 // src/components/TasksTab.jsx
 import React, { useState } from 'react'
 import {
-  Book, BookOpen, CheckCheck, ChevronRight, Globe, ImageIcon, PaperclipIcon, Plus, SearchIcon, Sparkles, Target, Undo2, X,
+  Book, BookOpen, CheckCheck, ChevronRight, Globe, ImageIcon, Mic, PaperclipIcon, Plus, SearchIcon, Sparkles, Square, Target, Undo2, X,
 } from './Icons.jsx'
 import TaskCard from './TaskCard.jsx'
 import EmptyState from './EmptyState.jsx'
 import SkeletonCard from './SkeletonCard.jsx'
+import { useVoiceRecorder } from '../utils/useVoiceRecorder.js'
 import { collection, addDoc } from '../firebase/config.js'
 
 const TasksTab = React.memo(({
@@ -24,6 +25,7 @@ const TasksTab = React.memo(({
     const [postTargetGroup, setPostTargetGroup] = useState("");
     const [isGroupDropdownOpen, setIsGroupDropdownOpen] = useState(false);
     const [wallSearchTerm, setWallSearchTerm] = useState("");
+    const { isRecording: recPub, audioUrl: audioPub, isUploading: upPub, setAudioUrl: setAudioPub, startRecording: startPub, stopRecording: stopPub, cancelRecording: cancelPub } = useVoiceRecorder('tasks_audios', showMessage);
 
     // FILTRO: ¿Qué ve el estudiante?
     const visibleTasks = role === 'teacher' ? tasks : tasks.filter(t => {
@@ -122,6 +124,9 @@ const TasksTab = React.memo(({
                             
                             {showPostAttachmentMenu && (
                                 <div className={`absolute top-full left-0 mt-2 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl rounded-xl p-2 flex flex-col gap-1 z-[9999] animate-in fade-in zoom-in duration-200`}>
+                                    <button type="button" onClick={() => { recPub ? stopPub() : startPub(); setShowPostAttachmentMenu(false); }} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold transition-colors w-full text-left ${recPub ? 'text-red-500 animate-pulse' : (isDarkMode ? 'hover:bg-gray-700 text-gray-200' : 'hover:bg-gray-100 text-gray-700')}`}>
+                                        {recPub ? <Square size={16} /> : <Mic size={16} />} {recPub ? 'Detener grabación...' : 'Nota de voz'}
+                                    </button>
                                     <label className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold cursor-pointer transition-colors ${isDarkMode ? 'hover:bg-gray-700 text-gray-200' : 'hover:bg-gray-100 text-gray-700'}`}>
                                         <ImageIcon size={16} /> Imagen
                                         <input type="file" accept="image/*" className="hidden" onChange={(e) => { handlePostLocalFileUpload(e); setShowPostAttachmentMenu(false); }} />
@@ -140,6 +145,13 @@ const TasksTab = React.memo(({
                         {hasAiModified && <button type="button" onClick={() => { setTaskTitle(prevTaskTitle); setTaskDesc(prevTaskDesc); setHasAiModified(false); }} className="bg-white dark:bg-gray-800 text-red-600 dark:text-red-400 border border-red-300 dark:border-red-800 px-3 py-1.5 rounded-lg text-sm font-bold shadow-sm hover:bg-red-50 dark:hover:bg-red-900/20 transition-all flex items-center gap-1 ml-auto"><Undo2 size={16} /> Deshacer</button>}
                     </div>
 
+                    {audioPub && (
+                        <div className="flex items-center gap-2 animate-in fade-in">
+                            <audio src={audioPub} controls className="h-10 max-w-[220px] outline-none" />
+                            <button type="button" onClick={cancelPub} className="text-red-500 hover:text-red-700 p-1" title="Quitar audio"><X size={16} /></button>
+                        </div>
+                    )}
+                    {upPub && <p className="text-sm text-gray-500 italic">Subiendo audio...</p>}
                     <div className="flex flex-wrap gap-4 items-center bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
                         {postType === 'task' && (
                             <>
@@ -156,10 +168,10 @@ const TasksTab = React.memo(({
             type: postType, title: taskTitle, description: taskDesc, 
             authorName: loggedInName, 
             targetGroupId: postTargetGroup, // <-- Guardamos el grupo aquí
-            imageUrl: postImageUrl.trim(), fileUrl: postFileUrl, fileName: postFileName,
+            imageUrl: postImageUrl.trim(), fileUrl: postFileUrl, fileName: postFileName, audioUrl: audioPub,
             dueDate: postType === 'task' ? taskDate : null, dueTime: postType === 'task' ? taskTime : null, allowLate: postType === 'task' ? allowLate : true, createdAt: Date.now(), comments: [], reactions: {} 
         });
-        setTaskTitle(""); setTaskDesc(""); setPostImageUrl(""); setPostFileUrl(""); setPostFileName(""); setShowImageInput(false); setShowPostAttachmentMenu(false); setTaskDate(getToday()); setTaskTime("23:59"); setHasAiModified(false); setAllowLate(false); setPostTargetGroup("");
+        setTaskTitle(""); setTaskDesc(""); setPostImageUrl(""); setPostFileUrl(""); setPostFileName(""); setAudioPub(""); setShowImageInput(false); setShowPostAttachmentMenu(false); setTaskDate(getToday()); setTaskTime("23:59"); setHasAiModified(false); setAllowLate(false); setPostTargetGroup("");
     } else showMessage("Llena título y descripción.");
 }} className={`${redButton} ml-auto`}>Publicar</button>
                     </div>
