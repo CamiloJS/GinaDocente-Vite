@@ -28,29 +28,11 @@ import {
 } from './components/Icons.jsx'
 import AudioPlayer, { AudioRecordingVisualizer } from './components/AudioPlayer.jsx'
 
-// Helper para evitar el error "Failed to fetch dynamically imported module" (Chunks viejos tras deploys).
-// Si falla la carga del chunk, forzamos recarga dura de la página en lugar de lanzar ErrorBoundary.
-function lazyWithRetry(componentImport) {
-  return React.lazy(() => {
-    return new Promise((resolve) => {
-      componentImport()
-        .then(resolve)
-        .catch((error) => {
-          console.error("Chunk load error:", error);
-          if (!window.__hasRetriedChunk) {
-            window.__hasRetriedChunk = true;
-            window.location.reload();
-          }
-        });
-    });
-  });
-}
-
-const GifPickerModal = lazyWithRetry(() => import('./components/GifPickerModal.jsx'))
+import GifPickerModal from './components/GifPickerModal.jsx'
 import EmptyState from './components/EmptyState.jsx'
 import ScrollToTop from './components/ScrollToTop.jsx'
 import LinkifyText from './components/LinkifyText.jsx'
-const TasksTab = lazyWithRetry(() => import('./components/TasksTab.jsx'))
+import TasksTab from './components/TasksTab.jsx'
 
 function App() {
           const [hasEntered, setHasEntered] = useState(false); 
