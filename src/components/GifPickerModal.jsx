@@ -11,7 +11,7 @@ const GifPickerModal = ({ onSelect, onClose, isDarkMode }) => {
     if (!query.trim()) return
     setLoading(true)
     try {
-      const res = await fetch(`https://g.tenor.com/v1/search?q=${query}&key=LIVDSRZULELA&limit=12`)
+      const res = await fetch(`https://tenor.googleapis.com/v2/search?q=${query}&key=AIzaSyB-BDGpMhiNjSfGiGiGHHd6jbu5nQvoOfs&limit=12&media_filter=gif`)
       const data = await res.json()
       setResults(data.results || [])
     } catch (error) {}
@@ -38,7 +38,7 @@ const GifPickerModal = ({ onSelect, onClose, isDarkMode }) => {
         <div className="flex-1 overflow-y-auto p-4 grid grid-cols-2 gap-2 max-h-64 bg-black/5">
           {results.length === 0 && !loading && <p className="col-span-2 text-center text-gray-500 text-sm py-4">Escribe algo y presiona Buscar.</p>}
           {results.map((gif) => (
-            <img key={gif.id} src={gif.media[0].gif.url} className="w-full h-24 object-cover rounded-xl cursor-pointer hover:scale-105 hover:shadow-lg transition-all" onClick={() => onSelect(gif.media[0].gif.url)} alt="GIF" />
+            <img key={gif.id} src={gif.media_formats?.tinygif?.url || gif.media_formats?.gif?.url} className="w-full h-24 object-cover rounded-xl cursor-pointer hover:scale-105 hover:shadow-lg transition-all" onClick={() => onSelect(gif.media_formats?.gif?.url || gif.media_formats?.tinygif?.url)} alt="GIF" />
           ))}
         </div>
       </div>

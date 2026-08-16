@@ -341,10 +341,10 @@ const handleOpenProfileByName = (name) => {
           const getMobileTabClass = (tabName) => {
               if (activeTab === tabName) {
                   return isDarkMode
-                      ? 'bg-[#6b1d1d] text-white scale-110 shadow-[0_4px_15px_rgba(107,29,29,0.5)] border border-white/20'
-                      : 'bg-[#e64a19] text-white scale-110 shadow-[0_4px_15px_rgba(230,74,25,0.4)] border border-white/40';
+                      ? 'bg-gray-800 text-gray-50 scale-110 shadow-sm border border-gray-700'
+                      : 'bg-gray-100 text-gray-900 scale-110 shadow-sm border border-gray-200';
               }
-              return isDarkMode ? 'text-gray-400 hover:bg-white/10' : 'text-gray-500 hover:bg-gray-100';
+              return isDarkMode ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-500 hover:bg-gray-100';
           };
 
           useEffect(() => {
@@ -912,7 +912,7 @@ useEffect(() => {
             
           const allChatUsers = [
               { id: 'teacher', name: TEACHER_NAME, role: 'teacher' },
-              ...Object.entries(userMappings || {}).map(([id, data]) => ({ 
+              ...Object.entries(userMappings || {}).filter(([id, data]) => data?.email).map(([id, data]) => ({ 
                   id, 
                   name: data?.fullName || FALLBACK_MAP[id]?.name || id, 
                   role: data?.role || 'student', 
@@ -1842,7 +1842,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                         
                         <label className="block text-xs font-bold mb-2 text-blue-600">Seleccionar Estudiantes (Múltiple)</label>
                         <div className={`max-h-48 overflow-y-auto rounded-xl border p-2 grid grid-cols-1 sm:grid-cols-2 gap-2 ${isDarkMode ? 'bg-gray-900/50 border-gray-700' : 'bg-white border-gray-200'}`}>
-                            {Object.entries(userMappings).map(([uKey, data]) => (
+                            {Object.entries(userMappings).filter(([uk, ud]) => uk !== 'teacher' && ud?.email).map(([uKey, data]) => (
                                 <label key={uKey} className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${selectedAcadMembers.includes(uKey) ? 'bg-blue-500/10 border border-blue-300' : (isDarkMode ? 'hover:bg-gray-700 border border-transparent' : 'hover:bg-gray-50 border border-transparent')}`}>
                                     <input type="checkbox" checked={selectedAcadMembers.includes(uKey)} onChange={(e) => {
                                         if(e.target.checked) setSelectedAcadMembers([...selectedAcadMembers, uKey]);
@@ -1900,7 +1900,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                 <h3 className="font-bold text-gray-800 mb-4">Directorio de Estudiantes</h3>
                 <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
                     {Object.keys(userMappings).length === 0 && <p className="text-sm text-gray-500 italic">No hay estudiantes extra.</p>}
-                    {Object.entries(userMappings).map(([userKey, data]) => {
+                    {Object.entries(userMappings).filter(([uk, ud]) => uk !== 'teacher' && ud?.email).map(([userKey, data]) => {
                         // Buscar a qué materias pertenece este estudiante
                         const studentClasses = academicGroups.filter(g => g.members.includes(userKey));
 
@@ -2168,7 +2168,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                   <div className="flex justify-between items-center mb-6">
                       <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2 drop-shadow-sm"><FileText className="text-[#AD3333]" /> Evaluaciones</h2>
                       {role === 'teacher' && (
-                          <button onClick={() => setIsCreatingEval(true)} className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md font-bold px-4 py-2.5 rounded-full hover:scale-105 transition flex items-center gap-2 text-sm"><Plus size={16}/> Crear</button>
+                          <button onClick={() => setIsCreatingEval(true)} className="bg-blue-600 hover:bg-blue-700 text-white shadow-md font-bold px-4 py-2.5 rounded-xl transition flex items-center gap-2 text-sm"><Plus size={16}/> Crear</button>
                       )}
                   </div>
                   
@@ -2204,7 +2204,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                                                       showMessage("Evaluación eliminada.");
                                                   })} className="text-gray-400 hover:text-red-600 p-2"><Trash2 size={18}/></button>
                                               </div>
-                                              <button onClick={() => setViewingResultsFor(ev)} className="bg-white/80 hover:bg-white text-blue-700 font-bold py-2 px-4 rounded-xl shadow-sm border border-blue-200 transition-all text-sm">Ver Resultados</button>
+                                              <button onClick={() => setViewingResultsFor(ev)} className="bg-white dark:bg-gray-800 text-blue-700 dark:text-blue-400 font-bold py-2 px-4 rounded-xl shadow-sm border border-blue-200 dark:border-blue-800 transition-all text-sm">Ver Resultados</button>
                                           </>
                                       ) : (
                                           isDone ? (
@@ -3327,7 +3327,7 @@ tickIcon = (
                                                   />
                                                   
                                                   {/* BOTON CON EL ICONO Y LAS MEDIDAS EXACTAS DE TU IMAGEN */}
-<button type="submit" disabled={!chatAppInput.trim() && !chatAppImageUrl} className={`w-10 h-10 mr-[8px] rounded-[14px] shrink-0 transition-all flex items-center justify-center shadow-sm disabled:shadow-none disabled:opacity-60 ${chatAppInput.trim() || chatAppImageUrl ? 'bg-blue-600 text-white hover:bg-blue-700' : (isDarkMode ? 'bg-gray-800 text-gray-500' : 'bg-gray-200 text-gray-400')}`}>
+<button type="submit" disabled={!chatAppInput.trim() && !chatAppImageUrl && !chatAppFileUrl} className={`w-10 h-10 mr-[8px] rounded-[14px] shrink-0 transition-all flex items-center justify-center shadow-sm disabled:shadow-none disabled:opacity-60 ${(chatAppInput.trim() || chatAppImageUrl || chatAppFileUrl) ? 'bg-blue-600 text-white hover:bg-blue-700' : (isDarkMode ? 'bg-gray-800 text-gray-500' : 'bg-gray-200 text-gray-400')}`}>
     <Send size={20} />
 </button>
                                               </div>
