@@ -2618,73 +2618,18 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
 
               <nav className="sticky top-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 px-4 md:px-6 py-4 flex justify-between items-start md:items-center shadow-sm">
                 
-                <div className="flex flex-col items-start gap-1">
-                  <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 min-w-[44px] bg-gradient-to-br from-[#AD3333] to-[#8a2828] rounded-xl flex items-center justify-center text-white font-extrabold shadow-lg shadow-[#AD3333]/40 border border-white/20">UP</div>
-                    <div>
-                      <h1 className="text-xl font-extrabold text-gray-800 leading-tight drop-shadow-sm">English TECH</h1>
-                      <p className="text-xs text-[#AD3333] font-bold">Universidad de Pamplona</p>
-                    </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 min-w-[44px] bg-gradient-to-br from-[#AD3333] to-[#8a2828] rounded-xl flex items-center justify-center text-white font-extrabold shadow-lg shadow-[#AD3333]/40 border border-white/20">UP</div>
+                  <div>
+                    <h1 className="text-xl font-extrabold text-gray-800 dark:text-gray-100 leading-tight drop-shadow-sm">English TECH</h1>
+                    <p className="text-xs text-[#AD3333] font-bold">Universidad de Pamplona</p>
                   </div>
-                  <button onClick={handleLogout} className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300 hover:text-red-600 font-bold transition-all ml-1 mt-1 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-full border border-gray-200 dark:border-gray-700 shadow-sm">
-                    <LogOutIcon size={12} /> Volver
-                  </button>
                 </div>
 
-                <div className="flex gap-2 items-center mt-2 md:mt-0">
-  {/* MENÚ DE PERFIL EN LA ESQUINA SUPERIOR DERECHA */}
-  <div className="relative ml-2">
-      <button onClick={() => setShowUserMenu(!showUserMenu)} className="w-10 h-10 rounded-full flex items-center justify-center text-white shadow-md transition-transform hover:scale-105 bg-gradient-to-br from-blue-600 to-indigo-700 border-2 border-white/40 z-50 relative overflow-hidden">
-          {userMappings[myChatId]?.profilePicUrl ? <img src={userMappings[myChatId].profilePicUrl} className="w-full h-full object-cover" /> : <UserIcon size={20} />}
-      </button>
-
-      {showUserMenu && (
-          <div className={`absolute right-0 top-12 mt-2 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl rounded-2xl z-[99999] animate-in fade-in slide-in-from-top-4`}>
-              <div className="p-4 border-b border-gray-500/20 flex flex-col items-center px-6">
-                  <div className="w-14 h-14 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 mb-2 shrink-0 overflow-hidden border-2 border-blue-200">
-                      {userMappings[myChatId]?.profilePicUrl ? <img src={userMappings[myChatId].profilePicUrl} className="w-full h-full object-cover" /> : <UserIcon size={30} />}
-                  </div>
-            <p className={`font-bold text-base w-full text-center leading-tight mb-1 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>{loggedInName}</p>
-            <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">{userMappings[myChatId]?.customLabel || (role === 'teacher' ? 'Docente' : 'Estudiante')}</p>
-        </div>
-        <div className="p-2 flex flex-col gap-1">
-            <button onClick={() => { setViewingProfileId(null); changeTab('profile'); setShowUserMenu(false); }} className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-bold rounded-xl transition-colors ${isDarkMode ? 'text-gray-200 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`}>
-                <UserIcon size={18} /> Perfil
-            </button>
-            {role === 'teacher' ? (
-                <>
-                    <button onClick={() => { changeTab('directory'); setShowUserMenu(false); }} className={`w-full flex lg:hidden items-center gap-2 px-3 py-2 text-sm font-bold rounded-xl transition-colors ${isDarkMode ? 'text-gray-200 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`}>
-                        <UsersIcon size={18} /> Directorio
-                    </button>
-                    <button onClick={() => { changeTab('inbox'); setShowUserMenu(false); }} className={`w-full flex items-center justify-between px-3 py-2 text-sm font-bold rounded-xl transition-colors ${isDarkMode ? 'text-gray-200 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`}>
-                        <div className="flex items-center gap-2"><Mail size={18} /> Buzón</div>
-                        {alerts.length > 0 && <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>}
-                    </button>
-                </>
-            ) : (
-                <button onClick={() => { setShowSugModal(true); setShowUserMenu(false); }} className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-bold rounded-xl transition-colors ${isDarkMode ? 'text-gray-200 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`}>
-                    <Mail size={18} /> Sugerencias
-                </button>
-            )}
-
-            <button onClick={() => { enableNotifications(); setShowUserMenu(false); }} className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-bold rounded-xl transition-colors ${isDarkMode ? 'text-gray-200 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`}>
-                <Bell size={18} /> Activar notificaciones
-            </button>
-
-            {/* 👇 BOTÓN EXCLUSIVO DE EDWIN BLINDADO 👇 */}
-            {role === 'teacher' && (
-                <button onClick={() => { setShowIAKnowledgeModal(true); setShowUserMenu(false); }} className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-bold rounded-xl transition-colors bg-purple-50 text-purple-700 hover:bg-purple-100`}>
-                    <Sparkles size={18} /> Conocimientos de IA
-                </button>
-            )}
-            {/* 👆 HASTA AQUÍ 👆 */}
-
-        </div>
-          </div>
-      )}
-  </div>
-</div>
-</nav>
+                <div className="flex gap-2 items-center">
+                  {/* Navbar limpio sin botones redundantes */}
+                </div>
+              </nav>
 
               <div className="max-w-[1600px] mx-auto w-full flex justify-center items-start px-0 md:px-4 gap-6 relative z-10">
                   {/* LEFT SIDEBAR (Facebook style) */}
@@ -2744,6 +2689,13 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                               </button>
                           </div>
                       )}
+
+                      {/* Opción de Cerrar Sesión en la parte inferior */}
+                      <div className="pt-2">
+                          <button onClick={handleLogout} className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-bold rounded-xl transition-all border ${isDarkMode ? 'border-gray-700 text-red-400 hover:bg-red-950/30 hover:border-red-800' : 'border-gray-200 text-red-600 hover:bg-red-50 hover:border-red-200'} shadow-sm`}>
+                              <LogOutIcon size={20} /> Cerrar sesión
+                          </button>
+                      </div>
                   </aside>
 
                   {/* CENTER CONTENT */}
@@ -2753,6 +2705,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                           <TasksTab 
                               academicGroups={academicGroups} 
                               myChatId={myChatId}
+                              userMappings={userMappings}
                               handleOpenProfileByName={handleOpenProfileByName}
                               role={role} glassCard={glassCard} glassInput={glassInput} redButton={redButton}
                               postType={postType} setPostType={setPostType} taskTitle={taskTitle} setTaskTitle={setTaskTitle} // ... el resto sigue igualito hacia abajo
@@ -2896,9 +2849,10 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                       
                       <button
                           onClick={() => setIsChatOpen(!isChatOpen)} 
-                          className={`w-14 h-14 rounded-full flex items-center justify-center focus:outline-none transition-all duration-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl hover:shadow-2xl hover:-translate-y-1 text-gray-800 dark:text-gray-200`}
+                          className="w-14 h-14 rounded-full flex items-center justify-center focus:outline-none transition-all duration-300 bg-gradient-to-tr from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-xl hover:shadow-2xl hover:scale-105 border-2 border-white/40 shadow-purple-500/30"
+                          title="Asistente GinAI"
                       >
-                          <CuteBotIcon size={32} />
+                          <CuteBotIcon size={32} className="text-white drop-shadow-sm" />
                       </button>
                   </div>
               )}
@@ -2973,8 +2927,12 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                           </div>
                       )}
                       
-                      <button onClick={() => setIsTeacherBotOpen(!isTeacherBotOpen)} className={`w-14 h-14 rounded-full flex items-center justify-center focus:outline-none transition-all duration-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl hover:shadow-2xl hover:-translate-y-1 text-gray-800 dark:text-gray-200`}>
-                          <CuteBotIcon size={32} className={isDarkMode ? '!text-black' : '!text-white'} />
+                      <button 
+                          onClick={() => setIsTeacherBotOpen(!isTeacherBotOpen)} 
+                          className="w-14 h-14 rounded-full flex items-center justify-center focus:outline-none transition-all duration-300 bg-gradient-to-tr from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-xl hover:shadow-2xl hover:scale-105 border-2 border-white/40 shadow-purple-500/30"
+                          title="Bot de ayuda"
+                      >
+                          <CuteBotIcon size={32} className="text-white drop-shadow-sm" />
                       </button>
                   </div>
               )}

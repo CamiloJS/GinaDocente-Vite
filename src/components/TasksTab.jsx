@@ -18,7 +18,7 @@ const TasksTab = React.memo(({
     setHasAiModified, callGemini, showMessage, handleAiTranslate, taskDate, setTaskDate,
     taskTime, setTaskTime, allowLate, setAllowLate, db, appId, loggedInName, getToday,
     tasks, user, isDarkMode, confirmAction, setFullScreenImage, handleOpenProfileByName,
-    academicGroups, myChatId, tasksLoading, taskLimit, loadMoreTasks, pinnedTasks
+    academicGroups, myChatId, userMappings, tasksLoading, taskLimit, loadMoreTasks, pinnedTasks
 }) => {
 
     // ESTADOS DEL MENÚ LIQUID GLASS
@@ -43,9 +43,11 @@ const TasksTab = React.memo(({
           })
         : visibleTasks;
 
+    const teacherPic = userMappings?.[myChatId]?.profilePicUrl;
+
     return (
         <div className="space-y-6">
-            <h2 className="text-3xl font-bold text-gray-800 mb-6 flex items-center gap-2 drop-shadow-sm"><BookOpen className="text-[#AD3333]" /> Muro de clase</h2>
+            <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-6 flex items-center gap-2 drop-shadow-sm"><BookOpen className="text-[#AD3333]" /> Muro de clase</h2>
             
             {/* VISTA COMPRIMIDA (MINIMALISTA) */}
             {role === 'teacher' && !isFormExpanded && (
@@ -54,9 +56,17 @@ const TasksTab = React.memo(({
                     className={`${glassCard} !p-4 mb-6 transition-all duration-300 hover:shadow-lg cursor-pointer border border-gray-200/90 dark:border-gray-700/90 rounded-2xl group`}
                 >
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#AD3333] to-[#8a2828] text-white flex items-center justify-center font-bold text-sm shadow-md shrink-0">
-                            {loggedInName?.charAt(0) || 'G'}
-                        </div>
+                        {teacherPic ? (
+                            <img 
+                                src={teacherPic} 
+                                alt={loggedInName} 
+                                className="w-11 h-11 rounded-full object-cover shadow-md border-2 border-white dark:border-gray-700 shrink-0" 
+                            />
+                        ) : (
+                            <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#AD3333] to-[#8a2828] text-white flex items-center justify-center font-bold text-sm shadow-md shrink-0 border-2 border-white dark:border-gray-700">
+                                {loggedInName?.charAt(0) || 'G'}
+                            </div>
+                        )}
                         <div className={`flex-1 px-4 py-2.5 rounded-full border text-sm font-medium transition-all ${isDarkMode ? 'bg-gray-800/80 border-gray-700 text-gray-400 group-hover:bg-gray-800' : 'bg-gray-100/80 border-gray-200 text-gray-500 group-hover:bg-gray-100 group-hover:border-gray-300'}`}>
                             ¿Qué deseas asignar o publicar hoy?
                         </div>
@@ -99,13 +109,26 @@ const TasksTab = React.memo(({
             {/* VISTA EXPANDIDA (FORMULARIO COMPLETO) */}
             {role === 'teacher' && isFormExpanded && (
                 <div className={`${glassCard} !p-5 mb-6 flex flex-col gap-3 transition-all duration-300 animate-in fade-in zoom-in-95 origin-top border border-gray-300 dark:border-gray-700 shadow-xl rounded-2xl`}>
-                    <div className="flex justify-between items-center pb-2 border-b border-gray-200 dark:border-gray-700">
-                        <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg w-fit border border-gray-200 dark:border-gray-700">
-                            <button type="button" onClick={() => setPostType('task')} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${postType === 'task' ? 'bg-white dark:bg-gray-900 shadow-sm text-[#AD3333]' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'}`}>Tarea nueva</button>
-                            <button type="button" onClick={() => setPostType('post')} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${postType === 'post' ? 'bg-white dark:bg-gray-900 shadow-sm text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'}`}>Nueva publicación</button>
+                    <div className="flex justify-between items-center pb-3 border-b border-gray-200 dark:border-gray-700">
+                        <div className="flex items-center gap-3">
+                            {teacherPic ? (
+                                <img 
+                                    src={teacherPic} 
+                                    alt={loggedInName} 
+                                    className="w-10 h-10 rounded-full object-cover shadow-sm border-2 border-white dark:border-gray-700 shrink-0" 
+                                />
+                            ) : (
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#AD3333] to-[#8a2828] text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
+                                    {loggedInName?.charAt(0) || 'G'}
+                                </div>
+                            )}
+                            <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-xl border border-gray-200 dark:border-gray-700">
+                                <button type="button" onClick={() => setPostType('task')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${postType === 'task' ? 'bg-white dark:bg-gray-900 shadow-sm text-[#AD3333]' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'}`}>Tarea nueva</button>
+                                <button type="button" onClick={() => setPostType('post')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${postType === 'post' ? 'bg-white dark:bg-gray-900 shadow-sm text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'}`}>Nueva publicación</button>
+                            </div>
                         </div>
                         
-                        <button type="button" onClick={() => setIsFormExpanded(false)} className="p-1.5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors" title="Minimizar formulario">
+                        <button type="button" onClick={() => setIsFormExpanded(false)} className="p-2 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors" title="Minimizar formulario">
                             <X size={18} />
                         </button>
                     </div>
