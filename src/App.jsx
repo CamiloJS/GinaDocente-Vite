@@ -1,6 +1,7 @@
 // src/App.jsx
 import React, { useState, useEffect, useRef } from 'react'
 import ReactDOM from 'react-dom'
+import confetti from 'canvas-confetti'
 import {
   auth, db, appId, secondaryAuth, collection, onSnapshot, doc, setDoc, getDocs,
   deleteDoc, addDoc, updateDoc, getDoc, query, orderBy, limit,
@@ -1267,6 +1268,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
               setActiveTakingEval(null);
               setStudentAnswers({});
               submittingEvalRef.current = false;
+              if (!autoSubmit) confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
               showMessage(autoSubmit ? "⏳ Tiempo agotado. Evaluación enviada automáticamente." : "✅ Evaluación completada y enviada.");
           };
 

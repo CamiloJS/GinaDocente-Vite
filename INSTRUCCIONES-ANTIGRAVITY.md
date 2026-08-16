@@ -276,4 +276,22 @@ Es muy común que la profesora o los estudiantes peguen enlaces a videos de YouT
 
 **Entrega:** Documenta en `REPORTE-OPENCODE.md` si utilizaste un componente React o una función pura, y confirma que las URLs largas no rompen las tarjetas en vista móvil (recuerda usar `break-words` o `break-all`).
 
+---
+
+# INSTRUCCION #18
+
+**Objetivo:** Gamificación y Recompensa Visual: Efecto "Confetti" al Completar Tareas.
+
+En aplicaciones educativas, el refuerzo positivo es crucial para mantener la motivación de los estudiantes. Vamos a añadir un efecto visual de celebración (confetti) cuando un estudiante envía una evidencia de tarea o completa una evaluación.
+
+**Acciones a implementar por Opencode:**
+1. **Instalar Dependencia:** Instala la librería `canvas-confetti` (`npm install canvas-confetti`).
+2. **Importar Utilidad:** En los componentes donde se maneja el envío de tareas (`TaskCard.jsx`) y evaluaciones (`App.jsx`), importa `confetti` de la librería (`import confetti from 'canvas-confetti'`).
+3. **Disparar Confetti:** 
+   - En `TaskCard.jsx`, dentro de `handleCommentSubmit` (cuando el estudiante publica su comentario/evidencia), justo después de guardar en Firebase y mostrar el Toast de éxito, ejecuta la función de confetti: `confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } })`.
+   - En `App.jsx`, busca la función `submitEvaluation` (cuando se califica y guarda la evaluación del estudiante) y añade la misma llamada para celebrar su finalización.
+4. **Deploy:** Valida que el build pase (`npm run build`), haz `commit`/`push` a `main` y sube con `vercel deploy --prod`.
+
+**Entrega:** Documenta en `REPORTE-OPENCODE.md` si pudiste instalar y disparar el efecto confetti correctamente.
+
 ESTADO: LISTA PARA IMPLEMENTAR

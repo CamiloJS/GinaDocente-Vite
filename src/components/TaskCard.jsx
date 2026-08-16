@@ -1,6 +1,7 @@
 // src/components/TaskCard.jsx
 import React, { useState } from 'react'
 import ReactDOM from 'react-dom'
+import confetti from 'canvas-confetti'
 import {
   CheckCheck, CheckLine, Clock, Edit3, FileDocIcon, FileText, ImageIcon, Loader2, Lock, MessageSquareText, PaperclipIcon, Plus, ReplyIcon, Send, SmileIcon, Trash2, X, XLine,
 } from './Icons.jsx'
@@ -150,6 +151,7 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput, callGemini, cu
         
         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), { ...task, comments: [...(task.comments || []), newComment] });
         
+        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
         setCommentText(""); setCommentImageUrl(""); setCommentFileUrl(""); setCommentFileName("");
         setShowCommentImageInput(false); setShowAttachmentMenu(false); setShowEmojiPicker(false); setReplyingTo(null); setIsProcessing(false);
     };
