@@ -124,8 +124,9 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput: propGlassInput
 
     const handleDeleteComment = async (commentId, authorName) => {
         let updatedComments;
-        if (role === 'teacher') updatedComments = task.comments.filter((c, i) => (c.id || `old-${i}`) !== commentId);
-        else updatedComments = task.comments.map((c, i) => (c.id || `old-${i}`) === commentId ? { ...c, isDeleted: true } : c);
+        const currentComments = task.comments || [];
+        if (role === 'teacher') updatedComments = currentComments.filter((c, i) => (c.id || `old-${i}`) !== commentId);
+        else updatedComments = currentComments.map((c, i) => (c.id || `old-${i}`) === commentId ? { ...c, isDeleted: true } : c);
         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), { ...task, comments: updatedComments });
     };
 
@@ -141,7 +142,8 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput: propGlassInput
 
     const saveEditedComment = async () => {
         if (!editCommentText.trim()) return;
-        const updatedComments = task.comments.map((c, i) => {
+        const currentComments = task.comments || [];
+        const updatedComments = currentComments.map((c, i) => {
             const cid = c.id || `old-${i}`;
             if (cid === editingCommentId) {
                 const history = c.editHistory || [];

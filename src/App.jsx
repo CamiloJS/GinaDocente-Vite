@@ -238,11 +238,17 @@ useEffect(() => {
 
 const handleOpenProfileByName = (name) => {
     if (!name) return;
-    if (name === TEACHER_NAME || name === 'Profesora' || name === 'La profe') {
+    const cleanName = name.trim().toLowerCase();
+    if (cleanName === TEACHER_NAME.toLowerCase() || cleanName === 'profesora' || cleanName === 'la profe' || cleanName === 'docente') {
         setViewingProfileId('teacher');
     } else {
-        const foundUser = allChatUsers.find(u => u.name === name);
-        if (foundUser) setViewingProfileId(foundUser.id);
+        const foundUser = allChatUsers.find(u => (u.name || '').trim().toLowerCase() === cleanName);
+        if (foundUser) {
+            setViewingProfileId(foundUser.id);
+        } else {
+            const partialUser = allChatUsers.find(u => (u.name || '').toLowerCase().includes(cleanName) || cleanName.includes((u.name || '').toLowerCase()));
+            if (partialUser) setViewingProfileId(partialUser.id);
+        }
     }
     changeTab('profile');
 };
@@ -370,8 +376,22 @@ const handleOpenProfileByName = (name) => {
           const [chatAppFileUrl, setChatAppFileUrl] = useState("");
           const [chatAppFileName, setChatAppFileName] = useState("");
           const [isRecording, setIsRecording] = useState(false);
+          const [chatRecordingTime, setChatRecordingTime] = useState(0);
           const [chatAppAudioUrl, setChatAppAudioUrl] = useState("");
           const recordingRef = React.useRef(null);
+          const recordingStreamRef = React.useRef(null);
+
+          useEffect(() => {
+              let interval = null;
+              if (isRecording) {
+                  setChatRecordingTime(0);
+                  interval = setInterval(() => setChatRecordingTime(t => t + 1), 1000);
+              } else {
+                  setChatRecordingTime(0);
+              }
+              return () => { if (interval) clearInterval(interval); };
+          }, [isRecording]);
+
           const [showChatAppAttachmentMenu, setShowChatAppAttachmentMenu] = useState(false);
           const [showChatAppImageInput, setShowChatAppImageInput] = useState(false);
           const [showChatAppEmojiPicker, setShowChatAppEmojiPicker] = useState(false);
@@ -1259,6 +1279,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
               }
               try {
                   const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                  recordingStreamRef.current = stream;
                   const mediaRecorder = new MediaRecorder(stream);
                   recordingRef.current = mediaRecorder;
                   const chunks = [];
@@ -1266,6 +1287,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                   mediaRecorder.onstop = async () => {
                       const blob = new Blob(chunks, { type: 'audio/webm' });
                       stream.getTracks().forEach(t => t.stop());
+                      recordingStreamRef.current = null;
                       setIsRecording(false);
                       try {
                           showMessage("⏳ Subiendo audio...");
@@ -1283,6 +1305,24 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
               } catch (err) {
                   showMessage("No se pudo acceder al micrófono.");
               }
+          };
+
+          const cancelVoiceRecording = () => {
+              setIsRecording(false);
+              setChatAppAudioUrl("");
+              if (recordingRef.current && recordingRef.current.state !== 'inactive') {
+                  try {
+                      recordingRef.current.onstop = null;
+                      recordingRef.current.stop();
+                  } catch (e) {}
+              }
+              if (recordingStreamRef.current) {
+                  try {
+                      recordingStreamRef.current.getTracks().forEach(t => t.stop());
+                  } catch (e) {}
+                  recordingStreamRef.current = null;
+              }
+              recordingRef.current = null;
           };
 
           const handleChatAppLocalFileUpload = async (e) => {
@@ -1400,9 +1440,14 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
           const saveEditedGrade = async (gradeId) => {
               const newScore = parseFloat(editingGrade.score);
               if(isNaN(newScore) || newScore < 0 || newScore > 5) return showMessage("Nota inválida (debe ser entre 0.0 y 5.0)");
-              await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'grades', gradeId), { score: newScore });
-              setEditingGrade({id: null, score: ''});
-              showMessage("✅ Nota actualizada.");
+              try {
+                  await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'grades', gradeId), { score: newScore });
+                  setEditingGrade({id: null, score: ''});
+                  showMessage("✅ Nota actualizada.");
+              } catch (err) {
+                  console.error(err);
+                  showMessage("❌ Error al actualizar la nota.");
+              }
           };
 
            // --- LÓGICA DE FOTO DE PERFIL ---
@@ -3769,6 +3814,17 @@ tickIcon = (
                                                           <span className="truncate opacity-80">{replyingTo.text || (replyingTo.imageUrl ? '📷 Imagen' : '')}</span>
                                                       </div>
                                                       <button type="button" onClick={() => setReplyingTo(null)} className="text-gray-500 hover:text-red-500 ml-3 p-1 rounded-full"><X size={16}/></button>
+                                                  </div>
+                                              )}
+
+                                              {isRecording && (
+                                                  <div className="mb-1">
+                                                      <AudioRecordingVisualizer
+                                                          recordingTime={chatRecordingTime}
+                                                          onStop={toggleVoiceRecording}
+                                                          onCancel={cancelVoiceRecording}
+                                                          isDarkMode={isDarkMode}
+                                                      />
                                                   </div>
                                               )}
                                               
