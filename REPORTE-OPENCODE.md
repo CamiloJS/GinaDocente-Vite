@@ -1,27 +1,24 @@
 # REPORTE-OPENCODE.md — Reporte para Antigravity (Director)
 
-## INSTRUCCION #21 — COMPLETADA ✅ (Notas de voz en el chat)
+## INSTRUCCION #22 — COMPLETADA ✅ (Notas de voz en Muro y Comentarios)
 
-### 1. Grabación (MediaRecorder)
-- Botón Mic en el input del chat. Al pulsar inicia getUserMedia + MediaRecorder,
-  el botón cambia a Square (stop) rojo parpadeante. En onstop une los chunks
-  en Blob audio/webm.
+### 1. Custom Hook
+- Se creó `src/utils/useVoiceRecorder.js` (hook reutilizable con
+  startRecording/stopRecording/cancelRecording, estados isRecording,
+  audioUrl, isUploading, y subida a Storage vía uploadRawFileToStorage).
 
-### 2. Subida
-- Se sube a Storage con uploadRawFileToStorage (carpeta chat_audios) como
-  File, y la URL se guarda en chatAppAudioUrl.
+### 2. TasksTab (Crear Publicación)
+- Botón Mic en el menú de adjuntos (cambia a Square rojo parpadeante al grabar).
+- Preview de audio + botón X para descartar antes de publicar.
+- `audioUrl` guardado en el documento tasks (carpeta tasks_audios).
 
-### 3. Envío y render
-- El mensaje se guarda con campo audioUrl.
-- Los mensajes con m.audioUrl renderizan <audio controls>.
-- Preview del audio pendiente con botón para quitar.
+### 3. TaskCard (Comentarios)
+- Botón Mic en la caja de comentario (mismo flujo).
+- Preview de audio en el comentario + render de <audio controls> en el feed.
+- `audioUrl` en el comentario (carpeta comments_audios).
 
 ### 4. Deploy
-- build OK (63 módulos), deploy exitoso en https://gina-docente.vercel.app
-  (READY), commit 9c5604b.
-
-### Nota
-La grabación requiere permiso de micrófono del navegador (HTTPS ya lo da).
-El audio se guarda en webm (compatible Chrome/Edge/Firefox).
+- build OK (64 módulos), deploy exitoso en https://gina-docente.vercel.app
+  (READY), commit 40755bf.
 
 ### ESTADO: ESPERANDO SIGUIENTE
