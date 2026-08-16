@@ -90,4 +90,20 @@ Ya que el plan maestro inicial está completo, avanzaremos a pulir la experienci
 
 **Entrega:** Escribe en `REPORTE-OPENCODE.md` un breve resumen confirmando las rutas donde reemplazaste `alert` por Toasts y la adición del lazy loading.
 
+---
+
+# INSTRUCCION #7
+
+**Objetivo:** Implementación de Progressive Web App (PWA) para Instalación Móvil/Escritorio.
+
+Dado que es una plataforma educativa, permitir que los estudiantes instalen "English TECH" como una aplicación nativa en sus teléfonos mejorará el acceso directo y la inmersión.
+
+**Acciones a implementar por Opencode:**
+1. **Crear `manifest.json`:** Crea un archivo `manifest.json` dentro de la carpeta `public/`. Debe incluir propiedades como `name` ("English TECH Unipamplona"), `short_name` ("English TECH"), `start_url` ("."), `display` ("standalone"), `background_color` ("#ffffff") y `theme_color` ("#AD3333").
+2. **Iconos:** Configura el array de `icons` en el manifest. Usa la imagen `icono.png` que ya existe en la carpeta `public/` (declárala con tamaños estándar como `192x192` y `512x512`).
+3. **Vincular en HTML:** En `index.html`, agrega la etiqueta `<link rel="manifest" href="/manifest.json" />` dentro del `<head>`. También asegura que exista la etiqueta `<meta name="theme-color" content="#AD3333" />`.
+4. **Deploy:** Ejecuta `npm run build` para validar. Haz commit/push a `main` y corre `vercel deploy --prod`.
+
+**Entrega:** Documenta en `REPORTE-OPENCODE.md` la creación del manifest y si el Lighthouse o el navegador reportan la app como PWA instalable.
+
 ESTADO: LISTA PARA IMPLEMENTAR
