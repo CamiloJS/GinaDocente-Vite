@@ -366,4 +366,22 @@ Al ser una plataforma para aprender inglés, la práctica oral (speaking) es fun
 
 **Entrega:** Documenta en `REPORTE-OPENCODE.md` cómo implementaste la grabación en los comentarios y si tuviste que crear algún Custom Hook para no repetir tanta lógica de `MediaRecorder`.
 
+---
+
+# INSTRUCCION #23
+
+**Objetivo:** Soporte Multimedia: Reproductor de YouTube Integrado (Video Embeds).
+
+En clases de inglés, los docentes suelen enviar videos explicativos, canciones y ejercicios de listening alojados en YouTube. Si bien ya lograste que las URLs sean clicables, la experiencia de usuario (UX) será de clase mundial si el video se puede reproducir directamente dentro de la tarjeta de la tarea o comentario sin salir de la plataforma.
+
+**Acciones a implementar por Opencode:**
+1. **Mejorar Componente `LinkifyText.jsx`:** Modifica este componente para que, además de retornar los enlaces clicables, identifique si alguna de las URLs encontradas pertenece a YouTube.
+2. **Regex de YouTube:** Utiliza una expresión regular (ej. `/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i`) para extraer el ID del video (`videoId`).
+3. **Renderizar Iframe:** Si encuentra al menos un video de YouTube, renderiza un iframe embebido debajo del bloque de texto:
+   `<iframe src={"https://www.youtube.com/embed/" + videoId} className="w-full aspect-video rounded-xl mt-3 shadow-md" allowFullScreen></iframe>`
+4. **Resiliencia:** Asegúrate de que los links que no sean de YouTube sigan viéndose como enlaces normales y que, si el mensaje tiene texto y un link de video, se lea el texto y debajo salga el reproductor.
+5. **Deploy:** Verifica compresión y compilación (`npm run build`), haz `commit`/`push` a `main` y sube con `vercel deploy --prod`.
+
+**Entrega:** Documenta en `REPORTE-OPENCODE.md` cómo integraste la extracción del ID de YouTube y confirma que los videos se ajustan bien en la pantalla del celular (`w-full aspect-video`).
+
 ESTADO: LISTA PARA IMPLEMENTAR
