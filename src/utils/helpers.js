@@ -113,6 +113,23 @@ export const containsBadWords = (text) => {
   })
 }
 
+// Filtro de contenido en backend (Vercel /api/filter) con fallback local
+export const checkBadWordsAsync = async (text) => {
+  try {
+    const res = await fetch('/api/filter', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text || '' }),
+    })
+    if (res.ok) {
+      const data = await res.json()
+      return !!data.hasBadWords
+    }
+  } catch (err) {}
+  // Fallback local si la API no responde (nunca perder el filtro)
+  return containsBadWords(text)
+}
+
 export const formatChatDate = (timestamp) => {
   const date = new Date(timestamp)
   const today = new Date()

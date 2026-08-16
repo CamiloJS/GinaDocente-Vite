@@ -5,7 +5,7 @@ import {
   CheckCheck, CheckLine, Clock, Edit3, FileDocIcon, FileText, ImageIcon, Loader2, Lock, MessageSquareText, PaperclipIcon, Plus, ReplyIcon, Send, SmileIcon, Trash2, X, XLine,
 } from './Icons.jsx'
 import {
-  compressImage, containsBadWords, uploadImageToStorage, uploadRawFileToStorage, TEACHER_NAME, COMMENT_EMOJIS, REACTION_EMOJIS,
+  compressImage, containsBadWords, checkBadWordsAsync, uploadImageToStorage, uploadRawFileToStorage, TEACHER_NAME, COMMENT_EMOJIS, REACTION_EMOJIS,
 } from '../utils/helpers.js'
 import { glassCard, glassInput } from '../utils/styles.js'
 import { useClickOutside } from '../utils/hooks.js'
@@ -138,7 +138,7 @@ const TaskCard = React.memo(({ task, role, db, appId, glassInput, callGemini, cu
         e.preventDefault();
         if(!commentText.trim() && !commentImageUrl && !commentFileUrl) return;
         setIsProcessing(true);
-        if (containsBadWords(commentText)) { showMessage("⚠️ Comentario bloqueado: Lenguaje inapropiado."); setIsProcessing(false); return; }
+        if (await checkBadWordsAsync(commentText)) { showMessage("⚠️ Comentario bloqueado: Lenguaje inapropiado."); setIsProcessing(false); return; }
 
         const newComment = { 
             id: Date.now().toString() + Math.random().toString(36).substr(2, 5), 

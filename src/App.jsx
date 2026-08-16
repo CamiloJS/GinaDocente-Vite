@@ -9,7 +9,7 @@ import {
 } from './firebase/config.js'
 import {
   CHAT_GRADIENTS, CHAT_PATTERNS, COMMENT_EMOJIS, FALLBACK_MAP, SLIDE_GRADIENTS,
-  TEACHER_NAME, compressImage, containsBadWords, formatChatDate, formatTime,
+  TEACHER_NAME, compressImage, containsBadWords, checkBadWordsAsync, formatChatDate, formatTime,
   uploadImageToStorage, uploadRawFileToStorage,
 } from './utils/helpers.js'
 import {
@@ -450,7 +450,7 @@ const handleOpenProfileByName = (name) => {
             if (!sugText) return;
             setIsSugLoading(true);
 
-            if (containsBadWords(sugText)) {
+            if (await checkBadWordsAsync(sugText)) {
               showMessage("Contenido inapropiado, se le será notificado a la profesora.");
               await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'alerts'), { studentName: loggedInName, originalText: sugText, createdAt: Date.now() });
               setShowSugModal(false); 
@@ -1045,7 +1045,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
               e.preventDefault();
               if (!chatAppInput.trim() && !chatAppImageUrl.trim() && !chatAppFileUrl) return;
 
-              if (containsBadWords(chatAppInput)) {
+              if (await checkBadWordsAsync(chatAppInput)) {
                   showMessage("⚠️ Mensaje bloqueado: Lenguaje inapropiado.");
                   return;
               }
