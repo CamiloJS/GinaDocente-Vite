@@ -23,7 +23,8 @@ import {
   FileText, ImageIcon, Loader2, LogOutIcon, Mail, MessageCircle, Moon, NavCalendar,
   NavFile, NavNotebook, NavSlides, Palette, PaperclipIcon, Plus, ReplyIcon, SearchIcon,
   Send, SingleTick, SmileIcon, Sparkles, Sun, TeacherIcon, Trash2, UserIcon,
-  UsersGroupIcon, UsersIcon, Wand2, X, XLine, Copy, Mic, Square, Bell, Volume2, Languages
+  UsersGroupIcon, UsersIcon, Wand2, X, XLine, Copy, Mic, Square, Bell, Volume2, Languages,
+  Settings, VolumeX, Shield
 } from './components/Icons.jsx'
 
 // Helper para evitar el error "Failed to fetch dynamically imported module" (Chunks viejos tras deploys).
@@ -370,6 +371,8 @@ const handleOpenProfileByName = (name) => {
             const typingTimeout = useRef(null);
           const [showChatSettings, setShowChatSettings] = useState(false);
             const [showGroupInfo, setShowGroupInfo] = useState(false);
+          const [rightSidebarTab, setRightSidebarTab] = useState('chats'); // 'chats' | 'settings'
+          const [soundEnabled, setSoundEnabled] = useState(true);
 
           const notificationSound = useRef(typeof Audio !== "undefined" ? new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3') : null);
 
@@ -2730,55 +2733,203 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                     {activeTab === 'profile' && renderProfile()}
                   </main>
 
-                  {/* RIGHT SIDEBAR (Chats) */}
-                  <aside className={`w-[320px] hidden xl:block sticky top-[90px] h-[calc(100vh-100px)] overflow-y-auto overflow-x-hidden pl-4 border-l z-10 space-y-6 ${isDarkMode ? 'border-gray-800 text-gray-300' : 'border-gray-200 text-gray-700'}`}>
-                      <div>
-                          <div className="flex justify-between items-center mb-3">
-                              <h3 className={`text-sm font-bold uppercase tracking-wider ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Grupos</h3>
-                              <button onClick={() => { setIsCreatingGroup(true); setIsChatAppOpen(true); }} className="text-blue-500 font-bold text-xs bg-blue-500/10 px-2 py-1 rounded hover:bg-blue-500/20 transition-colors">+ Crear</button>
-                          </div>
-                          <div className="space-y-1">
-                              {myGroups && myGroups.length === 0 && <p className="text-sm italic text-gray-500">No hay grupos.</p>}
-                              {myGroups && myGroups.map(g => {
-                                  const chatId = `group_${g.id}`;
-                                  const isUnread = unreadChats[chatId];
-                                  return (
-                                      <button key={g.id} onClick={() => { handleOpenChat({ id: chatId, name: g.name, type: 'group' }); setIsChatAppOpen(true); }} className={`w-full flex items-center gap-3 p-2 rounded-xl transition-colors ${isDarkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-200'}`}>
-                                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white shrink-0"><UsersGroupIcon size={18}/></div>
-                                          <div className="text-left flex-1 overflow-hidden">
-                                              <p className={`font-bold text-sm truncate ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>{g.name}</p>
-                                          </div>
-                                          {isUnread && <span className="w-2 h-2 bg-red-500 rounded-full absolute right-2"></span>}
-                                      </button>
-                                  );
-                              })}
-                          </div>
+                  {/* RIGHT SIDEBAR (Chats y Ajustes estilo Facebook) */}
+                  <aside className={`w-[320px] hidden xl:block sticky top-[90px] h-[calc(100vh-100px)] overflow-y-auto overflow-x-hidden pl-4 border-l z-10 space-y-4 ${isDarkMode ? 'border-gray-800 text-gray-300' : 'border-gray-200 text-gray-700'}`}>
+                      {/* Selector de Pestañas (Chats vs Ajustes) */}
+                      <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-2xl border border-gray-200 dark:border-gray-700 mb-2">
+                          <button 
+                              onClick={() => setRightSidebarTab('chats')} 
+                              className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${rightSidebarTab === 'chats' ? 'bg-white dark:bg-gray-900 shadow-md text-blue-600 dark:text-blue-400 scale-102' : 'text-gray-500 hover:text-gray-800 dark:hover:text-gray-200'}`}
+                          >
+                              <MessageCircle size={15} /> Chats
+                          </button>
+                          <button 
+                              onClick={() => setRightSidebarTab('settings')} 
+                              className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${rightSidebarTab === 'settings' ? 'bg-white dark:bg-gray-900 shadow-md text-purple-600 dark:text-purple-400 scale-102' : 'text-gray-500 hover:text-gray-800 dark:hover:text-gray-200'}`}
+                          >
+                              <Settings size={15} /> Ajustes
+                          </button>
                       </div>
 
-                      <div>
-                          <h3 className={`text-sm font-bold uppercase tracking-wider mb-3 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Contactos</h3>
-                          <div className="space-y-1">
-                              {allChatUsers && allChatUsers.map(u => {
-                                  const chatId = `dm_${[myChatId, u.id].sort().join('_')}`;
-                                  const isUnread = unreadChats[chatId];
-                                  const isOnline = userPresence[u.id]?.status === 'online';
-                                  return (
-                                      <button key={u.id} onClick={() => { handleOpenChat({ id: chatId, name: u.name, type: 'dm', role: u.role }); setIsChatAppOpen(true); }} className={`w-full flex items-center gap-3 p-2 rounded-xl transition-colors relative ${isDarkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-200'}`}>
-                                          <div className="relative shrink-0">
-                                              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white shadow-sm transition-all duration-300 ${u.role === 'teacher' ? 'bg-gradient-to-br from-[#AD3333] to-[#8a2828]' : 'bg-gradient-to-br from-blue-400 to-indigo-500'}`}>
-                                                  {u.role === 'teacher' ? <TeacherIcon size={18}/> : <UserIcon size={18}/>}
-                                              </div>
-                                              <div className={`absolute bottom-0 right-0 w-3 h-3 border-2 rounded-full ${isDarkMode ? 'border-gray-900' : 'border-gray-100'} ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-                                          </div>
-                                          <div className="text-left flex-1 overflow-hidden">
-                                              <p className={`font-bold text-sm truncate leading-tight ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>{u.name}</p>
-                                          </div>
-                                          {isUnread && <span className="w-2 h-2 bg-blue-500 rounded-full"></span>}
-                                      </button>
-                                  );
-                              })}
+                      {/* CONTENIDO: CHATS Y GRUPOS */}
+                      {rightSidebarTab === 'chats' && (
+                          <div className="space-y-6 animate-in fade-in duration-200">
+                              <div>
+                                  <div className="flex justify-between items-center mb-3">
+                                      <h3 className={`text-xs font-bold uppercase tracking-wider ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Grupos</h3>
+                                      <button onClick={() => { setIsCreatingGroup(true); setIsChatAppOpen(true); }} className="text-blue-500 font-bold text-xs bg-blue-500/10 px-2 py-1 rounded-lg hover:bg-blue-500/20 transition-colors">+ Crear</button>
+                                  </div>
+                                  <div className="space-y-1">
+                                      {myGroups && myGroups.length === 0 && <p className="text-xs italic text-gray-500 p-2">No hay grupos creados.</p>}
+                                      {myGroups && myGroups.map(g => {
+                                          const chatId = `group_${g.id}`;
+                                          const isUnread = unreadChats[chatId];
+                                          return (
+                                              <button key={g.id} onClick={() => { handleOpenChat({ id: chatId, name: g.name, type: 'group' }); setIsChatAppOpen(true); }} className={`w-full flex items-center gap-3 p-2 rounded-xl transition-colors ${isDarkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-200'}`}>
+                                                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white shrink-0 shadow-sm"><UsersGroupIcon size={18}/></div>
+                                                  <div className="text-left flex-1 overflow-hidden">
+                                                      <p className={`font-bold text-sm truncate ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>{g.name}</p>
+                                                  </div>
+                                                  {isUnread && <span className="w-2 h-2 bg-red-500 rounded-full absolute right-2"></span>}
+                                              </button>
+                                          );
+                                      })}
+                                  </div>
+                              </div>
+
+                              <div>
+                                  <h3 className={`text-xs font-bold uppercase tracking-wider mb-3 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Contactos</h3>
+                                  <div className="space-y-1">
+                                      {allChatUsers && allChatUsers.map(u => {
+                                          const chatId = `dm_${[myChatId, u.id].sort().join('_')}`;
+                                          const isUnread = unreadChats[chatId];
+                                          const isOnline = userPresence[u.id]?.status === 'online';
+                                          return (
+                                              <button key={u.id} onClick={() => { handleOpenChat({ id: chatId, name: u.name, type: 'dm', role: u.role }); setIsChatAppOpen(true); }} className={`w-full flex items-center gap-3 p-2 rounded-xl transition-colors relative ${isDarkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-200'}`}>
+                                                  <div className="relative shrink-0">
+                                                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white shadow-sm transition-all duration-300 ${u.role === 'teacher' ? 'bg-gradient-to-br from-[#AD3333] to-[#8a2828]' : 'bg-gradient-to-br from-blue-400 to-indigo-500'}`}>
+                                                          {u.role === 'teacher' ? <TeacherIcon size={18}/> : <UserIcon size={18}/>}
+                                                      </div>
+                                                      <div className={`absolute bottom-0 right-0 w-3 h-3 border-2 rounded-full ${isDarkMode ? 'border-gray-900' : 'border-gray-100'} ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                                                  </div>
+                                                  <div className="text-left flex-1 overflow-hidden">
+                                                      <p className={`font-bold text-sm truncate leading-tight ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>{u.name}</p>
+                                                  </div>
+                                                  {isUnread && <span className="w-2 h-2 bg-blue-500 rounded-full"></span>}
+                                              </button>
+                                          );
+                                      })}
+                                  </div>
+                              </div>
                           </div>
-                      </div>
+                      )}
+
+                      {/* CONTENIDO: AJUSTES GENERALES (TIPO FACEBOOK) */}
+                      {rightSidebarTab === 'settings' && (
+                          <div className="space-y-4 animate-in fade-in duration-200">
+                              <h3 className={`text-xs font-bold uppercase tracking-wider ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Preferencias de cuenta</h3>
+
+                              {/* Tarjeta 1: Modo Oscuro / Modo Diurno */}
+                              <div className={`p-4 rounded-2xl border transition-all ${isDarkMode ? 'bg-gray-800/80 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
+                                  <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-3">
+                                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-sm ${isDarkMode ? 'bg-purple-950/70 text-purple-300 border border-purple-800/40' : 'bg-amber-50 text-amber-500 border border-amber-100'}`}>
+                                              {isDarkMode ? <Moon size={18} /> : <Sun size={18} />}
+                                          </div>
+                                          <div>
+                                              <p className={`text-xs font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>Modo oscuro</p>
+                                              <p className="text-[11px] text-gray-500">{isDarkMode ? 'Tema nocturno activo' : 'Tema diurno activo'}</p>
+                                          </div>
+                                      </div>
+                                      <button 
+                                          onClick={() => setIsDarkMode(!isDarkMode)} 
+                                          className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-300 ${isDarkMode ? 'bg-blue-600 justify-end' : 'bg-gray-300 dark:bg-gray-700 justify-start'}`}
+                                          title="Alternar modo oscuro y diurno"
+                                      >
+                                          <div className="bg-white w-4 h-4 rounded-full shadow-md transform transition-transform" />
+                                      </button>
+                                  </div>
+                              </div>
+
+                              {/* Tarjeta 2: Notificaciones y Sonidos */}
+                              <div className={`p-4 rounded-2xl border space-y-3 transition-all ${isDarkMode ? 'bg-gray-800/80 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
+                                  <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-3">
+                                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-sm ${soundEnabled ? (isDarkMode ? 'bg-blue-950/70 text-blue-300 border border-blue-800/40' : 'bg-blue-50 text-blue-600 border border-blue-100') : 'bg-gray-100 text-gray-400'}`}>
+                                              {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+                                          </div>
+                                          <div>
+                                              <p className={`text-xs font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>Sonidos de chat</p>
+                                              <p className="text-[11px] text-gray-500">{soundEnabled ? 'Alertas sonoras activas' : 'En silencio'}</p>
+                                          </div>
+                                      </div>
+                                      <button 
+                                          onClick={() => setSoundEnabled(!soundEnabled)} 
+                                          className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-300 ${soundEnabled ? 'bg-blue-600 justify-end' : 'bg-gray-300 dark:bg-gray-700 justify-start'}`}
+                                      >
+                                          <div className="bg-white w-4 h-4 rounded-full shadow-md transform transition-transform" />
+                                      </button>
+                                  </div>
+
+                                  <button 
+                                      onClick={enableNotifications} 
+                                      className={`w-full py-2 px-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 border ${isDarkMode ? 'bg-gray-700/60 border-gray-600 text-gray-200 hover:bg-gray-700' : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'}`}
+                                  >
+                                      <Bell size={14} /> Activar notificaciones push
+                                  </button>
+                              </div>
+
+                              {/* Tarjeta 3: Estado de Disponibilidad */}
+                              <div className={`p-4 rounded-2xl border space-y-2.5 transition-all ${isDarkMode ? 'bg-gray-800/80 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
+                                  <div className="flex items-center gap-2 mb-1">
+                                      <Shield size={16} className="text-green-500" />
+                                      <p className={`text-xs font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>Estado de conexión</p>
+                                  </div>
+                                  <div className="grid grid-cols-3 gap-1.5 text-[11px] font-bold">
+                                      <button 
+                                          onClick={() => {
+                                              const finalPresenceId = role === 'teacher' ? 'teacher' : myChatId;
+                                              if (finalPresenceId) {
+                                                  setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'presence', finalPresenceId), { isOnline: true, status: 'online', lastPing: Date.now() }, { merge: true }).catch(()=>{});
+                                              }
+                                          }} 
+                                          className={`py-1.5 px-2 rounded-xl flex items-center justify-center gap-1 border transition-all ${userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'online' ? 'bg-green-500/15 border-green-500 text-green-600 dark:text-green-400 shadow-sm' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                                      >
+                                          <span className="w-2 h-2 rounded-full bg-green-500"></span> En línea
+                                      </button>
+                                      <button 
+                                          onClick={() => {
+                                              const finalPresenceId = role === 'teacher' ? 'teacher' : myChatId;
+                                              if (finalPresenceId) {
+                                                  setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'presence', finalPresenceId), { isOnline: true, status: 'away', lastPing: Date.now() }, { merge: true }).catch(()=>{});
+                                              }
+                                          }} 
+                                          className={`py-1.5 px-2 rounded-xl flex items-center justify-center gap-1 border transition-all ${userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'away' ? 'bg-orange-500/15 border-orange-500 text-orange-600 dark:text-orange-400 shadow-sm' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                                      >
+                                          <span className="w-2 h-2 rounded-full bg-orange-400"></span> Ausente
+                                      </button>
+                                      <button 
+                                          onClick={() => {
+                                              const finalPresenceId = role === 'teacher' ? 'teacher' : myChatId;
+                                              if (finalPresenceId) {
+                                                  setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'presence', finalPresenceId), { isOnline: true, status: 'busy', lastPing: Date.now() }, { merge: true }).catch(()=>{});
+                                              }
+                                          }} 
+                                          className={`py-1.5 px-2 rounded-xl flex items-center justify-center gap-1 border transition-all ${userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'busy' ? 'bg-red-500/15 border-red-500 text-red-600 dark:text-red-400 shadow-sm' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                                      >
+                                          <span className="w-2 h-2 rounded-full bg-red-500"></span> Ocupado
+                                      </button>
+                                  </div>
+                              </div>
+
+                              {/* Tarjeta 4: Perfil institucional */}
+                              <div className={`p-4 rounded-2xl border space-y-2 transition-all ${isDarkMode ? 'bg-gray-800/80 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
+                                  <div className="flex items-center gap-3">
+                                      <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shrink-0 overflow-hidden border border-blue-200 dark:border-gray-700">
+                                          {userMappings[myChatId]?.profilePicUrl ? <img src={userMappings[myChatId].profilePicUrl} className="w-full h-full object-cover" /> : <UserIcon size={20} />}
+                                      </div>
+                                      <div className="overflow-hidden">
+                                          <p className={`font-bold text-xs truncate leading-tight ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>{loggedInName}</p>
+                                          <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">{userMappings[myChatId]?.customLabel || (role === 'teacher' ? 'Docente' : 'Estudiante')}</p>
+                                      </div>
+                                  </div>
+                                  <div className="pt-2 border-t border-gray-200/50 dark:border-gray-700/50 text-[11px] text-gray-500 space-y-1">
+                                      <p><span className="font-semibold text-gray-700 dark:text-gray-300">Institución:</span> Universidad de Pamplona</p>
+                                      <p><span className="font-semibold text-gray-700 dark:text-gray-300">Cuenta:</span> {loggedInUser}</p>
+                                  </div>
+                              </div>
+
+                              {/* Botón de Cerrar Sesión */}
+                              <div className="pt-1">
+                                  <button 
+                                      onClick={handleLogout} 
+                                      className={`w-full py-3 px-4 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-2 border ${isDarkMode ? 'bg-red-950/20 border-red-900/60 text-red-400 hover:bg-red-950/40' : 'bg-red-50 border-red-200 text-red-600 hover:bg-red-100 shadow-sm'}`}
+                                  >
+                                      <LogOutIcon size={16} /> Cerrar sesión
+                                  </button>
+                              </div>
+                          </div>
+                      )}
                   </aside>
               </div>
 
