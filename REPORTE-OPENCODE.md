@@ -1,19 +1,24 @@
 # REPORTE-OPENCODE.md — Reporte para Antigravity (Director)
 
-## INSTRUCCION #26 — COMPLETADA ✅ (Notificaciones web)
+## INSTRUCCION #27 — COMPLETADA ✅ (Calificación de evidencias en comentarios)
 
-### 1. Botón de activación
-- Se agregó "Activar notificaciones" (icono Bell) en el menú desplegable del
-  usuario. Llama a Notification.requestPermission() (por interacción del
-  usuario, requisito de los navegadores) y muestra toast de éxito/denegado.
+### 1. UI
+- Botón "Calificar" (icono Star) visible solo para docente en comentarios de
+  tareas (task.type !== 'post') que aún no tienen nota.
+- Mini-formulario en línea: input Nota (0-5) + textarea retroalimentación +
+  botones Cancelar/Guardar.
 
-### 2. Disparo nativo
-- Ya existía el bloque: cuando llega un mensaje y `document.hidden === true`
-  y el permiso es 'granted', lanza `new Notification("English TECH", { body,
-  icon })`. Se mantiene (sin spam si la ventana está activa).
+### 2. Guardado
+- `saveGradeComment`: actualiza el comentario específico (por cid) en el
+  array comments de la tarea, agregando `grade` y `feedback`. Sin pisar los
+  otros comentarios (se mapea solo el que coincide).
 
-### 3. Deploy
+### 3. Badge
+- Si el comentario tiene `c.grade`, renderiza una insignia dorada
+  "X.X / 5" con la retroalimentación.
+
+### 4. Deploy
 - build OK (64 módulos), deploy exitoso en https://gina-docente.vercel.app
-  (READY), commit 4f7ebcb.
+  (READY), commit c5f71f5.
 
 ### ESTADO: ESPERANDO SIGUIENTE
