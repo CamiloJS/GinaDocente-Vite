@@ -3255,9 +3255,10 @@ Devuelve ÚNICAMENTE un array JSON plano (sin bloques markdown \`\`\`json ni tex
 
             // Filtro por materia y búsqueda
             const filteredSyllabus = syllabus.filter(item => {
-              // Filtro por materia
+              // Filtro por materia: con materia seleccionada SOLO se muestran los contenidos de esa materia
               if (syllabusSubjectFilter !== 'all') {
-                if (item.targetGroupId && item.targetGroupId !== 'all' && item.targetGroupId !== syllabusSubjectFilter) {
+                const itemGroup = item.targetGroupId && item.targetGroupId !== 'all' ? item.targetGroupId : 'all';
+                if (itemGroup !== syllabusSubjectFilter) {
                   return false;
                 }
               }
@@ -3302,9 +3303,8 @@ Devuelve ÚNICAMENTE un array JSON plano (sin bloques markdown \`\`\`json ni tex
                         <button
                           type="button"
                           onClick={() => setShowAddSyllabus(true)}
-                          className={`${redButton} text-xs font-bold py-2 px-3.5 rounded-xl shadow-xs flex items-center gap-1.5 transition-all`}
+                          className="px-3.5 py-2 rounded-xl bg-[#AD3333] hover:bg-[#8a2828] text-white text-xs font-bold flex items-center justify-center shadow-xs transition-all hover:scale-[1.02]"
                         >
-                          <Plus size={15} />
                           <span>Añadir</span>
                         </button>
                       )}
