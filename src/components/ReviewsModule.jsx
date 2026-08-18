@@ -860,8 +860,7 @@ export const SlideEditorModal = ({ presentation, onClose, onSave, onProject, isD
                         type="text"
                         value={card.example || ''}
                         onChange={e => {
-                          const newCards = [...activeSlide.cards];
-                          newCards[cIdx].example = e.target.value;
+                          const newCards = activeSlide.cards.map((c, i) => i === cIdx ? {...c, example: e.target.value} : {...c});
                           handleSlideChange('cards', newCards);
                         }}
                         placeholder="Ejemplo práctico (opcional)..."

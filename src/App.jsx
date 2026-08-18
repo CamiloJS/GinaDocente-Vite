@@ -2411,6 +2411,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
   const handleSendAppMessage = async (e) => {
       if (e) e.preventDefault();
       if (isSendingChatAppMessageRef.current) return;
+      if (!activeChat) return;
       if (!chatAppInput.trim() && !chatAppImageUrl.trim() && !chatAppFileUrl && !chatAppAudioUrl) return;
 
       isSendingChatAppMessageRef.current = true;
@@ -2477,8 +2478,8 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
               targetIds = [activeChat.id.replace('dm_', '').split('_').find(id => id !== myChatId)];
           }
 
-          targetIds.forEach(async tId => {
-              if(tId) {
+          for (const tId of targetIds) {
+              if(tId && activeChat) {
                   const alertRef = doc(db, 'artifacts', appId, 'public', 'data', 'chatAlerts', tId);
                   const alertSnap = await getDoc(alertRef).catch(() => null);
                   if (alertSnap && alertSnap.exists()) {
@@ -2487,7 +2488,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                       await setDoc(alertRef, { hasUnread: true, timestamp: Date.now(), chats: { [activeChat.id]: true }, previewSender: previewName, previewText: msgPreviewText }).catch(() => {});
                   }
               }
-          });
+          }
       } catch (err) {
           console.error("Error enviando mensaje de chat:", err);
           showMessage("❌ Error al enviar el mensaje. Intente de nuevo.");
@@ -2643,6 +2644,8 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
     } catch (error) {
         showMessage("Hubo un error al subir el archivo.");
         setIsAiLoading(false);
+    } finally {
+        if (e.target) e.target.value = '';
     }
 };
 

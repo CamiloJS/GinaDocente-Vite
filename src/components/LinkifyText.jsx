@@ -35,8 +35,11 @@ const LinkifyText = ({ text, isDarkMode = false }) => {
       const videoId = extractYouTubeId(part)
       if (videoId && !ytIds.includes(videoId)) {
         ytIds.push(videoId)
-        // No renderizamos el link de texto crudo para YouTube, solo el reproductor personalizado abajo
-        return null;
+        return (
+          <a key={idx} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline break-all">
+            {part}
+          </a>
+        );
       }
       return (
         <a key={idx} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline break-all">
