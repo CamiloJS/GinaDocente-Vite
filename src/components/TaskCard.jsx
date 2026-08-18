@@ -1,7 +1,6 @@
 // src/components/TaskCard.jsx
 import React, { useState } from 'react'
 import ReactDOM from 'react-dom'
-import confetti from 'canvas-confetti'
 import * as XLSX from 'xlsx'
 import {
   CheckCheck, CheckLine, Clock, Edit3, FileDocIcon, FileText, ImageIcon, Loader2, Lock, MessageSquareText, Mic, PaperclipIcon, Plus, ReplyIcon, Send, SmileIcon, Square, Star, Pin, Trash2, X, XLine, Volume2, Languages, UserIcon, BookOpen, NavNotebook, Play, Pause, Download, MessageCircle
@@ -225,7 +224,6 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                     name: loggedInName || (role === 'teacher' ? TEACHER_NAME : 'Estudiante'), 
                     timestamp: Date.now() 
                 };
-                confetti({ particleCount: 35, spread: 55, origin: { y: 0.8 } });
                 showMessage(`⭐ ¡Puntaje asignado: ${score} estrella${score > 1 ? 's' : ''}!`);
             }
 
@@ -312,7 +310,6 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                 return c;
             });
             await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), { ...task, comments: updatedComments });
-            confetti({ particleCount: 30, spread: 50, origin: { y: 0.7 } });
             showMessage(`⭐ Has valorado con ${stars} estrella${stars > 1 ? 's' : ''}`);
         } catch (err) {
             console.error("Error al valorar comentario:", err);
@@ -620,7 +617,6 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
         
         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), { ...task, comments: [...(task.comments || []), newComment] });
         
-        confetti({ particleCount: 20, spread: 40, origin: { y: 0.8 } });
         setCommentTitle(""); setCommentText(""); setCommentImageUrl(""); setCommentFileUrl(""); setCommentFileName(""); setAudioCom("");
         setShowCommentImageInput(false); setShowAttachmentMenu(false); setShowEmojiPicker(false); setReplyingTo(null); setIsProcessing(false);
         showMessage(isForum ? "✅ Aporte publicado en el foro" : isTask && role !== 'teacher' ? "✅ Tarea entregada con éxito" : "✅ Comentario publicado");
