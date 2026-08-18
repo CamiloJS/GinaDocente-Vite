@@ -376,6 +376,7 @@ function App() {
 
   const [chatPreferences, setChatPreferences] = useState({});
   const [userPresence, setUserPresence] = useState({});
+  const userPresenceRef = useRef({});
   const [typingStatus, setTypingStatus] = useState({});
   const [showChatSettings, setShowChatSettings] = useState(false);
   const [showGroupInfo, setShowGroupInfo] = useState(false);
@@ -1831,24 +1832,24 @@ useEffect(() => {
     });
 
     const uPresence = onSnapshot(collection(db, ...base, 'presence'), s => {
-        const p = {}; s.docs.forEach(d => p[d.id] = d.data()); setUserPresence(p);
+        const p = {}; s.docs.forEach(d => p[d.id] = d.data()); setUserPresence(p); userPresenceRef.current = p;
     });
 
-    // 👇 NUEVO: Cazafantasmas (Revisa los latidos cada 30 seg) 👇
+    // 👇 Cazafantasmas: revisa los latidos cada 30 seg y PERSISTE el offline en Firestore
+    // (antes solo corregía el estado local, y el snapshot de la BD resucitaba al fantasma)
     const ghostInterval = setInterval(() => {
-        setUserPresence(prev => {
-            const now = Date.now();
-            let changed = false;
-            const newP = { ...prev };
-            Object.keys(newP).forEach(k => {
-                // Si pasaron más de 180 seg sin latido (4x el intervalo), lo marca desconectado
-                // 90 seg era demasiado estricto con latencia de red o pestaña en segundo plano
-                if (newP[k].status !== 'offline' && newP[k].lastPing && (now - newP[k].lastPing > 180000)) {
-                    newP[k] = { ...newP[k], status: 'offline', isOnline: false };
-                    changed = true;
-                }
-            });
-            return changed ? newP : prev;
+        const now = Date.now();
+        const prev = userPresenceRef.current;
+        const staleKeys = Object.keys(prev).filter(k =>
+            prev[k].status !== 'offline' && prev[k].lastPing && (now - prev[k].lastPing > 180000)
+        );
+        if (staleKeys.length === 0) return;
+        const newP = { ...prev };
+        staleKeys.forEach(k => { newP[k] = { ...newP[k], status: 'offline', isOnline: false }; });
+        setUserPresence(newP);
+        userPresenceRef.current = newP;
+        staleKeys.forEach(k => {
+            setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'presence', k), { isOnline: false, status: 'offline', lastSeen: Date.now() }, { merge: true }).catch(() => {});
         });
     }, 30000);
 
@@ -2014,7 +2015,9 @@ useEffect(() => {
 
                   pingInterval = setInterval(() => {
                       if (currentStatus !== 'offline') {
-                          setDoc(presenceRef, { lastPing: Date.now() }, { merge: true }).catch(()=>{});
+                          // Re-afirma online/status: se auto-recupera si el cazafantasmas lo marcó offline
+                          // por un apagón de red que duró más del margen permitido
+                          setDoc(presenceRef, { lastPing: Date.now(), isOnline: true, status: currentStatus }, { merge: true }).catch(()=>{});
                       }
                   }, 45000);
 
