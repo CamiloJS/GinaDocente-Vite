@@ -1150,28 +1150,32 @@ function App() {
             e.preventDefault();
             if (!sugText) return;
             setIsSugLoading(true);
-
-            if (await checkBadWordsAsync(sugText)) {
-              showMessage("Contenido inapropiado, se le será notificado a la profesora.");
-              await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'alerts'), { studentName: loggedInName, originalText: sugText, createdAt: Date.now() });
-              setShowSugModal(false); 
-              setSugText("");
-              setSugCategory("");
-            } else {
-              const studentPhoto = userMappings?.[myChatId]?.profilePicUrl || auth.currentUser?.photoURL || '';
-              await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'suggestions'), { 
-                  studentName: loggedInName, 
-                  studentId: myChatId || null,
-                  studentPhoto: studentPhoto,
-                  text: sugText.trim(), 
-                  category: sugCategory || null,
-                  createdAt: Date.now(), 
-                  read: false 
-              });
-              showMessage("✅ Sugerencia enviada."); 
-              setShowSugModal(false); 
-              setSugText("");
-              setSugCategory("");
+            try {
+              if (await checkBadWordsAsync(sugText)) {
+                showMessage("Contenido inapropiado, se le será notificado a la profesora.");
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'alerts'), { studentName: loggedInName, originalText: sugText, createdAt: Date.now() });
+                setShowSugModal(false); 
+                setSugText("");
+                setSugCategory("");
+              } else {
+                const studentPhoto = userMappings?.[myChatId]?.profilePicUrl || auth.currentUser?.photoURL || '';
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'suggestions'), { 
+                    studentName: loggedInName, 
+                    studentId: myChatId || null,
+                    studentPhoto: studentPhoto,
+                    text: sugText.trim(), 
+                    category: sugCategory || null,
+                    createdAt: Date.now(), 
+                    read: false 
+                });
+                showMessage("✅ Sugerencia enviada."); 
+                setShowSugModal(false); 
+                setSugText("");
+                setSugCategory("");
+              }
+            } catch (err) {
+              console.error(err);
+              showMessage("❌ Error al enviar la sugerencia.");
             }
             setIsSugLoading(false);
           };
@@ -2241,8 +2245,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
             
           const handleUpdateChatPreference = async (chatId, key, value) => {
               const newPrefs = { ...chatPreferences };
-              if (!newPrefs[chatId]) newPrefs[chatId] = { gradient: '', pattern: 'none' };
-              newPrefs[chatId][key] = value;
+              newPrefs[chatId] = { ...(newPrefs[chatId] || { gradient: '', pattern: 'none' }), [key]: value };
               setChatPreferences(newPrefs);
               const prefsUid = user?.uid || myChatId;
               if (prefsUid) {
@@ -2262,9 +2265,14 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
           const handleDeleteGroup = async () => {
               const group = chatGroups.find(g => g.id === activeChat.id || `group_${g.id}` === activeChat.id || `acad_${g.academicGroupId}` === activeChat.id || `acad_${g.id}` === activeChat.id);
               if (!group) return;
-              await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', group.id));
-              setActiveChat(null);
-              showMessage("🗑️ Grupo eliminado.");
+              try {
+                  await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', group.id));
+                  setActiveChat(null);
+                  showMessage("🗑️ Grupo eliminado.");
+              } catch (err) {
+                  console.error(err);
+                  showMessage("❌ Error al eliminar el grupo.");
+              }
           };
 
             const handleDeleteEntireChat = async () => {
@@ -4669,10 +4677,12 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                             <button
                                                 type="button"
                                                 onClick={() => confirmAction(`¿Eliminar la materia "${g.name}"?`, async () => {
-                                                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', g.id));
+                                                    try {
+                                                        const syllabusSnap = await getDocs(query(collection(db, 'artifacts', appId, 'public', 'data', 'syllabus'), where('targetGroupId', '==', g.id)));
+                                                        await Promise.all(syllabusSnap.docs.map(d => deleteDoc(d.ref)));
+                                                    } catch (e) { console.error(e); }
                                                     try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', `acad_${g.id}`)); } catch (e) {}
-                                                    const syllabusSnap = await getDocs(query(collection(db, 'artifacts', appId, 'public', 'data', 'syllabus'), where('targetGroupId', '==', g.id)));
-                                                    await Promise.all(syllabusSnap.docs.map(d => deleteDoc(d.ref)));
+                                                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', g.id));
                                                 })}
                                                 className="text-gray-400 hover:text-red-500 p-1.5 rounded-lg transition-colors"
                                                 title="Eliminar materia"
@@ -4849,7 +4859,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                 for (const g of academicGroups) {
                                                     if ((g.members || []).includes(userKey)) {
                                                         const updatedMembers = g.members.filter(m => m !== userKey);
-                                                        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', g.id), { members: updatedMembers });
+                                                        try { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', g.id), { members: updatedMembers }); } catch (e) { console.error(e); }
                                                         const chatGroupId = `acad_${g.id}`;
                                                         const updatedChatMembers = Array.from(new Set([myChatId, 'teacher', ...updatedMembers]));
                                                         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', chatGroupId), { members: updatedChatMembers }, { merge: true }).catch(() => {});
@@ -5984,8 +5994,8 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                       ) : null}
                       
                       {visibleEvaluations.map(ev => {
-                          const deadline = new Date(`${ev.dueDate}T${ev.dueTime || '23:59'}`);
-                          const isExpired = new Date() > deadline;
+                          const deadline = ev.dueDate ? new Date(`${ev.dueDate}T${ev.dueTime || '23:59'}`) : null;
+                          const isExpired = deadline ? new Date() > deadline : false;
                           const studentGrade = role === 'student' ? grades.find(g => g.evaluationId === ev.id && (g.studentId === user?.uid || g.studentId === myChatId)) : null;
                           const isDone = !!studentGrade;
 
@@ -6057,10 +6067,15 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                     <button 
                                                         type="button"
                                                         onClick={() => confirmAction("¿Borrar evaluación? También se borrarán las notas de los estudiantes.", async () => {
-                                                            const gradeSnap = await getDocs(query(collection(db, 'artifacts', appId, 'public', 'data', 'grades'), where('evaluationId', '==', ev.id)));
-                                                            await Promise.all(gradeSnap.docs.map(d => deleteDoc(d.ref)));
-                                                            await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'evaluations', ev.id));
-                                                            showMessage("✅ Evaluación y notas eliminadas.");
+                                                            try {
+                                                                const gradeSnap = await getDocs(query(collection(db, 'artifacts', appId, 'public', 'data', 'grades'), where('evaluationId', '==', ev.id)));
+                                                                await Promise.all(gradeSnap.docs.map(d => deleteDoc(d.ref)));
+                                                                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'evaluations', ev.id));
+                                                                showMessage("✅ Evaluación y notas eliminadas.");
+                                                            } catch (err) {
+                                                                console.error(err);
+                                                                showMessage("❌ Error al eliminar. Algunos datos podrían no haberse borrado.");
+                                                            }
                                                         })}
                                                        className="text-gray-400 hover:text-red-600 p-1.5 rounded-lg transition-colors"
                                                        title="Eliminar evaluación"
@@ -6091,8 +6106,8 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                ) : (
                                                    <div className="w-full flex items-center justify-between">
                                                        <span className="text-xs font-bold text-gray-500">Tu calificación:</span>
-                                                       <span className={`text-sm font-black px-2.5 py-0.5 rounded-lg ${studentGrade.score >= 3.0 ? 'bg-green-500/10 text-green-600' : 'bg-red-500/10 text-red-600'}`}>
-                                                           {studentGrade.score.toFixed(1)} / 5.0
+                                                        <span className={`text-sm font-black px-2.5 py-0.5 rounded-lg ${(studentGrade?.score ?? 0) >= 3.0 ? 'bg-green-500/10 text-green-600' : 'bg-red-500/10 text-red-600'}`}>
+                                                            {(studentGrade?.score ?? 0).toFixed(1)} / 5.0
                                                        </span>
                                                    </div>
                                                )
@@ -8017,8 +8032,8 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                               const ph = ["¿En qué necesitas ayuda?", "¿Hay algo que no entiendas?", "Pregúntame lo que sea...", "Escribe tu duda aquí...", "¿Cómo puedo ayudarte?", "¿Necesitas apoyo con algo?", "Estoy aquí para servirte...", "¿Alguna duda, profe?", "Pregúntame sin miedo...", "¿Qué necesitas hoy?", "¿Hay algo que te preocupe?", "¿Necesitas ideas para la clase?", "¿Quieres que te ayude?", "¿Cómo va todo, profe?", "¿Necesitas que te oriente?", "¿Tienes alguna consulta?", "¿En qué te puedo ayudar?", "¿Hay algún problema?", "¿Necesitas apoyo pedagógico?", "¿Qué tal tu día, profe?", "¿Necesitas que te explique algo?", "¿Hay algo nuevo para aprender?", "¿Quieres que repasemos juntos?", "¿Cómo están tus alumnos?", "¿Necesitas recursos didácticos?", "¿Quieres que genere una actividad?", "¿Hay algo que mejorar?", "¿Necesitas una idea fresca?", "¿Qué tal el semestre, profe?", "¿Necesitas motivación hoy?", "¿Hay algo que te cause curiosidad?", "¿Quieres que te sorprenda?", "¿Necesitas un consejo rápido?", "¿Cómo va la clase de hoy?", "¿Necesitas que te recuerde algo?", "¿Hay algo pendiente?", "¿Quieres que revisemos algo juntos?", "¿Qué necesitas saber ahora?", "¿Necesitas que te guíe?", "¿Hay algo que te cause duda?", "¿Quieres practicar algo?", "¿Cómo podemos mejorar hoy?", "¿Necesitas que te recomiende algo?", "¿Hay algo nuevo en tu clase?", "¿Quieres que te apoye?", "¿Necesitas una mano amiga?", "¿Qué tal tu progreso, profe?", "¿Necesitas que te ayude a planear?", "¿Hay algo que te inspire?", "¿Quieres que creemos algo juntos?"];
                               setBotPlaceholder(ph[Math.floor(Math.random() * ph.length)]);
                               setIsTeacherBotLoading(true);
-                              const newHistory = [...teacherBotHistory, { role: 'user', text: userMsg }];
-                              setTeacherBotHistory(newHistory);
+                              let newHistory;
+                              setTeacherBotHistory(prev => { newHistory = [...prev, { role: 'user', text: userMsg }]; return newHistory; });
 
                               const prompt = `Eres el "Asistente Técnico y Pedagógico" oficial de English TECH, la plataforma académica integral diseñada para la Profesora Gina y sus estudiantes de inglés.
 
@@ -8937,7 +8952,7 @@ Respuesta del asistente (Profesional, sobria, sin asteriscos de markdown inneces
                                                                               </div>
                                                                           )}
 
-                                                                          {m.imageUrl && <img src={m.imageUrl} loading="lazy" decoding="async" alt="Adjunto" onLoad={() => chatMessagesEndRef.current?.scrollIntoView({ behavior: "smooth" })} onClick={() => setFullScreenImage(m.imageUrl)} className={isImageOnly ? "rounded-2xl max-h-60 object-contain cursor-pointer hover:opacity-90 transition-opacity drop-shadow-md" : "mt-1.5 rounded-xl max-h-48 object-contain cursor-pointer hover:opacity-90 transition-opacity bg-black/10 border border-white/20"} />}
+                                                                          {m.imageUrl && <img src={m.imageUrl} loading="lazy" decoding="async" alt="Adjunto" onLoad={(e) => { const container = e.target.closest('.overflow-y-auto'); if (container && container.scrollHeight - container.scrollTop - container.clientHeight < 300) chatMessagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }} onClick={() => setFullScreenImage(m.imageUrl)} className={isImageOnly ? "rounded-2xl max-h-60 object-contain cursor-pointer hover:opacity-90 transition-opacity drop-shadow-md" : "mt-1.5 rounded-xl max-h-48 object-contain cursor-pointer hover:opacity-90 transition-opacity bg-black/10 border border-white/20"} />}
                                                                           
                                                                           {m.fileUrl && (
                                                                               <a href={m.fileUrl} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-2 p-2 rounded-xl mt-1 w-fit transition-colors border ${isMe ? 'bg-white/20 border-white/30 text-white' : 'bg-black/10 border-black/10 dark:bg-white/10 dark:border-white/10 text-gray-800 dark:text-gray-100'}`}>
@@ -9133,10 +9148,10 @@ Respuesta del asistente (Profesional, sobria, sin asteriscos de markdown inneces
                                                   setChatAppInput(e.target.value);
                                                   if (!activeChat) return;
                                                   const typingRef = doc(db, 'artifacts', appId, 'public', 'data', 'typing', activeChat.id);
-                                                  setDoc(typingRef, { [myChatId]: true }, { merge: true });
+                                                  setDoc(typingRef, { [myChatId]: true }, { merge: true }).catch(() => {});
                                                   clearTimeout(typingTimeout.current);
                                                   typingTimeout.current = setTimeout(() => {
-                                                      setDoc(typingRef, { [myChatId]: false }, { merge: true });
+                                                      setDoc(typingRef, { [myChatId]: false }, { merge: true }).catch(() => {});
                                                   }, 2000);
                                               }}
                                                   placeholder="Escribe un mensaje..." 
