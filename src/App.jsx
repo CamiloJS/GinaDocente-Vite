@@ -4610,17 +4610,10 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                             </div>
                                             <div className="min-w-0 flex-1">
                                                 <h4 className="font-bold text-xs truncate text-gray-900 dark:text-gray-100">{g.name}</h4>
-                                                <button
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setGroupMembersModal({ isOpen: true, group: g, search: "" });
-                                                    }}
-                                                    className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline mt-0.5 cursor-pointer"
-                                                    title="Ver integrantes"
-                                                >
-                                                    <UsersIcon size={12} /> {g.members?.length || 0} miembros
-                                                </button>
+                                                <div className="flex items-center gap-1 text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
+                                                    <UsersIcon size={10} />
+                                                    <span>{g.members?.length || 0} {g.members?.length === 1 ? 'miembro' : 'miembros'}</span>
+                                                </div>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
