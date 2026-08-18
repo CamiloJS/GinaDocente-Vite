@@ -7977,6 +7977,20 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
 
                               const prompt = `Eres el "Asistente Técnico y Pedagógico" oficial de English TECH, la plataforma académica integral diseñada para la Profesora Gina y sus estudiantes de inglés.
 
+CONTEXTO ACTUAL DE LA PLATAFORMA (en tiempo real):
+Fecha y hora actual (Bogotá, Colombia): ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', weekday: 'long' })}
+
+DATOS REALES DE LA PLATAFORMA (acceso directo):
+- Total de publicaciones/tareas en el muro: ${tasks.length}
+- Últimas 5 publicaciones: ${tasks.slice(0, 5).map(t => `"${t.title || 'Sin título'}" (${t.targetGroupName || 'Global'}, ${new Date(t.createdAt).toLocaleDateString('es-CO')})`).join(' | ')}
+- Total de evaluaciones creadas: ${evaluations.length}
+- Evaluaciones próximas (por vencer): ${evaluations.filter(e => e.dueDate && new Date(e.dueDate) > new Date()).slice(0, 5).map(e => `"${e.title}" (vence: ${new Date(e.dueDate).toLocaleDateString('es-CO')})`).join(' | ')}
+- Total de estudiantes registrados: ${Object.keys(userMappings).filter(k => userMappings[k]?.role === 'student').length}
+- Nombres de estudiantes: ${Object.entries(userMappings).filter(([, u]) => u?.role === 'student').map(([, u]) => u.fullName || u.name).slice(0, 30).join(', ')}
+- Grupos académicos: ${academicGroups.length > 0 ? academicGroups.map(g => g.name).join(', ') : 'Ninguno creado aún'}
+- Semanas del syllabus: ${syllabus.length}
+- Contenido programático más reciente: ${syllabus.length > 0 ? `"Semana ${syllabus[syllabus.length - 1]?.week}: ${syllabus[syllabus.length - 1]?.topic || 'Sin tema'}"` : 'Sin contenido aún'}
+
 CONOCIMIENTO TOTAL Y MANUAL MAESTRO DE LA PLATAFORMA ENGLISH TECH:
 
 1. ROL DOCENTE Y ADMINISTRACIÓN:
