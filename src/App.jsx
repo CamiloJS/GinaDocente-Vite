@@ -7868,7 +7868,11 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                       <div className={`${glassCard} w-[92vw] sm:w-[420px] md:w-[480px] h-[520px] md:h-[600px] max-h-[80vh] flex flex-col p-4 animate-in slide-in-from-bottom-10 fade-in shadow-2xl ${isDarkMode ? 'bg-gray-900/95 border-gray-700' : 'bg-white/95 border-gray-200'}`}>
                           <div className={`flex justify-between items-center mb-3 border-b pb-3 ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
                               <div className="flex items-center gap-2.5">
-                                  <div className="p-1.5 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                                  <div className={`p-1.5 rounded-xl transition-all duration-300 ${
+                                      isTeacherBotLoading
+                                          ? 'bg-purple-500/20 text-purple-600 dark:text-purple-400'
+                                          : 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                                  }`} style={isTeacherBotLoading ? { animation: 'bot-think 2.5s ease-in-out infinite' } : {}}>
                                       <CuteBotIcon size={22} />
                                   </div>
                                   <div>
@@ -7878,6 +7882,11 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                       {isAiSessionPaused ? (
                                            <span className="text-[10px] text-amber-500 dark:text-amber-400 font-bold flex items-center gap-1">
                                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" /> Sesión pausada
+                                           </span>
+                                       ) : isTeacherBotLoading ? (
+                                           <span className="text-[10px] text-purple-500 dark:text-purple-400 font-bold flex items-center gap-1" style={{ transition: 'opacity 0.3s' }}>
+                                               <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
+                                               {["Hmm, déjame pensar...", "Interesante pregunta...", "Un segundito...", "Procesando...", "Analizando...", "Cargando conocimiento...", "Ya casi...", "Oooh buena esa..."][thinkingMsg]}
                                            </span>
                                        ) : (
                                            <span className="text-[10px] text-emerald-500 font-bold flex items-center gap-1">
@@ -7926,24 +7935,13 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                   </div>
                               ))}
                               {isTeacherBotLoading && (
-                                  <div className="flex items-start gap-2.5 animate-in fade-in duration-300">
-                                      <div className="relative shrink-0">
-                                          <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shadow-lg" style={{ animation: 'bot-think 3s ease-in-out infinite' }}>
-                                              <CuteBotIcon size={20} className="text-white" />
-                                          </div>
-                                          <span className="absolute -top-1 -right-1 text-[10px]" style={{ animation: 'float-up 2.2s ease-in-out infinite' }}>❓</span>
-                                          <span className="absolute -top-0.5 -left-1.5 text-[10px]" style={{ animation: 'float-up 2.2s ease-in-out 0.7s infinite' }}>💭</span>
+                                  <div className="flex items-center gap-2 py-2 px-3">
+                                      <div className="flex gap-1">
+                                          <span className="w-1.5 h-1.5 rounded-full bg-purple-400 dark:bg-purple-500" style={{ animation: 'typing-dot 1.4s ease-in-out infinite' }} />
+                                          <span className="w-1.5 h-1.5 rounded-full bg-purple-400 dark:bg-purple-500" style={{ animation: 'typing-dot 1.4s ease-in-out 0.2s infinite' }} />
+                                          <span className="w-1.5 h-1.5 rounded-full bg-purple-400 dark:bg-purple-500" style={{ animation: 'typing-dot 1.4s ease-in-out 0.4s infinite' }} />
                                       </div>
-                                      <div className="rounded-2xl rounded-tl-none border border-violet-200 dark:border-violet-800/50 bg-violet-50/80 dark:bg-violet-950/30 px-4 py-3 shadow-xs max-w-xs">
-                                          <p className="text-xs font-semibold text-violet-700 dark:text-violet-300 italic" style={{ transition: 'opacity 0.3s' }}>
-                                              {["Consultando el plan de estudios...", "Revisando las mejores estrategias pedagógicas...", "Preparando ejercicios interactivos...", "Analizando los objetivos de aprendizaje...", "Diseñando actividades didácticas...", "Buscando recursos educativos de calidad...", "Estructurando la retroalimentación...", "Combinando gramática y vocabulario..."][thinkingMsg]}
-                                          </p>
-                                          <div className="flex gap-1 mt-2">
-                                              <span className="w-1.5 h-1.5 rounded-full bg-violet-400 dark:bg-violet-500" style={{ animation: 'typing-dot 1.4s ease-in-out infinite' }} />
-                                              <span className="w-1.5 h-1.5 rounded-full bg-violet-400 dark:bg-violet-500" style={{ animation: 'typing-dot 1.4s ease-in-out 0.2s infinite' }} />
-                                              <span className="w-1.5 h-1.5 rounded-full bg-violet-400 dark:bg-violet-500" style={{ animation: 'typing-dot 1.4s ease-in-out 0.4s infinite' }} />
-                                          </div>
-                                      </div>
+                                      <span className="text-[10px] text-purple-500 dark:text-purple-400 italic font-medium">escribiendo...</span>
                                   </div>
                               )}
                               <div ref={teacherBotEndRef} />
