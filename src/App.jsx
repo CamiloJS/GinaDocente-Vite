@@ -262,7 +262,7 @@ function App() {
   const [sugCategory, setSugCategory] = useState("");
   const [isSugLoading, setIsSugLoading] = useState(false);
   const [revealedItems, setRevealedItems] = useState({}); 
-  const [toastMessage, setToastMessage] = useState("");
+  const [toast, setToast] = useState({ message: '', visible: false });
   const [profileReplyingTo, setProfileReplyingTo] = useState({});
 
   const [postType, setPostType] = useState('task'); 
@@ -304,6 +304,9 @@ function App() {
     isSending: false,
     sentToEmail: null,
     error: ''
+  });
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    try { return !localStorage.getItem('englishTech_onboardingDone'); } catch(e) { return false; }
   });
 
   // --- ESTADOS DE EVALUACIONES ---
@@ -514,7 +517,15 @@ function App() {
   const otherContactsUsers = filteredUsers.filter(u => !lastMessages[`dm_${[myChatId, u.id].sort().join('_')}`]);
 
   // --- ACCIONES Y HANDLERS BÁSICOS ---
-  const showMessage = (msg) => { setToastMessage(msg); setTimeout(() => setToastMessage(""), 5000); };
+  const toastTimerRef = useRef(null);
+  const showMessage = (msg, duration) => {
+    clearTimeout(toastTimerRef.current);
+    const isErr = msg.startsWith('❌') || msg.startsWith('🚨');
+    const dur = duration || (isErr ? 8000 : 4000);
+    setToast({ message: msg, visible: true });
+    toastTimerRef.current = setTimeout(() => setToast(prev => ({ ...prev, visible: false })), dur);
+    setTimeout(() => setToast({ message: '', visible: false }), dur + 300);
+  };
   const confirmAction = (msg, action, confirmText = null, isDestructive = null, title = null) => {
     const isDelete = isDestructive !== null
       ? isDestructive
@@ -548,7 +559,7 @@ function App() {
     if (tab !== 'chat') {
       if (activeChat) setIsChatMinimized(true);
     }
-    window.location.hash = targetHash; 
+    try { history.pushState(null, '', `#${targetHash}`); } catch(e) { window.location.hash = targetHash; } 
     setActiveTab(tab); 
   };
 
@@ -951,7 +962,11 @@ function App() {
       }
     };
     window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    window.addEventListener('popstate', handleHashChange);
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+      window.removeEventListener('popstate', handleHashChange);
+    };
   }, []);
 
   // Sincronización en tiempo real e instantánea de la URL del perfil activo
@@ -3095,7 +3110,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                 {/* Feed de Publicaciones del Perfil Cómodo y sin Desbordamientos */}
                 <div className="space-y-4 w-full">
                     {myPosts.length === 0 ? (
-                        <p className="text-gray-500 text-xs italic text-center py-6">Aún no hay publicaciones en este perfil.</p>
+                        <EmptyState icon={FileText} title="Sin publicaciones" message={isMyProfile ? "Comparte algo en tu perfil para que otros lo vean." : "Este usuario aún no ha publicado nada."} isDarkMode={isDarkMode} />
                     ) : null}
                     {myPosts.map(post => {
                         const isEditingThis = editingProfilePostId === post.id;
@@ -3206,7 +3221,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
           
 
           const renderReviews = () => (
-            <React.Suspense fallback={<p className="text-gray-500 p-8 text-center">Cargando diapositivas...</p>}>
+            <React.Suspense fallback={<div className="space-y-4 p-4">{[1,2,3].map(i => <div key={i} className="p-4 rounded-2xl border animate-pulse bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800"><div className="flex items-center gap-3 mb-4"><div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700" /><div className="flex-1 space-y-2"><div className="h-3 w-1/3 rounded bg-gray-200 dark:bg-gray-700" /></div></div><div className="h-4 w-full rounded mb-2 bg-gray-200 dark:bg-gray-700" /><div className="h-4 w-5/6 rounded bg-gray-200 dark:bg-gray-700" /></div>)}</div>}>
             <ReviewsModule
               role={role}
               isDarkMode={isDarkMode}
@@ -5344,7 +5359,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                     )}
 
                     {/* Muro / Feed filtrado para este grupo */}
-                    <React.Suspense fallback={<p className="text-gray-500 p-8 text-center">Cargando publicaciones del grupo...</p>}>
+                    <React.Suspense fallback={<div className="space-y-4 p-4">{[1,2].map(i => <div key={i} className="p-4 rounded-2xl border animate-pulse bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800"><div className="h-4 w-full rounded mb-2 bg-gray-200 dark:bg-gray-700" /><div className="h-4 w-5/6 rounded bg-gray-200 dark:bg-gray-700" /></div>)}</div>}>
                         <TasksTab 
                             academicGroups={academicGroups} 
                             myChatId={myChatId}
@@ -7685,7 +7700,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                   {/* CENTER CONTENT */}
                   <main className="flex-1 max-w-[680px] min-w-0 w-full p-2 md:p-6 pb-28 md:pb-8 relative z-10 shrink-0 mx-auto">
                       {activeTab === 'tasks' && (
-                          <React.Suspense fallback={<p className="text-gray-500 p-8 text-center">Cargando muro...</p>}>
+                          <React.Suspense fallback={<div className="space-y-4 p-4">{[1,2,3].map(i => <div key={i} className="p-4 rounded-2xl border animate-pulse bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800"><div className="flex items-center gap-3 mb-4"><div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700" /><div className="flex-1 space-y-2"><div className="h-3 w-1/3 rounded bg-gray-200 dark:bg-gray-700" /></div></div><div className="h-4 w-full rounded mb-2 bg-gray-200 dark:bg-gray-700" /><div className="h-4 w-5/6 rounded bg-gray-200 dark:bg-gray-700" /></div>)}</div>}>
                           <TasksTab 
                               academicGroups={academicGroups} 
                               myChatId={myChatId}
@@ -9322,9 +9337,12 @@ Respuesta del asistente (Profesional, sobria, sin asteriscos de markdown inneces
                   </div>
               , document.body)}
 
-              {toastMessage && (
-                <div className="fixed bottom-24 md:bottom-6 left-1/2 transform -translate-x-1/2 bg-gray-900/95 backdrop-blur-md text-white px-6 py-3 rounded-full shadow-2xl z-[200] font-medium text-sm text-center border border-gray-700 whitespace-nowrap">
-                  {toastMessage}
+              {toast.message && (
+                <div className={`fixed bottom-24 md:bottom-6 left-1/2 transform -translate-x-1/2 bg-gray-900/95 backdrop-blur-md text-white px-5 py-3 rounded-full shadow-2xl z-[200] font-medium text-sm text-center border border-gray-700 flex items-center gap-2 transition-opacity duration-300 ${toast.visible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                  <span className="whitespace-nowrap">{toast.message}</span>
+                  <button onClick={() => { clearTimeout(toastTimerRef.current); setToast({ message: '', visible: false }); }} className="ml-1 p-0.5 rounded-full hover:bg-white/20 transition-colors shrink-0" aria-label="Cerrar notificación">
+                    <X size={14} />
+                  </button>
                 </div>
               )}
 
@@ -9335,6 +9353,27 @@ Respuesta del asistente (Profesional, sobria, sin asteriscos de markdown inneces
 <img src={fullScreenImage} loading="lazy" className="w-auto h-auto max-w-[95vw] max-h-[90vh] object-contain rounded-lg shadow-2xl" onClick={e => e.stopPropagation()} />
                   </div>
               , document.body)}
+
+              {/* ONBOARDING PRIMERA VEZ */}
+              {showOnboarding && hasEntered && (
+                <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => { setShowOnboarding(false); try { localStorage.setItem('englishTech_onboardingDone', '1'); } catch(e) {} }}>
+                  <div className={`max-w-sm w-full rounded-3xl p-6 text-center space-y-4 ${isDarkMode ? 'bg-gray-900 border border-gray-700' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
+                    <div className="w-16 h-16 bg-gradient-to-br from-[#AD3333] to-[#8a2828] rounded-2xl flex items-center justify-center mx-auto">
+                      <span className="text-white text-2xl font-black">ET</span>
+                    </div>
+                    <h2 className="text-xl font-extrabold text-gray-900 dark:text-white">Bienvenido a English TECH</h2>
+                    <div className="space-y-3 text-left text-xs text-gray-600 dark:text-gray-400">
+                      <div className="flex items-start gap-3"><span className="text-lg">📋</span><div><b className="text-gray-900 dark:text-white">Muro</b> — Publicaciones y tareas de la profesora</div></div>
+                      <div className="flex items-start gap-3"><span className="text-lg">💬</span><div><b className="text-gray-900 dark:text-white">Chats</b> — Mensajes privados y grupales</div></div>
+                      <div className="flex items-start gap-3"><span className="text-lg">📊</span><div><b className="text-gray-900 dark:text-white">Evaluaciones</b> — Pruebas y calificaciones</div></div>
+                      <div className="flex items-start gap-3"><span className="text-lg">⚙️</span><div><b className="text-gray-900 dark:text-white">Ajustes</b> — Tema, sonidos y notificaciones</div></div>
+                    </div>
+                    <button onClick={() => { setShowOnboarding(false); try { localStorage.setItem('englishTech_onboardingDone', '1'); } catch(e) {} }} className="w-full py-3 bg-[#AD3333] hover:bg-[#8a2828] text-white font-bold rounded-xl transition-all min-h-[44px]">
+                      ¡Entendido!
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* MODAL GLOBAL DE CONFIRMACIÓN */}
               {globalGifCallback && ReactDOM.createPortal(<React.Suspense fallback={null}><GifPickerModal onSelect={(url) => { globalGifCallback(url); setGlobalGifCallback(null); }} onClose={() => setGlobalGifCallback(null)} isDarkMode={isDarkMode} /></React.Suspense>, document.body)}

@@ -620,7 +620,7 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
         
         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), { ...task, comments: [...(task.comments || []), newComment] });
         
-        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+        confetti({ particleCount: 20, spread: 40, origin: { y: 0.8 } });
         setCommentTitle(""); setCommentText(""); setCommentImageUrl(""); setCommentFileUrl(""); setCommentFileName(""); setAudioCom("");
         setShowCommentImageInput(false); setShowAttachmentMenu(false); setShowEmojiPicker(false); setReplyingTo(null); setIsProcessing(false);
         showMessage(isForum ? "✅ Aporte publicado en el foro" : isTask && role !== 'teacher' ? "✅ Tarea entregada con éxito" : "✅ Comentario publicado");
@@ -920,7 +920,7 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                     placeholder="Título de la publicación..." 
                 />
             ) : (
-                <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100 leading-snug mb-1.5 flex items-center gap-2">
+                <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100 leading-snug mb-1.5 flex items-center gap-2 line-clamp-2">
                     {task.title} {isLocked && <Lock size={16} className="text-red-500 shrink-0" />}
                 </h3>
             )}

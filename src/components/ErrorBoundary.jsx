@@ -20,14 +20,30 @@ class ErrorBoundary extends React.Component {
     } catch (e) {}
   }
 
+  getTheme() {
+    try {
+      const cls = document.documentElement.classList
+      if (cls.contains('theme-lights-out') || cls.contains('dark')) return 'dark'
+      if (cls.contains('theme-dim')) return 'dim'
+    } catch (e) {}
+    return 'light'
+  }
+
   render() {
     if (this.state.hasError) {
       const msg = this.state.error?.message || String(this.state.error) || ''
+      const theme = this.getTheme()
+      const isDark = theme !== 'light'
+      const bg = isDark ? '#0f1419' : '#f3f4f6'
+      const textColor = isDark ? '#e7e9ea' : '#111'
+      const mutedColor = isDark ? '#71767b' : '#666'
+      const btnBg = isDark ? '#374151' : '#374151'
+
       return (
         <div style={{
           minHeight: '100vh', display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center', gap: 16,
-          background: '#f3f4f6', padding: 24, textAlign: 'center', fontFamily: 'sans-serif'
+          background: bg, padding: 24, textAlign: 'center', fontFamily: 'sans-serif'
         }}>
           <div style={{
             width: 64, height: 64,
@@ -35,17 +51,22 @@ class ErrorBoundary extends React.Component {
             borderRadius: 16, display: 'flex', alignItems: 'center',
             justifyContent: 'center', color: 'white', fontWeight: 900, fontSize: 28
           }}>!</div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#111', margin: 0 }}>Error en la aplicación</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: textColor, margin: 0 }}>Algo salió mal</h1>
           {msg && (
-            <pre style={{
-              background: '#1e1e1e', color: '#f97171', padding: '10px 16px',
-              borderRadius: 10, fontSize: 12, textAlign: 'left',
-              maxWidth: '90vw', overflowX: 'auto', whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word', maxHeight: 180, overflowY: 'auto'
-            }}>{msg}</pre>
+            <details style={{ maxWidth: '90vw', width: 400 }}>
+              <summary style={{ cursor: 'pointer', color: mutedColor, fontSize: 12, marginBottom: 8 }}>
+                Ver detalles técnicos
+              </summary>
+              <pre style={{
+                background: '#1e1e1e', color: '#f97171', padding: '10px 16px',
+                borderRadius: 10, fontSize: 11, textAlign: 'left',
+                maxWidth: '90vw', overflowX: 'auto', whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word', maxHeight: 180, overflowY: 'auto', margin: 0
+              }}>{msg}</pre>
+            </details>
           )}
-          <p style={{ color: '#666', fontSize: 13, maxWidth: 400, margin: 0 }}>
-            Copia el mensaje rojo de arriba y compártelo para que podamos solucionarlo.
+          <p style={{ color: mutedColor, fontSize: 13, maxWidth: 400, margin: 0 }}>
+            No te preocupes, puedes intentar recargar la página.
           </p>
           <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
             <button
@@ -63,7 +84,7 @@ class ErrorBoundary extends React.Component {
             <button
               onClick={() => this.setState({ hasError: false, error: null })}
               style={{
-                padding: '12px 24px', borderRadius: 12, background: '#374151',
+                padding: '12px 24px', borderRadius: 12, background: btnBg,
                 color: 'white', fontWeight: 700, border: 'none', cursor: 'pointer', fontSize: 14
               }}
             >
