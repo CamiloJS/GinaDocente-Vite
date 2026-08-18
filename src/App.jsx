@@ -449,6 +449,7 @@ function App() {
   const cropImageRef = useRef(null);
   const cropContainerRef = useRef(null);
   const teacherBotEndRef = useRef(null);
+  const [thinkingMsg, setThinkingMsg] = useState(0);
   const recordingRef = useRef(null);
   const recordingStreamRef = useRef(null);
   const chatMessagesEndRef = useRef(null);
@@ -1867,6 +1868,13 @@ useEffect(() => {
 
    return () => { uBotSettings(); uChat(); uGroups(); uUnread(); uLastMsgs(); uChatPrefs(); uPresence(); uTyping(); uAcad(); uTeacherBot(); uTeacherBotHist(); clearInterval(ghostInterval); };
 }, [user, myChatId]);
+
+// Rotación de mensajes del bot mientras "piensa"
+useEffect(() => {
+    if (!isTeacherBotLoading) { setThinkingMsg(0); return; }
+    const id = setInterval(() => setThinkingMsg(i => (i + 1) % 8), 2500);
+    return () => clearInterval(id);
+}, [isTeacherBotLoading]);
 
 // Auto-sincronización de materias académicas con salas de chat grupales
 useEffect(() => {
@@ -7918,9 +7926,24 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                   </div>
                               ))}
                               {isTeacherBotLoading && (
-                                  <div className="flex items-center gap-2 p-3 text-xs text-blue-500">
-                                      <Loader2 className="animate-spin" size={16} />
-                                      <span>Elaborando respuesta pedagógica...</span>
+                                  <div className="flex items-start gap-2.5 animate-in fade-in duration-300">
+                                      <div className="relative shrink-0">
+                                          <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shadow-lg" style={{ animation: 'bot-think 3s ease-in-out infinite' }}>
+                                              <CuteBotIcon size={20} className="text-white" />
+                                          </div>
+                                          <span className="absolute -top-1 -right-1 text-[10px]" style={{ animation: 'float-up 2.2s ease-in-out infinite' }}>❓</span>
+                                          <span className="absolute -top-0.5 -left-1.5 text-[10px]" style={{ animation: 'float-up 2.2s ease-in-out 0.7s infinite' }}>💭</span>
+                                      </div>
+                                      <div className="rounded-2xl rounded-tl-none border border-violet-200 dark:border-violet-800/50 bg-violet-50/80 dark:bg-violet-950/30 px-4 py-3 shadow-xs max-w-xs">
+                                          <p className="text-xs font-semibold text-violet-700 dark:text-violet-300 italic" style={{ transition: 'opacity 0.3s' }}>
+                                              {["Consultando el plan de estudios...", "Revisando las mejores estrategias pedagógicas...", "Preparando ejercicios interactivos...", "Analizando los objetivos de aprendizaje...", "Diseñando actividades didácticas...", "Buscando recursos educativos de calidad...", "Estructurando la retroalimentación...", "Combinando gramática y vocabulario..."][thinkingMsg]}
+                                          </p>
+                                          <div className="flex gap-1 mt-2">
+                                              <span className="w-1.5 h-1.5 rounded-full bg-violet-400 dark:bg-violet-500" style={{ animation: 'typing-dot 1.4s ease-in-out infinite' }} />
+                                              <span className="w-1.5 h-1.5 rounded-full bg-violet-400 dark:bg-violet-500" style={{ animation: 'typing-dot 1.4s ease-in-out 0.2s infinite' }} />
+                                              <span className="w-1.5 h-1.5 rounded-full bg-violet-400 dark:bg-violet-500" style={{ animation: 'typing-dot 1.4s ease-in-out 0.4s infinite' }} />
+                                          </div>
+                                      </div>
                                   </div>
                               )}
                               <div ref={teacherBotEndRef} />
