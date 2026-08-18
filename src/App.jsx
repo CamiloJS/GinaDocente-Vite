@@ -103,6 +103,18 @@ export const GROUP_COVER_PATTERNS = [
   { id: 'doodle-5', name: 'Universitario', bg: 'linear-gradient(135deg, #7c2d12 0%, #c2410c 50%, #d97706 100%)' },
 ];
 
+const BotThinkingIcon = ({ size = 22, className = "" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+    <rect x="4" y="8" width="16" height="12" rx="2" stroke="currentColor" strokeWidth="2" />
+    <path d="M12 8V4H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M2 14h2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <path d="M20 14h2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <ellipse cx="9" cy="13" rx="2.2" ry="2.2" fill="currentColor" style={{ animation: 'bot-eye-happy 4s ease-in-out infinite' }} />
+    <ellipse cx="15" cy="13" rx="2.2" ry="2.2" fill="currentColor" style={{ animation: 'bot-eye-happy 4s ease-in-out 0.6s infinite' }} />
+    <path d="M9.5 17.5 Q12 19.5 14.5 17.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+  </svg>
+);
+
 function App() {
   // --- HELPERS BÁSICOS Y CONSTANTES INICIALES ---
   const getInitialHashInfo = () => {
@@ -449,7 +461,11 @@ function App() {
   const cropImageRef = useRef(null);
   const cropContainerRef = useRef(null);
   const teacherBotEndRef = useRef(null);
-  const [thinkingMsg, setThinkingMsg] = useState(0);
+  const [thinkingMsg, setThinkingMsg] = useState(() => Math.floor(Math.random() * 8));
+  const [botPlaceholder, setBotPlaceholder] = useState(() => {
+      const p = ["¿En qué necesitas ayuda?", "¿Hay algo que no entiendas?", "Pregúntame lo que sea...", "Escribe tu duda aquí...", "¿Cómo puedo ayudarte?", "¿Necesitas apoyo con algo?", "Estoy aquí para servirte...", "¿Alguna duda, profe?", "Pregúntame sin miedo...", "¿Qué necesitas hoy?", "¿Hay algo que te preocupe?", "¿Necesitas ideas para la clase?", "¿Quieres que te ayude?", "¿Cómo va todo, profe?", "¿Necesitas que te oriente?", "¿Tienes alguna consulta?", "¿En qué te puedo ayudar?", "¿Hay algún problema?", "¿Necesitas apoyo pedagógico?", "¿Qué tal tu día, profe?"];
+      return p[Math.floor(Math.random() * p.length)];
+  });
   const recordingRef = useRef(null);
   const recordingStreamRef = useRef(null);
   const chatMessagesEndRef = useRef(null);
@@ -1871,7 +1887,8 @@ useEffect(() => {
 
 // Rotación de mensajes del bot mientras "piensa"
 useEffect(() => {
-    if (!isTeacherBotLoading) { setThinkingMsg(0); return; }
+    if (!isTeacherBotLoading) return;
+    setThinkingMsg(Math.floor(Math.random() * 8));
     const id = setInterval(() => setThinkingMsg(i => (i + 1) % 8), 2500);
     return () => clearInterval(id);
 }, [isTeacherBotLoading]);
@@ -7873,7 +7890,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                           ? 'bg-purple-500/20 text-purple-600 dark:text-purple-400'
                                           : 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
                                   }`} style={isTeacherBotLoading ? { animation: 'bot-think 2.5s ease-in-out infinite' } : {}}>
-                                      <CuteBotIcon size={22} />
+                                      {isTeacherBotLoading ? <BotThinkingIcon size={22} /> : <CuteBotIcon size={22} />}
                                   </div>
                                   <div>
                                       <h3 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDarkMode ? 'text-gray-100' : 'text-gray-800'}`}>
@@ -7952,6 +7969,8 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                               if (!teacherBotInput.trim()) return;
                               const userMsg = teacherBotInput.trim(); 
                               setTeacherBotInput("");
+                              const ph = ["¿En qué necesitas ayuda?", "¿Hay algo que no entiendas?", "Pregúntame lo que sea...", "Escribe tu duda aquí...", "¿Cómo puedo ayudarte?", "¿Necesitas apoyo con algo?", "Estoy aquí para servirte...", "¿Alguna duda, profe?", "Pregúntame sin miedo...", "¿Qué necesitas hoy?", "¿Hay algo que te preocupe?", "¿Necesitas ideas para la clase?", "¿Quieres que te ayude?", "¿Cómo va todo, profe?", "¿Necesitas que te oriente?", "¿Tienes alguna consulta?", "¿En qué te puedo ayudar?", "¿Hay algún problema?", "¿Necesitas apoyo pedagógico?", "¿Qué tal tu día, profe?", "¿Necesitas que te explique algo?", "¿Hay algo nuevo para aprender?", "¿Quieres que repasemos juntos?", "¿Cómo están tus alumnos?", "¿Necesitas recursos didácticos?", "¿Quieres que genere una actividad?", "¿Hay algo que mejorar?", "¿Necesitas una idea fresca?", "¿Qué tal el semestre, profe?", "¿Necesitas motivación hoy?", "¿Hay algo que te cause curiosidad?", "¿Quieres que te sorprenda?", "¿Necesitas un consejo rápido?", "¿Cómo va la clase de hoy?", "¿Necesitas que te recuerde algo?", "¿Hay algo pendiente?", "¿Quieres que revisemos algo juntos?", "¿Qué necesitas saber ahora?", "¿Necesitas que te guíe?", "¿Hay algo que te cause duda?", "¿Quieres practicar algo?", "¿Cómo podemos mejorar hoy?", "¿Necesitas que te recomiende algo?", "¿Hay algo nuevo en tu clase?", "¿Quieres que te apoye?", "¿Necesitas una mano amiga?", "¿Qué tal tu progreso, profe?", "¿Necesitas que te ayude a planear?", "¿Hay algo que te inspire?", "¿Quieres que creemos algo juntos?"];
+                              setBotPlaceholder(ph[Math.floor(Math.random() * ph.length)]);
                               setIsTeacherBotLoading(true);
                               const newHistory = [...teacherBotHistory, { role: 'user', text: userMsg }];
                               setTeacherBotHistory(newHistory);
@@ -8063,7 +8082,7 @@ Respuesta del asistente (Profesional, sobria, sin asteriscos de markdown inneces
                               <input 
                                   value={teacherBotInput} 
                                   onChange={e => setTeacherBotInput(e.target.value)} 
-                                  placeholder="Escriba su consulta técnica o pedagógica..." 
+                                  placeholder={botPlaceholder} 
                                   className={`flex-1 py-2 px-3 text-xs sm:text-sm rounded-xl outline-none border focus:ring-2 transition-all ${
                                       isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-100 focus:ring-blue-500/50 placeholder-gray-500' : 'bg-gray-100 border-gray-300 text-gray-900 focus:ring-blue-400/50 placeholder-gray-500'
                                   }`} 
