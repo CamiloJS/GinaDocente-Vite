@@ -1113,11 +1113,15 @@ function App() {
 
           const callGemini = async (promptText) => {
             try {
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 60000);
               const res = await fetch('/api/gemini', { 
                 method: 'POST', 
                 headers: { 'Content-Type': 'application/json' }, 
-                body: JSON.stringify({ promptText: promptText }) 
+                body: JSON.stringify({ promptText: promptText }),
+                signal: controller.signal
               });
+              clearTimeout(timeoutId);
 
               if (!res.ok) {
                 let errData = {};
@@ -1143,6 +1147,10 @@ function App() {
               if (error.message === 'QUOTA_EXCEEDED' || error.code === 'QUOTA_EXCEEDED' || error.message?.includes('429')) {
                 setIsAiSessionPaused(true);
                 throw error;
+              }
+              if (error.name === 'AbortError') {
+                console.error("callGemini timeout:", error);
+                throw new Error("La IA tardó demasiado en responder. Intenta de nuevo.");
               }
               console.error("callGemini error:", error);
               return "";
@@ -8165,15 +8173,17 @@ Respuesta del asistente (Profesional, sobria, sin asteriscos de markdown inneces
                                   // Persistencia en Firestore no bloqueante
                                   setDoc(doc(db, 'artifacts', appId, 'users', 'teacher', 'teacherBot', 'history'), { messages: finalHistory }).catch(e => console.warn("Historial local guardado:", e));
                               } catch (err) {
-                                  console.error("Teacher bot error:", err);
-                                  let errorText = "❌ Ocurrió un error al procesar su solicitud. Por favor, intente de nuevo.";
-                                  if (err?.message === 'QUOTA_EXCEEDED' || err?.code === 'QUOTA_EXCEEDED' || err?.toString()?.includes('429') || err?.toString()?.includes('quota') || err?.toString()?.includes('RESOURCE_EXHAUSTED')) {
-                                      setIsAiSessionPaused(true);
-                                      errorText = "❌ Cuota de uso agotada temporalmente.";
-                                  }
-                                  const finalHistory = [...newHistory, { role: 'bot', text: errorText }];
-                                  setTeacherBotHistory(finalHistory);
-                                  setDoc(doc(db, 'artifacts', appId, 'users', 'teacher', 'teacherBot', 'history'), { messages: finalHistory }).catch(()=>{});
+                                   console.error("Teacher bot error:", err);
+                                   let errorText = "❌ Ocurrió un error al procesar su solicitud. Por favor, intente de nuevo.";
+                                   if (err?.message === 'QUOTA_EXCEEDED' || err?.code === 'QUOTA_EXCEEDED' || err?.toString()?.includes('429') || err?.toString()?.includes('quota') || err?.toString()?.includes('RESOURCE_EXHAUSTED')) {
+                                       setIsAiSessionPaused(true);
+                                       errorText = "❌ Cuota de uso agotada temporalmente.";
+                                   } else if (err?.message?.includes('demasiado') || err?.name === 'AbortError') {
+                                       errorText = "❌ La IA tardó demasiado en responder. Intenta con una pregunta más corta.";
+                                   }
+                                   const finalHistory = [...newHistory, { role: 'bot', text: errorText }];
+                                   setTeacherBotHistory(finalHistory);
+                                   setDoc(doc(db, 'artifacts', appId, 'users', 'teacher', 'teacherBot', 'history'), { messages: finalHistory }).catch(()=>{});
                               } finally {
                                   setIsTeacherBotLoading(false);
                               }
