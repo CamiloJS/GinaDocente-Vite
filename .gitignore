@@ -8,3 +8,7 @@ dist/
 
 .vercel
 .env*
+
+# Firebase service account keys (SENSITIVE - never commit)
+functions/serviceAccountKey.json
+*-firebase-adminsdk-*.json
