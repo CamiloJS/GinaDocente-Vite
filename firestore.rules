@@ -2,15 +2,85 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function isAuth() { return request.auth != null; }
+    function isTeacher() { return isAuth() && request.auth.token.role == 'teacher'; }
+    function isOwner(userId) { return isAuth() && request.auth.uid == userId; }
+
     match /artifacts/{appId} {
+      // Datos públicos de la plataforma
       match /public/data/{document=**} {
+        // Lectura: cualquier usuario autenticado
         allow read: if isAuth();
-        allow write: if isAuth();
+
+        // Escritura: reglas por colección
+        match /tasks/{docId} {
+          allow create, update, delete: if isTeacher();
+        }
+        match /evaluations/{docId} {
+          allow create, update, delete: if isTeacher();
+        }
+        match /grades/{docId} {
+          allow create: if isAuth();
+          allow update, delete: if isTeacher();
+        }
+        match /reviews/{docId} {
+          allow create, update, delete: if isTeacher();
+        }
+        match /syllabus/{docId} {
+          allow create, update, delete: if isTeacher();
+        }
+        match /suggestions/{docId} {
+          allow create: if isAuth();
+          allow update, delete: if isTeacher();
+        }
+        match /alerts/{docId} {
+          allow create: if isAuth();
+          allow update, delete: if isTeacher();
+        }
+        match /chatGroups/{docId} {
+          allow create: if isAuth();
+          allow update: if isAuth();
+          allow delete: if isTeacher();
+        }
+        match /academicGroups/{docId} {
+          allow create, update, delete: if isTeacher();
+        }
+        match /chats/{chatId}/messages/{msgId} {
+          allow create, update: if isAuth();
+          allow delete: if isAuth();
+        }
+        match /lastMessages/{docId} {
+          allow create, update, delete: if isAuth();
+        }
+        match /chatAlerts/{docId} {
+          allow create, update: if isAuth();
+        }
+        match /presence/{docId} {
+          allow create, update: if isAuth();
+        }
+        match /typing/{docId} {
+          allow create, update: if isAuth();
+        }
+        match /userMappings/{userId} {
+          allow create: if isAuth();
+          allow update: if isTeacher() || isOwner(userId);
+          allow delete: if isTeacher();
+        }
+        match /settings/{docId} {
+          allow read: if isAuth();
+          allow write: if isTeacher();
+        }
+        match /userPosts/{docId} {
+          allow create, update, delete: if isAuth();
+        }
       }
+
+      // Datos privados del usuario (chatbot history, preferencias)
       match /users/{userId}/{document=**} {
-        allow read, write: if isAuth() && request.auth.uid == userId;
+        allow read, write: if isOwner(userId);
       }
     }
+
+    // Bloquear todo lo demás
     match /{document=**} {
       allow read, write: if false;
     }

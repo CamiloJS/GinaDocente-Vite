@@ -1,5 +1,5 @@
 // src/App.jsx
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, Suspense } from 'react'
 import ReactDOM from 'react-dom'
 import confetti from 'canvas-confetti'
 import * as XLSX from 'xlsx'
@@ -32,14 +32,15 @@ import {
 } from './components/Icons.jsx'
 import AudioPlayer, { AudioRecordingVisualizer } from './components/AudioPlayer.jsx'
 
-import GifPickerModal from './components/GifPickerModal.jsx'
 import EmptyState from './components/EmptyState.jsx'
 import ScrollToTop from './components/ScrollToTop.jsx'
 import LinkifyText from './components/LinkifyText.jsx'
-import TasksTab from './components/TasksTab.jsx'
-import ReviewsModule from './components/ReviewsModule.jsx'
 import { extractTextFromPDF } from './utils/pdfExtractor.js'
 import { useClickOutside } from './utils/hooks.js'
+
+const TasksTab = React.lazy(() => import('./components/TasksTab.jsx'))
+const ReviewsModule = React.lazy(() => import('./components/ReviewsModule.jsx'))
+const GifPickerModal = React.lazy(() => import('./components/GifPickerModal.jsx'))
 
 // --- CONSTANTES DE DISEÑO Y PERSONALIZACIÓN DE GRUPOS ---
 export const GROUP_VECTOR_ICONS = [
@@ -3200,6 +3201,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
           
 
           const renderReviews = () => (
+            <React.Suspense fallback={<p className="text-gray-500 p-8 text-center">Cargando diapositivas...</p>}>
             <ReviewsModule
               role={role}
               isDarkMode={isDarkMode}
@@ -3214,6 +3216,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
               confirmAction={confirmAction}
               callGemini={callGemini}
             />
+            </React.Suspense>
           );
 
           const renderSyllabus = () => {
@@ -8438,7 +8441,7 @@ Respuesta del asistente (Profesional, sobria, sin asteriscos de markdown inneces
                                                            if (typers.length > 0) {
                                                                return <span className="text-emerald-500 font-bold animate-pulse">{typers.join(', ')} {typers.length === 1 ? 'está escribiendo...' : 'están escribiendo...'}</span>;
                                                            }
-                                                           const grp = chatGroups.find(g => `group_${g.id}` === activeChat.id || g.id === activeChat.id || `acad_${g.academicGroupId}` === activeChat.id);
+                                                            const grp = chatGroups.find(g => g.id === activeChat.id || `group_${g.id}` === activeChat.id || `acad_${g.academicGroupId}` === activeChat.id || `acad_${g.id}` === activeChat.id);
                                                            return `${grp?.members?.length || activeChat.members?.length || 0} miembros`;
                                                        }
                                                         const targetId = activeChat.id.split('_').find(id => id !== 'dm' && id !== myChatId);
