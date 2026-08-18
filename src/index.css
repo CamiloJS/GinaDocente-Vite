@@ -45,6 +45,14 @@
   background-color: rgba(255, 255, 255, 0.2);
 }
 
+.hide-scrollbars {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+.hide-scrollbars::-webkit-scrollbar {
+  display: none;
+}
+
 /* ===== TEMAS ESTILO X / TWITTER ===== */
 
 /* Modo Claro General */

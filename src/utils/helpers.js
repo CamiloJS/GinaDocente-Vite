@@ -61,12 +61,22 @@ export const splitNameFirstAndLast = (fullName) => {
 }
 
 export const FALLBACK_MAP = {
-  ginadocente: { email: 'ginamarcelaquintana19@gmail.com', name: 'La profe', role: 'teacher' },
+  ginadocente: { email: 'ginamarcelaquintana19@gmail.com', name: 'La profe', fullName: 'Gina Marcela Quintana Delgado', role: 'teacher', profilePicUrl: '/icono.png' },
+  teacher: { email: 'ginamarcelaquintana19@gmail.com', name: 'La profe', fullName: 'Gina Marcela Quintana Delgado', role: 'teacher', profilePicUrl: '/icono.png' },
 }
 
 // --- Funciones de utilidad ---
 export const compressImage = (file, maxWidth = 800, maxHeight = 800, quality = 0.6) => {
   return new Promise((resolve, reject) => {
+    // Si es un GIF animado, preservar los fotogramas y la animación intacta sin pasar por canvas
+    if (file.type === 'image/gif' || file.name?.toLowerCase().endsWith('.gif')) {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = (e) => reject(e);
+      reader.readAsDataURL(file);
+      return;
+    }
+
     const reader = new FileReader()
     reader.readAsDataURL(file)
     reader.onload = (event) => {
@@ -94,8 +104,10 @@ export const compressImage = (file, maxWidth = 800, maxHeight = 800, quality = 0
 }
 
 export const uploadImageToStorage = async (base64String, folderName) => {
-  // Generamos un nombre unico para que las imagenes no se sobreescriban
-  const fileName = `${appId}/${folderName}/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.jpg`
+  // Generamos un nombre único según el formato (soporte completo para GIFs animados)
+  const isGif = base64String.startsWith('data:image/gif');
+  const ext = isGif ? 'gif' : 'jpg';
+  const fileName = `${appId}/${folderName}/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`
   const storageRef = ref(storage, fileName)
 
   // Subimos el string Base64 directamente a Storage
@@ -153,10 +165,59 @@ export const formatChatDate = (timestamp) => {
 }
 
 export const formatTime = (seconds) => {
-  const m = Math.floor(seconds / 60).toString().padStart(2, '0')
-  const s = (seconds % 60).toString().padStart(2, '0')
-  return `${m}:${s}`
-}
+  if (seconds === null || seconds === undefined || isNaN(seconds) || !isFinite(seconds) || seconds < 0) {
+    return '0:00';
+  }
+  const total = Math.floor(seconds);
+  const m = Math.floor(total / 60).toString().padStart(2, '0');
+  const s = (total % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
+};
+
+// Formato de hora en 12 horas con AM / PM (ej: "14:30" -> "2:30 PM", timestamp -> "2:30 PM")
+export const format12HourTime = (timeInput) => {
+  if (!timeInput && timeInput !== 0) return '';
+  
+  // Si es un string de formato "HH:mm" o "HH:mm:ss"
+  if (typeof timeInput === 'string' && timeInput.includes(':') && !timeInput.includes('T') && !timeInput.includes('-') && !timeInput.includes('/')) {
+    const parts = timeInput.trim().split(':');
+    let h = parseInt(parts[0], 10);
+    const m = (parts[1] || '00').substring(0, 2);
+    if (isNaN(h)) return timeInput;
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12;
+    h = h ? h : 12;
+    return `${h}:${m}\u00A0${ampm}`;
+  }
+
+  // Si es un timestamp numérico o string parseable de fecha
+  try {
+    const d = new Date(timeInput);
+    if (isNaN(d.getTime())) return String(timeInput);
+    let h = d.getHours();
+    const m = String(d.getMinutes()).padStart(2, '0');
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12;
+    h = h ? h : 12;
+    return `${h}:${m}\u00A0${ampm}`;
+  } catch (e) {
+    return String(timeInput);
+  }
+};
+
+// Formato amigable de fecha y hora en 12h (ej: "17 ago, 2:30 PM" o "17 ago • 2:30 PM")
+export const formatDateTime12H = (timestamp) => {
+  if (!timestamp) return '';
+  try {
+    const d = new Date(timestamp);
+    if (isNaN(d.getTime())) return '';
+    const dateStr = d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+    const timeStr = format12HourTime(d);
+    return `${dateStr} • ${timeStr}`;
+  } catch (e) {
+    return '';
+  }
+};
 
 // Fecha relativa en español (ej: "Justo ahora", "Hace 5 min")
 export const timeAgo = (timestamp) => {
@@ -176,10 +237,58 @@ export const timeAgo = (timestamp) => {
   return `${dd}/${mm}/${d.getFullYear()}`
 }
 
+export const detectLanguage = (text) => {
+  if (!text || typeof text !== 'string') return 'en-US';
+  const clean = text.toLowerCase();
+  
+  // Patrones característicos de francés
+  const frenchMatches = (clean.match(/\b(bonjour|salut|merci|oui|non|avec|pour|dans|sur|nous|vous|ils|elles|mon|ma|mes|ton|ta|tes|son|sa|ses|le|la|les|un|une|des|du|au|aux|est|sont|c'est|j'ai|je|tu|il|elle|on|français|très|bien|aussi|cours|devoir|étudiant|parler|écouter|lire|écrire|professeur)\b|[éèêëàâîïôùûçœæ]/gi) || []).length;
+  
+  // Patrones característicos de español
+  const spanishMatches = (clean.match(/\b(el|la|los|las|un|una|unos|unas|para|por|con|de|en|sobre|entre|como|pero|más|muy|está|están|hola|gracias|tarea|actividad|clase|profesor|profesora|estudiante|entrega|fecha|asignación|repaso|pregunta|respuesta)\b|[áéíóúñ¿¡]/gi) || []).length;
+  
+  // Patrones característicos de inglés
+  const englishMatches = (clean.match(/\b(the|is|are|was|were|to|and|in|on|at|for|with|this|that|these|those|have|has|had|will|would|can|could|should|task|homework|lesson|unit|student|teacher|class|grade|submit|reading|writing|speaking|listen)\b/gi) || []).length;
+
+  if (frenchMatches > 2 || (frenchMatches > 0 && frenchMatches > englishMatches && frenchMatches > spanishMatches)) {
+    return 'fr-FR';
+  }
+  
+  if (spanishMatches > englishMatches && spanishMatches > 0) {
+    return 'es-ES';
+  }
+
+  // Por defecto inglés
+  return 'en-US';
+};
+
 export const speakText = (text) => {
-  if (!('speechSynthesis' in window)) return;
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = 'en-US';
-  window.speechSynthesis.speak(utterance);
-}
+  if (!('speechSynthesis' in window) || !text) return;
+  try {
+    window.speechSynthesis.cancel();
+    
+    // Limpiar etiquetas o URLs del texto antes de leer
+    const cleanText = text.replace(/https?:\/\/[^\s]+/g, '').replace(/[*_#`]/g, '').trim();
+    if (!cleanText) return;
+
+    const lang = detectLanguage(cleanText);
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.lang = lang;
+    utterance.rate = 0.95;
+
+    const voices = window.speechSynthesis.getVoices();
+    if (voices && voices.length > 0) {
+      const langPrefix = lang.split('-')[0];
+      const matchVoice = voices.find(v => v.lang.replace('_', '-').toLowerCase().startsWith(lang.toLowerCase())) ||
+                         voices.find(v => v.lang.replace('_', '-').toLowerCase().startsWith(langPrefix.toLowerCase()));
+      if (matchVoice) {
+        utterance.voice = matchVoice;
+      }
+    }
+
+    window.speechSynthesis.speak(utterance);
+  } catch (e) {
+    console.error('TTS error:', e);
+  }
+};
+

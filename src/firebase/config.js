@@ -4,11 +4,16 @@
 import { initializeApp } from 'firebase/app'
 import {
   getAuth,
+  setPersistence,
+  browserLocalPersistence,
   signInAnonymously,
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
+  GoogleAuthProvider,
+  signInWithPopup,
+  sendPasswordResetEmail,
 } from 'firebase/auth'
 import {
   initializeFirestore,
@@ -27,6 +32,7 @@ import {
   where,
   orderBy,
   limit,
+  writeBatch,
 } from 'firebase/firestore'
 import {
   getStorage,
@@ -48,6 +54,13 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig)
 const auth = getAuth(app)
+
+// Persistencia de sesión local en navegador para Google y Email Auth
+if (typeof window !== 'undefined') {
+  setPersistence(auth, browserLocalPersistence).catch(err => {
+    console.warn('Firebase Auth persistence error:', err)
+  })
+}
 
 // Memoria local (offline) automatica
 const db = initializeFirestore(app, {
@@ -83,6 +96,9 @@ export {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
+  GoogleAuthProvider,
+  signInWithPopup,
+  sendPasswordResetEmail,
   // Re-exportaciones de firestore
   collection,
   onSnapshot,
@@ -97,6 +113,7 @@ export {
   where,
   orderBy,
   limit,
+  writeBatch,
   // Re-exportaciones de storage
   ref,
   uploadString,

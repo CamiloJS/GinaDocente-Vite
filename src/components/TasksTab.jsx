@@ -1,14 +1,16 @@
 // src/components/TasksTab.jsx
 import React, { useState } from 'react'
 import {
-  Book, BookOpen, CheckCheck, ChevronRight, Globe, ImageIcon, Mic, NavNotebook, PaperclipIcon, Plus, SearchIcon, Sparkles, Square, Target, Undo2, X, Play, Pause
+  Book, BookOpen, CheckCheck, ChevronRight, Globe, ImageIcon, Mic, NavNotebook, PaperclipIcon, Plus, SearchIcon, Sparkles, Square, Target, Loader2, Undo2, X, Play, Pause, MessageCircle
 } from './Icons.jsx'
 import TaskCard from './TaskCard.jsx'
 import EmptyState from './EmptyState.jsx'
 import SkeletonCard from './SkeletonCard.jsx'
 import { useVoiceRecorder } from '../utils/useVoiceRecorder.js'
-import { collection, addDoc } from '../firebase/config.js'
+import { auth, signInAnonymously, db as defaultDb, appId as defaultAppId, collection, addDoc } from '../firebase/config.js'
 import AudioPlayer, { AudioRecordingVisualizer } from './AudioPlayer.jsx'
+import CustomVideoPlayer from './CustomVideoPlayer.jsx'
+import { getTeacherDynamicPlaceholder } from '../utils/teacherPlaceholders.js'
 
 const TasksTab = React.memo(({
     role, glassCard, glassInput, redButton, postType, setPostType, taskTitle, setTaskTitle,
@@ -19,22 +21,49 @@ const TasksTab = React.memo(({
     setHasAiModified, callGemini, showMessage, handleAiTranslate, taskDate, setTaskDate,
     taskTime, setTaskTime, allowLate, setAllowLate, db, appId, loggedInName, getToday,
     tasks, user, isDarkMode, confirmAction, setFullScreenImage, handleOpenProfileByName,
-    academicGroups, myChatId, userMappings, tasksLoading, taskLimit, loadMoreTasks, pinnedTasks
+    academicGroups, myChatId, userMappings, tasksLoading, taskLimit, loadMoreTasks, pinnedTasks,
+    wallSearchTerm: propWallSearchTerm, setWallSearchTerm: propSetWallSearchTerm,
+    fixedTargetGroup = null
 }) => {
 
     // ESTADOS DEL MENÚ LIQUID GLASS
     const [isFormExpanded, setIsFormExpanded] = useState(false);
-    const [postTargetGroup, setPostTargetGroup] = useState("");
+    const [isPublishing, setIsPublishing] = useState(false);
+    const [postTargetGroup, setPostTargetGroup] = useState(fixedTargetGroup || "all");
+    const [hasDueDate, setHasDueDate] = useState(true);
     const [isGroupDropdownOpen, setIsGroupDropdownOpen] = useState(false);
-    const [wallSearchTerm, setWallSearchTerm] = useState("");
+    const [postVideoUrl, setPostVideoUrl] = useState("");
+    const [showVideoInput, setShowVideoInput] = useState(false);
+    const [localWallSearchTerm, setLocalWallSearchTerm] = useState("");
+    const [dynamicPlaceholder, setDynamicPlaceholder] = useState(() => getTeacherDynamicPlaceholder(loggedInName));
+    const wallSearchTerm = propWallSearchTerm !== undefined ? propWallSearchTerm : localWallSearchTerm;
+    const setWallSearchTerm = propSetWallSearchTerm || setLocalWallSearchTerm;
     const { isRecording: recPub, audioUrl: audioPub, isUploading: upPub, recordingTime: recTimePub, setAudioUrl: setAudioPub, startRecording: startPub, stopRecording: stopPub, cancelRecording: cancelPub } = useVoiceRecorder('tasks_audios', showMessage);
 
-    // FILTRO: ¿Qué ve el estudiante?
-    const visibleTasks = role === 'teacher' ? tasks : tasks.filter(t => {
-        if (!t.targetGroupId || t.targetGroupId === 'all') return true; 
-        const group = academicGroups?.find(g => g.id === t.targetGroupId);
-        return group && group.members.includes(myChatId);
-    });
+    // Rotar o recalcular el placeholder dinámico al cambiar de usuario o periódicamente
+    React.useEffect(() => {
+        setDynamicPlaceholder(getTeacherDynamicPlaceholder(loggedInName));
+        const interval = setInterval(() => {
+            setDynamicPlaceholder(getTeacherDynamicPlaceholder(loggedInName));
+        }, 180000); // Cada 3 minutos rota sutilmente
+        return () => clearInterval(interval);
+    }, [loggedInName]);
+
+    // Sincronizar postTargetGroup si cambia fixedTargetGroup
+    React.useEffect(() => {
+        if (fixedTargetGroup) {
+            setPostTargetGroup(fixedTargetGroup);
+        }
+    }, [fixedTargetGroup]);
+
+    // FILTRO: ¿Qué ve el estudiante o el grupo fijo?
+    const visibleTasks = fixedTargetGroup
+        ? tasks.filter(t => t.targetGroupId === fixedTargetGroup)
+        : (role === 'teacher' ? tasks : tasks.filter(t => {
+            if (!t.targetGroupId || t.targetGroupId === 'all') return true; 
+            const group = academicGroups?.find(g => g.id === t.targetGroupId);
+            return group ? ((group.members || []).includes(myChatId) || (group.members || []).includes(user?.uid)) : false;
+        }));
 
     // Buscador de publicaciones
     const filteredTasks = wallSearchTerm.trim()
@@ -47,13 +76,7 @@ const TasksTab = React.memo(({
     const teacherPic = userMappings?.[myChatId]?.profilePicUrl;
 
     return (
-        <div className="space-y-5">
-            <div className="flex items-center gap-2.5 mb-4">
-                <div className="w-9 h-9 rounded-xl bg-red-500/10 flex items-center justify-center text-[#AD3333] shrink-0">
-                    <BookOpen size={20} />
-                </div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 drop-shadow-sm">Muro de publicaciones y tareas</h2>
-            </div>
+        <div className="space-y-4">
             
             {/* COMPOSER CARD (ALWAYS MOUNTED FOR FLUID 60FPS CSS ACCORDION EXPANSION) */}
             {role === 'teacher' && (
@@ -75,34 +98,41 @@ const TasksTab = React.memo(({
                                     {loggedInName?.charAt(0) || 'G'}
                                 </div>
                             )}
-                            <div className={`flex-1 px-4 py-2.5 rounded-full border text-sm font-medium transition-all ${isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-750' : 'bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200/70'}`}>
-                                ¿Qué deseas asignar o publicar hoy, {loggedInName?.split(' ')[0]}?
+                            <div className={`flex-1 px-4 py-2.5 rounded-full border text-sm font-medium transition-all truncate select-none ${isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-750' : 'bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200/70'}`}>
+                                {dynamicPlaceholder}
                             </div>
                             <button type="button" className="p-2.5 rounded-full bg-red-50 dark:bg-red-950/40 text-[#AD3333] hover:scale-110 transition-transform shadow-sm" title="Crear">
                                 <Plus size={18} />
                             </button>
                         </div>
 
-                        <div className="flex flex-wrap items-center justify-between gap-2 mt-3 pt-3 border-t border-gray-200 dark:border-gray-800 text-xs font-semibold text-gray-600 dark:text-gray-400">
-                            <div className="flex gap-2">
+                        <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-gray-200 dark:border-gray-800 text-xs font-semibold text-gray-600 dark:text-gray-400 w-full overflow-hidden">
+                            <div className="flex gap-2 items-center overflow-x-auto overflow-y-hidden pb-1 pt-0.5 max-w-full hide-scrollbars no-scrollbar select-none" style={{ WebkitOverflowScrolling: 'touch' }}>
                                 <button 
                                     type="button" 
                                     onClick={(e) => { e.stopPropagation(); setPostType('task'); setIsFormExpanded(true); }} 
-                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 dark:bg-red-950/30 text-[#AD3333] hover:bg-red-100 dark:hover:bg-red-950/60 transition-colors"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 dark:bg-red-950/30 text-[#AD3333] hover:bg-red-100 dark:hover:bg-red-950/60 transition-colors shrink-0 whitespace-nowrap"
                                 >
-                                    <NavNotebook size={15} /> Tarea con fecha
+                                    <NavNotebook size={15} /> Tarea
+                                </button>
+                                <button 
+                                    type="button" 
+                                    onClick={(e) => { e.stopPropagation(); setPostType('forum'); setIsFormExpanded(true); }} 
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-950/60 transition-colors shrink-0 whitespace-nowrap"
+                                >
+                                    <MessageCircle size={15} /> Foro
                                 </button>
                                 <button 
                                     type="button" 
                                     onClick={(e) => { e.stopPropagation(); setPostType('post'); setIsFormExpanded(true); }} 
-                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-950/60 transition-colors"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-950/60 transition-colors shrink-0 whitespace-nowrap"
                                 >
                                     <BookOpen size={15} /> Publicación
                                 </button>
                                 <button 
                                     type="button" 
                                     onClick={(e) => { e.stopPropagation(); setIsFormExpanded(true); setShowPostAttachmentMenu(true); }} 
-                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors shrink-0 whitespace-nowrap"
                                 >
                                     <PaperclipIcon size={15} /> Adjuntar
                                 </button>
@@ -146,6 +176,13 @@ const TasksTab = React.memo(({
                                         className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${postType === 'task' ? 'bg-white dark:bg-gray-900 shadow-sm text-[#AD3333]' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'}`}
                                     >
                                         <NavNotebook size={14} /> Tarea
+                                    </button>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setPostType('forum')} 
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${postType === 'forum' ? 'bg-white dark:bg-gray-900 shadow-sm text-emerald-600 dark:text-emerald-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'}`}
+                                    >
+                                        <MessageCircle size={14} /> Foro
                                     </button>
                                     <button 
                                         type="button" 
@@ -209,20 +246,20 @@ const TasksTab = React.memo(({
                             <input 
                                 value={taskTitle} 
                                 onChange={(e) => setTaskTitle(e.target.value)} 
-                                placeholder={postType === 'task' ? "Título claro de la tarea..." : "Título de la publicación..."} 
+                                placeholder={postType === 'task' ? "Título claro de la tarea..." : postType === 'forum' ? "Tema central del foro de debate..." : "Título de la publicación..."} 
                                 className="w-full text-base font-bold bg-transparent outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 pb-2 border-b border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100" 
                                 required 
                             />
                             <textarea 
                                 value={taskDesc} 
                                 onChange={(e) => setTaskDesc(e.target.value)} 
-                                placeholder="Escribe las instrucciones detalladas, indicaciones o una idea general..." 
+                                placeholder={postType === 'forum' ? "Escribe la pregunta detonante, pautas o tema de discusión para el debate..." : "Escribe las instrucciones detalladas, indicaciones o una idea general..."} 
                                 className="w-full text-sm bg-transparent outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 pt-3 min-h-[95px] resize-y leading-relaxed text-gray-900 dark:text-gray-100" 
                                 required 
                             />
 
                             {/* Previsualización de adjuntos multimedia */}
-                            {(showImageInput || postImageUrl || postFileUrl || audioPub) && (
+                            {(showImageInput || showVideoInput || postImageUrl || postVideoUrl || postFileUrl || audioPub) && (
                                 <div className="pt-3 border-t border-gray-200 dark:border-gray-700 space-y-2 animate-in fade-in">
                                     {showImageInput && (
                                         <div className="flex gap-2 items-center">
@@ -236,10 +273,29 @@ const TasksTab = React.memo(({
                                         </div>
                                     )}
 
+                                    {showVideoInput && (
+                                        <div className="flex gap-2 items-center">
+                                            <input 
+                                                value={postVideoUrl} 
+                                                onChange={(e) => setPostVideoUrl(e.target.value)} 
+                                                placeholder="Pega el enlace de YouTube o enlace directo de video (.mp4, etc.)..." 
+                                                className="flex-1 py-2 px-3 text-xs rounded-xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500" 
+                                            />
+                                            <button type="button" onClick={() => setShowVideoInput(false)} className="p-2 text-gray-400 hover:text-red-500"><X size={16}/></button>
+                                        </div>
+                                    )}
+
                                     {postImageUrl && (
                                         <div className="relative w-fit">
                                             <img src={postImageUrl} alt="Preview" loading="lazy" className="h-32 object-cover rounded-xl border border-gray-200 dark:border-gray-700 bg-black/5 shadow-sm" onError={(e) => e.target.style.display = 'none'} />
                                             <button type="button" onClick={() => setPostImageUrl("")} className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1.5 hover:bg-red-700 transition shadow-md"><X size={12}/></button>
+                                        </div>
+                                    )}
+
+                                    {postVideoUrl && (
+                                        <div className="relative max-w-md my-2 rounded-2xl overflow-hidden shadow-md">
+                                            <CustomVideoPlayer src={postVideoUrl} isDarkMode={isDarkMode} />
+                                            <button type="button" onClick={() => setPostVideoUrl("")} className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1.5 hover:bg-red-700 transition shadow-md z-10" title="Eliminar video"><X size={14}/></button>
                                         </div>
                                     )}
 
@@ -276,34 +332,77 @@ const TasksTab = React.memo(({
                                 <button 
                                     type="button" 
                                     onClick={async () => {
-                                        if (!taskDesc && !taskTitle) return showMessage("Escribe una idea en la descripción primero.");
+                                        if (!taskDesc && !taskTitle) return showMessage("Escribe una idea en el título o descripción primero.");
                                         setPrevTaskTitle(taskTitle); setPrevTaskDesc(taskDesc); setIsAiLoading(true);
-                                        const result = await callGemini(`Mejora esta publicación: Título: ${taskTitle}\nDescripción: ${taskDesc}\nDevuelve SÓLO en formato:\nTITULO: [Título nuevo]\nDESCRIPCION: [Descripción detallada]`);
-                                        if (!result) { setIsAiLoading(false); return; }
-                                        const titleMatch = result.match(/(?:T[IÍ]TULO|TITLE|TITULO)\s*[:\-]?\s*\*?\*?\s*(.*)/i);
-                                        const descMatch = result.match(/(?:DESCRIPCI[OÓ]N|DESCRIPTION|DESCRIPCION)\s*[:\-]?\s*\*?\*?\s*([\s\S]*)/i);
-                                        if (titleMatch && descMatch) { setTaskTitle(titleMatch[1].replace(/\*/g, '').trim()); setTaskDesc(descMatch[1].trim()); } else { setTaskDesc(result); }
-                                        setHasAiModified(true); setIsAiLoading(false);
+                                        try {
+                                            const prompt = `Eres una pedagoga experta en educación e idiomas. Enriquece y redacta de manera excelente la siguiente publicación para estudiantes:
+Título original: ${taskTitle || 'Sin título'}
+Descripción original: ${taskDesc || 'Sin descripción'}
+
+INSTRUCCIÓN CRÍTICA:
+1. NO uses asteriscos (** ni *) en ninguna palabra, título, viñeta ni frase. Escribe texto limpio sin formato markdown de asteriscos.
+2. Devuelve ÚNICAMENTE en este formato exacto:
+TITULO: [Título mejorado, atractivo y profesional]
+DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
+
+                                            const result = await callGemini(prompt);
+                                            if (!result) { 
+                                                setIsAiLoading(false); 
+                                                return showMessage("❌ No se pudo conectar con la IA. Intenta de nuevo."); 
+                                            }
+
+                                            const cleanText = (str) => (str || '').replace(/\*\*/g, '').replace(/\*/g, '').trim();
+                                            const titleMatch = result.match(/(?:T[IÍ]TULO|TITLE)\s*[:\-]?\s*\*?\*?\s*(.*)/i);
+                                            const descMatch = result.match(/(?:DESCRIPCI[OÓ]N|DESCRIPTION)\s*[:\-]?\s*\*?\*?\s*([\s\S]*)/i);
+
+                                            if (titleMatch && descMatch && titleMatch[1].trim()) {
+                                                setTaskTitle(cleanText(titleMatch[1]));
+                                                setTaskDesc(cleanText(descMatch[1]));
+                                            } else {
+                                                setTaskDesc(cleanText(result));
+                                            }
+                                            setHasAiModified(true);
+                                            showMessage("✨ Publicación potenciada con IA.");
+                                        } catch (err) {
+                                            console.error("Error al potenciar con IA:", err);
+                                            showMessage("❌ Error al procesar con IA.");
+                                        } finally {
+                                            setIsAiLoading(false);
+                                        }
                                     }} 
                                     disabled={isAiLoading} 
                                     className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow-md shadow-purple-500/20 transition-all flex items-center gap-1.5 disabled:opacity-50"
                                 >
-                                    <Sparkles size={15} /> Potenciar con IA
+                                    {isAiLoading ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />} Potenciar con IA
                                 </button>
                                 
                                 <button 
                                     type="button" 
                                     onClick={async () => {
-                                        if (!taskDesc) return showMessage("Escribe algo en la descripción para corregir.");
+                                        if (!taskDesc && !taskTitle) return showMessage("Escribe algo en la descripción o título para corregir.");
                                         setPrevTaskTitle(taskTitle); setPrevTaskDesc(taskDesc); setIsAiLoading(true);
-                                        const result = await callGemini(`Corrige la ortografía y gramática manteniendo el idioma original. Devuelve SÓLO el texto corregido:\n\n${taskDesc}`);
-                                        if (!result) { setIsAiLoading(false); return; }
-                                        setTaskDesc(result); setHasAiModified(true); setIsAiLoading(false);
+                                        try {
+                                            const cleanText = (str) => (str || '').replace(/\*\*/g, '').replace(/\*/g, '').trim();
+                                            const result = await callGemini(`Corrige la ortografía y gramática manteniendo el idioma original. REGLA ESTRICTA: NO uses asteriscos (* o **). Devuelve SÓLO el texto corregido en texto limpio:\n\n${taskDesc || taskTitle}`);
+                                            if (!result) { 
+                                                setIsAiLoading(false); 
+                                                return showMessage("❌ No se pudo corregir con IA."); 
+                                            }
+                                            if (taskDesc) setTaskDesc(cleanText(result));
+                                            else setTaskTitle(cleanText(result));
+                                            setHasAiModified(true);
+                                            showMessage("✅ Ortografía y gramática corregidas.");
+                                        } catch (err) {
+                                            console.error("Error al corregir con IA:", err);
+                                            showMessage("❌ Error al corregir.");
+                                        } finally {
+                                            setIsAiLoading(false);
+                                        }
                                     }} 
                                     disabled={isAiLoading} 
                                     className="px-3 py-2 rounded-xl text-xs font-bold border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all flex items-center gap-1.5 disabled:opacity-50 shadow-sm"
                                 >
-                                    <CheckCheck size={15} /> Corregir
+                                    {isAiLoading ? <Loader2 size={15} className="animate-spin" /> : <CheckCheck size={15} />} Corregir
                                 </button>
                                 
                                 <div className="flex flex-wrap gap-1.5">
@@ -327,6 +426,9 @@ const TasksTab = React.memo(({
                                     
                                     {showPostAttachmentMenu && (
                                         <div className="absolute bottom-full left-0 mb-2 w-52 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-2xl rounded-2xl p-2 flex flex-col gap-1 z-[9999] animate-in fade-in zoom-in-95 duration-200">
+                                            <button type="button" onClick={() => { setShowVideoInput(true); setShowPostAttachmentMenu(false); }} className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-colors w-full text-left text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                                <Play size={16} className="text-red-500" /> Adjuntar video
+                                            </button>
                                             <button type="button" onClick={() => { recPub ? stopPub() : startPub(); setShowPostAttachmentMenu(false); }} className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-colors w-full text-left text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
                                                 {recPub ? <Square size={16} className="text-red-500 animate-pulse" /> : <Mic size={16} />} {recPub ? 'Detener grabación...' : 'Nota de voz'}
                                             </button>
@@ -353,23 +455,59 @@ const TasksTab = React.memo(({
                             </div>
                         </div>
 
-                        {/* Parámetros de Entrega (Tareas) */}
-                        {postType === 'task' && (
-                            <div className="flex flex-wrap gap-4 items-center justify-between bg-gray-50 dark:bg-gray-800 p-4 rounded-2xl border border-gray-200 dark:border-gray-700 mt-2">
-                                <div className="flex flex-wrap gap-4 items-center">
-                                    <div>
-                                        <label className="text-xs font-bold text-gray-600 dark:text-gray-300 block mb-1">Fecha límite</label>
-                                        <input type="date" value={taskDate} onChange={(e) => setTaskDate(e.target.value)} className="py-1.5 px-3 text-xs font-bold rounded-xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500" required />
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-bold text-gray-600 dark:text-gray-300 block mb-1">Hora límite</label>
-                                        <input type="time" value={taskTime} onChange={(e) => setTaskTime(e.target.value)} className="py-1.5 px-3 text-xs font-bold rounded-xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500" required />
-                                    </div>
-                                    <label className="flex items-center gap-2 cursor-pointer pt-4">
-                                        <input type="checkbox" checked={allowLate} onChange={(e) => setAllowLate(e.target.checked)} className="w-4 h-4 accent-[#AD3333] rounded" />
-                                        <span className="text-xs font-bold text-gray-700 dark:text-gray-300">Permitir entregas tardías</span>
+                        {/* Parámetros de Entrega y Cierre (Tareas y Foros) */}
+                        {(postType === 'task' || postType === 'forum') && (
+                            <div className={`p-4 rounded-2xl border mt-2 space-y-3 ${
+                                postType === 'forum' 
+                                    ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/60' 
+                                    : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                            }`}>
+                                <div className="flex items-center justify-between pb-2 border-b border-gray-200/60 dark:border-gray-700/60">
+                                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={hasDueDate} 
+                                            onChange={(e) => setHasDueDate(e.target.checked)} 
+                                            className={`w-4 h-4 rounded ${postType === 'forum' ? 'accent-emerald-600' : 'accent-[#AD3333]'}`} 
+                                        />
+                                        <span className="text-xs font-bold text-gray-800 dark:text-gray-200">
+                                            {postType === 'forum' ? 'Establecer fecha límite de cierre' : 'Establecer fecha y hora límite de entrega'}
+                                        </span>
                                     </label>
+                                    {!hasDueDate && (
+                                        <span className="text-[11px] font-semibold text-gray-400 italic">
+                                            Abierto sin límite de tiempo
+                                        </span>
+                                    )}
                                 </div>
+
+                                {hasDueDate && (
+                                    <div className="flex flex-wrap gap-4 items-center animate-in fade-in duration-200">
+                                        <div>
+                                            <label className="text-xs font-bold text-gray-600 dark:text-gray-300 block mb-1">
+                                                {postType === 'forum' ? 'Fecha de cierre' : 'Fecha límite'}
+                                            </label>
+                                            <input type="date" value={taskDate} onChange={(e) => setTaskDate(e.target.value)} className="py-1.5 px-3 text-xs font-bold rounded-xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500" required={hasDueDate} />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-gray-600 dark:text-gray-300 block mb-1">
+                                                {postType === 'forum' ? 'Hora de cierre' : 'Hora límite'}
+                                            </label>
+                                            <input type="time" value={taskTime} onChange={(e) => setTaskTime(e.target.value)} className="py-1.5 px-3 text-xs font-bold rounded-xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500" required={hasDueDate} />
+                                        </div>
+                                        <label className="flex items-center gap-2 cursor-pointer pt-4">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={allowLate} 
+                                                onChange={(e) => setAllowLate(e.target.checked)} 
+                                                className={`w-4 h-4 rounded ${postType === 'forum' ? 'accent-emerald-600' : 'accent-[#AD3333]'}`} 
+                                            />
+                                            <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                                                {postType === 'forum' ? 'Permitir aportes tardíos' : 'Permitir entregas tardías'}
+                                            </span>
+                                        </label>
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -384,46 +522,203 @@ const TasksTab = React.memo(({
                             </button>
                             <button 
                                 type="button" 
+                                disabled={isPublishing}
                                 onClick={async () => {
-                                    if(!postTargetGroup) return showMessage("⚠️ Debes seleccionar una materia o grupo para publicar.");
-                                    if(taskTitle && taskDesc) {
-                                        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'tasks'), { 
-                                            type: postType, title: taskTitle, description: taskDesc, 
-                                            authorName: loggedInName, 
-                                            targetGroupId: postTargetGroup,
-                                            imageUrl: postImageUrl.trim(), fileUrl: postFileUrl, fileName: postFileName, audioUrl: audioPub,
-                                            dueDate: postType === 'task' ? taskDate : null, dueTime: postType === 'task' ? taskTime : null, allowLate: postType === 'task' ? allowLate : true, createdAt: Date.now(), comments: [], reactions: {} 
+                                    if (isPublishing) return;
+                                    const cleanTitle = (taskTitle || '').trim();
+                                    const cleanDesc = (taskDesc || '').trim();
+                                    if (!cleanTitle && !cleanDesc) {
+                                        return showMessage("⚠️ Por favor ingresa al menos un título o descripción para publicar.");
+                                    }
+                                    const finalTargetGroup = postTargetGroup || 'all';
+                                    const currentPostType = postType || 'task';
+                                    const isTimed = (currentPostType === 'task' || currentPostType === 'forum') && Boolean(hasDueDate);
+                                    const targetGrpObj = academicGroups?.find(g => g.id === finalTargetGroup);
+                                    const targetGroupName = targetGrpObj?.name ? targetGrpObj.name : (finalTargetGroup === 'all' ? 'Global' : 'Global');
+
+                                    const effectiveDb = db || defaultDb;
+                                    const effectiveAppId = appId || defaultAppId;
+
+                                    setIsPublishing(true);
+
+                                    try {
+                                        if (!auth.currentUser) {
+                                            try {
+                                                await signInAnonymously(auth);
+                                            } catch (authErr) {
+                                                console.warn("Auth initialization note:", authErr);
+                                            }
+                                        }
+
+                                        const payload = { 
+                                            type: currentPostType, 
+                                            title: cleanTitle || 'Sin título', 
+                                            description: cleanDesc, 
+                                            authorName: loggedInName || 'Profesora', 
+                                            targetGroupId: finalTargetGroup,
+                                            imageUrl: (postImageUrl || '').trim(), 
+                                            fileUrl: postFileUrl || '', 
+                                            fileName: postFileName || '', 
+                                            dueDate: (isTimed && taskDate) ? String(taskDate) : null, 
+                                            dueTime: (isTimed && taskTime) ? String(taskTime) : null, 
+                                            allowLate: isTimed ? Boolean(allowLate) : true, 
+                                            createdAt: Date.now(), 
+                                            comments: [], 
+                                            reactions: {} 
+                                        };
+
+                                        if (postVideoUrl && postVideoUrl.trim()) payload.videoUrl = postVideoUrl.trim();
+                                        if (audioPub && typeof audioPub === 'string' && audioPub.trim()) payload.audioUrl = audioPub.trim();
+                                        if (targetGroupName) payload.targetGroupName = targetGroupName;
+                                        if (role) payload.authorRole = role;
+
+                                        // Asegurar que no existan valores undefined en el documento
+                                        Object.keys(payload).forEach(k => {
+                                            if (payload[k] === undefined) {
+                                                delete payload[k];
+                                            }
                                         });
-                                        setTaskTitle(""); setTaskDesc(""); setPostImageUrl(""); setPostFileUrl(""); setPostFileName(""); setAudioPub(""); setShowImageInput(false); setShowPostAttachmentMenu(false); setTaskDate(getToday()); setTaskTime("23:59"); setHasAiModified(false); setAllowLate(false); setPostTargetGroup("");
+
+                                        try {
+                                            await addDoc(collection(effectiveDb, 'artifacts', effectiveAppId, 'public', 'data', 'tasks'), payload);
+                                        } catch (primaryErr) {
+                                            console.warn("Retrying task creation with basic schema:", primaryErr);
+                                            const basicPayload = {
+                                                type: currentPostType,
+                                                title: cleanTitle || 'Sin título',
+                                                description: cleanDesc,
+                                                authorName: loggedInName || 'Profesora',
+                                                targetGroupId: finalTargetGroup,
+                                                imageUrl: (postImageUrl || '').trim() || '',
+                                                fileUrl: postFileUrl || '',
+                                                fileName: postFileName || '',
+                                                dueDate: isTimed && taskDate ? String(taskDate) : null,
+                                                dueTime: isTimed && taskTime ? String(taskTime) : null,
+                                                allowLate: isTimed ? Boolean(allowLate) : true,
+                                                createdAt: Date.now(),
+                                                comments: [],
+                                                reactions: {}
+                                            };
+                                            await addDoc(collection(effectiveDb, 'artifacts', effectiveAppId, 'public', 'data', 'tasks'), basicPayload);
+                                        }
+
+                                        if (typeof setTaskTitle === 'function') setTaskTitle("");
+                                        if (typeof setTaskDesc === 'function') setTaskDesc("");
+                                        if (typeof setPostImageUrl === 'function') setPostImageUrl("");
+                                        if (typeof setPostVideoUrl === 'function') setPostVideoUrl("");
+                                        if (typeof setPostFileUrl === 'function') setPostFileUrl("");
+                                        if (typeof setPostFileName === 'function') setPostFileName("");
+                                        if (typeof setAudioPub === 'function') setAudioPub(""); 
+                                        setShowImageInput(false);
+                                        setShowVideoInput(false);
+                                        setShowPostAttachmentMenu(false); 
+                                        const todayStr = typeof getToday === 'function' ? getToday() : new Date().toISOString().split('T')[0];
+                                        if (typeof setTaskDate === 'function') setTaskDate(todayStr);
+                                        if (typeof setTaskTime === 'function') setTaskTime("23:59");
+                                        if (typeof setHasAiModified === 'function') setHasAiModified(false);
+                                        if (typeof setAllowLate === 'function') setAllowLate(false);
+                                        setHasDueDate(true);
                                         setIsFormExpanded(false);
-                                    } else showMessage("Llena título y descripción.");
+                                        showMessage(currentPostType === 'forum' ? "✅ Foro de debate publicado" : currentPostType === 'task' ? "✅ Tarea publicada" : "✅ Publicación compartida");
+                                    } catch (err) {
+                                        console.error("Error al publicar:", err);
+                                        showMessage(`❌ Error al publicar: ${err?.message || 'Intenta nuevamente.'}`);
+                                    } finally {
+                                        setIsPublishing(false);
+                                    }
                                 }} 
-                                className={`${redButton} !py-2.5 !px-6 text-xs font-bold shadow-lg shadow-red-600/30 hover:scale-102 transition-transform`}
+                                className={`!py-2.5 !px-6 text-xs font-bold shadow-lg transition-transform hover:scale-102 rounded-xl text-white flex items-center gap-2 ${
+                                    isPublishing ? 'opacity-70 cursor-not-allowed' : ''
+                                } ${
+                                    postType === 'forum' 
+                                        ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/30' 
+                                        : postType === 'post'
+                                            ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/30'
+                                            : `${redButton} shadow-red-600/30`
+                                }`}
                             >
-                                Publicar ahora
+                                {isPublishing && <Loader2 size={15} className="animate-spin" />}
+                                <span>{postType === 'forum' ? 'Publicar foro' : 'Publicar ahora'}</span>
                             </button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {tasksLoading ? (
-                <div className="space-y-4">{[0,1,2].map(i => <SkeletonCard key={i} isDarkMode={isDarkMode} />)}</div>
-            ) : (
-                <div className="mb-4 relative">
-                    <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border focus-within:ring-2 transition-all ${isDarkMode ? 'bg-gray-800 border-gray-700 focus-within:ring-blue-500/50' : 'bg-gray-50 border-gray-300 focus-within:ring-blue-400/50'}`}>
-                        <SearchIcon size={18} className={isDarkMode ? 'text-gray-400' : 'text-gray-500'} />
-                        <input value={wallSearchTerm} onChange={e => setWallSearchTerm(e.target.value)} placeholder="Buscar publicaciones..." className={`flex-1 bg-transparent border-none outline-none text-sm font-medium ${isDarkMode ? 'text-gray-100 placeholder-gray-500' : 'text-gray-900 placeholder-gray-500'}`} />
-                        {wallSearchTerm && <button onClick={() => setWallSearchTerm("")} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>}
-                    </div>
-                    {filteredTasks.length === 0 && <p className="text-gray-500 italic text-sm mt-2">No se encontraron publicaciones con ese término.</p>}
+            {wallSearchTerm.trim() && (
+                <div className="flex items-center justify-between px-3.5 py-2 rounded-2xl bg-blue-500/10 border border-blue-400/20 text-xs font-semibold text-blue-600 dark:text-blue-400 mb-3 animate-in fade-in">
+                    <span className="flex items-center gap-1.5 truncate">
+                        <SearchIcon size={14} className="shrink-0" />
+                        <span>Filtrando por: <strong>"{wallSearchTerm.trim()}"</strong></span>
+                    </span>
+                    <button type="button" onClick={() => setWallSearchTerm("")} className="underline hover:opacity-75 shrink-0 ml-2">
+                        Quitar filtro
+                    </button>
                 </div>
             )}
+
             {tasksLoading ? (
                 <div className="space-y-4">{[0,1,2].map(i => <SkeletonCard key={i} isDarkMode={isDarkMode} />)}</div>
-            ) : visibleTasks.length === 0 ? <EmptyState icon={BookOpen} title="Todavía no hay publicaciones" message="Cuando la profesora publique una tarea o aviso, aparecerá aquí." isDarkMode={isDarkMode} /> : null}
-{(pinnedTasks || []).map(task => <TaskCard key={task.id} task={{...task, type: task.type || 'task', isPinned: true}} role={role} db={db} appId={appId} glassCard={glassCard} glassInput={glassInput} callGemini={callGemini} currentUser={user} showMessage={showMessage} loggedInName={loggedInName} isDarkMode={isDarkMode} confirmAction={confirmAction} handleOpenProfileByName={handleOpenProfileByName} setFullScreenImage={setFullScreenImage} />)}
-              {filteredTasks.filter(t => !(pinnedTasks || []).some(p => p.id === t.id)).map(task => <TaskCard key={task.id} task={{...task, type: task.type || 'task'}} role={role} db={db} appId={appId} glassCard={glassCard} glassInput={glassInput} callGemini={callGemini} currentUser={user} showMessage={showMessage} loggedInName={loggedInName} isDarkMode={isDarkMode} confirmAction={confirmAction} handleOpenProfileByName={handleOpenProfileByName} setFullScreenImage={setFullScreenImage} />)}
+            ) : filteredTasks.length === 0 && wallSearchTerm.trim() ? (
+                <div className="text-center py-8 text-sm text-gray-500 italic">
+                    No se encontraron publicaciones que coincidan con "{wallSearchTerm}".
+                </div>
+            ) : visibleTasks.length === 0 ? (
+                <EmptyState icon={BookOpen} title="Todavía no hay publicaciones" message="Cuando la profesora publique una tarea o aviso, aparecerá aquí." isDarkMode={isDarkMode} />
+            ) : null}
+            {/* Sección de publicaciones y tareas fijadas (Pinned Posts) */}
+            {(pinnedTasks || []).length > 0 && (
+                <div className="space-y-4 mb-5 transition-all duration-500 ease-out">
+                    {(pinnedTasks || []).map(task => (
+                        <div key={'pinned-' + task.id} className="transition-all duration-500 ease-out transform animate-in fade-in slide-in-from-top-4">
+                            <TaskCard 
+                                task={{...task, type: task.type || 'task', isPinned: true}} 
+                                role={role} 
+                                db={db} 
+                                appId={appId} 
+                                academicGroups={academicGroups}
+                                glassCard={glassCard} 
+                                glassInput={glassInput} 
+                                callGemini={callGemini} 
+                                currentUser={user} 
+                                showMessage={showMessage} 
+                                loggedInName={loggedInName} 
+                                isDarkMode={isDarkMode} 
+                                confirmAction={confirmAction} 
+                                handleOpenProfileByName={handleOpenProfileByName} 
+                                setFullScreenImage={setFullScreenImage} 
+                                userMappings={userMappings} 
+                            />
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* Publicaciones y tareas regulares */}
+            <div className="space-y-4 transition-all duration-300">
+                {filteredTasks.filter(t => !(pinnedTasks || []).some(p => p.id === t.id)).map(task => (
+                    <div key={task.id} className="transition-all duration-300 ease-out">
+                        <TaskCard 
+                            task={{...task, type: task.type || 'task'}} 
+                            role={role} 
+                            db={db} 
+                            appId={appId} 
+                            academicGroups={academicGroups}
+                            glassCard={glassCard} 
+                            glassInput={glassInput} 
+                            callGemini={callGemini} 
+                            currentUser={user} 
+                            showMessage={showMessage} 
+                            loggedInName={loggedInName} 
+                            isDarkMode={isDarkMode} 
+                            confirmAction={confirmAction} 
+                            handleOpenProfileByName={handleOpenProfileByName} 
+                            setFullScreenImage={setFullScreenImage} 
+                            userMappings={userMappings} 
+                        />
+                    </div>
+                ))}
+            </div>
 {!tasksLoading && tasks.length >= taskLimit && (
     <button type="button" onClick={loadMoreTasks} className="w-full py-3 mt-6 rounded-xl border-2 border-dashed font-bold transition-all text-sm flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
         <Plus size={18} /> Cargar publicaciones anteriores

@@ -12,46 +12,62 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    console.error('Error capturado por ErrorBoundary:', error, errorInfo)
+    console.error('=== ErrorBoundary ===')
+    console.error('Error:', error?.stack || error)
+    console.error('Info:', errorInfo?.componentStack)
     try {
-      window.__ebError = (error && (error.stack || error.message || String(error))) + ' | INFO: ' + JSON.stringify(errorInfo)
+      window.__ebError = (error && (error.stack || error.message || String(error)))
     } catch (e) {}
-  }
-
-  handleCleanReload = async () => {
-    try {
-      if ('serviceWorker' in navigator) {
-        const regs = await navigator.serviceWorker.getRegistrations()
-        for (const reg of regs) {
-          await reg.unregister()
-        }
-      }
-      if ('caches' in window) {
-        const keys = await caches.keys()
-        for (const key of keys) {
-          await caches.delete(key)
-        }
-      }
-    } catch (e) {}
-    window.location.href = window.location.origin + window.location.pathname + '?v=' + Date.now()
   }
 
   render() {
     if (this.state.hasError) {
+      const msg = this.state.error?.message || String(this.state.error) || ''
       return (
-        <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-gray-100 dark:bg-gray-900 p-6 text-center">
-          <div className="w-20 h-20 bg-gradient-to-br from-[#AD3333] to-[#8a2828] rounded-2xl flex items-center justify-center text-white font-black text-3xl shadow-xl border border-white/20">UP</div>
-          <h1 className="text-2xl font-extrabold text-gray-900 dark:text-gray-100">¡Ups! Algo salió mal.</h1>
-
-          <p className="text-gray-600 dark:text-gray-400 max-w-md">
-            Se ha detectado una nueva versión de la aplicación. Haz clic abajo para actualizar y continuar.
+        <div style={{
+          minHeight: '100vh', display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', gap: 16,
+          background: '#f3f4f6', padding: 24, textAlign: 'center', fontFamily: 'sans-serif'
+        }}>
+          <div style={{
+            width: 64, height: 64,
+            background: 'linear-gradient(135deg,#AD3333,#8a2828)',
+            borderRadius: 16, display: 'flex', alignItems: 'center',
+            justifyContent: 'center', color: 'white', fontWeight: 900, fontSize: 28
+          }}>!</div>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#111', margin: 0 }}>Error en la aplicación</h1>
+          {msg && (
+            <pre style={{
+              background: '#1e1e1e', color: '#f97171', padding: '10px 16px',
+              borderRadius: 10, fontSize: 12, textAlign: 'left',
+              maxWidth: '90vw', overflowX: 'auto', whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word', maxHeight: 180, overflowY: 'auto'
+            }}>{msg}</pre>
+          )}
+          <p style={{ color: '#666', fontSize: 13, maxWidth: 400, margin: 0 }}>
+            Copia el mensaje rojo de arriba y compártelo para que podamos solucionarlo.
           </p>
-          <div className="flex gap-3 mt-2">
+          <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
             <button
-              onClick={this.handleCleanReload}
-              className="px-6 py-3 rounded-xl bg-[#AD3333] hover:bg-[#8a2828] text-white font-bold shadow-md transition-all active:scale-95"
+              onClick={() => {
+                sessionStorage.clear()
+                window.location.href = window.location.origin + '/?r=' + Date.now()
+              }}
+              style={{
+                padding: '12px 24px', borderRadius: 12, background: '#AD3333',
+                color: 'white', fontWeight: 700, border: 'none', cursor: 'pointer', fontSize: 14
+              }}
             >
-              Actualizar y recargar
+              Recargar página
+            </button>
+            <button
+              onClick={() => this.setState({ hasError: false, error: null })}
+              style={{
+                padding: '12px 24px', borderRadius: 12, background: '#374151',
+                color: 'white', fontWeight: 700, border: 'none', cursor: 'pointer', fontSize: 14
+              }}
+            >
+              Intentar continuar
             </button>
           </div>
         </div>

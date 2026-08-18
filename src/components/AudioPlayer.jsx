@@ -9,6 +9,7 @@ export const AudioPlayer = ({
   onDelete = null, 
   compact = false, 
   isDarkMode = false,
+  isMe = false,
   className = "" 
 }) => {
   const audioRef = useRef(null)
@@ -28,9 +29,15 @@ export const AudioPlayer = ({
       setIsLoaded(true)
     }
 
+    const handleDurationChange = () => {
+      if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
+        setDuration(audio.duration)
+      }
+    }
+
     const handleTimeUpdate = () => {
       setCurrentTime(audio.currentTime)
-      if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration) && duration === 0) {
+      if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration) && (duration === 0 || !isFinite(duration))) {
         setDuration(audio.duration)
       }
     }
@@ -44,6 +51,7 @@ export const AudioPlayer = ({
     const handlePlay = () => setIsPlaying(true)
 
     audio.addEventListener('loadedmetadata', handleLoadedMetadata)
+    audio.addEventListener('durationchange', handleDurationChange)
     audio.addEventListener('timeupdate', handleTimeUpdate)
     audio.addEventListener('ended', handleEnded)
     audio.addEventListener('pause', handlePause)
@@ -51,6 +59,7 @@ export const AudioPlayer = ({
 
     return () => {
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata)
+      audio.removeEventListener('durationchange', handleDurationChange)
       audio.removeEventListener('timeupdate', handleTimeUpdate)
       audio.removeEventListener('ended', handleEnded)
       audio.removeEventListener('pause', handlePause)
@@ -80,17 +89,21 @@ export const AudioPlayer = ({
 
   return (
     <div className={`relative flex items-center gap-2.5 p-2 px-3 rounded-2xl border transition-all shadow-xs ${
-      isDarkMode 
-        ? 'bg-gray-800/90 border-gray-700/80 text-gray-100' 
-        : 'bg-white border-gray-200 text-gray-800'
-    } ${compact ? 'max-w-[230px] text-xs' : 'max-w-[300px] text-sm'} ${className}`}>
+      isMe
+        ? (isDarkMode ? 'bg-blue-600/90 border-blue-500/50 text-white' : 'bg-blue-600 text-white border-blue-500/30')
+        : (isDarkMode ? 'bg-gray-800/90 border-gray-700/80 text-gray-100' : 'bg-white border-gray-200 text-gray-800')
+    } ${compact ? 'min-w-[200px] max-w-[260px] text-xs' : 'min-w-[240px] max-w-[320px] text-sm'} ${className}`}>
       <audio ref={audioRef} src={src} preload="metadata" />
 
       {/* Play/Pause Button */}
       <button
         type="button"
         onClick={togglePlay}
-        className="w-8 h-8 rounded-xl bg-[#AD3333] hover:bg-[#8a2828] text-white flex items-center justify-center shrink-0 shadow-xs transition-transform active:scale-95"
+        className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-xs transition-transform active:scale-95 ${
+          isMe
+            ? 'bg-white text-blue-600 hover:bg-gray-100'
+            : 'bg-[#AD3333] hover:bg-[#8a2828] text-white'
+        }`}
         title={isPlaying ? "Pausar" : "Reproducir"}
       >
         {isPlaying ? <Pause size={14} /> : <Play size={14} className="ml-0.5" />}
@@ -98,7 +111,7 @@ export const AudioPlayer = ({
 
       {/* Center Waveform & Progress */}
       <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
-        <div className="flex items-center justify-between gap-1 text-[10px] font-semibold text-gray-500 dark:text-gray-400">
+        <div className={`flex items-center justify-between gap-1 text-[10px] font-semibold ${isMe ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'}`}>
           <span className="truncate">{title}</span>
           <span className="font-mono tabular-nums">
             {formatTime(Math.floor(currentTime))} / {duration > 0 ? formatTime(Math.floor(duration)) : '0:00'}

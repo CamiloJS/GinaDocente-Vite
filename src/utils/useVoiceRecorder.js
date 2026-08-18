@@ -2,10 +2,11 @@
 import React from 'react'
 import { uploadRawFileToStorage } from './helpers.js'
 
-export const useVoiceRecorder = (folderName, showMessage) => {
+export const useVoiceRecorder = (folderName = 'audio', showMessage = () => {}) => {
   const [isRecording, setIsRecording] = React.useState(false)
   const [audioUrl, setAudioUrl] = React.useState('')
   const [isUploading, setIsUploading] = React.useState(false)
+  const [recordingTime, setRecordingTime] = React.useState(0)
   const recorderRef = React.useRef(null)
   const streamRef = React.useRef(null)
 
@@ -13,41 +14,75 @@ export const useVoiceRecorder = (folderName, showMessage) => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
-      const mediaRecorder = new MediaRecorder(stream)
+
+      let options = {}
+      if (typeof MediaRecorder !== 'undefined') {
+        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+          options = { mimeType: 'audio/webm;codecs=opus' }
+        } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+          options = { mimeType: 'audio/webm' }
+        } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+          options = { mimeType: 'audio/mp4' }
+        } else if (MediaRecorder.isTypeSupported('audio/ogg')) {
+          options = { mimeType: 'audio/ogg' }
+        }
+      }
+
+      const mediaRecorder = new MediaRecorder(stream, options)
       recorderRef.current = mediaRecorder
       const chunks = []
-      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data) }
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) chunks.push(e.data)
+      }
+
       mediaRecorder.onstop = async () => {
-        const blob = new Blob(chunks, { type: 'audio/webm' })
-        stream.getTracks().forEach(t => t.stop())
+        try {
+          stream.getTracks().forEach(t => t.stop())
+        } catch (e) {}
+
         setIsRecording(false)
+        if (chunks.length === 0) return
+
         setIsUploading(true)
         try {
-          const file = new File([blob], `nota-${Date.now()}.webm`, { type: 'audio/webm' })
+          const mimeType = mediaRecorder.mimeType || 'audio/webm'
+          const ext = mimeType.includes('mp4') ? 'mp4' : mimeType.includes('ogg') ? 'ogg' : 'webm'
+          const blob = new Blob(chunks, { type: mimeType })
+          const file = new File([blob], `nota-${Date.now()}.${ext}`, { type: mimeType })
           const url = await uploadRawFileToStorage(file, folderName)
           setAudioUrl(url)
-          showMessage('✅ Nota lista')
+          showMessage('✅ Nota de voz lista para enviar')
         } catch (err) {
+          console.error(err)
           showMessage('Hubo un error al subir el audio.')
         }
         setIsUploading(false)
       }
-      mediaRecorder.start()
+
+      mediaRecorder.start(250) // slice every 250ms for reliable chunks
       setIsRecording(true)
-      showMessage('🎙️ Grabando...')
+      showMessage('🎙️ Grabando nota de voz...')
     } catch (err) {
-      showMessage('No se pudo acceder al micrófono.')
+      console.error(err)
+      showMessage('No se pudo acceder al micrófono. Permite el acceso.')
+      setIsRecording(false)
     }
   }
 
   const stopRecording = () => {
-    recorderRef.current?.stop()
+    if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+      try {
+        recorderRef.current.stop()
+      } catch (e) {}
+    }
   }
 
   const cancelRecording = () => {
     setAudioUrl('')
     setIsRecording(false)
     setIsUploading(false)
+    setRecordingTime(0)
     if (recorderRef.current && recorderRef.current.state !== 'inactive') {
       try {
         recorderRef.current.onstop = null
@@ -62,8 +97,6 @@ export const useVoiceRecorder = (folderName, showMessage) => {
     }
     recorderRef.current = null
   }
-
-  const [recordingTime, setRecordingTime] = React.useState(0)
 
   React.useEffect(() => {
     let interval = null
@@ -80,7 +113,16 @@ export const useVoiceRecorder = (folderName, showMessage) => {
     }
   }, [isRecording])
 
-  return { isRecording, audioUrl, isUploading, recordingTime, setAudioUrl, startRecording, stopRecording, cancelRecording }
+  return {
+    isRecording,
+    audioUrl,
+    isUploading,
+    recordingTime,
+    setAudioUrl,
+    startRecording,
+    stopRecording,
+    cancelRecording
+  }
 }
 
 export default useVoiceRecorder

@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="description" content="English TECH - Plataforma educativa interactiva de aprendizaje de inglés para estudiantes de la Universidad de Pamplona." />
     <meta name="theme-color" content="#AD3333" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0, s-maxage=0" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <link rel="manifest" href="/manifest.json" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -16,8 +19,8 @@
     <!-- Open Graph -->
     <meta property="og:title" content="English TECH - Universidad de Pamplona" />
     <meta property="og:description" content="Plataforma educativa interactiva de aprendizaje de inglés para estudiantes de la Universidad de Pamplona." />
-    <meta property="og:image" content="https://gina-docente.vercel.app/icono.png" />
-    <meta property="og:url" content="https://gina-docente.vercel.app/" />
+    <meta property="og:image" content="https://gina-docente-qq2s.vercel.app/icono.png" />
+    <meta property="og:url" content="https://gina-docente-qq2s.vercel.app/" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="English TECH" />
 
@@ -25,13 +28,66 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="English TECH - Universidad de Pamplona" />
     <meta name="twitter:description" content="Plataforma educativa interactiva de aprendizaje de inglés para estudiantes de la Universidad de Pamplona." />
-    <meta name="twitter:image" content="https://gina-docente.vercel.app/icono.png" />
+    <meta name="twitter:image" content="https://gina-docente-qq2s.vercel.app/icono.png" />
 
+    <!-- Control de Versión Estricto y Limpieza de Caché -->
+    <script>
+      (function() {
+        var buildId = "__BUILD_TIMESTAMP__";
+        window.__CURRENT_BUILD_ID__ = buildId;
+
+        // Desregistrar cualquier Service Worker antiguo
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            for (var i = 0; i < registrations.length; i++) {
+              registrations[i].unregister();
+            }
+          }).catch(function() {});
+        }
+        // Limpiar Cache Storage obsoleto
+        if ('caches' in window) {
+          caches.keys().then(function(keys) {
+            for (var j = 0; j < keys.length; j++) {
+              caches.delete(keys[j]);
+            }
+          }).catch(function() {});
+        }
+        // Si el navegador cargó desde bfcache (Back/Forward Cache), forzar recarga fresca
+        window.addEventListener('pageshow', function(event) {
+          if (event.persisted) {
+            window.location.replace(window.location.pathname + '?_t=' + Date.now() + window.location.hash);
+          }
+        });
+
+        // Comprobación de versión ultra-rápida contra el servidor
+        try {
+          fetch('/version.json?_t=' + Date.now(), { cache: 'no-store' })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+              if (data && data.version && String(data.version) !== String(buildId)) {
+                var freshUrl = window.location.pathname + '?_v=' + data.version + '&_ts=' + Date.now() + window.location.hash;
+                window.location.replace(freshUrl);
+              } else {
+                if (window.location.search.indexOf('_v=') !== -1 || window.location.search.indexOf('_fresh=') !== -1 || window.location.search.indexOf('r=') !== -1 || window.location.search.indexOf('_ts=') !== -1) {
+                  setTimeout(function() {
+                    try {
+                      window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
+                    } catch (e) {}
+                  }, 1200);
+                }
+              }
+            }).catch(function() {});
+        } catch (err) {}
+      })();
+    </script>
+
+    <!-- Tema oscuro/claro antes de montar React para evitar flash -->
     <script>
       (function() {
         try {
           var saved = localStorage.getItem('englishTech_theme');
-          var isDark = saved === 'dim' || saved === 'lights_out' || saved === 'dark' || (saved === null && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          var isDark = saved === 'dim' || saved === 'lights_out' || saved === 'dark' ||
+            (saved === null && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
           if (isDark) {
             document.documentElement.classList.add('dark');
             if (saved === 'lights_out' || saved === 'dark') {
