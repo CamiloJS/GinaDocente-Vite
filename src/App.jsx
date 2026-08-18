@@ -215,6 +215,7 @@ function App() {
   const [loggedInUser, setLoggedInUser] = useState(() => initialActiveSession ? (initialActiveSession.role === 'teacher' ? 'GinaDocente' : `@${initialActiveSession.userKey}`) : ""); 
   const [loggedInName, setLoggedInName] = useState(() => initialActiveSession ? (initialActiveSession.name || initialActiveSession.userKey) : ""); 
   const [userMappings, setUserMappings] = useState({}); 
+  const userMappingsRef = useRef(userMappings);
   const [userMappingsLoaded, setUserMappingsLoaded] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [prefillUsername, setPrefillUsername] = useState("");
@@ -472,16 +473,8 @@ function App() {
   const typingTimeout = useRef(null);
   const chatImageInputRef = useRef(null);
   const chatDocInputRef = useRef(null);
-  const notificationSound = useRef(typeof Audio !== "undefined" ? (() => {
-    try {
-      const snd = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-      snd.volume = 0.5;
-      return snd;
-    } catch (e) {
-      return null;
-    }
-  })() : null);
   const submittingEvalRef = useRef(false);
+  const submitEvaluationRef = useRef(null);
   const onboardingFileInputRef = useRef(null);
   const isSendingChatAppMessageRef = useRef(false);
   // Fix closure bug: ref siempre tiene el valor actual de soundEnabled
@@ -811,6 +804,7 @@ function App() {
       submittingEvalRef.current = false;
     }
   };
+  submitEvaluationRef.current = submitEvaluation;
 
   const handleEnableRetry = async (gradeId, studentName) => {
     confirmAction(`¿Deseas autorizar un nuevo intento a ${studentName}? Se eliminará la anulación y el estudiante podrá volver a presentar la evaluación.`, async () => {
@@ -1144,7 +1138,7 @@ function App() {
               if (activeTakingEval && timeRemaining > 0) {
                   interval = setInterval(() => setTimeRemaining(prev => prev - 1), 1000);
               } else if (activeTakingEval && timeRemaining === 0) {
-                  submitEvaluation(true);
+                  submitEvaluationRef.current?.(true);
               }
               return () => clearInterval(interval);
           }, [activeTakingEval, timeRemaining]);
@@ -1728,6 +1722,7 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
                 const maps = {};
                 s.docs.forEach(d => { maps[d.id] = d.data(); });
                 setUserMappings(maps);
+                userMappingsRef.current = maps;
                 setUserMappingsLoaded(true);
             }, (err) => {
                 console.warn('userMappings snapshot warning:', err);
@@ -1750,7 +1745,6 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
                 
                 const rawSession = localStorage.getItem('englishTech_activeSession');
                 if (!rawSession) {
-                    // Si el usuario cerró sesión explícitamente y no hay sesión activa en localStorage, nos quedamos en Login
                     return;
                 }
 
@@ -1774,17 +1768,18 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
                 }
 
                 if (u && u.email) {
+                    const currentMappings = userMappingsRef.current || {};
                     const emailLower = u.email.toLowerCase();
-                    let foundKey = Object.keys(userMappings || {}).find(k => 
-                        (userMappings[k]?.email && userMappings[k].email.toLowerCase() === emailLower) ||
-                        (userMappings[k]?.uid && userMappings[k].uid === u.uid)
+                    let foundKey = Object.keys(currentMappings).find(k => 
+                        (currentMappings[k]?.email && currentMappings[k].email.toLowerCase() === emailLower) ||
+                        (currentMappings[k]?.uid && currentMappings[k].uid === u.uid)
                     );
                     if (!foundKey) {
                         foundKey = Object.keys(FALLBACK_MAP).find(k => FALLBACK_MAP[k]?.email?.toLowerCase() === emailLower);
                     }
 
                     if (foundKey) {
-                        const dbData = userMappings[foundKey] || {};
+                        const dbData = currentMappings[foundKey] || {};
                         const fallbackData = FALLBACK_MAP[foundKey] || {};
                         const finalRole = dbData.role || fallbackData.role || 'student';
                         const finalName = dbData.fullName || fallbackData.name || foundKey;
@@ -1799,7 +1794,7 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
                 }
             });
             return () => unsubscribe();
-          }, [userMappings]);
+          }, []);
 
           // 1. COSAS GLOBALES (Se necesitan siempre para notificaciones y chats)
 useEffect(() => {
@@ -2095,6 +2090,20 @@ useEffect(() => {
                   };
               }
           }, [myChatId, role]);
+
+          // Cleanup de MediaRecorder y typingTimeout al desmontar
+          useEffect(() => {
+              return () => {
+                  if (recordingRef.current && recordingRef.current.state !== 'inactive') {
+                      try { recordingRef.current.stop(); } catch (e) {}
+                  }
+                  if (recordingStreamRef.current) {
+                      try { recordingStreamRef.current.getTracks().forEach(t => t.stop()); } catch (e) {}
+                  }
+                  clearTimeout(typingTimeout.current);
+              };
+          }, []);
+
           useEffect(() => {
               if (isChatAppOpen && myChatId) {
                   setHasUnreadChat(false);
@@ -2180,10 +2189,11 @@ useEffect(() => {
           };
 
           const handleDeleteAppMessage = async (msgId) => {
+              if (!activeChat) return;
               await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chats', activeChat.id, 'messages', msgId));
 
               // Actualizar o eliminar la vista previa del último mensaje
-              const msgsSnapshot = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'chats', activeChat.id, 'messages'));
+              const msgsSnapshot = await getDocs(query(collection(db, 'artifacts', appId, 'public', 'data', 'chats', activeChat.id, 'messages'), orderBy('createdAt', 'desc'), limit(1)));
               if (msgsSnapshot.empty) {
                   await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'lastMessages', activeChat.id));
               } else {
@@ -2198,7 +2208,7 @@ useEffect(() => {
           };
 
           const handleEditAppMessage = async () => {
-    if (!editAppMessageText.trim()) return;
+    if (!activeChat || !editAppMessageText.trim()) return;
     
     // 🛑 FILTRO NUEVO: Comparar los dos textos
     const originalMsg = chatMessages.find(m => m.id === editingAppMessageId);
@@ -5753,7 +5763,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                       <button 
                                                           type="button" 
                                                           onClick={() => {
-                                                              const newQ = [...evalFormData.questions]; newQ[qIndex].type = 'multiple'; setEvalFormData({...evalFormData, questions: newQ});
+                                                              const newQ = [...evalFormData.questions]; newQ[qIndex] = {...newQ[qIndex], type: 'multiple', options: newQ[qIndex].options ? newQ[qIndex].options.map(o => ({...o})) : [{text:'',isCorrect:false},{text:'',isCorrect:false}]}; setEvalFormData({...evalFormData, questions: newQ});
                                                           }}
                                                           className={`px-2.5 py-1 rounded-lg transition-all ${q.type === 'multiple' ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-xs' : 'text-gray-500'}`}
                                                       >
@@ -5762,7 +5772,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                       <button 
                                                           type="button" 
                                                           onClick={() => {
-                                                              const newQ = [...evalFormData.questions]; newQ[qIndex].type = 'text'; setEvalFormData({...evalFormData, questions: newQ});
+                                                              const newQ = [...evalFormData.questions]; newQ[qIndex] = {...newQ[qIndex], type: 'text'}; setEvalFormData({...evalFormData, questions: newQ});
                                                           }}
                                                           className={`px-2.5 py-1 rounded-lg transition-all ${q.type === 'text' ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-xs' : 'text-gray-500'}`}
                                                       >
@@ -5781,7 +5791,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                           <input 
                                               value={q.text} 
                                               onChange={(e) => {
-                                                  const newQ = [...evalFormData.questions]; newQ[qIndex].text = e.target.value; setEvalFormData({...evalFormData, questions: newQ});
+                                                  const newQ = [...evalFormData.questions]; newQ[qIndex] = {...newQ[qIndex], text: e.target.value}; setEvalFormData({...evalFormData, questions: newQ});
                                               }} 
                                               placeholder="Escribe el enunciado de la pregunta..." 
                                               className={`${glassInput} !py-2 text-xs font-semibold`} 
@@ -5797,7 +5807,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                               type="checkbox" 
                                                               checked={opt.isCorrect} 
                                                               onChange={(e) => {
-                                                                  const newQ = [...evalFormData.questions]; newQ[qIndex].options[oIndex].isCorrect = e.target.checked; setEvalFormData({...evalFormData, questions: newQ});
+                                                                  const newQ = [...evalFormData.questions]; newQ[qIndex] = {...newQ[qIndex], options: newQ[qIndex].options.map((o, i) => i === oIndex ? {...o, isCorrect: e.target.checked} : {...o})}; setEvalFormData({...evalFormData, questions: newQ});
                                                               }} 
                                                               className="w-4 h-4 accent-green-600 rounded cursor-pointer" 
                                                               title="Marcar como correcta" 
@@ -5805,7 +5815,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                           <input 
                                                               value={opt.text} 
                                                               onChange={(e) => {
-                                                                  const newQ = [...evalFormData.questions]; newQ[qIndex].options[oIndex].text = e.target.value; setEvalFormData({...evalFormData, questions: newQ});
+                                                                  const newQ = [...evalFormData.questions]; newQ[qIndex] = {...newQ[qIndex], options: newQ[qIndex].options.map((o, i) => i === oIndex ? {...o, text: e.target.value} : {...o})}; setEvalFormData({...evalFormData, questions: newQ});
                                                               }} 
                                                               placeholder={`Opción ${oIndex + 1}`} 
                                                               className={`${glassInput} !py-1.5 flex-1 text-xs ${opt.isCorrect ? 'border-green-500/50 bg-green-500/10' : ''}`} 
@@ -5813,13 +5823,13 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                           />
                                                           <button type="button" onClick={() => {
                                                               if(q.options.length <= 2) return showMessage("Mínimo 2 opciones.");
-                                                              const newQ = [...evalFormData.questions]; newQ[qIndex].options.splice(oIndex, 1); setEvalFormData({...evalFormData, questions: newQ});
+                                                              const newQ = [...evalFormData.questions]; const newOpts = [...q.options]; newOpts.splice(oIndex, 1); newQ[qIndex] = {...q, options: newOpts}; setEvalFormData({...evalFormData, questions: newQ});
                                                           }} className="text-gray-400 hover:text-red-500 p-1" title="Eliminar opción"><X size={14}/></button>
                                                       </div>
                                                   ))}
                                                   {q.options.length < 4 && (
                                                       <button type="button" onClick={() => {
-                                                          const newQ = [...evalFormData.questions]; newQ[qIndex].options.push({text: '', isCorrect: false}); setEvalFormData({...evalFormData, questions: newQ});
+                                                          const newQ = [...evalFormData.questions]; newQ[qIndex] = {...q, options: [...q.options, {text: '', isCorrect: false}]}; setEvalFormData({...evalFormData, questions: newQ});
                                                       }} className="text-[11px] font-bold text-blue-600 hover:underline pt-1 flex items-center gap-1">
                                                           <Plus size={12}/> Agregar opción
                                                       </button>
@@ -5831,7 +5841,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                   <input 
                                                       value={q.correctAnswer} 
                                                       onChange={(e) => {
-                                                          const newQ = [...evalFormData.questions]; newQ[qIndex].correctAnswer = e.target.value; setEvalFormData({...evalFormData, questions: newQ});
+                                                          const newQ = [...evalFormData.questions]; newQ[qIndex] = {...newQ[qIndex], correctAnswer: e.target.value}; setEvalFormData({...evalFormData, questions: newQ});
                                                       }} 
                                                       placeholder="Ej: went" 
                                                       className={`${glassInput} !py-1.5 text-xs border-green-500/40 bg-green-500/10`} 
@@ -8374,9 +8384,9 @@ Respuesta del asistente (Profesional, sobria, sin asteriscos de markdown inneces
                                                            const grp = chatGroups.find(g => `group_${g.id}` === activeChat.id || g.id === activeChat.id || `acad_${g.academicGroupId}` === activeChat.id);
                                                            return `${grp?.members?.length || activeChat.members?.length || 0} miembros`;
                                                        }
-                                                       const targetId = activeChat.id.split('_').find(id => id !== 'dm' && id !== myChatId);
-                                                       const isTyping = typingStatus[activeChat.id]?.[targetId];
-                                                       if (isTyping || (typeof isTyping === 'object' && isTyping?.isTyping)) return <span className="text-blue-500 font-bold animate-pulse">Escribiendo...</span>;
+                                                        const targetId = activeChat.id.split('_').find(id => id !== 'dm' && id !== myChatId);
+                                                        const isTyping = typingStatus[activeChat.id]?.[targetId];
+                                                        if (isTyping === true || (typeof isTyping === 'object' && isTyping?.isTyping === true)) return <span className="text-blue-500 font-bold animate-pulse">Escribiendo...</span>;
                                                        const pData = userPresence[targetId] || {};
                                                        if (pData.status === 'online') {
                                                            return pData.currentChatId === activeChat.id ? <span className="text-green-600 font-bold">En este chat</span> : <span className="text-green-500 font-bold">En línea</span>;
@@ -9077,15 +9087,16 @@ Respuesta del asistente (Profesional, sobria, sin asteriscos de markdown inneces
 
                                               <input 
                                                   value={chatAppInput} 
-                                                  onChange={(e) => {
-                                                      setChatAppInput(e.target.value);
-                                                      const typingRef = doc(db, 'artifacts', appId, 'public', 'data', 'typing', activeChat.id);
-                                                      setDoc(typingRef, { [myChatId]: true }, { merge: true });
-                                                      clearTimeout(typingTimeout.current);
-                                                      typingTimeout.current = setTimeout(() => {
-                                                          setDoc(typingRef, { [myChatId]: false }, { merge: true });
-                                                      }, 2000);
-                                                  }} 
+                                              onChange={(e) => {
+                                                  setChatAppInput(e.target.value);
+                                                  if (!activeChat) return;
+                                                  const typingRef = doc(db, 'artifacts', appId, 'public', 'data', 'typing', activeChat.id);
+                                                  setDoc(typingRef, { [myChatId]: true }, { merge: true });
+                                                  clearTimeout(typingTimeout.current);
+                                                  typingTimeout.current = setTimeout(() => {
+                                                      setDoc(typingRef, { [myChatId]: false }, { merge: true });
+                                                  }, 2000);
+                                              }}
                                                   placeholder="Escribe un mensaje..." 
                                                   className={`flex-1 min-w-0 bg-transparent border-none outline-none py-1.5 px-1.5 text-xs font-medium ${isDarkMode ? 'text-gray-100 placeholder-gray-500' : 'text-gray-900 placeholder-gray-400'}`} 
                                               />
@@ -9450,7 +9461,7 @@ Respuesta del asistente (Profesional, sobria, sin asteriscos de markdown inneces
                                           type="button"
                                           onClick={() => {
                                               setIsMobileMenuOpen(false);
-                                              setShowSettingsModal(true);
+                                              changeTab('settings');
                                           }}
                                           className="w-full flex items-center justify-between p-3.5 hover:bg-gray-100 dark:hover:bg-gray-750 transition-colors text-left"
                                       >
@@ -9467,7 +9478,7 @@ Respuesta del asistente (Profesional, sobria, sin asteriscos de markdown inneces
                                           type="button"
                                           onClick={() => {
                                               setIsMobileMenuOpen(false);
-                                              handleSignOut();
+                                              handleLogout();
                                           }}
                                           className="w-full flex items-center justify-between p-3.5 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors text-left text-red-600 dark:text-red-400"
                                       >

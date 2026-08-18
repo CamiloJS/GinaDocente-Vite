@@ -31,7 +31,6 @@ const TasksTab = React.memo(({
     const [isPublishing, setIsPublishing] = useState(false);
     const [postTargetGroup, setPostTargetGroup] = useState(fixedTargetGroup || "all");
     const [hasDueDate, setHasDueDate] = useState(true);
-    const [isGroupDropdownOpen, setIsGroupDropdownOpen] = useState(false);
     const [postVideoUrl, setPostVideoUrl] = useState("");
     const [showVideoInput, setShowVideoInput] = useState(false);
     const [localWallSearchTerm, setLocalWallSearchTerm] = useState("");
@@ -436,7 +435,7 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                                 <ImageIcon size={16} /> Subir imagen
                                                 <input type="file" accept="image/*" className="hidden" onChange={(e) => { handlePostLocalFileUpload(e); setShowPostAttachmentMenu(false); }} />
                                             </label>
-                                            <button type="button" onClick={() => { window.openGifPicker((url) => setPostImageUrl(url)); setShowPostAttachmentMenu(false); }} className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-colors w-full text-left text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                            <button type="button" onClick={() => { window.openGifPicker?.((url) => setPostImageUrl(url)); setShowPostAttachmentMenu(false); }} className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-colors w-full text-left text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
                                                 <span className="font-black border border-current px-1 rounded text-[9px] flex items-center justify-center h-4">GIF</span> Insertar GIF
                                             </button>
                                             <label className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold cursor-pointer transition-colors text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">

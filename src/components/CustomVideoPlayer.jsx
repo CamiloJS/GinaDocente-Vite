@@ -94,14 +94,22 @@ const CustomVideoPlayer = ({ src, url, videoId: propVideoId, title = "Video de l
     }
   };
 
-  const toggleFullscreen = () => {
+  const toggleFullscreen = async () => {
     if (!containerRef.current) return;
     if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen?.().catch(console.error);
-      setIsFullscreen(true);
+      try {
+        await containerRef.current.requestFullscreen?.();
+        setIsFullscreen(true);
+      } catch (err) {
+        console.error(err);
+      }
     } else {
-      document.exitFullscreen?.().catch(console.error);
-      setIsFullscreen(false);
+      try {
+        await document.exitFullscreen?.();
+        setIsFullscreen(false);
+      } catch (err) {
+        console.error(err);
+      }
     }
   };
 

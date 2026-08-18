@@ -527,7 +527,11 @@ export const SlideEditorModal = ({ presentation, onClose, onSave, onProject, isD
   const handleDeleteSlide = (idx) => {
     if (slides.length <= 1) return;
     setSlides(prev => prev.filter((_, i) => i !== idx));
-    setActiveSlideIdx(prev => Math.max(0, Math.min(prev, slides.length - 2)));
+    setActiveSlideIdx(prev => {
+      if (idx < prev) return prev - 1;
+      if (idx === prev) return Math.max(0, prev - 1);
+      return Math.max(0, Math.min(prev, slides.length - 2));
+    });
   };
 
   const handleDuplicateSlide = (idx) => {
@@ -836,8 +840,7 @@ export const SlideEditorModal = ({ presentation, onClose, onSave, onProject, isD
                         type="text"
                         value={card.title || ''}
                         onChange={e => {
-                          const newCards = [...activeSlide.cards];
-                          newCards[cIdx].title = e.target.value;
+                          const newCards = activeSlide.cards.map((c, i) => i === cIdx ? {...c, title: e.target.value} : {...c});
                           handleSlideChange('cards', newCards);
                         }}
                         placeholder="Título del concepto..."
@@ -847,8 +850,7 @@ export const SlideEditorModal = ({ presentation, onClose, onSave, onProject, isD
                       <textarea
                         value={card.text || ''}
                         onChange={e => {
-                          const newCards = [...activeSlide.cards];
-                          newCards[cIdx].text = e.target.value;
+                          const newCards = activeSlide.cards.map((c, i) => i === cIdx ? {...c, text: e.target.value} : {...c});
                           handleSlideChange('cards', newCards);
                         }}
                         rows={2}
@@ -917,9 +919,11 @@ export const SlideEditorModal = ({ presentation, onClose, onSave, onProject, isD
                         type="text"
                         value={typeof bullet === 'object' ? bullet.title : bullet}
                         onChange={e => {
-                          const newBullets = [...activeSlide.bullets];
-                          if (typeof newBullets[bIdx] === 'object') newBullets[bIdx].title = e.target.value;
-                          else newBullets[bIdx] = { title: e.target.value, text: '', example: '' };
+                          const newBullets = activeSlide.bullets.map((b, i) => {
+                            if (i !== bIdx) return b;
+                            if (typeof b === 'object') return {...b, title: e.target.value};
+                            return { title: e.target.value, text: '', example: '' };
+                          });
                           handleSlideChange('bullets', newBullets);
                         }}
                         placeholder="Título del punto clave..."
@@ -929,8 +933,11 @@ export const SlideEditorModal = ({ presentation, onClose, onSave, onProject, isD
                       <textarea
                         value={typeof bullet === 'object' ? bullet.text : ''}
                         onChange={e => {
-                          const newBullets = [...activeSlide.bullets];
-                          if (typeof newBullets[bIdx] === 'object') newBullets[bIdx].text = e.target.value;
+                          const newBullets = activeSlide.bullets.map((b, i) => {
+                            if (i !== bIdx) return b;
+                            if (typeof b === 'object') return {...b, text: e.target.value};
+                            return b;
+                          });
                           handleSlideChange('bullets', newBullets);
                         }}
                         rows={2}
@@ -942,8 +949,11 @@ export const SlideEditorModal = ({ presentation, onClose, onSave, onProject, isD
                         type="text"
                         value={typeof bullet === 'object' ? bullet.example : ''}
                         onChange={e => {
-                          const newBullets = [...activeSlide.bullets];
-                          if (typeof newBullets[bIdx] === 'object') newBullets[bIdx].example = e.target.value;
+                          const newBullets = activeSlide.bullets.map((b, i) => {
+                            if (i !== bIdx) return b;
+                            if (typeof b === 'object') return {...b, example: e.target.value};
+                            return b;
+                          });
                           handleSlideChange('bullets', newBullets);
                         }}
                         placeholder="Ejemplo (opcional)..."

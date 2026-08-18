@@ -77,6 +77,10 @@ export const compressImage = (file, maxWidth = 800, maxHeight = 800, quality = 0
       return;
     }
 
+    const isPng = file.type === 'image/png' || file.name?.toLowerCase().endsWith('.png');
+    const outputFormat = isPng ? 'image/png' : 'image/jpeg';
+    const outputQuality = isPng ? undefined : quality;
+
     const reader = new FileReader()
     reader.readAsDataURL(file)
     reader.onload = (event) => {
@@ -94,8 +98,11 @@ export const compressImage = (file, maxWidth = 800, maxHeight = 800, quality = 0
         canvas.width = width
         canvas.height = height
         const ctx = canvas.getContext('2d')
+        if (isPng) {
+          ctx.clearRect(0, 0, width, height);
+        }
         ctx.drawImage(img, 0, 0, width, height)
-        resolve(canvas.toDataURL('image/jpeg', quality))
+        resolve(canvas.toDataURL(outputFormat, outputQuality))
       }
       img.onerror = (error) => reject(error)
     }

@@ -17,6 +17,7 @@ export const AudioPlayer = ({
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
   const [isLoaded, setIsLoaded] = useState(false)
+  const durationRef = useRef(0)
 
   useEffect(() => {
     const audio = audioRef.current
@@ -25,6 +26,7 @@ export const AudioPlayer = ({
     const handleLoadedMetadata = () => {
       if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
         setDuration(audio.duration)
+        durationRef.current = audio.duration
       }
       setIsLoaded(true)
     }
@@ -32,13 +34,15 @@ export const AudioPlayer = ({
     const handleDurationChange = () => {
       if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
         setDuration(audio.duration)
+        durationRef.current = audio.duration
       }
     }
 
     const handleTimeUpdate = () => {
       setCurrentTime(audio.currentTime)
-      if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration) && (duration === 0 || !isFinite(duration))) {
+      if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration) && (durationRef.current === 0 || !isFinite(durationRef.current))) {
         setDuration(audio.duration)
+        durationRef.current = audio.duration
       }
     }
 

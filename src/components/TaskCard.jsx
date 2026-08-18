@@ -61,7 +61,7 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
     const [revealedComments, setRevealedComments] = useState({}); 
     const [historyOpenCid, setHistoryOpenCid] = useState(null); 
     const [showCommentModal, setShowCommentModal] = useState(false); 
-    const [fullScreenImage, setFullScreenImage] = useState(null);
+    const [localFullScreenImage, setLocalFullScreenImage] = useState(null);
     const [replyingTo, setReplyingTo] = useState(null);
     const [gradingCid, setGradingCid] = useState(null);
     const [gradeValue, setGradeValue] = useState("");
@@ -1024,7 +1024,7 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                         loading="lazy" 
                         decoding="async" 
                         alt="Adjunto de publicación" 
-                        onClick={() => setFullScreenImage(task.imageUrl)} 
+                        onClick={() => setLocalFullScreenImage(task.imageUrl)} 
                         className="w-full h-auto max-h-96 object-contain cursor-pointer hover:opacity-95 transition-opacity" 
                         onError={(e) => e.target.style.display = 'none'} 
                     />
@@ -1343,7 +1343,7 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                                         ) : (
                                             <div className="flex flex-col gap-2 mt-1.5">
                                                 {c.text && <p className={`text-xs leading-relaxed ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>{<LinkifyText text={c.text} />}</p>}
-                                                {c.imageUrl && <img src={c.imageUrl} loading="lazy" decoding="async" alt="Adjunto" onClick={() => setFullScreenImage(c.imageUrl)} className="w-24 h-24 rounded-xl border object-cover shadow-xs cursor-pointer hover:opacity-80 transition-opacity" onError={(e) => e.target.style.display = 'none'} />}
+                                                {c.imageUrl && <img src={c.imageUrl} loading="lazy" decoding="async" alt="Adjunto" onClick={() => setLocalFullScreenImage(c.imageUrl)} className="w-24 h-24 rounded-xl border object-cover shadow-xs cursor-pointer hover:opacity-80 transition-opacity" onError={(e) => e.target.style.display = 'none'} />}
                                                 {c.audioUrl && <div className="mt-1"><AudioPlayer src={c.audioUrl} title="Nota de voz" isDarkMode={isDarkMode} compact={true} /></div>}
                                                 {c.fileUrl && (
                                                     <a href={c.fileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-2 rounded-xl border w-fit text-[11px] font-medium transition-colors bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
@@ -1701,7 +1701,7 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                                               <ImageIcon size={15} /> Subir foto
                                               <input type="file" accept="image/*" className="hidden" onChange={(e) => { handleLocalFileUpload(e); setShowAttachmentMenu(false); }} />
                                           </label>
-                                          <button type="button" onClick={() => { window.openGifPicker((url) => setCommentImageUrl(url)); setShowAttachmentMenu(false); }} className="flex items-center gap-2 px-2.5 py-2 rounded-xl text-xs font-bold hover:bg-gray-100 dark:hover:bg-gray-700 text-left">
+                                          <button type="button" onClick={() => { window.openGifPicker?.((url) => setCommentImageUrl(url)); setShowAttachmentMenu(false); }} className="flex items-center gap-2 px-2.5 py-2 rounded-xl text-xs font-bold hover:bg-gray-100 dark:hover:bg-gray-700 text-left">
                                               <span className="font-black border border-current px-1 rounded text-[8px]">GIF</span> GIF
                                           </button>
                                           <label className="flex items-center gap-2 px-2.5 py-2 rounded-xl text-xs font-bold hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-left">
@@ -1825,10 +1825,10 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
             , document.body)}
 
             {/* FULLSCREEN IMAGE MODAL */}
-            {fullScreenImage && ReactDOM.createPortal(
-                <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setFullScreenImage(null)}>
+            {localFullScreenImage && ReactDOM.createPortal(
+                <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setLocalFullScreenImage(null)}>
                     <button className="absolute top-4 md:top-8 right-4 md:right-8 text-white/70 hover:text-white bg-black/50 hover:bg-red-600 p-2 rounded-full transition-all shadow-lg"><X size={28}/></button>
-                    <img src={fullScreenImage} loading="lazy" className="w-auto h-auto max-w-[95vw] max-h-[90vh] object-contain rounded-2xl shadow-2xl" onClick={e => e.stopPropagation()} />
+                    <img src={localFullScreenImage} loading="lazy" className="w-auto h-auto max-w-[95vw] max-h-[90vh] object-contain rounded-2xl shadow-2xl" onClick={e => e.stopPropagation()} />
                 </div>
             , document.body)}
         </div>

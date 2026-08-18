@@ -20,7 +20,9 @@ const GifPickerModal = ({ onSelect, onClose, isDarkMode }) => {
         url: g.images?.fixed_height?.url || g.images?.original?.url,
       })).filter((g) => g.url)
       setResults(gifs)
-    } catch (error) {}
+    } catch (error) {
+      setResults([])
+    }
     setLoading(false)
   }
   React.useEffect(() => {
@@ -31,8 +33,8 @@ const GifPickerModal = ({ onSelect, onClose, isDarkMode }) => {
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
   return (
-    <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className={`w-full max-w-md rounded-3xl shadow-2xl flex flex-col overflow-hidden ${isDarkMode ? 'bg-gray-900 border border-gray-700' : 'bg-white border border-gray-200'}`}>
+    <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className={`w-full max-w-md rounded-3xl shadow-2xl flex flex-col overflow-hidden ${isDarkMode ? 'bg-gray-900 border border-gray-700' : 'bg-white border border-gray-200'}`} onClick={e => e.stopPropagation()}>
         <div className="flex justify-between items-center p-4 border-b border-gray-500/30">
           <h3 className={`font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>Buscar GIF</h3>
           <button type="button" onClick={onClose} className="text-gray-500 hover:text-red-500"><X size={20} /></button>
