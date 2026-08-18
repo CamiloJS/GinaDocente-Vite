@@ -51,7 +51,7 @@ export const TEACHER_NAME = 'Gina Marcela Quintana Delgado'
 export const splitNameFirstAndLast = (fullName) => {
   if (!fullName) return { first: '', last: '' }
   const parts = fullName.trim().split(/\s+/)
-  if (parts.length <= 1) return { first: fullName, last: '' }
+  if (parts.length <= 1) return { first: parts[0] || '', last: '' }
   if (parts.length === 2) return { first: parts[0], last: parts[1] }
   if (parts.length === 3) return { first: parts[0], last: `${parts[1]} ${parts[2]}` }
   // 4 o más palabras (ej: Gina Marcela Quintana Delgado -> First: Gina Marcela, Last: Quintana Delgado)
@@ -133,6 +133,7 @@ export const uploadRawFileToStorage = async (file, folderName) => {
 }
 
 export const containsBadWords = (text) => {
+  if (!text || typeof text !== 'string') return false;
   let normalizedText = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   const leetMap = { '4': 'a', '@': 'a', '3': 'e', '1': 'i', '!': 'i', '0': 'o', '5': 's', '7': 't', '8': 'b', '$': 's' }
   normalizedText = normalizedText.replace(/[4@31!0578$]/g, (m) => leetMap[m] || m)
@@ -248,8 +249,8 @@ export const detectLanguage = (text) => {
   if (!text || typeof text !== 'string') return 'en-US';
   const clean = text.toLowerCase();
   
-  // Patrones característicos de francés
-  const frenchMatches = (clean.match(/\b(bonjour|salut|merci|oui|non|avec|pour|dans|sur|nous|vous|ils|elles|mon|ma|mes|ton|ta|tes|son|sa|ses|le|la|les|un|une|des|du|au|aux|est|sont|c'est|j'ai|je|tu|il|elle|on|français|très|bien|aussi|cours|devoir|étudiant|parler|écouter|lire|écrire|professeur)\b|[éèêëàâîïôùûçœæ]/gi) || []).length;
+  // Patrones característicos de francés (solo palabras completas, sin caracteres acentuados sueltos)
+  const frenchMatches = (clean.match(/\b(bonjour|salut|merci|oui|non|avec|pour|dans|sur|nous|vous|ils|elles|mon|ma|mes|ton|ta|tes|son|sa|ses|le|la|les|un|une|des|du|au|aux|est|sont|c'est|j'ai|je|tu|il|elle|on|français|très|bien|aussi|cours|devoir|étudiant|parler|écouter|lire|écrire|professeur)\b/gi) || []).length;
   
   // Patrones característicos de español
   const spanishMatches = (clean.match(/\b(el|la|los|las|un|una|unos|unas|para|por|con|de|en|sobre|entre|como|pero|más|muy|está|están|hola|gracias|tarea|actividad|clase|profesor|profesora|estudiante|entrega|fecha|asignación|repaso|pregunta|respuesta)\b|[áéíóúñ¿¡]/gi) || []).length;
@@ -257,7 +258,7 @@ export const detectLanguage = (text) => {
   // Patrones característicos de inglés
   const englishMatches = (clean.match(/\b(the|is|are|was|were|to|and|in|on|at|for|with|this|that|these|those|have|has|had|will|would|can|could|should|task|homework|lesson|unit|student|teacher|class|grade|submit|reading|writing|speaking|listen)\b/gi) || []).length;
 
-  if (frenchMatches > 2 || (frenchMatches > 0 && frenchMatches > englishMatches && frenchMatches > spanishMatches)) {
+  if (frenchMatches > 2 && frenchMatches > spanishMatches && frenchMatches > englishMatches) {
     return 'fr-FR';
   }
   

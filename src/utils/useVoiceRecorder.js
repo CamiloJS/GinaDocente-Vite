@@ -10,7 +10,16 @@ export const useVoiceRecorder = (folderName = 'audio', showMessage = () => {}) =
   const recorderRef = React.useRef(null)
   const streamRef = React.useRef(null)
 
+  const cleanupStream = () => {
+    if (streamRef.current) {
+      try { streamRef.current.getTracks().forEach(t => t.stop()); } catch (e) {}
+      streamRef.current = null;
+    }
+    recorderRef.current = null;
+  };
+
   const startRecording = async () => {
+    if (recorderRef.current && recorderRef.current.state !== 'inactive') return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
@@ -37,10 +46,7 @@ export const useVoiceRecorder = (folderName = 'audio', showMessage = () => {}) =
       }
 
       mediaRecorder.onstop = async () => {
-        try {
-          stream.getTracks().forEach(t => t.stop())
-        } catch (e) {}
-
+        cleanupStream();
         setIsRecording(false)
         if (chunks.length === 0) return
 
@@ -60,7 +66,7 @@ export const useVoiceRecorder = (folderName = 'audio', showMessage = () => {}) =
         setIsUploading(false)
       }
 
-      mediaRecorder.start(250) // slice every 250ms for reliable chunks
+      mediaRecorder.start(250)
       setIsRecording(true)
       showMessage('🎙️ Grabando nota de voz...')
     } catch (err) {
@@ -89,13 +95,7 @@ export const useVoiceRecorder = (folderName = 'audio', showMessage = () => {}) =
         recorderRef.current.stop()
       } catch (e) {}
     }
-    if (streamRef.current) {
-      try {
-        streamRef.current.getTracks().forEach(t => t.stop())
-      } catch (e) {}
-      streamRef.current = null
-    }
-    recorderRef.current = null
+    cleanupStream();
   }
 
   React.useEffect(() => {
@@ -112,6 +112,16 @@ export const useVoiceRecorder = (folderName = 'audio', showMessage = () => {}) =
       if (interval) clearInterval(interval)
     }
   }, [isRecording])
+
+  // Cleanup al desmontar: liberar micrófono y cancelar grabs activos
+  React.useEffect(() => {
+    return () => {
+      if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+        try { recorderRef.current.onstop = null; recorderRef.current.stop(); } catch (e) {}
+      }
+      cleanupStream();
+    };
+  }, []);
 
   return {
     isRecording,

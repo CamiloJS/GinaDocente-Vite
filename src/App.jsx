@@ -2260,7 +2260,7 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
           };
 
           const handleDeleteGroup = async () => {
-              const group = chatGroups.find(g => `group_${g.id}` === activeChat.id);
+              const group = chatGroups.find(g => g.id === activeChat.id || `group_${g.id}` === activeChat.id || `acad_${g.academicGroupId}` === activeChat.id || `acad_${g.id}` === activeChat.id);
               if (!group) return;
               await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', group.id));
               setActiveChat(null);
@@ -2310,30 +2310,40 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
   const handleSaveGroupName = async () => {
       if (!editGroupNameVal.trim() || !activeChat) return;
       const grp = chatGroups.find(g => g.id === activeChat.id || `group_${g.id}` === activeChat.id || `acad_${g.academicGroupId}` === activeChat.id || `acad_${g.id}` === activeChat.id);
-      if (grp) {
-          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', grp.id), { name: editGroupNameVal.trim() });
-          if (grp.academicGroupId || grp.id.startsWith('acad_')) {
-              const acadId = grp.academicGroupId || grp.id.replace('acad_', '');
-              await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', acadId), { name: editGroupNameVal.trim() }).catch(() => {});
+      try {
+          if (grp) {
+              await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', grp.id), { name: editGroupNameVal.trim() });
+              if (grp.academicGroupId || grp.id.startsWith('acad_')) {
+                  const acadId = grp.academicGroupId || grp.id.replace('acad_', '');
+                  await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', acadId), { name: editGroupNameVal.trim() }).catch(() => {});
+              }
           }
+          setActiveChat(prev => ({ ...prev, name: editGroupNameVal.trim() }));
+          setIsEditingGroupName(false);
+          showMessage("✅ Nombre del grupo actualizado");
+      } catch (err) {
+          console.error(err);
+          showMessage("❌ Error al guardar el nombre.");
       }
-      setActiveChat(prev => ({ ...prev, name: editGroupNameVal.trim() }));
-      setIsEditingGroupName(false);
-      showMessage("✅ Nombre del grupo actualizado");
   };
 
   const handleSaveGroupDesc = async () => {
       if (!activeChat) return;
       const grp = chatGroups.find(g => g.id === activeChat.id || `group_${g.id}` === activeChat.id || `acad_${g.academicGroupId}` === activeChat.id || `acad_${g.id}` === activeChat.id);
-      if (grp) {
-          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', grp.id), { description: editGroupDescVal.trim() });
-          if (grp.academicGroupId || grp.id.startsWith('acad_')) {
-              const acadId = grp.academicGroupId || grp.id.replace('acad_', '');
-              await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', acadId), { description: editGroupDescVal.trim() }).catch(() => {});
+      try {
+          if (grp) {
+              await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', grp.id), { description: editGroupDescVal.trim() });
+              if (grp.academicGroupId || grp.id.startsWith('acad_')) {
+                  const acadId = grp.academicGroupId || grp.id.replace('acad_', '');
+                  await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', acadId), { description: editGroupDescVal.trim() }).catch(() => {});
+              }
           }
+          setIsEditingGroupDesc(false);
+          showMessage("✅ Descripción guardada");
+      } catch (err) {
+          console.error(err);
+          showMessage("❌ Error al guardar la descripción.");
       }
-      setIsEditingGroupDesc(false);
-      showMessage("✅ Descripción guardada");
   };
 
   const handleRemoveGroupMember = async (memberKey, memberName) => {
@@ -2355,15 +2365,20 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
       const grp = chatGroups.find(g => g.id === activeChat.id || `group_${g.id}` === activeChat.id || `acad_${g.academicGroupId}` === activeChat.id || `acad_${g.id}` === activeChat.id);
       if (!grp) return;
       const updatedMembers = Array.from(new Set([...(grp.members || []), ...selectedNewMembers]));
-      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', grp.id), { members: updatedMembers });
-      if (grp.academicGroupId || grp.id.startsWith('acad_')) {
-          const acadId = grp.academicGroupId || grp.id.replace('acad_', '');
-          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', acadId), { members: updatedMembers.filter(m => m !== 'teacher') }).catch(() => {});
+      try {
+          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', grp.id), { members: updatedMembers });
+          if (grp.academicGroupId || grp.id.startsWith('acad_')) {
+              const acadId = grp.academicGroupId || grp.id.replace('acad_', '');
+              await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', acadId), { members: updatedMembers.filter(m => m !== 'teacher') }).catch(() => {});
+          }
+          setShowAddMembersModal(false);
+          setSelectedNewMembers([]);
+          setAddMemberSearch("");
+          showMessage(`✅ Se añadieron ${selectedNewMembers.length} integrante(s) al grupo`);
+      } catch (err) {
+          console.error(err);
+          showMessage("❌ Error al añadir miembros.");
       }
-      setShowAddMembersModal(false);
-      setSelectedNewMembers([]);
-      setAddMemberSearch("");
-      showMessage(`✅ Se añadieron ${selectedNewMembers.length} integrante(s) al grupo`);
   };
 
   const handleLeaveGroupChat = async () => {
@@ -2478,16 +2493,21 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
                   showMessage("⚠️ Ingresa un nombre y selecciona al menos 1 miembro.");
                   return;
               }
-              await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'chatGroups'), {
-                  name: newGroupName.trim(),
-                  members: [myChatId, ...newGroupMembers],
-                  createdBy: myChatId,
-                  createdAt: Date.now()
-              });
-              setIsCreatingGroup(false);
-              setNewGroupName("");
-              setNewGroupMembers([]);
-              showMessage("✅ Grupo creado.");
+              try {
+                  await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'chatGroups'), {
+                      name: newGroupName.trim(),
+                      members: [myChatId, ...newGroupMembers],
+                      createdBy: myChatId,
+                      createdAt: Date.now()
+                  });
+                  setIsCreatingGroup(false);
+                  setNewGroupName("");
+                  setNewGroupMembers([]);
+                  showMessage("✅ Grupo creado.");
+              } catch (err) {
+                  console.error(err);
+                  showMessage("❌ Error al crear el grupo.");
+              }
           };
 
           const toggleVoiceRecording = async () => {
@@ -2630,28 +2650,33 @@ const [activeChatReactionMsgId, setActiveChatReactionMsgId] = useState(null);
               });
               if(!valid) return;
 
-              await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'evaluations'), {
-                  ...evalFormData,
-                  strictAntiCheat: !!evalFormData.strictAntiCheat,
-                  isArchived: false,
-                  targetGroupId: evalFormData.targetGroupId || 'all',
-                  targetGroupName: evalFormData.targetGroupName || 'Todos los estudiantes (Global)',
-                  createdAt: Date.now(),
-                  createdBy: myChatId
-              });
-              setIsCreatingEval(false);
-              setEvalFormData({
-                  title: "",
-                  description: "",
-                  dueDate: getToday(),
-                  dueTime: "23:59",
-                  timeLimit: 30,
-                  strictAntiCheat: false,
-                  targetGroupId: "all",
-                  targetGroupName: "Todos los estudiantes (Global)",
-                  questions: []
-              });
-              showMessage("✅ Evaluación creada exitosamente.");
+              try {
+                  await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'evaluations'), {
+                      ...evalFormData,
+                      strictAntiCheat: !!evalFormData.strictAntiCheat,
+                      isArchived: false,
+                      targetGroupId: evalFormData.targetGroupId || 'all',
+                      targetGroupName: evalFormData.targetGroupName || 'Todos los estudiantes (Global)',
+                      createdAt: Date.now(),
+                      createdBy: myChatId
+                  });
+                  setIsCreatingEval(false);
+                  setEvalFormData({
+                      title: "",
+                      description: "",
+                      dueDate: getToday(),
+                      dueTime: "23:59",
+                      timeLimit: 30,
+                      strictAntiCheat: false,
+                      targetGroupId: "all",
+                      targetGroupName: "Todos los estudiantes (Global)",
+                      questions: []
+                  });
+                  showMessage("✅ Evaluación creada exitosamente.");
+              } catch (err) {
+                  console.error(err);
+                  showMessage("❌ Error al crear la evaluación. Intenta de nuevo.");
+              }
           };
 
 
@@ -3884,7 +3909,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                           <div className="p-8 text-center space-y-3">
                             <Loader2 size={32} className="animate-spin text-amber-500 mx-auto" />
                             <h4 className="text-sm font-bold text-gray-800 dark:text-gray-200">
-                              {syllabusAssistantModal.type === 'activity' ? 'Diseñando actividad pedagógica...' : 'Estructurando plan de clase de 90 min...'}
+                              {syllabusAssistantModal.type === 'activity' ? 'Diseñando actividad pedagógica...' : `Estructurando plan de clase de ${syllabusAssistantModal.duration || 90} min...`}
                             </h4>
                             <p className="text-xs text-gray-500">Analizando objetivos y conceptos clave de la semana...</p>
                           </div>
@@ -4536,9 +4561,15 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                         const file = e.target.files?.[0];
                                         if (!file) return;
                                         if (file.size > 4 * 1024 * 1024) return showMessage("⚠️ La imagen no debe superar los 4MB.");
-                                        const reader = new FileReader();
-                                        reader.onload = (ev) => setNewAcadGroupAvatarUrl(ev.target.result);
-                                        reader.readAsDataURL(file);
+                                        try {
+                                            showMessage("⏳ Subiendo imagen...");
+                                            const compressed = await compressImage(file, 400, 400, 0.7);
+                                            const url = await uploadImageToStorage(compressed, 'group_avatars');
+                                            setNewAcadGroupAvatarUrl(url);
+                                        } catch (err) {
+                                            console.error(err);
+                                            showMessage("❌ Error al subir la imagen.");
+                                        }
                                     }}
                                 />
                             </label>
@@ -4637,7 +4668,12 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                             </button>
                                             <button
                                                 type="button"
-                                                onClick={() => confirmAction(`¿Eliminar la materia "${g.name}"?`, () => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', g.id)))}
+                                                onClick={() => confirmAction(`¿Eliminar la materia "${g.name}"?`, async () => {
+                                                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', g.id));
+                                                    try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', `acad_${g.id}`)); } catch (e) {}
+                                                    const syllabusSnap = await getDocs(query(collection(db, 'artifacts', appId, 'public', 'data', 'syllabus'), where('targetGroupId', '==', g.id)));
+                                                    await Promise.all(syllabusSnap.docs.map(d => deleteDoc(d.ref)));
+                                                })}
                                                 className="text-gray-400 hover:text-red-500 p-1.5 rounded-lg transition-colors"
                                                 title="Eliminar materia"
                                             >
@@ -4686,7 +4722,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                         <input name="fullname" placeholder="Nombre completo del alumno" className={`${glassInput} !py-2.5 text-xs`} required autoFocus />
                         <input name="username" placeholder="Usuario (ej: marianagomez)" className={`${glassInput} !py-2.5 text-xs`} required />
                         <input name="email" type="email" placeholder="Correo electrónico institucional" className={`${glassInput} !py-2.5 text-xs`} required />
-                        <input name="password" type="text" placeholder="Contraseña temporal" className={`${glassInput} !py-2.5 text-xs`} required />
+                        <input name="password" type="password" placeholder="Contraseña temporal" className={`${glassInput} !py-2.5 text-xs`} required />
                     </div>
 
                     <div className="flex justify-end gap-2 pt-1">
@@ -4814,6 +4850,9 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                     if ((g.members || []).includes(userKey)) {
                                                         const updatedMembers = g.members.filter(m => m !== userKey);
                                                         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', g.id), { members: updatedMembers });
+                                                        const chatGroupId = `acad_${g.id}`;
+                                                        const updatedChatMembers = Array.from(new Set([myChatId, 'teacher', ...updatedMembers]));
+                                                        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', chatGroupId), { members: updatedChatMembers }, { merge: true }).catch(() => {});
                                                     }
                                                 }
                                                 if (viewingProfileId === userKey) {
@@ -5724,7 +5763,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                       </div>
                                       <div>
                                           <label className="text-xs font-bold text-gray-700 dark:text-gray-300 ml-1">Tiempo (minutos)</label>
-                                          <input type="number" min="1" max="180" value={evalFormData.timeLimit} onChange={e => setEvalFormData({...evalFormData, timeLimit: parseInt(e.target.value)})} className={`${glassInput} !py-2 text-xs`} required />
+                                          <input type="number" min="1" max="180" value={evalFormData.timeLimit} onChange={e => setEvalFormData({...evalFormData, timeLimit: parseInt(e.target.value) || 30})} className={`${glassInput} !py-2 text-xs`} required />
                                       </div>
                                   </div>
                                    {/* Toggle Modo Anti-Trampas Minimalista */}
@@ -6015,12 +6054,14 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                    >
                                                        <Archive size={16}/>
                                                    </button>
-                                                   <button 
-                                                       type="button"
-                                                       onClick={() => confirmAction("¿Borrar evaluación? También se borrarán las notas de los estudiantes.", async () => {
-                                                           await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'evaluations', ev.id));
-                                                           showMessage("Evaluación eliminada.");
-                                                       })} 
+                                                    <button 
+                                                        type="button"
+                                                        onClick={() => confirmAction("¿Borrar evaluación? También se borrarán las notas de los estudiantes.", async () => {
+                                                            const gradeSnap = await getDocs(query(collection(db, 'artifacts', appId, 'public', 'data', 'grades'), where('evaluationId', '==', ev.id)));
+                                                            await Promise.all(gradeSnap.docs.map(d => deleteDoc(d.ref)));
+                                                            await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'evaluations', ev.id));
+                                                            showMessage("✅ Evaluación y notas eliminadas.");
+                                                        })}
                                                        className="text-gray-400 hover:text-red-600 p-1.5 rounded-lg transition-colors"
                                                        title="Eliminar evaluación"
                                                    >
@@ -8380,7 +8421,7 @@ Respuesta del asistente (Profesional, sobria, sin asteriscos de markdown inneces
                                                                .filter(([uid, val]) => uid !== myChatId && (val === true || (typeof val === 'object' && val.isTyping)))
                                                                .map(([uid, val]) => (typeof val === 'object' && val.name) ? val.name.split(' ')[0] : (userMappings[uid]?.fullName?.split(' ')[0] || (uid === 'teacher' ? 'Gina' : uid)));
                                                            if (typers.length > 0) {
-                                                               return <span className="text-emerald-500 font-bold animate-pulse">{typers.join(', ')} está escribiendo...</span>;
+                                                               return <span className="text-emerald-500 font-bold animate-pulse">{typers.join(', ')} {typers.length === 1 ? 'está escribiendo...' : 'están escribiendo...'}</span>;
                                                            }
                                                            const grp = chatGroups.find(g => `group_${g.id}` === activeChat.id || g.id === activeChat.id || `acad_${g.academicGroupId}` === activeChat.id);
                                                            return `${grp?.members?.length || activeChat.members?.length || 0} miembros`;
@@ -9267,7 +9308,7 @@ Respuesta del asistente (Profesional, sobria, sin asteriscos de markdown inneces
               {/* MODAL IMAGEN PANTALLA COMPLETA (APP) */}
               {fullScreenImage && ReactDOM.createPortal(
                   <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setFullScreenImage(null)}>
-                      <button className="absolute top-4 md:top-8 right-4 md:right-8 text-white/70 hover:text-white bg-black/50 hover:bg-red-600 p-2 rounded-full transition-all shadow-lg"><X size={28}/></button>
+                       <button onClick={() => setFullScreenImage(null)} className="absolute top-4 md:top-8 right-4 md:right-8 text-white/70 hover:text-white bg-black/50 hover:bg-red-600 p-2 rounded-full transition-all shadow-lg"><X size={28}/></button>
 <img src={fullScreenImage} loading="lazy" className="w-auto h-auto max-w-[95vw] max-h-[90vh] object-contain rounded-lg shadow-2xl" onClick={e => e.stopPropagation()} />
                   </div>
               , document.body)}
@@ -9283,8 +9324,19 @@ Respuesta del asistente (Profesional, sobria, sin asteriscos de markdown inneces
                           <p className={`text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>{confirmDialog.message}</p>
                           <div className="flex gap-3 mt-4">
                                   <button onClick={() => setConfirmDialog({ isOpen: false })} className={`flex-1 py-2.5 rounded-xl font-bold transition-all shadow-sm ${isDarkMode ? 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'}`}>Cancelar</button>
-                                  <button 
-                                      onClick={() => { if (confirmDialog.onConfirm) confirmDialog.onConfirm(); setConfirmDialog({ isOpen: false }); }} 
+                                   <button 
+                                      onClick={() => { 
+                                          if (confirmDialog.onConfirm) {
+                                              const result = confirmDialog.onConfirm();
+                                              if (result && typeof result.catch === 'function') {
+                                                  result.catch(err => {
+                                                      console.error(err);
+                                                      showMessage("❌ Error al realizar la acción.");
+                                                  });
+                                              }
+                                          }
+                                          setConfirmDialog({ isOpen: false }); 
+                                      }}
                                       className={`flex-1 text-white py-2.5 rounded-xl font-bold transition-all shadow-md ${confirmDialog.isDestructive ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}
                                   >
                                       {confirmDialog.confirmText || (confirmDialog.isDestructive ? 'Sí, eliminar' : 'Sí, continuar')}
@@ -9827,8 +9879,7 @@ Respuesta del asistente (Profesional, sobria, sin asteriscos de markdown inneces
                                                       <button onClick={() => {
                                                           if(!editIAText.trim()) return;
                                                           const newList = teacherBotInfoList.map(i => i.id === item.id ? { ...i, text: editIAText.trim() } : i);
-                                                          setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'teacherBot'), { infoList: newList });
-                                                          setEditingIAId(null);
+                                                          setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'teacherBot'), { infoList: newList }).then(() => setEditingIAId(null)).catch(err => { console.error(err); showMessage("❌ Error al guardar."); });
                                                       }} className="text-white bg-green-600 hover:bg-green-700 transition-colors p-1.5 rounded-lg" title="Guardar"><CheckLine size={16}/></button>
                                                   </div>
                                               </div>
@@ -9840,7 +9891,7 @@ Respuesta del asistente (Profesional, sobria, sin asteriscos de markdown inneces
                                                       <button onClick={() => {
                                                           confirmAction("¿Seguro que desea borrar este conocimiento?", () => {
                                                               const newList = teacherBotInfoList.filter(i => i.id !== item.id);
-                                                              setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'teacherBot'), { infoList: newList });
+                                                              setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'teacherBot'), { infoList: newList }).catch(err => { console.error(err); showMessage("❌ Error al eliminar."); });
                                                           });
                                                       }} className="text-red-500 hover:text-red-700 transition-colors bg-red-100 p-1.5 rounded-lg" title="Eliminar"><Trash2 size={14}/></button>
                                                   </div>
@@ -9856,8 +9907,7 @@ Respuesta del asistente (Profesional, sobria, sin asteriscos de markdown inneces
                                   <button onClick={() => {
                                       if(!newIAKnowledge.trim()) return;
                                       const newList = [...teacherBotInfoList, { id: Date.now().toString(), text: newIAKnowledge.trim() }];
-                                      setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'teacherBot'), { infoList: newList });
-                                      setNewIAKnowledge("");
+                                      setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'teacherBot'), { infoList: newList }).then(() => setNewIAKnowledge("")).catch(err => { console.error(err); showMessage("❌ Error al guardar."); });
                                   }} className={`${redButton} h-auto px-4 !bg-purple-600 hover:!bg-purple-700`}><Plus size={18}/></button>
                               </div>
                           </div>

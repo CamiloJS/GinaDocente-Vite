@@ -204,13 +204,11 @@ export const SlidePresenterViewer = ({ presentation, onClose, onEdit, role, them
   const isLight = themeMode === 'light';
   const isDim = themeMode === 'dim';
 
-  const toggleNativeFullscreen = () => {
+  const toggleNativeFullscreen = async () => {
     if (!document.fullscreenElement) {
-      viewerRef.current?.requestFullscreen?.().catch(() => {});
-      setIsFullscreen(true);
+      try { await viewerRef.current?.requestFullscreen?.(); setIsFullscreen(true); } catch (e) {}
     } else {
-      document.exitFullscreen?.().catch(() => {});
-      setIsFullscreen(false);
+      try { await document.exitFullscreen?.(); setIsFullscreen(false); } catch (e) {}
     }
   };
 
