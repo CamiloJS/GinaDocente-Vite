@@ -473,6 +473,7 @@ function App() {
   const typingTimeout = useRef(null);
   const chatImageInputRef = useRef(null);
   const chatDocInputRef = useRef(null);
+  const notificationSound = useRef(null);
   const submittingEvalRef = useRef(false);
   const submitEvaluationRef = useRef(null);
   const onboardingFileInputRef = useRef(null);
