@@ -2,10 +2,12 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function isAuth() { return request.auth != null; }
+    function isTeacher() { return isAuth() && request.auth.token.role == "teacher"; }
+
     match /artifacts/{appId} {
       match /public/data/{document=**} {
         allow read: if isAuth();
-        allow write: if isAuth();
+        allow write: if isTeacher();
       }
       match /users/{userId}/{document=**} {
         allow read, write: if isAuth() && request.auth.uid == userId;

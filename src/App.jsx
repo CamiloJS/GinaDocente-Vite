@@ -1213,6 +1213,7 @@ function App() {
 
             try {
                 await signInWithEmailAndPassword(auth, targetEmail, password);
+                if (auth.currentUser) await auth.currentUser.getIdToken(true);
                 
                 const userPhoto = userMappings?.[cleanUser]?.profilePicUrl || auth.currentUser?.photoURL || (expectedRole === 'teacher' ? userMappings?.['teacher']?.profilePicUrl : null) || '';
                 const newAcc = { username: cleanUser, name: targetName, role: expectedRole, email: targetEmail, profilePicUrl: userPhoto };
@@ -1277,6 +1278,7 @@ function App() {
               const res = await signInWithPopup(auth, provider);
               const gUser = res.user;
               if (!gUser) return;
+              if (gUser) await gUser.getIdToken(true);
               
               const email = gUser.email || '';
               const fullName = gUser.displayName || 'Estudiante';
