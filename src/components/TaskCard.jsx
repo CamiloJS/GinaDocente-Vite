@@ -1298,9 +1298,9 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                                                     </span>
                                                 )}
                                                 {isTaskType && isStudentAuthor && task.allowLate && task.dueDate && c.createdAt && new Date(c.createdAt) > new Date(`${task.dueDate}T${task.dueTime || '23:59'}`) && (
-                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800/40">
-                                                        <Clock size={10} className="text-red-500" />
-                                                        <span>Entregó tarde</span>
+                                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-px rounded-full text-[9px] font-bold bg-red-50 dark:bg-red-950/40 text-red-500 dark:text-red-400 border border-red-200/60 dark:border-red-800/30">
+                                                        <Clock size={8} />
+                                                        <span>tarde</span>
                                                     </span>
                                                 )}
                                             </div>
