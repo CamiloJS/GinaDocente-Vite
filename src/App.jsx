@@ -8152,7 +8152,24 @@ Bot:`;
                                           actionTaken = true;
                                       }
                                   } catch (e) {
-                                      // No es JSON, es texto normal - está bien
+                                      // No es JSON - detectar intención en texto
+                                      const rl = cleanReply.toLowerCase();
+                                      if (rl.match(/modo\s*oscuro|dark\s*mode|oscuro/) && !rl.match(/desactiv|apag|claro/)) {
+                                          if (themeMode === 'light') { setThemeMode('dim'); cleanReply = '✅ Modo oscuro activado.'; }
+                                          else { cleanReply = 'El modo oscuro ya está activado.'; }
+                                      } else if (rl.match(/lights?\s*out|negro\s*puro|amole/)) {
+                                          setThemeMode('lights_out'); cleanReply = '✅ Modo Lights Out activado.';
+                                      } else if (rl.match(/claro|light/) && rl.match(/activ|cambiar|poner/) && !rl.match(/oscuro|dark/)) {
+                                          setThemeMode('light'); cleanReply = '✅ Tema claro activado.';
+                                      } else if (rl.match(/sonido/) && rl.match(/desactiv|apag|silenc|off|mute/)) {
+                                          setSoundEnabled(false); try { localStorage.setItem('englishTech_sound', 'false'); } catch(ex) {} cleanReply = '✅ Sonidos desactivados.';
+                                      } else if (rl.match(/sonido/) && rl.match(/activ|encender|on/)) {
+                                          setSoundEnabled(true); try { localStorage.setItem('englishTech_sound', 'true'); } catch(ex) {} cleanReply = '✅ Sonidos activados.';
+                                      } else if (rl.match(/notif|push/) && rl.match(/desactiv|apag|off/)) {
+                                          setPushEnabled(false); try { localStorage.setItem('englishTech_push', 'false'); } catch(ex) {} cleanReply = '✅ Notificaciones push desactivadas.';
+                                      } else if (rl.match(/notif|push/) && rl.match(/activ|encender|on/)) {
+                                          togglePushNotifications(); cleanReply = '✅ Procesando notificaciones push...';
+                                      }
                                   }
 
                                   const finalHistory = [...newHistory, { role: 'bot', text: cleanReply, time: botTime }];
