@@ -8079,62 +8079,31 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                               const newHistory = [...teacherBotHistory, { role: 'user', text: userMsg, time: new Date().toLocaleTimeString('es-CO', { timeZone: 'America/Bogota', hour: '2-digit', minute: '2-digit' }) }];
                               setTeacherBotHistory(newHistory);
 
-                              // RAG: Buscar contexto relevante según la pregunta
-                              const q = userMsg.toLowerCase();
-                              let contextParts = [];
-
-                              // Estudiantes
-                              if (q.match(/estudiante|alumno|alumnos|matricul|inscrit|registr|quién|cuántos.*estud/)) {
-                                  const studs = Object.entries(userMappings).filter(([, u]) => u?.role === 'student').map(([, u]) => u.fullName || u.name);
-                                  contextParts.push(`Estudiantes (${studs.length}): ${studs.join(', ')}`);
-                              }
-
-                              // Tareas/publicaciones
-                              if (q.match(/tarea|tareas|publicac|muro|asignac|publicar|entreg|actividad|foro/)) {
-                                  const recent = tasks.slice(0, 10).map(t => `"${t.title || 'Sin título'}" (${t.targetGroupName || 'Global'}, ${t.dueDate || 'sin fecha'})`);
-                                  contextParts.push(`Últimas ${recent.length} publicaciones: ${recent.join(' | ')}`);
-                                  if (q.match(/cuánt|total|cantidad|número.*tarea/)) contextParts.push(`Total tareas: ${tasks.length}`);
-                              }
-
-                              // Evaluaciones
-                              if (q.match(/evaluaci|examen|prueba|nota|calific|calificación|aprob|reprob/)) {
-                                  const evs = evaluations.slice(0, 5).map(e => `"${e.title}" (vence: ${e.dueDate || 'sin fecha'})`);
-                                  contextParts.push(`Evaluaciones (${evaluations.length}): ${evs.join(' | ')}`);
-                                  if (grades.length > 0) {
-                                      const avg = grades.reduce((s, g) => s + (Number(g.score) || 0), 0) / grades.length;
-                                      contextParts.push(`Promedio general del grupo: ${avg.toFixed(1)}/5.0`);
-                                  }
-                              }
-
-                              // Syllabus/contenidos
-                              if (q.match(/syllabus|semana|contenid|programa|tema.*clase|plan.*clase|planific/)) {
-                                  const weeks = syllabus.slice(-5).map(s => `Semana ${s.week}: ${s.topic || 'Sin tema'}`);
-                                  contextParts.push(`Syllabus (${syllabus.length} semanas): ${weeks.join(' | ')}`);
-                              }
-
-                              // Grupos
-                              if (q.match(/grupo|materia|curso|grado|clase/)) {
-                                  const groups = academicGroups.map(g => `${g.name} (${(g.members || []).length} miembros)`);
-                                  contextParts.push(`Grupos: ${groups.length > 0 ? groups.join(', ') : 'Ninguno creado'}`);
-                              }
-
-                              // Si no matchea nada específico, dar resumen general
-                              if (contextParts.length === 0) {
-                                  contextParts.push(`Resumen: ${tasks.length} tareas, ${evaluations.length} evaluaciones, ${Object.keys(userMappings).filter(k => userMappings[k]?.role === 'student').length} estudiantes, ${academicGroups.length} grupos, ${syllabus.length} semanas syllabus`);
-                              }
+                              // SIEMPRE enviar resumen completo de TODOS los datos (compacto)
+                              const studs = Object.entries(userMappings).filter(([, u]) => u?.role === 'student').map(([, u]) => u.fullName || u.name);
+                              const evList = evaluations.map(e => `"${e.title || 'Sin título'}" (${e.dueDate || 'sin fecha'}, ${e.isArchived ? 'archivada' : 'activa'})`);
+                              const taskList = tasks.slice(0, 10).map(t => `"${t.title || 'Sin título'}" (${t.targetGroupName || 'Global'}, ${t.dueDate || 'sin fecha'})`);
+                              const weekList = syllabus.map(s => `S${s.week}: ${s.topic || 'Sin tema'}`);
+                              const groupList = academicGroups.map(g => `${g.name} (${(g.members || []).length} miembros)`);
+                              const studCount = studs.length;
+                              const avgGrade = grades.length > 0 ? (grades.reduce((s, g) => s + (Number(g.score) || 0), 0) / grades.length).toFixed(1) : 'N/A';
 
                               const now = new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-                              const prompt = `Asistente de English TECH. Fecha: ${now}. Solo responde lo que se pregunta. Sé breve (máx 2-3 oraciones). Sin asteriscos. En español.
+                              const contextData = [
+                                  `Estudiantes (${studCount}): ${studs.slice(0, 20).join(', ')}`,
+                                  `Tareas (${tasks.length}): ${taskList.join(' | ')}`,
+                                  `Evaluaciones (${evaluations.length}): ${evList.join(' | ')}`,
+                                  `Grupos (${academicGroups.length}): ${groupList.join(', ') || 'Ninguno'}`,
+                                  `Syllabus (${syllabus.length} sem): ${weekList.slice(-8).join(', ')}`,
+                                  `Promedio general: ${avgGrade}/5.0`
+                              ].join('\n');
 
-${teacherBotInfoList.length > 0 ? 'Notas docente: ' + teacherBotInfoList.map(i => i.text).join('; ') : ''}
-
-Contexto disponible:
-${contextParts.join('\n')}
-
-Historial: ${newHistory.slice(-6).map(m => `${m.role === 'user' ? 'Gina' : 'Bot'}: ${m.text}`).join('\n')}
-
-Pregunta: ${userMsg}
+                              const prompt = `Asistente de English TECH. Fecha: ${now}. Responde SOLO lo que se pregunta. Sé breve (máx 2-3 oraciones). Sin asteriscos. En español.
+${teacherBotInfoList.length > 0 ? '\nNotas docente: ' + teacherBotInfoList.map(i => i.text).join('; ') : ''}
+\nDatos de la plataforma:\n${contextData}
+\nHistorial: ${newHistory.slice(-6).map(m => `${m.role === 'user' ? 'Gina' : 'Bot'}: ${m.text}`).join('\n')}
+\nPregunta: ${userMsg}
 Respuesta:`;
 
                               try {
