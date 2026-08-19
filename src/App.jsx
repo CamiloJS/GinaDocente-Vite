@@ -8082,7 +8082,11 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                               // SIEMPRE enviar resumen completo de TODOS los datos (compacto)
                               const studs = Object.entries(userMappings).filter(([, u]) => u?.role === 'student').map(([, u]) => u.fullName || u.name);
                               const evList = evaluations.map(e => `"${e.title || 'Sin título'}" (${e.dueDate || 'sin fecha'}, ${e.isArchived ? 'archivada' : 'activa'})`);
-                              const taskList = tasks.slice(0, 10).map(t => `"${t.title || 'Sin título'}" (${t.targetGroupName || 'Global'}, ${t.dueDate || 'sin fecha'})`);
+                              const taskList = tasks.slice(0, 10).map(t => {
+                                  const commentCount = (t.comments || []).length;
+                                  const recentComments = (t.comments || []).slice(-3).map(c => `${c.author}: ${(c.text || '').substring(0, 60)}`);
+                                  return `"${t.title || 'Sin título'}" (${t.targetGroupName || 'Global'}, ${t.dueDate || 'sin fecha'}, ${commentCount} comentarios${recentComments.length > 0 ? ': ' + recentComments.join(' | ') : ''})`;
+                              });
                               const weekList = syllabus.map(s => `S${s.week}: ${s.topic || 'Sin tema'}`);
                               const groupList = academicGroups.map(g => `${g.name} (${(g.members || []).length} miembros)`);
                               const studCount = studs.length;
