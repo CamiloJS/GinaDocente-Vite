@@ -8083,32 +8083,33 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                               const q = userMsg.toLowerCase().trim();
                               let botReply = null;
 
-                              // Modo oscuro
-                              if (q.match(/modo\s*oscuro|tema\s*oscuro|dark\s*mode|oscuro|noche/) && q.match(/activ|cambiar|poner|switch|toggle|encender/)) {
-                                  if (themeMode === 'light') { setThemeMode('dim'); botReply = 'Modo oscuro activado. Puedes cambiar entre "Dim" y "Lights Out" en Ajustes.'; }
-                                  else { botReply = 'El modo oscuro ya está activado. Actualmente estás en tema "' + (themeMode === 'dim' ? 'Dim' : 'Lights Out') + '."'; }
-                              } else if (q.match(/modo\s*oscuro|tema\s*oscuro|dark\s*mode|oscuro|noche/) && q.match(/desactivar|apagar|quitar|off|claro/)) {
-                                  if (themeMode !== 'light') { setThemeMode('light'); botReply = 'Modo oscuro desactivado. Tema claro activado.'; }
+                              // Modo oscuro - patron MUY amplio
+                              if (q.match(/oscuro|dark|noche|tema.*oscuro|modo.*oscuro/) && !q.match(/desactivar|apagar|quitar|off|claro/)) {
+                                  if (themeMode === 'light') { setThemeMode('dim'); botReply = '✅ Modo oscuro activado.'; }
+                                  else { botReply = 'El modo oscuro ya está activado (' + (themeMode === 'dim' ? 'Dim' : 'Lights Out') + ').'; }
+                              }
+                              // Lights Out
+                              else if (q.match(/lights?\s*out|negro\s*puro|amole|amold/)) {
+                                  setThemeMode('lights_out'); botReply = '✅ Modo Lights Out activado.';
+                              }
+                              // Tema claro
+                              else if (q.match(/claro|light|blanco|día/) && q.match(/activ|cambiar|poner|modo|tema/) && !q.match(/oscuro|dark|noche/)) {
+                                  if (themeMode !== 'light') { setThemeMode('light'); botReply = '✅ Tema claro activado.'; }
                                   else { botReply = 'El tema claro ya está activado.'; }
-                              } else if (q.match(/cambiar.*tema|tema.*claro|modo\s*claro|light\s*mode|claro/) && !q.match(/oscuro|dark/)) {
-                                  if (themeMode !== 'light') { setThemeMode('light'); botReply = 'Tema claro activado.'; }
-                                  else { botReply = 'El tema claro ya está activado.'; }
-                              } else if (q.match(/lights?\s*out|negro\s*puro|amole/) && q.match(/activ|cambiar|poner/)) {
-                                  setThemeMode('lights_out'); botReply = 'Modo Lights Out (negro puro AMOLED) activado.';
                               }
 
                               // Sonidos
-                              else if (q.match(/sonido|notificacion.*sonido|tono|sound/) && q.match(/desactivar|apagar|silenciar|off|mute/)) {
-                                  setSoundEnabled(false); try { localStorage.setItem('englishTech_sound', 'false'); } catch(e) {} botReply = 'Sonidos de notificación desactivados.';
-                              } else if (q.match(/sonido|notificacion.*sonido|tono|sound/) && q.match(/activar|encender|on/)) {
-                                  setSoundEnabled(true); try { localStorage.setItem('englishTech_sound', 'true'); } catch(e) {} botReply = 'Sonidos de notificación activados.';
+                              else if (q.match(/sonido|sound|tono/) && q.match(/desactivar|apagar|silenciar|off|mute|no/)) {
+                                  setSoundEnabled(false); try { localStorage.setItem('englishTech_sound', 'false'); } catch(e) {} botReply = '✅ Sonidos desactivados.';
+                              } else if (q.match(/sonido|sound|tono/) && q.match(/activar|encender|on|sí|si/)) {
+                                  setSoundEnabled(true); try { localStorage.setItem('englishTech_sound', 'true'); } catch(e) {} botReply = '✅ Sonidos activados.';
                               }
 
                               // Notificaciones push
-                              else if (q.match(/notificacion|push|alerta/) && q.match(/desactivar|apagar|off/)) {
-                                  setPushEnabled(false); try { localStorage.setItem('englishTech_push', 'false'); } catch(e) {} botReply = 'Notificaciones push desactivadas.';
-                              } else if (q.match(/notificacion|push|alerta/) && q.match(/activar|encender|on/)) {
-                                  togglePushNotifications(); botReply = 'Procesando activación de notificaciones push...';
+                              else if (q.match(/notif|push|alerta/) && q.match(/desactivar|apagar|off|no|quitar/)) {
+                                  setPushEnabled(false); try { localStorage.setItem('englishTech_push', 'false'); } catch(e) {} botReply = '✅ Notificaciones push desactivadas.';
+                              } else if (q.match(/notif|push|alerta/) && q.match(/activar|encender|on|sí|si/)) {
+                                  togglePushNotifications(); botReply = '✅ Procesando notificaciones push...';
                               }
 
                               // Si el bot detectó un comando, guardar y responder
