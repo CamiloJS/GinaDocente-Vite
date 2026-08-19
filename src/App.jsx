@@ -8079,6 +8079,48 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                               const newHistory = [...teacherBotHistory, { role: 'user', text: userMsg, time: new Date().toLocaleTimeString('es-CO', { timeZone: 'America/Bogota', hour: '2-digit', minute: '2-digit' }) }];
                               setTeacherBotHistory(newHistory);
 
+                              // DETECCIÓN DE COMANDOS: El bot puede ejecutar acciones
+                              const q = userMsg.toLowerCase().trim();
+                              let botReply = null;
+
+                              // Modo oscuro
+                              if (q.match(/modo\s*oscuro|tema\s*oscuro|dark\s*mode|oscuro|noche/) && q.match(/activ|cambiar|poner|switch|toggle|encender/)) {
+                                  if (themeMode === 'light') { setThemeMode('dim'); botReply = 'Modo oscuro activado. Puedes cambiar entre "Dim" y "Lights Out" en Ajustes.'; }
+                                  else { botReply = 'El modo oscuro ya está activado. Actualmente estás en tema "' + (themeMode === 'dim' ? 'Dim' : 'Lights Out') + '."'; }
+                              } else if (q.match(/modo\s*oscuro|tema\s*oscuro|dark\s*mode|oscuro|noche/) && q.match(/desactivar|apagar|quitar|off|claro/)) {
+                                  if (themeMode !== 'light') { setThemeMode('light'); botReply = 'Modo oscuro desactivado. Tema claro activado.'; }
+                                  else { botReply = 'El tema claro ya está activado.'; }
+                              } else if (q.match(/cambiar.*tema|tema.*claro|modo\s*claro|light\s*mode|claro/) && !q.match(/oscuro|dark/)) {
+                                  if (themeMode !== 'light') { setThemeMode('light'); botReply = 'Tema claro activado.'; }
+                                  else { botReply = 'El tema claro ya está activado.'; }
+                              } else if (q.match(/lights?\s*out|negro\s*puro|amole/) && q.match(/activ|cambiar|poner/)) {
+                                  setThemeMode('lights_out'); botReply = 'Modo Lights Out (negro puro AMOLED) activado.';
+                              }
+
+                              // Sonidos
+                              else if (q.match(/sonido|notificacion.*sonido|tono|sound/) && q.match(/desactivar|apagar|silenciar|off|mute/)) {
+                                  setSoundEnabled(false); try { localStorage.setItem('englishTech_sound', 'false'); } catch(e) {} botReply = 'Sonidos de notificación desactivados.';
+                              } else if (q.match(/sonido|notificacion.*sonido|tono|sound/) && q.match(/activar|encender|on/)) {
+                                  setSoundEnabled(true); try { localStorage.setItem('englishTech_sound', 'true'); } catch(e) {} botReply = 'Sonidos de notificación activados.';
+                              }
+
+                              // Notificaciones push
+                              else if (q.match(/notificacion|push|alerta/) && q.match(/desactivar|apagar|off/)) {
+                                  setPushEnabled(false); try { localStorage.setItem('englishTech_push', 'false'); } catch(e) {} botReply = 'Notificaciones push desactivadas.';
+                              } else if (q.match(/notificacion|push|alerta/) && q.match(/activar|encender|on/)) {
+                                  togglePushNotifications(); botReply = 'Procesando activación de notificaciones push...';
+                              }
+
+                              // Si el bot detectó un comando, guardar y responder
+                              if (botReply) {
+                                  const botTime = new Date().toLocaleTimeString('es-CO', { timeZone: 'America/Bogota', hour: '2-digit', minute: '2-digit' });
+                                  const finalHistory = [...newHistory, { role: 'bot', text: botReply, time: botTime }];
+                                  setTeacherBotHistory(finalHistory);
+                                  setDoc(doc(db, 'artifacts', appId, 'users', user?.uid || 'teacher', 'teacherBot', 'history'), { messages: finalHistory }).catch(()=>{});
+                                  setIsTeacherBotLoading(false);
+                                  return;
+                              }
+
                               // SIEMPRE enviar resumen completo de TODOS los datos (compacto)
                               const studs = Object.entries(userMappings).filter(([, u]) => u?.role === 'student').map(([, u]) => u.fullName || u.name);
                               const evList = evaluations.map(e => `"${e.title || 'Sin título'}" (ID:${e.id}, vence: ${e.dueDate || 'sin fecha'}, ${e.isArchived ? 'archivada' : 'activa'})`);
