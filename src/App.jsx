@@ -1944,7 +1944,7 @@ useEffect(() => {
 
 // 2. PESTAÑA: ASIGNACIONES (Muro de clase)
 useEffect(() => {
-    if (!hasEntered || !myChatId || activeTab !== 'tasks') return;
+    if (!hasEntered || !myChatId || (activeTab !== 'tasks' && activeTab !== 'groups')) return;
     const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'tasks'), orderBy('createdAt', 'desc'), limit(taskLimit));
     const uTasks = onSnapshot(q, s => { 
         setTasks(s.docs.map(d => ({ id: d.id, ...d.data() }))); 
@@ -5048,7 +5048,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                         <UsersIcon size={11} /> {memberCount} miembros
                                                     </span>
                                                     <span className="text-[10px] font-semibold text-teal-600 dark:text-teal-400">
-                                                        {groupTasksCount} pubs
+                                                        {groupTasksCount} publicaciones
                                                     </span>
                                                 </div>
                                             </div>
