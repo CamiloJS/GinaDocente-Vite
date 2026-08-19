@@ -5021,7 +5021,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                 isDarkMode={isDarkMode}
                             />
                         ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-2">
                                 {availableGroups.map((group) => {
                                     const groupTasksCount = tasks.filter(t => t.targetGroupId === group.id).length;
                                     const memberCount = group.members?.length || 0;
@@ -5030,44 +5030,42 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                         <div
                                             key={group.id}
                                             onClick={() => setSelectedGroupForFeed(group)}
-                                            className={`p-5 rounded-3xl border transition-all cursor-pointer flex flex-col justify-between gap-4 hover:scale-[1.01] ${glassCard} hover:shadow-md relative overflow-hidden group`}
+                                            className={`p-3 sm:p-4 rounded-xl border transition-all cursor-pointer flex items-center gap-3 hover:scale-[1.01] ${glassCard} hover:shadow-md relative overflow-hidden group`}
                                             style={{
                                                 borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'
                                             }}
                                         >
-                                            <div className="flex items-start justify-between gap-3">
-                                                <div className="w-12 h-12 rounded-2xl bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center text-gray-900 dark:text-white shadow-xs shrink-0 transition-transform group-hover:scale-105">
-                                                    {renderGroupVectorIcon(group.emoji || 'BookOpen', 22, "text-gray-900 dark:text-white")}
-                                                </div>
-                                                <span className="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-teal-500/10 border border-teal-500/20 text-teal-700 dark:text-teal-300">
-                                                    {groupTasksCount} publicaciones
-                                                </span>
+                                            <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center text-gray-900 dark:text-white shadow-xs shrink-0 transition-transform group-hover:scale-105">
+                                                {renderGroupVectorIcon(group.emoji || 'BookOpen', 18, "text-gray-900 dark:text-white")}
                                             </div>
 
-                                            <div>
-                                                <h3 className="text-base font-extrabold text-gray-900 dark:text-gray-100">
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100 truncate">
                                                     {group.name}
                                                 </h3>
-                                                <div className="mt-1.5 flex items-center gap-2">
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setGroupMembersModal({ isOpen: true, group, search: "" });
-                                                        }}
-                                                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 font-bold text-xs transition-colors border border-teal-500/20 shadow-2xs active:scale-95"
-                                                        title="Ver lista de integrantes del grupo"
-                                                    >
-                                                        <UsersIcon size={13} />
-                                                        <span>{memberCount} {memberCount === 1 ? 'miembro' : 'miembros'}</span>
-                                                    </button>
+                                                <div className="flex items-center gap-2 mt-0.5">
+                                                    <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                                                        <UsersIcon size={11} /> {memberCount} miembros
+                                                    </span>
+                                                    <span className="text-[10px] font-semibold text-teal-600 dark:text-teal-400">
+                                                        {groupTasksCount} pubs
+                                                    </span>
                                                 </div>
                                             </div>
 
-                                            <div className="pt-2 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
-                                                <span className="text-xs font-bold flex items-center gap-1 text-teal-600 dark:text-teal-400">
-                                                    Ver muro del grupo <ChevronRight size={14} />
-                                                </span>
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setGroupMembersModal({ isOpen: true, group, search: "" });
+                                                    }}
+                                                    className="p-1.5 rounded-lg text-gray-400 hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/20 transition-colors"
+                                                    title="Ver miembros"
+                                                >
+                                                    <UsersIcon size={14} />
+                                                </button>
+                                                <ChevronRight size={14} className="text-gray-400" />
                                             </div>
                                         </div>
                                     );
