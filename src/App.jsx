@@ -8081,8 +8081,8 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                               const now = new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
                               // Datos compactos para el contexto
-                              const studs = Object.entries(userMappings).filter(([, u]) => u?.role === 'student').map(([, u]) => u.fullName || u.name);
-                              const evList = evaluations.map(e => `"${e.title || 'Sin título'}" (vence: ${e.dueDate || 'sin fecha'})`);
+                              const studs = Object.entries(userMappings).filter(([, u]) => u?.role === 'student').map(([, u]) => `${u.fullName || u.name} (ID:${Object.keys(userMappings).find(k => userMappings[k] === u)})`);
+                              const evList = evaluations.map(e => `"${e.title || 'Sin título'}" (vence: ${e.dueDate || 'sin fecha'}, ${e.isArchived ? 'archivada' : 'activa'})`);
                               const taskList = tasks.slice(0, 10).map(t => {
                                   const cc = (t.comments || []).length;
                                   return `"${t.title || 'Sin título'}" (${t.targetGroupName || 'Global'}, ${cc} comentarios)`;
@@ -8096,30 +8096,28 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                               });
                               const gradeDetails = Object.entries(gradesByStudent).map(([n, s]) => `${n}: ${s.join(', ')}`);
                               const avgGrade = grades.length > 0 ? (grades.reduce((s, g) => s + (Number(g.score) || 0), 0) / grades.length).toFixed(1) : 'N/A';
+                              const groupList = academicGroups.map(g => `${g.name} (ID:${g.id}, ${(g.members || []).length} miembros)`);
+                              const weekList = syllabus.slice(-8).map(s => `S${s.week}: ${s.topic || 'Sin tema'}`);
 
-                              const prompt = `Eres el asistente de English TECH. Fecha: ${now}.
-ACCIONES DISPONIBLES (responde SOLO el JSON si el usuario pide una acción, o texto normal si es una pregunta):
-Si el usuario pide cambiar ajustes, responde EXACTAMENTE este JSON (sin texto adicional):
-{"action":"ACCION_AQUI","response":"Tu respuesta al usuario"}
+                              const prompt = `Asistente de English TECH. Fecha: ${now}. Responde SOLO con JSON cuando el usuario pida una accion, o texto normal si es pregunta. Breve. Sin asteriscos. En espanol.
 
-ACCIONES:
-- dark_on: Activar modo oscuro
-- dark_off: Desactivar modo oscuro (tema claro)
-- lights_out: Activar negro puro AMOLED
-- sound_on: Activar sonidos
-- sound_off: Desactivar sonidos
-- push_on: Activar notificaciones push
-- push_off: Desactivar notificaciones push
-- navigate_SETTINGS: Ir a ajustes
-- navigate_TASKS: Ir a asignaciones
-- navigate_REVIEWS: Ir a diapositivas
-- navigate_EVALUATIONS: Ir a evaluaciones
+ACCIONES (responde JSON: {"action":"NOMBRE","params":{...},"response":"respuesta al usuario"}):
+CONFIGURACION: dark_on, dark_off, sound_on, sound_off, push_on, push_off
+NAVEGACION: navigate_SETTINGS, navigate_TASKS, navigate_REVIEWS, navigate_EVALUATIONS, navigate_GROUPS, navigate_DIRECTORY
+TAREAS: create_task (params: {title,description,group}), list_tasks, delete_task (params: {title})
+EVALUACIONES: list_evaluations, eval_stats (params: {title}), archive_eval (params: ${evaluations.map(e=>`"${e.title}"`).join(',')})
+NOTAS: grade_report, student_report (params: {name}), top_students, worst_students
+GRUPOS: list_groups, group_info (params: ${academicGroups.map(g=>`"${g.name}"`).join(',')})
+SILABUS: syllabus_summary, syllabus_week (params: {week})
+ESTUDIANTES: list_students, student_count
+GENERAR: generate_activity (params: {topic,level}), generate_lesson_plan (params: {topic,duration}), generate_quiz (params: {topic,num_questions})
+CHAT: send_broadcast (params: {message}), create_group (params: {name})
+REPORTE: performance_report (params: {scope:all|group|student})
 
-Si NO es una acción, responde con texto normal. Sé breve. Sin asteriscos. En español.
-${teacherBotInfoList.length > 0 ? '\nNotas docente: ' + teacherBotInfoList.map(i => i.text).join('; ') : ''}
-\nDatos: ${studs.length} estudiantes, ${tasks.length} tareas (${taskList.join(' | ')}), ${evaluations.length} evaluaciones (${evList.join(' | ')}), ${academicGroups.length} grupos, ${syllabus.length} sem syllabus, Notas: ${avgGrade}/5.0 (${gradeDetails.join(' | ')})
-\nHistorial: ${newHistory.slice(-6).map(m => `${m.role === 'user' ? 'Gina' : 'Bot'}: ${m.text}`).join('\n')}
-\nGina: ${userMsg}
+${teacherBotInfoList.length > 0 ? 'Notas docente: ' + teacherBotInfoList.map(i => i.text).join('; ') + '\n' : ''}
+Datos: ${studs.length} estudiantes (${studs.slice(0,15).join(', ')}), ${tasks.length} tareas (${taskList.join(' | ')}), ${evaluations.length} evaluaciones (${evList.join(' | ')}), ${academicGroups.length} grupos (${groupList.join(' | ')}), ${syllabus.length} sem syllabus (${weekList.join(', ')}), Notas: ${avgGrade}/5.0 (${gradeDetails.join(' | ')})
+Historial: ${newHistory.slice(-6).map(m => `${m.role === 'user' ? 'Gina' : 'Bot'}: ${m.text}`).join('\n')}
+Gina: ${userMsg}
 Bot:`;
 
                               try {
@@ -8136,6 +8134,7 @@ Bot:`;
                                       if (parsed && parsed.action) {
                                           // Ejecutar la acción
                                           switch(parsed.action) {
+                                              // Configuración
                                               case 'dark_on': setThemeMode('dim'); break;
                                               case 'dark_off': setThemeMode('light'); break;
                                               case 'lights_out': setThemeMode('lights_out'); break;
@@ -8143,10 +8142,128 @@ Bot:`;
                                               case 'sound_off': setSoundEnabled(false); try { localStorage.setItem('englishTech_sound', 'false'); } catch(e) {} break;
                                               case 'push_on': togglePushNotifications(); break;
                                               case 'push_off': setPushEnabled(false); try { localStorage.setItem('englishTech_push', 'false'); } catch(e) {} break;
+                                              // Navegación
                                               case 'navigate_SETTINGS': changeTab('settings'); break;
                                               case 'navigate_TASKS': changeTab('tasks'); break;
                                               case 'navigate_REVIEWS': changeTab('reviews'); break;
                                               case 'navigate_EVALUATIONS': changeTab('evaluations'); break;
+                                              case 'navigate_GROUPS': changeTab('groups'); break;
+                                              case 'navigate_DIRECTORY': changeTab('directory'); break;
+                                              // Tareas
+                                              case 'create_task':
+                                                  if (parsed.params?.title) {
+                                                      setTaskTitle(parsed.params.title);
+                                                      setTaskDesc(parsed.params.description || '');
+                                                      if (parsed.params.group) {
+                                                          const grp = academicGroups.find(g => g.name.toLowerCase().includes(parsed.params.group.toLowerCase()));
+                                                          if (grp) setPostTargetGroup(grp.id);
+                                                      }
+                                                      changeTab('tasks');
+                                                      setIsFormExpanded(true);
+                                                  }
+                                                  break;
+                                              case 'list_tasks':
+                                                  cleanReply = `Tienes ${tasks.length} tareas/publicaciones:\n${tasks.slice(0,10).map((t,i) => `${i+1}. "${t.title || 'Sin título'}" (${t.targetGroupName || 'Global'})`).join('\n')}`;
+                                                  break;
+                                              case 'delete_task':
+                                                  if (parsed.params?.title) {
+                                                      const t = tasks.find(t => (t.title || '').toLowerCase().includes(parsed.params.title.toLowerCase()));
+                                                      if (t) {
+                                                          confirmAction(`¿Eliminar la tarea "${t.title}"?`, async () => {
+                                                              await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', t.id));
+                                                          });
+                                                          cleanReply = `Tarea "${t.title}" eliminada.`;
+                                                      } else { cleanReply = 'No encontré una tarea con ese nombre.'; }
+                                                  }
+                                                  break;
+                                              // Evaluaciones
+                                              case 'list_evaluations':
+                                                  cleanReply = `Evaluaciones (${evaluations.length}):\n${evaluations.map((e,i) => `${i+1}. "${e.title || 'Sin título'}" (vence: ${e.dueDate || 'sin fecha'}, ${e.isArchived ? 'archivada' : 'activa'})`).join('\n')}`;
+                                                  break;
+                                              case 'eval_stats':
+                                                  if (parsed.params?.title) {
+                                                      const ev = evaluations.find(e => (e.title || '').toLowerCase().includes(parsed.params.title.toLowerCase()));
+                                                      if (ev) {
+                                                          const evGrades = grades.filter(g => g.evaluationId === ev.id);
+                                                          const avg = evGrades.length > 0 ? (evGrades.reduce((s,g) => s + (Number(g.score)||0), 0) / evGrades.length).toFixed(1) : 'N/A';
+                                                          const passed = evGrades.filter(g => (Number(g.score)||0) >= 3.0).length;
+                                                          cleanReply = `"${ev.title}": ${evGrades.length} presentados, promedio ${avg}/5.0, ${passed} aprobados.`;
+                                                      } else { cleanReply = 'No encontré esa evaluación.'; }
+                                                  }
+                                                  break;
+                                              case 'archive_eval':
+                                                  if (parsed.params?.title) {
+                                                      const ev = evaluations.find(e => (e.title || '').toLowerCase().includes(parsed.params.title.toLowerCase()));
+                                                      if (ev) {
+                                                          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'evaluations', ev.id), { isArchived: !ev.isArchived });
+                                                          cleanReply = `Evaluación "${ev.title}" ${ev.isArchived ? 'restaurada' : 'archivada'}.`;
+                                                      }
+                                                  }
+                                                  break;
+                                              // Notas
+                                              case 'grade_report':
+                                                  cleanReply = `Reporte de notas:\nPromedio general: ${avgGrade}/5.0\n${gradeDetails.join('\n')}`;
+                                                  break;
+                                              case 'student_report':
+                                                  if (parsed.params?.name) {
+                                                      const studentGrades = grades.filter(g => (g.studentName || '').toLowerCase().includes(parsed.params.name.toLowerCase()));
+                                                      if (studentGrades.length > 0) {
+                                                          const sg = studentGrades.map(g => { const ev = evaluations.find(e => e.id === g.evaluationId); return `${ev?.title || 'Eval'}: ${Number(g.score||0).toFixed(1)}/5.0`; });
+                                                          const avg = (studentGrades.reduce((s,g) => s + (Number(g.score)||0), 0) / studentGrades.length).toFixed(1);
+                                                          cleanReply = `Notas de ${parsed.params.name}:\n${sg.join('\n')}\nPromedio: ${avg}/5.0`;
+                                                      } else { cleanReply = `No encontré notas para "${parsed.params.name}".`; }
+                                                  }
+                                                  break;
+                                              case 'top_students':
+                                                  const sorted = Object.entries(gradesByStudent).map(([n,s]) => ({ name: n, avg: s.reduce((acc,v) => acc + parseFloat(v.split(': ')[1]) || 0, 0) / s.length })).sort((a,b) => b.avg - a.avg).slice(0,5);
+                                                  cleanReply = `Top 5 estudiantes:\n${sorted.map((s,i) => `${i+1}. ${s.name}: ${s.avg.toFixed(1)}/5.0`).join('\n')}`;
+                                                  break;
+                                              case 'worst_students':
+                                                  const sortedW = Object.entries(gradesByStudent).map(([n,s]) => ({ name: n, avg: s.reduce((acc,v) => acc + parseFloat(v.split(': ')[1]) || 0, 0) / s.length })).sort((a,b) => a.avg - b.avg).slice(0,5);
+                                                  cleanReply = `Estudiantes con menor rendimiento:\n${sortedW.map((s,i) => `${i+1}. ${s.name}: ${s.avg.toFixed(1)}/5.0`).join('\n')}`;
+                                                  break;
+                                              // Grupos
+                                              case 'list_groups':
+                                                  cleanReply = `Grupos (${academicGroups.length}):\n${groupList.join('\n')}`;
+                                                  break;
+                                              // Syllabus
+                                              case 'syllabus_summary':
+                                                  cleanReply = `Syllabus (${syllabus.length} semanas):\n${weekList.join('\n')}`;
+                                                  break;
+                                              // Estudiantes
+                                              case 'list_students':
+                                                  cleanReply = `Estudiantes (${studs.length}):\n${studs.slice(0,20).join('\n')}`;
+                                                  break;
+                                              case 'student_count':
+                                                  cleanReply = `Total de estudiantes: ${studs.length}`;
+                                                  break;
+                                              // Generar contenido con IA
+                                              case 'generate_activity':
+                                              case 'generate_lesson_plan':
+                                              case 'generate_quiz':
+                                                  // Estas acciones requieren una llamada adicional a la IA
+                                                  if (parsed.action === 'generate_activity' || parsed.action === 'generate_lesson_plan' || parsed.action === 'generate_quiz') {
+                                                      const topic = parsed.params?.topic || 'inglés general';
+                                                      const level = parsed.params?.level || 'intermedio';
+                                                      const duration = parsed.params?.duration || '60';
+                                                      const numQ = parsed.params?.num_questions || '5';
+                                                      const genPrompt = parsed.action === 'generate_activity'
+                                                          ? `Diseña una actividad didáctica práctica y dinámica para aprender ${topic} (nivel ${level}). Incluye: título, objetivo, dinámica paso a paso, y criterio de evaluación. Máximo 200 palabras.`
+                                                          : parsed.action === 'generate_lesson_plan'
+                                                          ? `Diseña un plan de clase de ${duration} minutos para ${topic} (nivel ${level}). Incluye: warm-up, presentation, practice, wrap-up. Máximo 200 palabras.`
+                                                          : `Genera ${numQ} preguntas de opción múltiple sobre ${topic} (nivel ${level}). Formato: Pregunta / Opción A / Opción B / Opción C / Correcta. Máximo 150 palabras.`;
+                                                      const genReply = await callGemini(genPrompt);
+                                                      cleanReply = genReply?.trim()?.replace(/\*\*/g, '').replace(/\*/g, '') || 'No pude generar el contenido.';
+                                                  }
+                                              // Chat
+                                              case 'create_group':
+                                                  if (parsed.params?.name) {
+                                                      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'chatGroups'), {
+                                                          name: parsed.params.name, members: [myChatId, 'teacher'], createdBy: myChatId, createdAt: Date.now()
+                                                      });
+                                                      cleanReply = `Grupo "${parsed.params.name}" creado.`;
+                                                  }
+                                                  break;
                                           }
                                           cleanReply = parsed.response || '✅ Acción ejecutada.';
                                           actionTaken = true;
