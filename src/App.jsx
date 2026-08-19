@@ -8081,7 +8081,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
 
                               // SIEMPRE enviar resumen completo de TODOS los datos (compacto)
                               const studs = Object.entries(userMappings).filter(([, u]) => u?.role === 'student').map(([, u]) => u.fullName || u.name);
-                              const evList = evaluations.map(e => `"${e.title || 'Sin título'}" (${e.dueDate || 'sin fecha'}, ${e.isArchived ? 'archivada' : 'activa'})`);
+                              const evList = evaluations.map(e => `"${e.title || 'Sin título'}" (ID:${e.id}, vence: ${e.dueDate || 'sin fecha'}, ${e.isArchived ? 'archivada' : 'activa'})`);
                               const taskList = tasks.slice(0, 10).map(t => {
                                   const commentCount = (t.comments || []).length;
                                   const recentComments = (t.comments || []).slice(-3).map(c => `${c.author}: ${(c.text || '').substring(0, 60)}`);
@@ -8090,6 +8090,16 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                               const weekList = syllabus.map(s => `S${s.week}: ${s.topic || 'Sin tema'}`);
                               const groupList = academicGroups.map(g => `${g.name} (${(g.members || []).length} miembros)`);
                               const studCount = studs.length;
+
+                              // Notas individuales por estudiante y evaluación
+                              const gradesByStudent = {};
+                              grades.forEach(g => {
+                                  const name = g.studentName || 'Desconocido';
+                                  if (!gradesByStudent[name]) gradesByStudent[name] = [];
+                                  const ev = evaluations.find(e => e.id === g.evaluationId);
+                                  gradesByStudent[name].push(`${ev?.title || 'Eval'}: ${Number(g.score || 0).toFixed(1)}/5.0${g.status === 'cancelled_tab_change' ? ' (cancelada)' : ''}`);
+                              });
+                              const gradeDetails = Object.entries(gradesByStudent).map(([name, scores]) => `${name}: ${scores.join(', ')}`);
                               const avgGrade = grades.length > 0 ? (grades.reduce((s, g) => s + (Number(g.score) || 0), 0) / grades.length).toFixed(1) : 'N/A';
 
                               const now = new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -8098,12 +8108,13 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                   `Estudiantes (${studCount}): ${studs.slice(0, 20).join(', ')}`,
                                   `Tareas (${tasks.length}): ${taskList.join(' | ')}`,
                                   `Evaluaciones (${evaluations.length}): ${evList.join(' | ')}`,
+                                  `Notas: Promedio general ${avgGrade}/5.0. Detalle: ${gradeDetails.length > 0 ? gradeDetails.join(' | ') : 'Sin notas aún'}`,
                                   `Grupos (${academicGroups.length}): ${groupList.join(', ') || 'Ninguno'}`,
-                                  `Syllabus (${syllabus.length} sem): ${weekList.slice(-8).join(', ')}`,
-                                  `Promedio general: ${avgGrade}/5.0`
+                                  `Syllabus (${syllabus.length} sem): ${weekList.slice(-8).join(', ')}`
                               ].join('\n');
 
                               const prompt = `Asistente de English TECH. Fecha: ${now}. Responde SOLO lo que se pregunta. Sé breve (máx 2-3 oraciones). Sin asteriscos. En español.
+Qué puedes hacer: Consultar datos en tiempo real de la plataforma (estudiantes, tareas, comentarios, evaluaciones, notas por estudiante, grupos, syllabus, horarios). Dar resúmenes, comparar, contar, listar. NO puedes modificar configuraciones, crear tareas, ni ejecutar acciones.
 ${teacherBotInfoList.length > 0 ? '\nNotas docente: ' + teacherBotInfoList.map(i => i.text).join('; ') : ''}
 \nDatos de la plataforma:\n${contextData}
 \nHistorial: ${newHistory.slice(-6).map(m => `${m.role === 'user' ? 'Gina' : 'Bot'}: ${m.text}`).join('\n')}
