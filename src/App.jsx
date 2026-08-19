@@ -8034,12 +8034,13 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                   ¡Hola, Profesora Gina! 👋 Soy su Asistente de English TECH. Estoy aquí para orientarle en la gestión de contenidos, evaluaciones, asignaciones y uso de las herramientas de la plataforma. ¿En qué le puedo colaborar hoy?
                               </div>
                               {teacherBotHistory.map((m, i) => (
-                                  <div key={i} className={`text-xs sm:text-sm p-3 rounded-2xl max-w-[88%] shadow-xs whitespace-pre-wrap leading-relaxed ${
+                                  <div key={i} className={`text-xs sm:text-sm px-3 py-2 rounded-2xl max-w-[75%] shadow-xs whitespace-pre-wrap leading-relaxed ${
                                       m.role === 'user' 
                                           ? (isDarkMode ? 'bg-blue-600 text-white ml-auto rounded-tr-none' : 'bg-gray-800 text-white ml-auto rounded-tr-none') 
                                           : (isDarkMode ? 'bg-gray-800/90 text-gray-100 rounded-tl-none border border-gray-700' : 'bg-white text-gray-800 rounded-tl-none border border-gray-200 shadow-2xs')
                                   }`}>
                                       {formatBotText(m.text)}
+                                      {m.time && <span className={`block text-[9px] mt-1 opacity-60 ${m.role === 'user' ? 'text-right' : 'text-left'}`}>{m.time}</span>}
                                   </div>
                               ))}
                               {isTeacherBotLoading && (
@@ -8063,10 +8064,10 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                               const ph = ["¿En qué necesitas ayuda?", "¿Hay algo que no entiendas?", "Pregúntame lo que sea...", "Escribe tu duda aquí...", "¿Cómo puedo ayudarte?", "¿Necesitas apoyo con algo?", "Estoy aquí para servirte...", "¿Alguna duda, profe?", "Pregúntame sin miedo...", "¿Qué necesitas hoy?", "¿Hay algo que te preocupe?", "¿Necesitas ideas para la clase?", "¿Quieres que te ayude?", "¿Cómo va todo, profe?", "¿Necesitas que te oriente?", "¿Tienes alguna consulta?", "¿En qué te puedo ayudar?", "¿Hay algún problema?", "¿Necesitas apoyo pedagógico?", "¿Qué tal tu día, profe?", "¿Necesitas que te explique algo?", "¿Hay algo nuevo para aprender?", "¿Quieres que repasemos juntos?", "¿Cómo están tus alumnos?", "¿Necesitas recursos didácticos?", "¿Quieres que genere una actividad?", "¿Hay algo que mejorar?", "¿Necesitas una idea fresca?", "¿Qué tal el semestre, profe?", "¿Necesitas motivación hoy?", "¿Hay algo que te cause curiosidad?", "¿Quieres que te sorprenda?", "¿Necesitas un consejo rápido?", "¿Cómo va la clase de hoy?", "¿Necesitas que te recuerde algo?", "¿Hay algo pendiente?", "¿Quieres que revisemos algo juntos?", "¿Qué necesitas saber ahora?", "¿Necesitas que te guíe?", "¿Hay algo que te cause duda?", "¿Quieres practicar algo?", "¿Cómo podemos mejorar hoy?", "¿Necesitas que te recomiende algo?", "¿Hay algo nuevo en tu clase?", "¿Quieres que te apoye?", "¿Necesitas una mano amiga?", "¿Qué tal tu progreso, profe?", "¿Necesitas que te ayude a planear?", "¿Hay algo que te inspire?", "¿Quieres que creemos algo juntos?"];
                               setBotPlaceholder(ph[Math.floor(Math.random() * ph.length)]);
                               setIsTeacherBotLoading(true);
-                              const newHistory = [...teacherBotHistory, { role: 'user', text: userMsg }];
+                              const newHistory = [...teacherBotHistory, { role: 'user', text: userMsg, time: new Date().toLocaleTimeString('es-CO', { timeZone: 'America/Bogota', hour: '2-digit', minute: '2-digit' }) }];
                               setTeacherBotHistory(newHistory);
 
-                              const prompt = `Eres el asistente de English TECH para la Profesora Gina. Plataforma educativa de inglés con: muro de tareas, evaluaciones, diapositivas, syllabus, chats, grupos académicos, buzón de sugerencias.
+                              const prompt = `Eres el asistente de English TECH para la Profesora Gina. Fecha y hora actual (Bogotá, Colombia): ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}. Plataforma educativa de inglés con: muro de tareas, evaluaciones, diapositivas, syllabus, chats, grupos académicos, buzón de sugerencias.
 
 Datos actuales: ${tasks.length} tareas, ${evaluations.length} evaluaciones, ${Object.keys(userMappings).filter(k => userMappings[k]?.role === 'student').length} estudiantes, ${academicGroups.length} grupos, ${syllabus.length} semanas de syllabus.
 
@@ -8086,10 +8087,11 @@ Respuesta:`;
 
                               try {
                                   const reply = await callGemini(prompt);
+                                  const botTime = new Date().toLocaleTimeString('es-CO', { timeZone: 'America/Bogota', hour: '2-digit', minute: '2-digit' });
                                   const cleanReply = reply && reply.trim() 
                                       ? reply.trim().replace(/\*\*/g, '').replace(/\*/g, '') 
                                       : "Disculpe, no pude procesar la respuesta en este momento. Por favor intente de nuevo.";
-                                  const finalHistory = [...newHistory, { role: 'bot', text: cleanReply }];
+                                  const finalHistory = [...newHistory, { role: 'bot', text: cleanReply, time: botTime }];
                                   setTeacherBotHistory(finalHistory);
                                   // Persistencia en Firestore no bloqueante
                                   setDoc(doc(db, 'artifacts', appId, 'users', 'teacher', 'teacherBot', 'history'), { messages: finalHistory }).catch(e => console.warn("Historial local guardado:", e));
