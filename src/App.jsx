@@ -8079,100 +8079,86 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                               const newHistory = [...teacherBotHistory, { role: 'user', text: userMsg, time: new Date().toLocaleTimeString('es-CO', { timeZone: 'America/Bogota', hour: '2-digit', minute: '2-digit' }) }];
                               setTeacherBotHistory(newHistory);
 
-                              // DETECCIÓN DE COMANDOS: El bot puede ejecutar acciones
-                              const q = userMsg.toLowerCase().trim();
-                              let botReply = null;
+                              // INTELIGENCIA: Enviar a la IA para que interprete la intención y possible action
+                              const now = new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-                              // Modo oscuro - patron MUY amplio
-                              if (q.match(/oscuro|dark|noche|tema.*oscuro|modo.*oscuro/) && !q.match(/desactivar|apagar|quitar|off|claro/)) {
-                                  if (themeMode === 'light') { setThemeMode('dim'); botReply = '✅ Modo oscuro activado.'; }
-                                  else { botReply = 'El modo oscuro ya está activado (' + (themeMode === 'dim' ? 'Dim' : 'Lights Out') + ').'; }
-                              }
-                              // Lights Out
-                              else if (q.match(/lights?\s*out|negro\s*puro|amole|amold/)) {
-                                  setThemeMode('lights_out'); botReply = '✅ Modo Lights Out activado.';
-                              }
-                              // Tema claro
-                              else if (q.match(/claro|light|blanco|día/) && q.match(/activ|cambiar|poner|modo|tema/) && !q.match(/oscuro|dark|noche/)) {
-                                  if (themeMode !== 'light') { setThemeMode('light'); botReply = '✅ Tema claro activado.'; }
-                                  else { botReply = 'El tema claro ya está activado.'; }
-                              }
-
-                              // Sonidos
-                              else if (q.match(/sonido|sound|tono/) && q.match(/desactivar|apagar|silenciar|off|mute|no/)) {
-                                  setSoundEnabled(false); try { localStorage.setItem('englishTech_sound', 'false'); } catch(e) {} botReply = '✅ Sonidos desactivados.';
-                              } else if (q.match(/sonido|sound|tono/) && q.match(/activar|encender|on|sí|si/)) {
-                                  setSoundEnabled(true); try { localStorage.setItem('englishTech_sound', 'true'); } catch(e) {} botReply = '✅ Sonidos activados.';
-                              }
-
-                              // Notificaciones push
-                              else if (q.match(/notif|push|alerta/) && q.match(/desactivar|apagar|off|no|quitar/)) {
-                                  setPushEnabled(false); try { localStorage.setItem('englishTech_push', 'false'); } catch(e) {} botReply = '✅ Notificaciones push desactivadas.';
-                              } else if (q.match(/notif|push|alerta/) && q.match(/activar|encender|on|sí|si/)) {
-                                  togglePushNotifications(); botReply = '✅ Procesando notificaciones push...';
-                              }
-
-                              // Si el bot detectó un comando, guardar y responder
-                              if (botReply) {
-                                  const botTime = new Date().toLocaleTimeString('es-CO', { timeZone: 'America/Bogota', hour: '2-digit', minute: '2-digit' });
-                                  const finalHistory = [...newHistory, { role: 'bot', text: botReply, time: botTime }];
-                                  setTeacherBotHistory(finalHistory);
-                                  setDoc(doc(db, 'artifacts', appId, 'users', user?.uid || 'teacher', 'teacherBot', 'history'), { messages: finalHistory }).catch(()=>{});
-                                  setIsTeacherBotLoading(false);
-                                  return;
-                              }
-
-                              // SIEMPRE enviar resumen completo de TODOS los datos (compacto)
+                              // Datos compactos para el contexto
                               const studs = Object.entries(userMappings).filter(([, u]) => u?.role === 'student').map(([, u]) => u.fullName || u.name);
-                              const evList = evaluations.map(e => `"${e.title || 'Sin título'}" (ID:${e.id}, vence: ${e.dueDate || 'sin fecha'}, ${e.isArchived ? 'archivada' : 'activa'})`);
+                              const evList = evaluations.map(e => `"${e.title || 'Sin título'}" (vence: ${e.dueDate || 'sin fecha'})`);
                               const taskList = tasks.slice(0, 10).map(t => {
-                                  const commentCount = (t.comments || []).length;
-                                  const recentComments = (t.comments || []).slice(-3).map(c => `${c.author}: ${(c.text || '').substring(0, 60)}`);
-                                  return `"${t.title || 'Sin título'}" (${t.targetGroupName || 'Global'}, ${t.dueDate || 'sin fecha'}, ${commentCount} comentarios${recentComments.length > 0 ? ': ' + recentComments.join(' | ') : ''})`;
+                                  const cc = (t.comments || []).length;
+                                  return `"${t.title || 'Sin título'}" (${t.targetGroupName || 'Global'}, ${cc} comentarios)`;
                               });
-                              const weekList = syllabus.map(s => `S${s.week}: ${s.topic || 'Sin tema'}`);
-                              const groupList = academicGroups.map(g => `${g.name} (${(g.members || []).length} miembros)`);
-                              const studCount = studs.length;
-
-                              // Notas individuales por estudiante y evaluación
                               const gradesByStudent = {};
                               grades.forEach(g => {
                                   const name = g.studentName || 'Desconocido';
                                   if (!gradesByStudent[name]) gradesByStudent[name] = [];
                                   const ev = evaluations.find(e => e.id === g.evaluationId);
-                                  gradesByStudent[name].push(`${ev?.title || 'Eval'}: ${Number(g.score || 0).toFixed(1)}/5.0${g.status === 'cancelled_tab_change' ? ' (cancelada)' : ''}`);
+                                  gradesByStudent[name].push(`${ev?.title || 'Eval'}: ${Number(g.score || 0).toFixed(1)}/5.0`);
                               });
-                              const gradeDetails = Object.entries(gradesByStudent).map(([name, scores]) => `${name}: ${scores.join(', ')}`);
+                              const gradeDetails = Object.entries(gradesByStudent).map(([n, s]) => `${n}: ${s.join(', ')}`);
                               const avgGrade = grades.length > 0 ? (grades.reduce((s, g) => s + (Number(g.score) || 0), 0) / grades.length).toFixed(1) : 'N/A';
 
-                              const now = new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                              const prompt = `Eres el asistente de English TECH. Fecha: ${now}.
+ACCIONES DISPONIBLES (responde SOLO el JSON si el usuario pide una acción, o texto normal si es una pregunta):
+Si el usuario pide cambiar ajustes, responde EXACTAMENTE este JSON (sin texto adicional):
+{"action":"ACCION_AQUI","response":"Tu respuesta al usuario"}
 
-                              const contextData = [
-                                  `Estudiantes (${studCount}): ${studs.slice(0, 20).join(', ')}`,
-                                  `Tareas (${tasks.length}): ${taskList.join(' | ')}`,
-                                  `Evaluaciones (${evaluations.length}): ${evList.join(' | ')}`,
-                                  `Notas: Promedio general ${avgGrade}/5.0. Detalle: ${gradeDetails.length > 0 ? gradeDetails.join(' | ') : 'Sin notas aún'}`,
-                                  `Grupos (${academicGroups.length}): ${groupList.join(', ') || 'Ninguno'}`,
-                                  `Syllabus (${syllabus.length} sem): ${weekList.slice(-8).join(', ')}`
-                              ].join('\n');
+ACCIONES:
+- dark_on: Activar modo oscuro
+- dark_off: Desactivar modo oscuro (tema claro)
+- lights_out: Activar negro puro AMOLED
+- sound_on: Activar sonidos
+- sound_off: Desactivar sonidos
+- push_on: Activar notificaciones push
+- push_off: Desactivar notificaciones push
+- navigate_SETTINGS: Ir a ajustes
+- navigate_TASKS: Ir a asignaciones
+- navigate_REVIEWS: Ir a diapositivas
+- navigate_EVALUATIONS: Ir a evaluaciones
 
-                              const prompt = `Asistente de English TECH. Fecha: ${now}. Responde SOLO lo que se pregunta. Sé breve (máx 2-3 oraciones). Sin asteriscos. En español.
-Qué puedes hacer: Consultar datos en tiempo real de la plataforma (estudiantes, tareas, comentarios, evaluaciones, notas por estudiante, grupos, syllabus, horarios). Dar resúmenes, comparar, contar, listar. NO puedes modificar configuraciones, crear tareas, ni ejecutar acciones.
+Si NO es una acción, responde con texto normal. Sé breve. Sin asteriscos. En español.
 ${teacherBotInfoList.length > 0 ? '\nNotas docente: ' + teacherBotInfoList.map(i => i.text).join('; ') : ''}
-\nDatos de la plataforma:\n${contextData}
+\nDatos: ${studs.length} estudiantes, ${tasks.length} tareas (${taskList.join(' | ')}), ${evaluations.length} evaluaciones (${evList.join(' | ')}), ${academicGroups.length} grupos, ${syllabus.length} sem syllabus, Notas: ${avgGrade}/5.0 (${gradeDetails.join(' | ')})
 \nHistorial: ${newHistory.slice(-6).map(m => `${m.role === 'user' ? 'Gina' : 'Bot'}: ${m.text}`).join('\n')}
-\nPregunta: ${userMsg}
-Respuesta:`;
+\nGina: ${userMsg}
+Bot:`;
 
                               try {
                                   const reply = await callGemini(prompt);
                                   const botTime = new Date().toLocaleTimeString('es-CO', { timeZone: 'America/Bogota', hour: '2-digit', minute: '2-digit' });
-                                  const cleanReply = reply && reply.trim() 
+                                  let cleanReply = reply && reply.trim() 
                                       ? reply.trim().replace(/\*\*/g, '').replace(/\*/g, '') 
                                       : "Disculpe, no pude procesar la respuesta en este momento. Por favor intente de nuevo.";
+
+                                  // Intentar parsear JSON de acción
+                                  let actionTaken = false;
+                                  try {
+                                      const parsed = JSON.parse(cleanReply);
+                                      if (parsed && parsed.action) {
+                                          // Ejecutar la acción
+                                          switch(parsed.action) {
+                                              case 'dark_on': setThemeMode('dim'); break;
+                                              case 'dark_off': setThemeMode('light'); break;
+                                              case 'lights_out': setThemeMode('lights_out'); break;
+                                              case 'sound_on': setSoundEnabled(true); try { localStorage.setItem('englishTech_sound', 'true'); } catch(e) {} break;
+                                              case 'sound_off': setSoundEnabled(false); try { localStorage.setItem('englishTech_sound', 'false'); } catch(e) {} break;
+                                              case 'push_on': togglePushNotifications(); break;
+                                              case 'push_off': setPushEnabled(false); try { localStorage.setItem('englishTech_push', 'false'); } catch(e) {} break;
+                                              case 'navigate_SETTINGS': changeTab('settings'); break;
+                                              case 'navigate_TASKS': changeTab('tasks'); break;
+                                              case 'navigate_REVIEWS': changeTab('reviews'); break;
+                                              case 'navigate_EVALUATIONS': changeTab('evaluations'); break;
+                                          }
+                                          cleanReply = parsed.response || '✅ Acción ejecutada.';
+                                          actionTaken = true;
+                                      }
+                                  } catch (e) {
+                                      // No es JSON, es texto normal - está bien
+                                  }
+
                                   const finalHistory = [...newHistory, { role: 'bot', text: cleanReply, time: botTime }];
                                   setTeacherBotHistory(finalHistory);
-                                  // Persistencia en Firestore no bloqueante
                                   setDoc(doc(db, 'artifacts', appId, 'users', user?.uid || 'teacher', 'teacherBot', 'history'), { messages: finalHistory }).catch(e => console.warn("Historial local guardado:", e));
                               } catch (err) {
                                    console.error("Teacher bot error:", err);
