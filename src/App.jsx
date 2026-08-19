@@ -8079,20 +8079,60 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                               const newHistory = [...teacherBotHistory, { role: 'user', text: userMsg, time: new Date().toLocaleTimeString('es-CO', { timeZone: 'America/Bogota', hour: '2-digit', minute: '2-digit' }) }];
                               setTeacherBotHistory(newHistory);
 
-                              const prompt = `Eres el asistente de English TECH para la Profesora Gina. Fecha y hora actual (Bogotá, Colombia): ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}. Plataforma educativa de inglés con: muro de tareas, evaluaciones, diapositivas, syllabus, chats, grupos académicos, buzón de sugerencias.
+                              // RAG: Buscar contexto relevante según la pregunta
+                              const q = userMsg.toLowerCase();
+                              let contextParts = [];
 
-Datos actuales: ${tasks.length} tareas, ${evaluations.length} evaluaciones, ${Object.keys(userMappings).filter(k => userMappings[k]?.role === 'student').length} estudiantes, ${academicGroups.length} grupos, ${syllabus.length} semanas de syllabus.
+                              // Estudiantes
+                              if (q.match(/estudiante|alumno|alumnos|matricul|inscrit|registr|quién|cuántos.*estud/)) {
+                                  const studs = Object.entries(userMappings).filter(([, u]) => u?.role === 'student').map(([, u]) => u.fullName || u.name);
+                                  contextParts.push(`Estudiantes (${studs.length}): ${studs.join(', ')}`);
+                              }
 
-INSTRUCCIONES:
-- Responde SOLO lo que se pregunta. Sé breve (máx 2-3 oraciones).
-- NO uses asteriscos. Texto limpio.
-- Tono profesional, respetuoso y directo.
-- Responde en español.
+                              // Tareas/publicaciones
+                              if (q.match(/tarea|tareas|publicac|muro|asignac|publicar|entreg|actividad|foro/)) {
+                                  const recent = tasks.slice(0, 10).map(t => `"${t.title || 'Sin título'}" (${t.targetGroupName || 'Global'}, ${t.dueDate || 'sin fecha'})`);
+                                  contextParts.push(`Últimas ${recent.length} publicaciones: ${recent.join(' | ')}`);
+                                  if (q.match(/cuánt|total|cantidad|número.*tarea/)) contextParts.push(`Total tareas: ${tasks.length}`);
+                              }
 
-${teacherBotInfoList.length > 0 ? 'Notas de la docente: ' + teacherBotInfoList.map(i => i.text).join('; ') : ''}
+                              // Evaluaciones
+                              if (q.match(/evaluaci|examen|prueba|nota|calific|calificación|aprob|reprob/)) {
+                                  const evs = evaluations.slice(0, 5).map(e => `"${e.title}" (vence: ${e.dueDate || 'sin fecha'})`);
+                                  contextParts.push(`Evaluaciones (${evaluations.length}): ${evs.join(' | ')}`);
+                                  if (grades.length > 0) {
+                                      const avg = grades.reduce((s, g) => s + (Number(g.score) || 0), 0) / grades.length;
+                                      contextParts.push(`Promedio general del grupo: ${avg.toFixed(1)}/5.0`);
+                                  }
+                              }
 
-Historial reciente:
-${newHistory.slice(-10).map(m => `${m.role === 'user' ? 'Gina' : 'Bot'}: ${m.text}`).join('\n')}
+                              // Syllabus/contenidos
+                              if (q.match(/syllabus|semana|contenid|programa|tema.*clase|plan.*clase|planific/)) {
+                                  const weeks = syllabus.slice(-5).map(s => `Semana ${s.week}: ${s.topic || 'Sin tema'}`);
+                                  contextParts.push(`Syllabus (${syllabus.length} semanas): ${weeks.join(' | ')}`);
+                              }
+
+                              // Grupos
+                              if (q.match(/grupo|materia|curso|grado|clase/)) {
+                                  const groups = academicGroups.map(g => `${g.name} (${(g.members || []).length} miembros)`);
+                                  contextParts.push(`Grupos: ${groups.length > 0 ? groups.join(', ') : 'Ninguno creado'}`);
+                              }
+
+                              // Si no matchea nada específico, dar resumen general
+                              if (contextParts.length === 0) {
+                                  contextParts.push(`Resumen: ${tasks.length} tareas, ${evaluations.length} evaluaciones, ${Object.keys(userMappings).filter(k => userMappings[k]?.role === 'student').length} estudiantes, ${academicGroups.length} grupos, ${syllabus.length} semanas syllabus`);
+                              }
+
+                              const now = new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+                              const prompt = `Asistente de English TECH. Fecha: ${now}. Solo responde lo que se pregunta. Sé breve (máx 2-3 oraciones). Sin asteriscos. En español.
+
+${teacherBotInfoList.length > 0 ? 'Notas docente: ' + teacherBotInfoList.map(i => i.text).join('; ') : ''}
+
+Contexto disponible:
+${contextParts.join('\n')}
+
+Historial: ${newHistory.slice(-6).map(m => `${m.role === 'user' ? 'Gina' : 'Bot'}: ${m.text}`).join('\n')}
 
 Pregunta: ${userMsg}
 Respuesta:`;
