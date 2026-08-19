@@ -8033,16 +8033,28 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                               }`}>
                                   ¡Hola, Profesora Gina! 👋 Soy su Asistente de English TECH. Estoy aquí para orientarle en la gestión de contenidos, evaluaciones, asignaciones y uso de las herramientas de la plataforma. ¿En qué le puedo colaborar hoy?
                               </div>
-                              {teacherBotHistory.map((m, i) => (
-                                  <div key={i} className={`text-xs sm:text-sm px-3 py-2 rounded-2xl max-w-[75%] shadow-xs whitespace-pre-wrap leading-relaxed ${
-                                      m.role === 'user' 
-                                          ? (isDarkMode ? 'bg-blue-600 text-white ml-auto rounded-tr-none' : 'bg-gray-800 text-white ml-auto rounded-tr-none') 
-                                          : (isDarkMode ? 'bg-gray-800/90 text-gray-100 rounded-tl-none border border-gray-700' : 'bg-white text-gray-800 rounded-tl-none border border-gray-200 shadow-2xs')
-                                  }`}>
-                                      {formatBotText(m.text)}
-                                      {m.time && <span className={`block text-[9px] mt-1 opacity-60 ${m.role === 'user' ? 'text-right' : 'text-left'}`}>{m.time}</span>}
-                                  </div>
-                              ))}
+                              {teacherBotHistory.map((m, i) => {
+                                  const isMe = m.role === 'user';
+                                  const isFirst = i === 0 || teacherBotHistory[i-1]?.role !== m.role;
+                                  const isLast = i === teacherBotHistory.length - 1 || teacherBotHistory[i+1]?.role !== m.role;
+                                  const radius = isMe
+                                      ? `rounded-l-2xl ${isFirst ? 'rounded-tr-2xl' : 'rounded-tr-[4px]'} ${isLast ? 'rounded-br-2xl' : 'rounded-br-[4px]'}`
+                                      : `rounded-r-2xl ${isFirst ? 'rounded-tl-2xl' : 'rounded-tl-[4px]'} ${isLast ? 'rounded-bl-2xl' : 'rounded-bl-[4px]'}`;
+                                  return (
+                                      <div key={i} className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} ${isLast ? 'mb-2.5' : 'mb-[2px]'}`}>
+                                          <div className={`relative max-w-[90%] sm:max-w-[85%] px-3 py-2 shadow-xs relative backdrop-blur-xl border transition-all duration-200 ${radius} ${
+                                              isMe
+                                                  ? (isDarkMode ? 'bg-blue-600/90 text-white border-blue-500/50' : 'bg-blue-600/90 text-white border-blue-500/20')
+                                                  : (isDarkMode ? 'bg-gray-800/80 text-gray-100 border-gray-700/50' : 'bg-white/80 text-gray-800 border-gray-200/50')
+                                          }`}>
+                                              <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap pr-6">{formatBotText(m.text)}</p>
+                                              <div className={`flex items-center justify-end gap-1 mt-0.5 opacity-80 ${isMe ? 'text-blue-100' : (isDarkMode ? 'text-gray-400' : 'text-gray-500')}`}>
+                                                  <span className="text-[9px] font-medium leading-none">{m.time || ''}</span>
+                                              </div>
+                                          </div>
+                                      </div>
+                                  );
+                              })}
                               {isTeacherBotLoading && (
                                   <div className="flex items-center gap-2 py-2 px-3">
                                       <div className="flex gap-1">
