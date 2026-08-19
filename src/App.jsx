@@ -1902,7 +1902,7 @@ useEffect(() => {
 
     // Listener para el conocimiento del bot de la profe
     const uTeacherBot = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'teacherBot'), d => setTeacherBotInfoList(d.data()?.infoList || []));
-    const uTeacherBotHist = onSnapshot(doc(db, 'artifacts', appId, 'users', 'teacher', 'teacherBot', 'history'), d => {
+    const uTeacherBotHist = onSnapshot(doc(db, 'artifacts', appId, 'users', user?.uid || 'teacher', 'teacherBot', 'history'), d => {
         if (d.exists()) {
             setTeacherBotHistory(d.data()?.messages || []);
         }
@@ -8007,7 +8007,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                   <button 
                                       type="button"
                                       onClick={async () => {
-                                          await deleteDoc(doc(db, 'artifacts', appId, 'users', 'teacher', 'teacherBot', 'history')).catch(()=>{});
+                                          await deleteDoc(doc(db, 'artifacts', appId, 'users', user?.uid || 'teacher', 'teacherBot', 'history')).catch(()=>{});
                                           setTeacherBotHistory([]);
                                           showMessage("🔄 Sesión del asistente reiniciada.");
                                       }} 
@@ -8094,7 +8094,7 @@ Respuesta:`;
                                   const finalHistory = [...newHistory, { role: 'bot', text: cleanReply, time: botTime }];
                                   setTeacherBotHistory(finalHistory);
                                   // Persistencia en Firestore no bloqueante
-                                  setDoc(doc(db, 'artifacts', appId, 'users', 'teacher', 'teacherBot', 'history'), { messages: finalHistory }).catch(e => console.warn("Historial local guardado:", e));
+                                  setDoc(doc(db, 'artifacts', appId, 'users', user?.uid || 'teacher', 'teacherBot', 'history'), { messages: finalHistory }).catch(e => console.warn("Historial local guardado:", e));
                               } catch (err) {
                                    console.error("Teacher bot error:", err);
                                    let errorText = "❌ Ocurrió un error al procesar su solicitud. Por favor, intente de nuevo.";
@@ -8106,7 +8106,7 @@ Respuesta:`;
                                    }
                                    const finalHistory = [...newHistory, { role: 'bot', text: errorText }];
                                    setTeacherBotHistory(finalHistory);
-                                   setDoc(doc(db, 'artifacts', appId, 'users', 'teacher', 'teacherBot', 'history'), { messages: finalHistory }).catch(()=>{});
+                                   setDoc(doc(db, 'artifacts', appId, 'users', user?.uid || 'teacher', 'teacherBot', 'history'), { messages: finalHistory }).catch(()=>{});
                               } finally {
                                   setIsTeacherBotLoading(false);
                               }
