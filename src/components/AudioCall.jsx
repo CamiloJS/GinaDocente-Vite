@@ -1,9 +1,9 @@
 // src/components/AudioCall.jsx
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { rtdb, auth } from '../firebase/config.js'
-import { ref, set, onValue, remove, push } from 'firebase/database'
+import { db, appId } from '../firebase/config.js'
+import { doc, setDoc, onSnapshot, deleteDoc, collection, addDoc } from 'firebase/firestore'
 
-// Iconos inline para evitar conflictos de importación
+// Iconos inline
 const PhoneIcon = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
 const PhoneOffIcon = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 3v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91"/><line x1="23" y1="1" x2="1" y2="23"/></svg>
 const MicIcon = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
@@ -19,7 +19,7 @@ const ICE_SERVERS = {
 }
 
 const AudioCall = ({ activeChat, myChatId, isDarkMode, showMessage, userMappings, onClose }) => {
-  const [callState, setCallState] = useState('idle') // idle, calling, ringing, connected
+  const [callState, setCallState] = useState('idle')
   const [isMuted, setIsMuted] = useState(false)
   const [callDuration, setCallDuration] = useState(0)
   const [callError, setCallError] = useState(null)
@@ -27,24 +27,18 @@ const AudioCall = ({ activeChat, myChatId, isDarkMode, showMessage, userMappings
   const localStream = useRef(null)
   const remoteAudio = useRef(null)
   const callTimer = useRef(null)
-  const callId = useRef(null)
+  const callDocRef = useRef(null)
 
   const callerName = myChatId === 'teacher' ? 'Prof. Gina' : (userMappings?.[myChatId]?.fullName || myChatId)
   const calleeName = activeChat?.name || 'Usuario'
 
-  // Cleanup on unmount
   useEffect(() => {
-    return () => {
-      endCall()
-    }
+    return () => { endCall() }
   }, [])
 
-  // Timer for call duration
   useEffect(() => {
     if (callState === 'connected') {
-      callTimer.current = setInterval(() => {
-        setCallDuration(prev => prev + 1)
-      }, 1000)
+      callTimer.current = setInterval(() => setCallDuration(prev => prev + 1), 1000)
     } else {
       if (callTimer.current) clearInterval(callTimer.current)
       setCallDuration(0)
@@ -58,120 +52,74 @@ const AudioCall = ({ activeChat, myChatId, isDarkMode, showMessage, userMappings
     return `${m}:${s}`
   }
 
-  const getCallPath = useCallback(() => {
+  const getCallDocId = useCallback(() => {
     if (!activeChat) return null
     const chatId = activeChat.id || `dm_${[myChatId, activeChat.id].sort().join('_')}`
-    return `calls/${chatId}`
+    return chatId.replace(/[^a-zA-Z0-9_-]/g, '_')
   }, [activeChat, myChatId])
 
-  // Create peer connection
-  const createPeerConnection = useCallback(async (isInitiator) => {
+  const createPeerConnection = useCallback(async () => {
     try {
       const pc = new RTCPeerConnection(ICE_SERVERS)
       peerConnection.current = pc
-
-      // Get local audio stream
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
       localStream.current = stream
       stream.getTracks().forEach(track => pc.addTrack(track, stream))
-
-      // Handle remote stream
-      pc.ontrack = (event) => {
-        if (remoteAudio.current) {
-          remoteAudio.current.srcObject = event.streams[0]
-        }
-      }
-
-      // ICE candidates
+      pc.ontrack = (event) => { if (remoteAudio.current) remoteAudio.current.srcObject = event.streams[0] }
       pc.onicecandidate = (event) => {
-        if (event.candidate && callId.current) {
-          const candidatePath = `${getCallPath()}/${callId.current}/candidates`
-          push(ref(rtdb, candidatePath), event.candidate.toJSON())
+        if (event.candidate && callDocRef.current) {
+          const candRef = doc(db, 'artifacts', appId, 'public', 'data', 'calls', callDocRef.current, 'candidates', Date.now().toString())
+          setDoc(candRef, event.candidate.toJSON()).catch(() => {})
         }
       }
-
-      // Connection state changes
       pc.onconnectionstatechange = () => {
-        if (pc.connectionState === 'connected') {
-          setCallState('connected')
-        } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
-          endCall()
-        }
+        if (pc.connectionState === 'connected') setCallState('connected')
+        else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') endCall()
       }
-
       return pc
     } catch (err) {
       console.error('Error creating peer connection:', err)
       setCallError('No se pudo acceder al micrófono')
       return null
     }
-  }, [getCallPath])
+  }, [appId])
 
-  // Start a call
   const startCall = async () => {
     if (!activeChat) return
     setCallState('calling')
     setCallError(null)
-
-    const path = getCallPath()
-    callId.current = push(ref(rtdb, path)).key
+    const docId = getCallDocId()
+    callDocRef.current = docId
 
     try {
-      const pc = await createPeerConnection(true)
+      const pc = await createPeerConnection()
       if (!pc) { setCallState('idle'); return }
-
-      // Create offer
       const offer = await pc.createOffer()
       await pc.setLocalDescription(offer)
-
-      // Save offer to Firebase
-      await set(ref(rtdb, `${path}/${callId.current}`), {
-        caller: myChatId,
-        callerName: callerName,
-        callee: activeChat.id,
-        calleeName: calleeName,
-        offer: pc.localDescription.toJSON(),
-        status: 'ringing',
-        startedAt: Date.now(),
-        type: activeChat.type || 'dm'
+      const callRef = doc(db, 'artifacts', appId, 'public', 'data', 'calls', docId)
+      await setDoc(callRef, {
+        caller: myChatId, callerName, callee: activeChat.id, calleeName,
+        offer: pc.localDescription.toJSON(), status: 'ringing',
+        startedAt: Date.now(), type: activeChat.type || 'dm'
       })
-
-      // Listen for answer
-      const answerRef = ref(rtdb, `${path}/${callId.current}/answer`)
-      onValue(answerRef, async (snapshot) => {
-        const data = snapshot.val()
-        if (data && peerConnection.current) {
-          try {
-            await peerConnection.current.setRemoteDescription(new RTCSessionDescription(data))
-            setCallState('connected')
-          } catch (err) {
-            console.error('Error setting answer:', err)
-            endCall()
-          }
+      onSnapshot(callRef, async (snapshot) => {
+        const data = snapshot.data()
+        if (!data) return
+        if (data.answer && peerConnection.current) {
+          try { await peerConnection.current.setRemoteDescription(new RTCSessionDescription(data.answer)); setCallState('connected') }
+          catch (err) { console.error('Error setting answer:', err); endCall() }
         }
+        if (data.status === 'ended') endCall()
       })
-
-      // Listen for call ended
-      const statusRef = ref(rtdb, `${path}/${callId.current}/status`)
-      onValue(statusRef, (snapshot) => {
-        if (snapshot.val() === 'ended') {
-          endCall()
-        }
-      })
-
-      // Listen for ICE candidates from callee
-      const candRef = ref(rtdb, `${path}/${callId.current}/calleeCandidates`)
-      onValue(candRef, async (snapshot) => {
-        const data = snapshot.val()
-        if (data && peerConnection.current) {
-          Object.values(data).forEach(async (candidate) => {
-            try {
-              await peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate))
-            } catch (e) {}
+      const candRef = doc(db, 'artifacts', appId, 'public', 'data', 'calls', docId, 'calleeCandidates', 'list')
+      onSnapshot(candRef, async (snapshot) => {
+        const data = snapshot.data()
+        if (data?.candidates && peerConnection.current) {
+          data.candidates.forEach(async (candidate) => {
+            try { await peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate)) } catch (e) {}
           })
         }
       })
-
     } catch (err) {
       console.error('Error starting call:', err)
       setCallError('Error al iniciar la llamada')
@@ -179,49 +127,31 @@ const AudioCall = ({ activeChat, myChatId, isDarkMode, showMessage, userMappings
     }
   }
 
-  // Answer an incoming call
   const answerCall = async (callData) => {
     setCallState('connected')
     setCallError(null)
-    callId.current = callData.id
+    callDocRef.current = callData.id
 
     try {
-      const pc = await createPeerConnection(false)
+      const pc = await createPeerConnection()
       if (!pc) { setCallState('idle'); return }
-
-      // Set remote description (offer)
       await pc.setRemoteDescription(new RTCSessionDescription(callData.offer))
-
-      // Create answer
       const answer = await pc.createAnswer()
       await pc.setLocalDescription(answer)
-
-      // Save answer to Firebase
-      const path = getCallPath()
-      await set(ref(rtdb, `${path}/${callData.id}/answer`), pc.localDescription.toJSON())
-      await set(ref(rtdb, `${path}/${callData.id}/status`), 'connected')
-
-      // Listen for ICE candidates from caller
-      const candRef = ref(rtdb, `${path}/${callData.id}/candidates`)
-      onValue(candRef, async (snapshot) => {
-        const data = snapshot.val()
-        if (data && peerConnection.current) {
-          Object.values(data).forEach(async (candidate) => {
-            try {
-              await peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate))
-            } catch (e) {}
+      const callRef = doc(db, 'artifacts', appId, 'public', 'data', 'calls', callData.id)
+      await setDoc(callRef, { answer: pc.localDescription.toJSON(), status: 'connected' }, { merge: true })
+      const candRef = doc(db, 'artifacts', appId, 'public', 'data', 'calls', callData.id, 'candidates', 'list')
+      onSnapshot(candRef, async (snapshot) => {
+        const data = snapshot.data()
+        if (data?.candidates && peerConnection.current) {
+          data.candidates.forEach(async (candidate) => {
+            try { await peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate)) } catch (e) {}
           })
         }
       })
-
-      // Listen for call ended
-      const statusRef = ref(rtdb, `${path}/${callData.id}/status`)
-      onValue(statusRef, (snapshot) => {
-        if (snapshot.val() === 'ended') {
-          endCall()
-        }
+      onSnapshot(callRef, (snapshot) => {
+        if (snapshot.data()?.status === 'ended') endCall()
       })
-
     } catch (err) {
       console.error('Error answering call:', err)
       setCallError('Error al contestar la llamada')
@@ -229,35 +159,26 @@ const AudioCall = ({ activeChat, myChatId, isDarkMode, showMessage, userMappings
     }
   }
 
-  // End call
   const endCall = async () => {
     try {
-      if (peerConnection.current) {
-        peerConnection.current.close()
-        peerConnection.current = null
-      }
-      if (localStream.current) {
-        localStream.current.getTracks().forEach(track => track.stop())
-        localStream.current = null
-      }
-      if (callId.current && getCallPath()) {
-        await set(ref(rtdb, `${getCallPath()}/${callId.current}/status`), 'ended')
-        await remove(ref(rtdb, `${getCallPath()}/${callId.current}`))
+      if (peerConnection.current) { peerConnection.current.close(); peerConnection.current = null }
+      if (localStream.current) { localStream.current.getTracks().forEach(track => track.stop()); localStream.current = null }
+      if (callDocRef.current) {
+        const callRef = doc(db, 'artifacts', appId, 'public', 'data', 'calls', callDocRef.current)
+        await setDoc(callRef, { status: 'ended' }, { merge: true }).catch(() => {})
+        await deleteDoc(callRef).catch(() => {})
       }
     } catch (e) {}
     setCallState('idle')
     setIsMuted(false)
-    callId.current = null
+    callDocRef.current = null
     if (callTimer.current) clearInterval(callTimer.current)
     onClose?.()
   }
 
-  // Toggle mute
   const toggleMute = () => {
     if (localStream.current) {
-      localStream.current.getAudioTracks().forEach(track => {
-        track.enabled = !track.enabled
-      })
+      localStream.current.getAudioTracks().forEach(track => { track.enabled = !track.enabled })
       setIsMuted(!isMuted)
     }
   }
@@ -266,20 +187,14 @@ const AudioCall = ({ activeChat, myChatId, isDarkMode, showMessage, userMappings
 
   return (
     <>
-      {/* Hidden audio element for remote stream */}
       <audio ref={remoteAudio} autoPlay playsInline />
-
-      {/* Call overlay */}
       <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/90 backdrop-blur-sm animate-in fade-in duration-200">
         <div className={`w-full max-w-sm rounded-3xl p-8 text-center space-y-6 ${isDarkMode ? 'bg-gray-900 border border-gray-700' : 'bg-white'}`}>
-          {/* Avatar */}
           <div className="relative mx-auto w-20 h-20">
             <div className={`w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg ${callState === 'connected' ? 'bg-green-500 animate-pulse' : callState === 'calling' ? 'bg-blue-500 animate-pulse' : 'bg-orange-500'}`}>
-              {callState === 'connected' ? <Phone size={28} /> : callState === 'calling' ? <Phone size={28} className="animate-bounce" /> : <Users size={28} />}
+              {callState === 'connected' ? <PhoneIcon size={28} /> : callState === 'calling' ? <PhoneIcon size={28} className="animate-bounce" /> : <UsersIcon size={28} />}
             </div>
           </div>
-
-          {/* Status */}
           <div>
             <h3 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
               {callState === 'calling' ? `Llamando a ${calleeName}...` :
@@ -288,36 +203,20 @@ const AudioCall = ({ activeChat, myChatId, isDarkMode, showMessage, userMappings
             </h3>
             <p className={`text-sm mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
               {callState === 'connected' ? formatDuration(callDuration) :
-               callState === 'calling' ? 'Esperando respuesta...' :
-               'Llamada entrante'}
+               callState === 'calling' ? 'Esperando respuesta...' : 'Llamada entrante'}
             </p>
           </div>
-
-          {/* Error message */}
-          {callError && (
-            <p className="text-red-500 text-sm font-medium">{callError}</p>
-          )}
-
-          {/* Call controls */}
+          {callError && <p className="text-red-500 text-sm font-medium">{callError}</p>}
           <div className="flex items-center justify-center gap-4">
-            {/* Mute button (only when connected) */}
             {callState === 'connected' && (
-              <button
-                onClick={toggleMute}
+              <button onClick={toggleMute}
                 className={`p-4 rounded-full transition-all shadow-lg ${isMuted ? 'bg-red-500 text-white' : (isDarkMode ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-gray-200 text-gray-700 hover:bg-gray-300')}`}
-                title={isMuted ? 'Activar micrófono' : 'Silenciar'}
-              >
-                {isMuted ? <MicOff size={24} /> : <Mic size={24} />}
+                title={isMuted ? 'Activar micrófono' : 'Silenciar'}>
+                {isMuted ? <MicOffIcon size={24} /> : <MicIcon size={24} />}
               </button>
             )}
-
-            {/* End call button */}
-            <button
-              onClick={endCall}
-              className="p-4 rounded-full bg-red-600 text-white hover:bg-red-700 transition-all shadow-lg"
-              title="Finalizar llamada"
-            >
-              <PhoneOff size={24} />
+            <button onClick={endCall} className="p-4 rounded-full bg-red-600 text-white hover:bg-red-700 transition-all shadow-lg" title="Finalizar llamada">
+              <PhoneOffIcon size={24} />
             </button>
           </div>
         </div>
