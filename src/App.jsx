@@ -28,10 +28,11 @@ import {
   Settings, VolumeX, Shield, Play, Pause, GoogleIcon, KeyRound, UserCheck, UserX,
   ChevronDown, ChevronUp, Minus, HelpCircle, Lightbulb, GraduationCap, Laptop, PenTool,
   Compass, Atom, Award, Bookmark, Terminal, Folder, Globe, Target, Layers, RotateCcw,
-  Archive, ShieldAlert, Unlock, Menu, UserPlus, Camera, Upload, Phone
+  Archive, ShieldAlert, Unlock, Menu, UserPlus, Camera, Upload, Phone, PhoneOff
 } from './components/Icons.jsx'
 import AudioPlayer, { AudioRecordingVisualizer } from './components/AudioPlayer.jsx'
 import AudioCall from './components/AudioCall.jsx'
+import { playRingtone, stopRingtone } from './utils/callSounds.js'
 
 import EmptyState from './components/EmptyState.jsx'
 import ScrollToTop from './components/ScrollToTop.jsx'
@@ -490,9 +491,12 @@ function App() {
   const pushEnabledRef = useRef(pushEnabled);
   const [isChatMinimized, setIsChatMinimized] = useState(false);
   const [activeCall, setActiveCall] = useState(null);
+  const [incomingCall, setIncomingCall] = useState(null);
+  const incomingRingtoneRef = useRef(null);
 
   // --- VALORES DERIVADOS Y HELPERS DE USUARIO / CHAT ---
   const myChatId = role === 'teacher' ? 'teacher' : (loggedInUser ? loggedInUser.replace('@', '') : '');
+  const myDisplayName = role === 'teacher' ? TEACHER_NAME : (loggedInName || myChatId);
 
   const allChatUsers = [
     { id: 'teacher', name: TEACHER_NAME, role: 'teacher', profilePicUrl: userMappings['teacher']?.profilePicUrl || '' },
@@ -2137,26 +2141,96 @@ useEffect(() => {
               };
           }, []);
 
-          // Listener de llamadas entrantes (Firestore, no RTDB)
+          // Listener de llamadas entrantes (Firestore)
           useEffect(() => {
               if (!myChatId) return
               const callsRef = collection(db, 'artifacts', appId, 'public', 'data', 'calls')
               const unsubscribe = onSnapshot(callsRef, (snapshot) => {
                   snapshot.docs.forEach(d => {
                       const call = d.data()
-                      if (call && call.status === 'ringing' && !activeCall) {
+                      if (!call || call.status !== 'ringing' || activeCall || incomingCall) return
+                      // Llamada DM: soy el destinatario
+                      if (call.type !== 'group') {
                           const calleeId = call.callee || ''
-                          if (calleeId.includes(myChatId)) {
+                          if (calleeId === myChatId) {
                               const callerName = call.callerName || 'Alguien'
-                              if (window.confirm(`${callerName} te está llamando. ¿Aceptas?`)) {
-                                  setActiveCall({ id: d.id, name: call.calleeName || 'Usuario', callerName: callerName, type: call.type || 'dm', offer: call.offer, role: 'callee' })
-                              }
+                              setIncomingCall({
+                                  callId: d.id,
+                                  isGroup: false,
+                                  callerName,
+                                  offer: call.offer,
+                                  targetId: call.initiator
+                              })
+                          }
+                      } else {
+                          // Llamada grupal: soy participante
+                          const participants = call.participants || []
+                          const isMe = participants.some(p => p.id === myChatId)
+                          const isInitiator = call.initiator === myChatId
+                          if (isMe && !isInitiator) {
+                              setIncomingCall({
+                                  callId: d.id,
+                                  isGroup: true,
+                                  callerName: call.initiatorName || 'Alguien',
+                                  groupId: call.groupId,
+                                  participants: participants.map(p => ({ id: p.id, name: p.name }))
+                              })
                           }
                       }
                   })
               })
               return () => unsubscribe()
-          }, [myChatId, activeCall])
+          }, [myChatId, activeCall, incomingCall])
+
+          // Ringtone para llamada entrante
+          useEffect(() => {
+              if (incomingCall) {
+                  incomingRingtoneRef.current = playRingtone()
+              } else {
+                  stopRingtone()
+                  incomingRingtoneRef.current = null
+              }
+              return () => { stopRingtone(); incomingRingtoneRef.current = null }
+          }, [incomingCall])
+
+          // Aceptar llamada entrante
+          const acceptIncomingCall = () => {
+              stopRingtone()
+              if (!incomingCall) return
+              const call = incomingCall
+              setIncomingCall(null)
+              if (call.isGroup) {
+                  setActiveCall({
+                      callId: call.callId,
+                      role: 'participant',
+                      isGroup: true,
+                      name: call.callerName,
+                      callerName: call.callerName,
+                      groupId: call.groupId,
+                      participants: call.participants
+                  })
+              } else {
+                  setActiveCall({
+                      callId: call.callId,
+                      role: 'participant',
+                      isGroup: false,
+                      name: call.callerName,
+                      callerName: call.callerName,
+                      offer: call.offer
+                  })
+              }
+          }
+
+          // Rechazar llamada entrante
+          const rejectIncomingCall = () => {
+              stopRingtone()
+              if (!incomingCall) return
+              const callIdToReject = incomingCall.callId
+              setIncomingCall(null)
+              const callRef = doc(db, 'artifacts', appId, 'public', 'data', 'calls', callIdToReject)
+              setDoc(callRef, { status: 'ended' }, { merge: true }).catch(() => {})
+              deleteDoc(callRef).catch(() => {})
+          }
 
           useEffect(() => {
               if (isChatAppOpen && myChatId) {
@@ -8633,16 +8707,41 @@ Bot:`;
                                       </div>
 
                                       <div className="flex items-center gap-0.5 relative shrink-0">
-                                          {activeChat.type !== 'group' && (
                                           <button 
                                               type="button"
-                                              onClick={() => setActiveCall({ id: `dm_${[myChatId, activeChat.id.replace('dm_', '').split('_').find(id => id !== myChatId)].sort().join('_')}`, name: activeChat.name, type: 'dm' })} 
+                                              onClick={() => {
+                                                  if (activeChat.type === 'group') {
+                                                      const grp = chatGroups.find(g => g.id === activeChat.id || `group_${g.id}` === activeChat.id || `acad_${g.academicGroupId}` === activeChat.id || `acad_${g.id}` === activeChat.id)
+                                                      const members = (grp?.members || []).filter(m => m !== myChatId)
+                                                      const participants = members.map(id => ({
+                                                          id,
+                                                          name: id === 'teacher' ? TEACHER_NAME : (userMappings[id]?.fullName || id)
+                                                      }))
+                                                      if (participants.length === 0) { showMessage("No hay otros miembros para llamar."); return }
+                                                      setActiveCall({
+                                                          callId: `group_${(grp?.id || activeChat.id).replace(/[^a-zA-Z0-9_-]/g, '_')}`,
+                                                          role: 'initiator',
+                                                          isGroup: true,
+                                                          name: activeChat.name,
+                                                          groupId: grp?.id || activeChat.id,
+                                                          participants
+                                                      })
+                                                  } else {
+                                                      const targetId = activeChat.id.replace('dm_', '').split('_').find(id => id !== myChatId)
+                                                      setActiveCall({
+                                                          callId: `dm_${[myChatId, targetId].sort().join('_')}`,
+                                                          role: 'initiator',
+                                                          isGroup: false,
+                                                          name: activeChat.name,
+                                                          targetId
+                                                      })
+                                                  }
+                                              }} 
                                               className="p-1.5 rounded-lg text-green-500 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
                                               title="Iniciar llamada de audio"
                                           >
                                               <Phone size={16}/>
                                           </button>
-                                          )}
                                           <button 
                                               type="button"
                                               onClick={() => setShowChatSettings(!showChatSettings)} 
@@ -9541,13 +9640,54 @@ Bot:`;
               {/* LLAMADA DE AUDIO */}
               {activeCall && (
                   <AudioCall
-                      activeChat={activeCall}
+                      activeCall={activeCall}
                       myChatId={myChatId}
+                      myName={myDisplayName}
                       isDarkMode={isDarkMode}
                       showMessage={showMessage}
                       userMappings={userMappings}
                       onClose={() => setActiveCall(null)}
                   />
+              )}
+
+              {/* MODAL DE LLAMADA ENTRANTE */}
+              {incomingCall && !activeCall && (
+                  <div className="fixed inset-0 z-[600] flex items-center justify-center bg-black/90 backdrop-blur-sm animate-in fade-in duration-200 p-4">
+                      <div className={`w-full max-w-sm rounded-3xl p-6 sm:p-8 text-center space-y-5 sm:space-y-6 ${isDarkMode ? 'bg-gray-900 border border-gray-700' : 'bg-white'}`}>
+                          <div className="relative mx-auto w-20 h-20 sm:w-24 sm:h-24">
+                              <div className={`w-full h-full rounded-full bg-orange-500 animate-pulse flex items-center justify-center text-white shadow-lg`}>
+                                  <span className="text-2xl font-bold">{incomingCall.callerName?.charAt(0)?.toUpperCase() || '?'}</span>
+                              </div>
+                              <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-green-500 border-2 border-white dark:border-gray-900"></span>
+                          </div>
+                          <div>
+                              <h3 className={`text-lg sm:text-xl font-bold truncate ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                                  {incomingCall.callerName} te está llamando...
+                              </h3>
+                              <p className={`text-sm mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                  {incomingCall.isGroup ? 'Llamada grupal' : 'Llamada de audio'}
+                              </p>
+                          </div>
+                          <div className="flex items-center justify-center gap-5">
+                              <button
+                                  onClick={rejectIncomingCall}
+                                  className="p-4 sm:p-5 rounded-full bg-red-600 text-white hover:bg-red-700 transition-all shadow-lg active:scale-95"
+                                  title="Rechazar llamada"
+                                  style={{ minWidth: 56, minHeight: 56 }}
+                              >
+                                  <PhoneOff size={26} />
+                              </button>
+                              <button
+                                  onClick={acceptIncomingCall}
+                                  className="p-4 sm:p-5 rounded-full bg-green-500 text-white hover:bg-green-600 transition-all shadow-lg animate-pulse active:scale-95"
+                                  title="Contestar llamada"
+                                  style={{ minWidth: 56, minHeight: 56 }}
+                              >
+                                  <Phone size={26} />
+                              </button>
+                          </div>
+                      </div>
+                  </div>
               )}
 
               {/* MODAL GLOBAL DE CONFIRMACIÓN */}
