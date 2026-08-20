@@ -36,6 +36,13 @@ const AudioCall = ({ activeChat, myChatId, isDarkMode, showMessage, userMappings
     return () => { endCall() }
   }, [])
 
+  // Iniciar llamada automáticamente al montar el componente
+  useEffect(() => {
+    if (activeChat && callState === 'idle') {
+      startCall()
+    }
+  }, [activeChat])
+
   useEffect(() => {
     if (callState === 'connected') {
       callTimer.current = setInterval(() => setCallDuration(prev => prev + 1), 1000)
