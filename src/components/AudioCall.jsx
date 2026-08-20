@@ -83,8 +83,14 @@ const AudioCall = ({ activeChat, myChatId, isDarkMode, showMessage, userMappings
       pc.ontrack = (event) => { if (remoteAudio.current) remoteAudio.current.srcObject = event.streams[0] }
       pc.onicecandidate = (event) => {
         if (event.candidate && callDocRef.current) {
-          const candRef = doc(db, 'artifacts', appId, 'public', 'data', 'calls', callDocRef.current, 'candidates', Date.now().toString())
-          setDoc(candRef, event.candidate.toJSON()).catch(() => {})
+          // Guardar candidato en un array累积
+          const candPath = isCallee ? 'calleeCandidates' : 'callerCandidates'
+          const listRef = doc(db, 'artifacts', appId, 'public', 'data', 'calls', callDocRef.current, candPath, 'list')
+          // Obtener candidatos existentes y agregar el nuevo
+          const existing = peerConnection.current._iceCandidates || []
+          existing.push(event.candidate.toJSON())
+          peerConnection.current._iceCandidates = existing
+          setDoc(listRef, { candidates: existing }).catch(() => {})
         }
       }
       pc.onconnectionstatechange = () => {
@@ -97,7 +103,7 @@ const AudioCall = ({ activeChat, myChatId, isDarkMode, showMessage, userMappings
       setCallError('No se pudo acceder al micrófono')
       return null
     }
-  }, [appId])
+  }, [appId, isCallee])
 
   // Caller: iniciar llamada
   const startCall = async () => {
@@ -161,7 +167,7 @@ const AudioCall = ({ activeChat, myChatId, isDarkMode, showMessage, userMappings
       const callRef = doc(db, 'artifacts', appId, 'public', 'data', 'calls', docId)
       await setDoc(callRef, { answer: pc.localDescription.toJSON(), status: 'connected' }, { merge: true })
       // Escuchar ICE candidates del caller
-      onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'calls', docId, 'candidates', 'list'), (snapshot) => {
+      onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'calls', docId, 'callerCandidates', 'list'), (snapshot) => {
         const data = snapshot.data()
         if (data?.candidates && peerConnection.current) {
           data.candidates.forEach(async (candidate) => {
