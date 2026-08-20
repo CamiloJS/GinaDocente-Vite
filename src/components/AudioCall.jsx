@@ -18,9 +18,62 @@ const ICE_SERVERS = {
   ]
 }
 
-// Sonidos
-const RINGTONE_URL = 'https://assets.mixkit.co/active_storage/sfx/2073/2073-preview.mp3'
-const HANGUP_URL = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'
+// Sonidos generados con Web Audio API (no dependen de URLs externas)
+const playTone = (frequency, duration, type = 'sine') => {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.frequency.value = frequency
+    osc.type = type
+    gain.gain.value = 0.8
+    osc.start()
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration)
+    osc.stop(ctx.currentTime + duration)
+  } catch (e) {}
+}
+
+const playRingtone = () => {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)()
+    const playNote = (freq, start, dur) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.frequency.value = freq
+      osc.type = 'sine'
+      gain.gain.value = 0.6
+      osc.start(ctx.currentTime + start)
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + dur)
+      osc.stop(ctx.currentTime + start + dur)
+    }
+    // Patrón de ringtone: Do-Mi-Sol-Do (ascending)
+    playNote(523.25, 0, 0.15)    // C5
+    playNote(659.25, 0.15, 0.15)  // E5
+    playNote(783.99, 0.3, 0.15)   // G5
+    playNote(1046.5, 0.45, 0.3)   // C6
+    return ctx
+  } catch (e) { return null }
+}
+
+const playHangup = () => {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.frequency.value = 480
+    osc.type = 'sine'
+    gain.gain.value = 0.7
+    osc.start()
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3)
+    osc.stop(ctx.currentTime + 0.3)
+  } catch (e) {}
+}
 
 const AudioCall = ({ activeChat, myChatId, isDarkMode, showMessage, userMappings, onClose }) => {
   const [callState, setCallState] = useState('idle')
@@ -42,19 +95,14 @@ const AudioCall = ({ activeChat, myChatId, isDarkMode, showMessage, userMappings
   // Reproducir ringtone cuando hay llamada entrante
   useEffect(() => {
     if (callState === 'ringing') {
-      try {
-        ringtoneRef.current = new Audio(RINGTONE_URL)
-        ringtoneRef.current.loop = true
-        ringtoneRef.current.volume = 1.5
-        ringtoneRef.current.play().catch(() => {})
-      } catch (e) {}
+      ringtoneRef.current = playRingtone()
     } else {
       if (ringtoneRef.current) {
-        ringtoneRef.current.pause()
+        try { ringtoneRef.current.close() } catch (e) {}
         ringtoneRef.current = null
       }
     }
-    return () => { if (ringtoneRef.current) { ringtoneRef.current.pause(); ringtoneRef.current = null } }
+    return () => { if (ringtoneRef.current) { try { ringtoneRef.current.close() } catch(e) {} ringtoneRef.current = null } }
   }, [callState])
 
   // Cleanup on unmount
@@ -97,11 +145,7 @@ const AudioCall = ({ activeChat, myChatId, isDarkMode, showMessage, userMappings
 
   // Reproducir sonido de colgar
   const playHangupSound = () => {
-    try {
-      const audio = new Audio(HANGUP_URL)
-      audio.volume = 1.5
-      audio.play().catch(() => {})
-    } catch (e) {}
+    playHangup()
   }
 
   const createPeerConnection = useCallback(async () => {

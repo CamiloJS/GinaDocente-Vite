@@ -2149,7 +2149,7 @@ useEffect(() => {
                           if (calleeId.includes(myChatId)) {
                               const callerName = call.callerName || 'Alguien'
                               if (window.confirm(`${callerName} te está llamando. ¿Aceptas?`)) {
-                                  setActiveCall({ id: d.id, name: callerName, type: call.type || 'dm', offer: call.offer, role: 'callee' })
+                                  setActiveCall({ id: d.id, name: call.calleeName || 'Usuario', callerName: callerName, type: call.type || 'dm', offer: call.offer, role: 'callee' })
                               }
                           }
                       }
