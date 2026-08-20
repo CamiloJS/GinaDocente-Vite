@@ -18,10 +18,12 @@ const ICE_SERVERS = {
   ]
 }
 
-// activeChat puede tener: { id, name, type, offer?, role? }
-// role: 'caller' = quien inició, 'callee' = quien recibe
+// Sonidos
+const RINGTONE_URL = 'https://assets.mixkit.co/active_storage/sfx/2073/2073-preview.mp3'
+const HANGUP_URL = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'
+
 const AudioCall = ({ activeChat, myChatId, isDarkMode, showMessage, userMappings, onClose }) => {
-  const [callState, setCallState] = useState('idle') // idle, calling, ringing, connected
+  const [callState, setCallState] = useState('idle')
   const [isMuted, setIsMuted] = useState(false)
   const [callDuration, setCallDuration] = useState(0)
   const [callError, setCallError] = useState(null)
@@ -30,10 +32,30 @@ const AudioCall = ({ activeChat, myChatId, isDarkMode, showMessage, userMappings
   const remoteAudio = useRef(null)
   const callTimer = useRef(null)
   const callDocRef = useRef(null)
+  const ringtoneRef = useRef(null)
   const isCallee = activeChat?.role === 'callee'
 
-  const callerName = myChatId === 'teacher' ? 'Prof. Gina' : (userMappings?.[myChatId]?.fullName || myChatId)
-  const calleeName = activeChat?.name || 'Usuario'
+  // Determinar quién es quién correctamente
+  const myName = myChatId === 'teacher' ? 'Prof. Gina' : (userMappings?.[myChatId]?.fullName || myChatId)
+  const otherName = activeChat?.name || 'Usuario'
+
+  // Reproducir ringtone cuando hay llamada entrante
+  useEffect(() => {
+    if (callState === 'ringing') {
+      try {
+        ringtoneRef.current = new Audio(RINGTONE_URL)
+        ringtoneRef.current.loop = true
+        ringtoneRef.current.volume = 1.5
+        ringtoneRef.current.play().catch(() => {})
+      } catch (e) {}
+    } else {
+      if (ringtoneRef.current) {
+        ringtoneRef.current.pause()
+        ringtoneRef.current = null
+      }
+    }
+    return () => { if (ringtoneRef.current) { ringtoneRef.current.pause(); ringtoneRef.current = null } }
+  }, [callState])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -73,6 +95,15 @@ const AudioCall = ({ activeChat, myChatId, isDarkMode, showMessage, userMappings
     return chatId.replace(/[^a-zA-Z0-9_-]/g, '_')
   }, [activeChat, myChatId])
 
+  // Reproducir sonido de colgar
+  const playHangupSound = () => {
+    try {
+      const audio = new Audio(HANGUP_URL)
+      audio.volume = 1.5
+      audio.play().catch(() => {})
+    } catch (e) {}
+  }
+
   const createPeerConnection = useCallback(async () => {
     try {
       const pc = new RTCPeerConnection(ICE_SERVERS)
@@ -80,13 +111,16 @@ const AudioCall = ({ activeChat, myChatId, isDarkMode, showMessage, userMappings
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
       localStream.current = stream
       stream.getTracks().forEach(track => pc.addTrack(track, stream))
-      pc.ontrack = (event) => { if (remoteAudio.current) remoteAudio.current.srcObject = event.streams[0] }
+      pc.ontrack = (event) => {
+        if (remoteAudio.current) {
+          remoteAudio.current.srcObject = event.streams[0]
+          remoteAudio.current.volume = 1.5
+        }
+      }
       pc.onicecandidate = (event) => {
         if (event.candidate && callDocRef.current) {
-          // Guardar candidato en un array累积
           const candPath = isCallee ? 'calleeCandidates' : 'callerCandidates'
           const listRef = doc(db, 'artifacts', appId, 'public', 'data', 'calls', callDocRef.current, candPath, 'list')
-          // Obtener candidatos existentes y agregar el nuevo
           const existing = peerConnection.current._iceCandidates || []
           existing.push(event.candidate.toJSON())
           peerConnection.current._iceCandidates = existing
@@ -105,7 +139,6 @@ const AudioCall = ({ activeChat, myChatId, isDarkMode, showMessage, userMappings
     }
   }, [appId, isCallee])
 
-  // Caller: iniciar llamada
   const startCall = async () => {
     if (!activeChat) return
     setCallState('calling')
@@ -120,11 +153,10 @@ const AudioCall = ({ activeChat, myChatId, isDarkMode, showMessage, userMappings
       await pc.setLocalDescription(offer)
       const callRef = doc(db, 'artifacts', appId, 'public', 'data', 'calls', docId)
       await setDoc(callRef, {
-        caller: myChatId, callerName, callee: activeChat.id, calleeName,
+        caller: myChatId, callerName: myName, callee: activeChat.id, calleeName: otherName,
         offer: pc.localDescription.toJSON(), status: 'ringing',
         startedAt: Date.now(), type: activeChat.type || 'dm'
       })
-      // Escuchar respuesta
       onSnapshot(callRef, (snapshot) => {
         const data = snapshot.data()
         if (!data) return
@@ -135,7 +167,6 @@ const AudioCall = ({ activeChat, myChatId, isDarkMode, showMessage, userMappings
         }
         if (data.status === 'ended') endCall()
       })
-      // Escuchar ICE candidates del callee
       onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'calls', docId, 'calleeCandidates', 'list'), (snapshot) => {
         const data = snapshot.data()
         if (data?.candidates && peerConnection.current) {
@@ -151,7 +182,6 @@ const AudioCall = ({ activeChat, myChatId, isDarkMode, showMessage, userMappings
     }
   }
 
-  // Callee: contestar llamada
   const answerCall = async () => {
     setCallState('connected')
     setCallError(null)
@@ -166,7 +196,6 @@ const AudioCall = ({ activeChat, myChatId, isDarkMode, showMessage, userMappings
       await pc.setLocalDescription(answer)
       const callRef = doc(db, 'artifacts', appId, 'public', 'data', 'calls', docId)
       await setDoc(callRef, { answer: pc.localDescription.toJSON(), status: 'connected' }, { merge: true })
-      // Escuchar ICE candidates del caller
       onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'calls', docId, 'callerCandidates', 'list'), (snapshot) => {
         const data = snapshot.data()
         if (data?.candidates && peerConnection.current) {
@@ -185,8 +214,8 @@ const AudioCall = ({ activeChat, myChatId, isDarkMode, showMessage, userMappings
     }
   }
 
-  // Rechazar llamada
   const rejectCall = async () => {
+    playHangupSound()
     const docId = getCallDocId()
     try {
       const callRef = doc(db, 'artifacts', appId, 'public', 'data', 'calls', docId)
@@ -196,8 +225,8 @@ const AudioCall = ({ activeChat, myChatId, isDarkMode, showMessage, userMappings
     onClose?.()
   }
 
-  // Finalizar llamada
   const endCall = async () => {
+    playHangupSound()
     try {
       if (peerConnection.current) { peerConnection.current.close(); peerConnection.current = null }
       if (localStream.current) { localStream.current.getTracks().forEach(track => track.stop()); localStream.current = null }
@@ -223,6 +252,9 @@ const AudioCall = ({ activeChat, myChatId, isDarkMode, showMessage, userMappings
 
   if (callState === 'idle') return null
 
+  // Determinar qué nombre mostrar (el OTRO, no yo)
+  const displayName = isCallee ? (activeChat.callerName || 'Alguien') : otherName
+
   return (
     <>
       <audio ref={remoteAudio} autoPlay playsInline />
@@ -242,9 +274,9 @@ const AudioCall = ({ activeChat, myChatId, isDarkMode, showMessage, userMappings
           </div>
           <div>
             <h3 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-              {callState === 'calling' ? `Llamando a ${calleeName}...` :
-               callState === 'ringing' ? `${callerName} te está llamando...` :
-               `En llamada con ${isCallee ? callerName : calleeName}`}
+              {callState === 'calling' ? `Llamando a ${displayName}...` :
+               callState === 'ringing' ? `${displayName} te está llamando...` :
+               `En llamada con ${displayName}`}
             </h3>
             <p className={`text-sm mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
               {callState === 'connected' ? formatDuration(callDuration) :
