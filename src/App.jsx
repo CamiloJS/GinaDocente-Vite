@@ -4,11 +4,12 @@ import ReactDOM from 'react-dom'
 import confetti from 'canvas-confetti'
 import * as XLSX from 'xlsx'
 import {
-  auth, db, appId, secondaryAuth, collection, onSnapshot, doc, setDoc, getDocs,
+  auth, db, appId, rtdb, secondaryAuth, collection, onSnapshot, doc, setDoc, getDocs,
   deleteDoc, addDoc, updateDoc, getDoc, query, where, orderBy, limit,
   signInWithEmailAndPassword, onAuthStateChanged, createUserWithEmailAndPassword, signInAnonymously,
   signOut, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail,
 } from './firebase/config.js'
+import { ref as rtdbRef, set as rtdbSet, onValue, remove as rtdbRemove, push as rtdbPush } from 'firebase/database'
 import {
   CHAT_GRADIENTS, CHAT_PATTERNS, COMMENT_EMOJIS, FALLBACK_MAP, SLIDE_GRADIENTS,
   TEACHER_NAME, compressImage, containsBadWords, checkBadWordsAsync, formatChatDate, formatTime,
@@ -31,6 +32,7 @@ import {
   Archive, ShieldAlert, Unlock, Menu, UserPlus, Camera, Upload
 } from './components/Icons.jsx'
 import AudioPlayer, { AudioRecordingVisualizer } from './components/AudioPlayer.jsx'
+import AudioCall from './components/AudioCall.jsx'
 
 import EmptyState from './components/EmptyState.jsx'
 import ScrollToTop from './components/ScrollToTop.jsx'
@@ -488,6 +490,7 @@ function App() {
   const chatSoundIndexRef = useRef(chatSoundIndex);
   const pushEnabledRef = useRef(pushEnabled);
   const [isChatMinimized, setIsChatMinimized] = useState(false);
+  const [activeCall, setActiveCall] = useState(null);
 
   // --- VALORES DERIVADOS Y HELPERS DE USUARIO / CHAT ---
   const myChatId = role === 'teacher' ? 'teacher' : (loggedInUser ? loggedInUser.replace('@', '') : '');
@@ -2134,6 +2137,28 @@ useEffect(() => {
                   clearTimeout(typingTimeout.current);
               };
           }, []);
+
+          // Listener de llamadas entrantes
+          useEffect(() => {
+              if (!myChatId || !rtdb) return
+              const callsPath = `calls`
+              const callsRef = rtdbRef(rtdb, callsPath)
+              const unsubscribe = onValue(callsRef, (snapshot) => {
+                  const data = snapshot.val()
+                  if (!data) return
+                  // Buscar llamadas donde soy el destinatario
+                  Object.entries(data).forEach(([id, call]) => {
+                      if (call.callee === myChatId && call.status === 'ringing' && !activeCall) {
+                          // Llamada entrante detectada
+                          const callerName = call.callerName || 'Alguien'
+                          if (window.confirm(`${callerName} te está llamando. ¿Aceptas?`)) {
+                              setActiveCall({ id, name: callerName, type: call.type || 'dm', offer: call.offer })
+                          }
+                      }
+                  })
+              })
+              return () => unsubscribe()
+          }, [myChatId, activeCall])
 
           useEffect(() => {
               if (isChatAppOpen && myChatId) {
@@ -8610,6 +8635,16 @@ Bot:`;
                                       </div>
 
                                       <div className="flex items-center gap-0.5 relative shrink-0">
+                                          {activeChat.type !== 'group' && (
+                                          <button 
+                                              type="button"
+                                              onClick={() => setActiveCall({ id: `dm_${[myChatId, activeChat.id.replace('dm_', '').split('_').find(id => id !== myChatId)].sort().join('_')}`, name: activeChat.name, type: 'dm' })} 
+                                              className="p-1.5 rounded-lg text-green-500 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+                                              title="Iniciar llamada de audio"
+                                          >
+                                              <Phone size={16}/>
+                                          </button>
+                                          )}
                                           <button 
                                               type="button"
                                               onClick={() => setShowChatSettings(!showChatSettings)} 
@@ -9503,6 +9538,18 @@ Bot:`;
                     </button>
                   </div>
                 </div>
+              )}
+
+              {/* LLAMADA DE AUDIO */}
+              {activeCall && (
+                  <AudioCall
+                      activeChat={activeCall}
+                      myChatId={myChatId}
+                      isDarkMode={isDarkMode}
+                      showMessage={showMessage}
+                      userMappings={userMappings}
+                      onClose={() => setActiveCall(null)}
+                  />
               )}
 
               {/* MODAL GLOBAL DE CONFIRMACIÓN */}

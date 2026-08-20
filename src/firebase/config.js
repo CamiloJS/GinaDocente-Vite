@@ -41,6 +41,9 @@ import {
   uploadBytes,
   getDownloadURL,
 } from 'firebase/storage'
+import {
+  getDatabase,
+} from 'firebase/database'
 
 const firebaseConfig = {
   apiKey: 'AIzaSyB-BDGpMhiNjSfGiGiGHHd6jbu5nQvoOfs',
@@ -74,6 +77,7 @@ if (typeof window !== 'undefined') {
 }
 
 const storage = getStorage(app)
+const rtdb = getDatabase(app)
 
 const secondaryApp = initializeApp(firebaseConfig, 'SecondaryApp')
 const secondaryAuth = getAuth(secondaryApp)
@@ -86,6 +90,7 @@ export {
   auth,
   db,
   storage,
+  rtdb,
   secondaryApp,
   secondaryAuth,
   appId,
