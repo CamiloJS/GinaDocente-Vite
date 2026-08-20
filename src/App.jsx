@@ -29,7 +29,7 @@ import {
   Settings, VolumeX, Shield, Play, Pause, GoogleIcon, KeyRound, UserCheck, UserX,
   ChevronDown, ChevronUp, Minus, HelpCircle, Lightbulb, GraduationCap, Laptop, PenTool,
   Compass, Atom, Award, Bookmark, Terminal, Folder, Globe, Target, Layers, RotateCcw,
-  Archive, ShieldAlert, Unlock, Menu, UserPlus, Camera, Upload
+  Archive, ShieldAlert, Unlock, Menu, UserPlus, Camera, Upload, Phone
 } from './components/Icons.jsx'
 import AudioPlayer, { AudioRecordingVisualizer } from './components/AudioPlayer.jsx'
 import AudioCall from './components/AudioCall.jsx'
