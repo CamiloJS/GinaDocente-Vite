@@ -4,12 +4,11 @@ import ReactDOM from 'react-dom'
 import confetti from 'canvas-confetti'
 import * as XLSX from 'xlsx'
 import {
-  auth, db, appId, rtdb, secondaryAuth, collection, onSnapshot, doc, setDoc, getDocs,
+  auth, db, appId, secondaryAuth, collection, onSnapshot, doc, setDoc, getDocs,
   deleteDoc, addDoc, updateDoc, getDoc, query, where, orderBy, limit,
   signInWithEmailAndPassword, onAuthStateChanged, createUserWithEmailAndPassword, signInAnonymously,
   signOut, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail,
 } from './firebase/config.js'
-import { ref as rtdbRef, set as rtdbSet, onValue, remove as rtdbRemove, push as rtdbPush } from 'firebase/database'
 import {
   CHAT_GRADIENTS, CHAT_PATTERNS, COMMENT_EMOJIS, FALLBACK_MAP, SLIDE_GRADIENTS,
   TEACHER_NAME, compressImage, containsBadWords, checkBadWordsAsync, formatChatDate, formatTime,
@@ -2138,21 +2137,17 @@ useEffect(() => {
               };
           }, []);
 
-          // Listener de llamadas entrantes
+          // Listener de llamadas entrantes (Firestore, no RTDB)
           useEffect(() => {
-              if (!myChatId || !rtdb) return
-              const callsPath = `calls`
-              const callsRef = rtdbRef(rtdb, callsPath)
-              const unsubscribe = onValue(callsRef, (snapshot) => {
-                  const data = snapshot.val()
-                  if (!data) return
-                  // Buscar llamadas donde soy el destinatario
-                  Object.entries(data).forEach(([id, call]) => {
-                      if (call.callee === myChatId && call.status === 'ringing' && !activeCall) {
-                          // Llamada entrante detectada
+              if (!myChatId) return
+              const callsRef = collection(db, 'artifacts', appId, 'public', 'data', 'calls')
+              const unsubscribe = onSnapshot(callsRef, (snapshot) => {
+                  snapshot.docs.forEach(d => {
+                      const call = d.data()
+                      if (call && call.callee === myChatId && call.status === 'ringing' && !activeCall) {
                           const callerName = call.callerName || 'Alguien'
                           if (window.confirm(`${callerName} te está llamando. ¿Aceptas?`)) {
-                              setActiveCall({ id, name: callerName, type: call.type || 'dm', offer: call.offer })
+                              setActiveCall({ id: d.id, name: callerName, type: call.type || 'dm', offer: call.offer })
                           }
                       }
                   })
