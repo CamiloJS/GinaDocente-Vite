@@ -1,7 +1,7 @@
 // src/components/AudioCall.jsx
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { db, appId } from '../firebase/config.js'
-import { doc, setDoc, onSnapshot, deleteDoc, collection, addDoc } from 'firebase/firestore'
+import { doc, setDoc, onSnapshot, deleteDoc, collection } from 'firebase/firestore'
 
 // Iconos inline
 const PhoneIcon = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
@@ -18,8 +18,10 @@ const ICE_SERVERS = {
   ]
 }
 
+// activeChat puede tener: { id, name, type, offer?, role? }
+// role: 'caller' = quien inició, 'callee' = quien recibe
 const AudioCall = ({ activeChat, myChatId, isDarkMode, showMessage, userMappings, onClose }) => {
-  const [callState, setCallState] = useState('idle')
+  const [callState, setCallState] = useState('idle') // idle, calling, ringing, connected
   const [isMuted, setIsMuted] = useState(false)
   const [callDuration, setCallDuration] = useState(0)
   const [callError, setCallError] = useState(null)
@@ -28,21 +30,27 @@ const AudioCall = ({ activeChat, myChatId, isDarkMode, showMessage, userMappings
   const remoteAudio = useRef(null)
   const callTimer = useRef(null)
   const callDocRef = useRef(null)
+  const isCallee = activeChat?.role === 'callee'
 
   const callerName = myChatId === 'teacher' ? 'Prof. Gina' : (userMappings?.[myChatId]?.fullName || myChatId)
   const calleeName = activeChat?.name || 'Usuario'
 
+  // Cleanup on unmount
   useEffect(() => {
     return () => { endCall() }
   }, [])
 
-  // Iniciar llamada automáticamente al montar el componente
+  // El caller inicia la llamada automáticamente
   useEffect(() => {
-    if (activeChat && callState === 'idle') {
+    if (activeChat && !isCallee && callState === 'idle') {
       startCall()
+    }
+    if (activeChat && isCallee) {
+      setCallState('ringing')
     }
   }, [activeChat])
 
+  // Timer for call duration
   useEffect(() => {
     if (callState === 'connected') {
       callTimer.current = setInterval(() => setCallDuration(prev => prev + 1), 1000)
@@ -91,6 +99,7 @@ const AudioCall = ({ activeChat, myChatId, isDarkMode, showMessage, userMappings
     }
   }, [appId])
 
+  // Caller: iniciar llamada
   const startCall = async () => {
     if (!activeChat) return
     setCallState('calling')
@@ -109,17 +118,19 @@ const AudioCall = ({ activeChat, myChatId, isDarkMode, showMessage, userMappings
         offer: pc.localDescription.toJSON(), status: 'ringing',
         startedAt: Date.now(), type: activeChat.type || 'dm'
       })
-      onSnapshot(callRef, async (snapshot) => {
+      // Escuchar respuesta
+      onSnapshot(callRef, (snapshot) => {
         const data = snapshot.data()
         if (!data) return
-        if (data.answer && peerConnection.current) {
-          try { await peerConnection.current.setRemoteDescription(new RTCSessionDescription(data.answer)); setCallState('connected') }
-          catch (err) { console.error('Error setting answer:', err); endCall() }
+        if (data.answer && peerConnection.current && callState !== 'connected') {
+          peerConnection.current.setRemoteDescription(new RTCSessionDescription(data.answer))
+            .then(() => setCallState('connected'))
+            .catch(err => { console.error(err); endCall() })
         }
         if (data.status === 'ended') endCall()
       })
-      const candRef = doc(db, 'artifacts', appId, 'public', 'data', 'calls', docId, 'calleeCandidates', 'list')
-      onSnapshot(candRef, async (snapshot) => {
+      // Escuchar ICE candidates del callee
+      onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'calls', docId, 'calleeCandidates', 'list'), (snapshot) => {
         const data = snapshot.data()
         if (data?.candidates && peerConnection.current) {
           data.candidates.forEach(async (candidate) => {
@@ -134,21 +145,23 @@ const AudioCall = ({ activeChat, myChatId, isDarkMode, showMessage, userMappings
     }
   }
 
-  const answerCall = async (callData) => {
+  // Callee: contestar llamada
+  const answerCall = async () => {
     setCallState('connected')
     setCallError(null)
-    callDocRef.current = callData.id
+    const docId = getCallDocId()
+    callDocRef.current = docId
 
     try {
       const pc = await createPeerConnection()
       if (!pc) { setCallState('idle'); return }
-      await pc.setRemoteDescription(new RTCSessionDescription(callData.offer))
+      await pc.setRemoteDescription(new RTCSessionDescription(activeChat.offer))
       const answer = await pc.createAnswer()
       await pc.setLocalDescription(answer)
-      const callRef = doc(db, 'artifacts', appId, 'public', 'data', 'calls', callData.id)
+      const callRef = doc(db, 'artifacts', appId, 'public', 'data', 'calls', docId)
       await setDoc(callRef, { answer: pc.localDescription.toJSON(), status: 'connected' }, { merge: true })
-      const candRef = doc(db, 'artifacts', appId, 'public', 'data', 'calls', callData.id, 'candidates', 'list')
-      onSnapshot(candRef, async (snapshot) => {
+      // Escuchar ICE candidates del caller
+      onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'calls', docId, 'candidates', 'list'), (snapshot) => {
         const data = snapshot.data()
         if (data?.candidates && peerConnection.current) {
           data.candidates.forEach(async (candidate) => {
@@ -166,6 +179,18 @@ const AudioCall = ({ activeChat, myChatId, isDarkMode, showMessage, userMappings
     }
   }
 
+  // Rechazar llamada
+  const rejectCall = async () => {
+    const docId = getCallDocId()
+    try {
+      const callRef = doc(db, 'artifacts', appId, 'public', 'data', 'calls', docId)
+      await setDoc(callRef, { status: 'ended' }, { merge: true }).catch(() => {})
+      await deleteDoc(callRef).catch(() => {})
+    } catch (e) {}
+    onClose?.()
+  }
+
+  // Finalizar llamada
   const endCall = async () => {
     try {
       if (peerConnection.current) { peerConnection.current.close(); peerConnection.current = null }
@@ -198,19 +223,27 @@ const AudioCall = ({ activeChat, myChatId, isDarkMode, showMessage, userMappings
       <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/90 backdrop-blur-sm animate-in fade-in duration-200">
         <div className={`w-full max-w-sm rounded-3xl p-8 text-center space-y-6 ${isDarkMode ? 'bg-gray-900 border border-gray-700' : 'bg-white'}`}>
           <div className="relative mx-auto w-20 h-20">
-            <div className={`w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg ${callState === 'connected' ? 'bg-green-500 animate-pulse' : callState === 'calling' ? 'bg-blue-500 animate-pulse' : 'bg-orange-500'}`}>
-              {callState === 'connected' ? <PhoneIcon size={28} /> : callState === 'calling' ? <PhoneIcon size={28} className="animate-bounce" /> : <UsersIcon size={28} />}
+            <div className={`w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg ${
+              callState === 'connected' ? 'bg-green-500 animate-pulse' : 
+              callState === 'calling' ? 'bg-blue-500 animate-pulse' : 
+              callState === 'ringing' ? 'bg-orange-500 animate-pulse' : 'bg-gray-500'
+            }`}>
+              {callState === 'connected' ? <PhoneIcon size={28} /> : 
+               callState === 'calling' ? <PhoneIcon size={28} className="animate-bounce" /> : 
+               callState === 'ringing' ? <PhoneIcon size={28} className="animate-bounce" /> :
+               <UsersIcon size={28} />}
             </div>
           </div>
           <div>
             <h3 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
               {callState === 'calling' ? `Llamando a ${calleeName}...` :
                callState === 'ringing' ? `${callerName} te está llamando...` :
-               `En llamada con ${calleeName}`}
+               `En llamada con ${isCallee ? callerName : calleeName}`}
             </h3>
             <p className={`text-sm mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
               {callState === 'connected' ? formatDuration(callDuration) :
-               callState === 'calling' ? 'Esperando respuesta...' : 'Llamada entrante'}
+               callState === 'calling' ? 'Esperando respuesta...' :
+               callState === 'ringing' ? 'Toca contestar o rechazar' : 'Llamada entrante'}
             </p>
           </div>
           {callError && <p className="text-red-500 text-sm font-medium">{callError}</p>}
@@ -222,7 +255,16 @@ const AudioCall = ({ activeChat, myChatId, isDarkMode, showMessage, userMappings
                 {isMuted ? <MicOffIcon size={24} /> : <MicIcon size={24} />}
               </button>
             )}
-            <button onClick={endCall} className="p-4 rounded-full bg-red-600 text-white hover:bg-red-700 transition-all shadow-lg" title="Finalizar llamada">
+            {callState === 'ringing' && isCallee && (
+              <button onClick={answerCall}
+                className="p-4 rounded-full bg-green-500 text-white hover:bg-green-600 transition-all shadow-lg animate-pulse"
+                title="Contestar llamada">
+                <PhoneIcon size={24} />
+              </button>
+            )}
+            <button onClick={callState === 'ringing' && isCallee ? rejectCall : endCall}
+              className="p-4 rounded-full bg-red-600 text-white hover:bg-red-700 transition-all shadow-lg"
+              title={callState === 'ringing' && isCallee ? 'Rechazar llamada' : 'Finalizar llamada'}>
               <PhoneOffIcon size={24} />
             </button>
           </div>

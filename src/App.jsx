@@ -2145,12 +2145,11 @@ useEffect(() => {
                   snapshot.docs.forEach(d => {
                       const call = d.data()
                       if (call && call.status === 'ringing' && !activeCall) {
-                          // Verificar si soy el destinatario (el callee contiene mi ID)
                           const calleeId = call.callee || ''
                           if (calleeId.includes(myChatId)) {
                               const callerName = call.callerName || 'Alguien'
                               if (window.confirm(`${callerName} te está llamando. ¿Aceptas?`)) {
-                                  setActiveCall({ id: d.id, name: callerName, type: call.type || 'dm', offer: call.offer })
+                                  setActiveCall({ id: d.id, name: callerName, type: call.type || 'dm', offer: call.offer, role: 'callee' })
                               }
                           }
                       }
