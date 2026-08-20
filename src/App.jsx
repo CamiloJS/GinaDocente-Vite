@@ -8429,7 +8429,7 @@ Bot:`;
 
               {/* MODAL DE CREAR GRUPO */}
               {isCreatingGroup && ReactDOM.createPortal(
-                  <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in">
+                  <div className="fixed inset-0 z-[100100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in">
                       <div className={`max-w-md w-full rounded-3xl shadow-2xl p-6 flex flex-col gap-4 border ${isDarkMode ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-800'}`}>
                           <div className="flex justify-between items-center pb-2 border-b border-gray-200 dark:border-gray-800">
                               <h3 className="text-xl font-extrabold flex items-center gap-2">

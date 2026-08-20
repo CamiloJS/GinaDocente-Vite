@@ -116,6 +116,7 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
         type: 'dm',
         initiator: myChatId,
         initiatorName: myName,
+        callerName: myName,
         callee: activeCall.targetId,
         calleeName: otherName,
         offer: pc.localDescription.toJSON(),
@@ -125,7 +126,7 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
 
       addUnsub(onSnapshot(callRef, (snap) => {
         const data = snap.data()
-        if (!data) return
+        if (!data) { endCall(); return }
         if (data.answer && pc && pc.signalingState !== 'stable' && pc.remoteDescription === null) {
           pc.setRemoteDescription(new RTCSessionDescription(data.answer)).catch(err => { console.error(err); endCall() })
         }
@@ -166,43 +167,47 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
       })
 
       for (const p of participants) {
-        const pc = await createPC()
-        peersRef.current.set(p.id, pc)
-        attachRemoteStream(pc, p.id)
+        try {
+          const pc = await createPC()
+          peersRef.current.set(p.id, pc)
+          attachRemoteStream(pc, p.id)
 
-        pc.onicecandidate = (e) => {
-          if (e.candidate) {
-            const list = pc._ice || []
-            list.push(e.candidate.toJSON())
-            pc._ice = list
-            saveCandidates([...callsBase(callId), 'initiatorIce', p.id, 'list'], pc)
+          pc.onicecandidate = (e) => {
+            if (e.candidate) {
+              const list = pc._ice || []
+              list.push(e.candidate.toJSON())
+              pc._ice = list
+              saveCandidates([...callsBase(callId), 'initiatorIce', p.id, 'list'], pc)
+            }
           }
+
+          const offer = await pc.createOffer()
+          await pc.setLocalDescription(offer)
+          await setDoc(doc(db, ...callsBase(callId), 'offers', p.id), { offer: pc.localDescription.toJSON() })
+
+          addUnsub(onSnapshot(doc(db, ...callsBase(callId), 'answers', p.id), (snap) => {
+            const data = snap.data()
+            if (data?.answer && pc && pc.remoteDescription === null) {
+              pc.setRemoteDescription(new RTCSessionDescription(data.answer)).catch(err => console.error(err))
+            }
+          }))
+
+          addUnsub(onSnapshot(doc(db, ...callsBase(callId), 'participantIce', p.id, 'list'), (snap) => {
+            const data = snap.data()
+            if (data?.candidates && pc) {
+              data.candidates.forEach(async (c) => {
+                try { await pc.addIceCandidate(new RTCIceCandidate(c)) } catch (e) {}
+              })
+            }
+          }))
+        } catch (err) {
+          console.error('Error setting up participant ' + p.id + ':', err)
         }
-
-        const offer = await pc.createOffer()
-        await pc.setLocalDescription(offer)
-        await setDoc(doc(db, ...callsBase(callId), 'offers', p.id), { offer: pc.localDescription.toJSON() })
-
-        addUnsub(onSnapshot(doc(db, ...callsBase(callId), 'answers', p.id), (snap) => {
-          const data = snap.data()
-          if (data?.answer && pc && pc.remoteDescription === null) {
-            pc.setRemoteDescription(new RTCSessionDescription(data.answer)).catch(err => console.error(err))
-          }
-        }))
-
-        addUnsub(onSnapshot(doc(db, ...callsBase(callId), 'participantIce', p.id, 'list'), (snap) => {
-          const data = snap.data()
-          if (data?.candidates && pc) {
-            data.candidates.forEach(async (c) => {
-              try { await pc.addIceCandidate(new RTCIceCandidate(c)) } catch (e) {}
-            })
-          }
-        }))
       }
 
       addUnsub(onSnapshot(callRef, (snap) => {
         const data = snap.data()
-        if (data?.status === 'ended') endCall()
+        if (!data || data.status === 'ended') endCall()
       }))
     } catch (err) {
       console.error('Error starting group call:', err)
@@ -260,7 +265,7 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
 
       addUnsub(onSnapshot(callRef, (snap) => {
         const data = snap.data()
-        if (data?.status === 'ended') endCall()
+        if (!data || data.status === 'ended') endCall()
       }))
     } catch (err) {
       console.error('Error in join group call:', err)
@@ -301,7 +306,8 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
       }))
 
       addUnsub(onSnapshot(callRef, (snap) => {
-        if (snap.data()?.status === 'ended') endCall()
+        const d = snap.data()
+        if (!d || d.status === 'ended') endCall()
       }))
     } catch (err) {
       console.error('Error answering DM call:', err)
