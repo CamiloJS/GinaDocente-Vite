@@ -1,0 +1,75 @@
+  <!-- Student Viewer Container -->
+  <div id="viewerContainer" class="flex-1 flex flex-col overflow-hidden hidden bg-slate-950 select-none">
+    <!-- Top Progress Bar -->
+    <div class="h-12 border-b border-slate-800 bg-slate-900/90 px-2.5 sm:px-5 flex items-center justify-between gap-2 sm:gap-4 sticky top-0 z-30">
+      <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+        <button id="viewerBtnToggleIndex" onclick="toggleViewerMobileIndex()" title="Índice de aprendizaje" class="md:hidden flex items-center justify-center w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 shrink-0">
+          <i data-lucide="list" class="w-4 h-4"></i>
+        </button>
+        <span class="text-xs font-semibold text-slate-400 hidden sm:inline shrink-0">Progreso del OVA:</span>
+        <div class="w-20 xs:w-36 sm:w-64 h-2 rounded-full bg-slate-800 overflow-hidden border border-slate-700/80 shrink-0">
+          <div id="viewerProgressBar" class="h-full bg-gradient-to-r from-brand-600 to-brand-500 rounded-full transition-all duration-300" style="width: 10%;"></div>
+        </div>
+        <span id="viewerProgressPercent" class="text-xs font-bold text-brand-400 shrink-0">10%</span>
+      </div>
+
+      <div class="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+        <span id="viewerBreadcrumb" class="hidden md:inline text-xs text-slate-400 truncate max-w-sm">Inicio</span>
+        <button id="viewerBtnSwitchEditor" onclick="handleViewerSwitchToEditor()" class="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700 transition">
+          <i id="viewerEditIcon" data-lucide="edit-3" class="w-3.5 h-3.5 text-brand-400"></i>
+          <span id="viewerEditText" class="hidden xs:inline">Modo Editor</span>
+        </button>
+        <button onclick="toggleFullScreen()" title="Pantalla Completa" class="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition">
+          <i data-lucide="maximize-2" class="w-3.5 h-3.5"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Viewer Split Body -->
+    <div class="flex-1 flex overflow-hidden relative">
+      <!-- Backdrop for mobile index drawer -->
+      <div id="viewerNavBackdrop" onclick="closeViewerMobileIndex()" class="hidden fixed inset-0 bg-black/60 backdrop-blur-xs z-30 md:hidden transition-opacity"></div>
+
+      <!-- Left Viewer Navigation -->
+      <nav id="viewerNavSidebar" class="w-72 border-r border-slate-800 bg-slate-900/95 md:bg-slate-900/40 p-3 overflow-y-auto custom-scrollbar shrink-0 hidden md:block fixed md:static inset-y-0 left-0 z-40 md:z-auto transition-transform shadow-2xl md:shadow-none">
+        <div class="flex items-center justify-between px-3 py-2">
+          <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            Índice de Aprendizaje
+          </div>
+          <button onclick="closeViewerMobileIndex()" class="md:hidden p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800" title="Cerrar índice">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+        <div id="viewerNavList" class="space-y-1">
+          <!-- Rendered dynamically -->
+        </div>
+      </nav>
+
+      <!-- Right Main Reader Canvas -->
+      <main class="flex-1 flex flex-col overflow-hidden bg-slate-950">
+        <div id="viewerContentScroll" class="flex-1 overflow-y-auto p-2.5 sm:p-6 md:p-10 custom-scrollbar">
+          <div class="max-w-4xl mx-auto space-y-6 sm:space-y-8" id="viewerMainCard">
+            <!-- Dynamic Content Rendered Here -->
+          </div>
+        </div>
+
+        <!-- Viewer Bottom Navigation Bar -->
+        <footer class="border-t border-slate-800 bg-slate-900/90 px-3 sm:px-6 py-2 sm:py-3 flex items-center justify-between shrink-0">
+          <button id="viewerBtnPrev" onclick="viewerPrevSlide()" class="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition disabled:opacity-30 disabled:cursor-not-allowed">
+            <i data-lucide="arrow-left" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i>
+            <span>Anterior</span>
+          </button>
+
+          <!-- Slide indicators -->
+          <div id="viewerSlideDots" class="flex items-center gap-1.5">
+            <!-- Dots rendered dynamically -->
+          </div>
+
+          <button id="viewerBtnNext" onclick="viewerNextSlide()" class="flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-1.5 sm:py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold shadow-md shadow-brand-500/25 transition disabled:opacity-30 disabled:cursor-not-allowed">
+            <span>Siguiente</span>
+            <i data-lucide="arrow-right" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i>
+          </button>
+        </footer>
+      </main>
+    </div>
+  </div>

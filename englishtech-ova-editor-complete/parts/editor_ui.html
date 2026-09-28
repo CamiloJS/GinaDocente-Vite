@@ -1,0 +1,245 @@
+  <!-- Main Canva-Style Workspace -->
+  <div id="editorContainer" class="flex-1 flex overflow-hidden relative">
+    <!-- 1. Navigation Dock (Bottom bar on mobile, Left slim dock on desktop) -->
+    <nav id="dockNav" class="w-full sm:w-14 md:w-16 border-t sm:border-t-0 sm:border-r border-slate-800 bg-slate-900/95 flex flex-row sm:flex-col items-center justify-around sm:justify-start py-1 sm:py-4 gap-1 sm:gap-4 select-none shrink-0 z-40">
+      <button 
+        id="dockBtnPages" 
+        onclick="switchDockTab('pages')" 
+        class="dock-btn w-10 h-10 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl flex flex-col items-center justify-center text-[9px] sm:text-[10px] font-bold gap-0.5 transition bg-brand-500 text-white shadow-md shadow-brand-500/20"
+        title="Páginas y Secciones"
+      >
+        <i data-lucide="layers" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i>
+        <span>Páginas</span>
+      </button>
+
+      <button 
+        id="dockBtnElements" 
+        onclick="switchDockTab('elements')" 
+        class="dock-btn w-10 h-10 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl flex flex-col items-center justify-center text-[9px] sm:text-[10px] font-medium gap-0.5 transition text-slate-400 hover:text-white hover:bg-slate-800"
+        title="Biblioteca de Recursos Didácticos"
+      >
+        <i data-lucide="plus-circle" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i>
+        <span>Recursos</span>
+      </button>
+
+      <button 
+        id="dockBtnCover" 
+        onclick="switchDockTab('cover')" 
+        class="dock-btn w-10 h-10 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl flex flex-col items-center justify-center text-[9px] sm:text-[10px] font-medium gap-0.5 transition text-slate-400 hover:text-white hover:bg-slate-800"
+        title="Diseño de Portada"
+      >
+        <i data-lucide="image" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i>
+        <span>Portada</span>
+      </button>
+
+      <button 
+        id="dockBtnSettings" 
+        onclick="switchDockTab('settings')" 
+        class="dock-btn w-10 h-10 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl flex flex-col items-center justify-center text-[9px] sm:text-[10px] font-medium gap-0.5 transition text-slate-400 hover:text-white hover:bg-slate-800"
+        title="Configuración del OVA"
+      >
+        <i data-lucide="sliders" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i>
+        <span>Ajustes</span>
+      </button>
+
+      <div class="dock-collapse-wrapper mt-auto pt-2 border-t border-slate-800 w-9 sm:w-10 flex flex-col items-center gap-2">
+        <button onclick="toggleDrawerCollapse()" title="Colapsar o expandir panel lateral" class="p-1.5 sm:p-2 text-slate-500 hover:text-white hover:bg-slate-800 rounded-xl transition">
+          <i id="drawerCollapseIcon" data-lucide="panel-left-close" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </nav>
+
+    <!-- Mobile Drawer Backdrop Overlay -->
+    <div id="drawerBackdrop" onclick="closeDrawerMobile()" class="is-backdrop-hidden fixed sm:absolute inset-0 bg-black/60 backdrop-blur-xs z-30 transition-opacity"></div>
+
+    <!-- 2. Expandable Canva Drawer (280px) -->
+    <aside id="canvaDrawer" class="w-72 sm:w-80 border-r border-slate-800 bg-slate-900/95 flex flex-col shrink-0 transition-all duration-300 is-drawer-closed">
+      <!-- Tab 1: Pages List -->
+      <div id="drawerTabPages" class="flex-1 flex flex-col overflow-hidden">
+        <div class="p-3 sm:p-4 border-b border-slate-800 flex items-center justify-between">
+          <div class="min-w-0 flex-1">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-200">Secciones del OVA</h3>
+            <p class="text-[10px] sm:text-[11px] text-slate-500 truncate">Organiza tu contenido interactivo</p>
+          </div>
+          <div class="flex items-center gap-1 shrink-0">
+            <button onclick="promptNewPage()" class="flex items-center gap-1 text-xs font-bold px-2 sm:px-2.5 py-1.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white shadow-sm shadow-brand-500/20 transition">
+              <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+              <span>Sección</span>
+            </button>
+            <button onclick="closeDrawerMobile()" class="md:hidden p-1.5 text-slate-400 hover:text-white rounded-xl transition" title="Cerrar panel">
+              <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+
+        <div id="pageTreeList" class="flex-1 overflow-y-auto p-2.5 sm:p-3 space-y-2 custom-scrollbar">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+
+      <!-- Tab 2: Elements Palette -->
+      <div id="drawerTabElements" class="flex-1 flex flex-col overflow-hidden hidden">
+        <div class="p-3 sm:p-4 border-b border-slate-800 flex items-center justify-between">
+          <div class="min-w-0 flex-1">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-200">Elementos Interactivos</h3>
+            <p class="text-[10px] sm:text-[11px] text-slate-500 truncate">Haz clic para insertar en la página</p>
+          </div>
+          <button onclick="closeDrawerMobile()" class="md:hidden p-1.5 text-slate-400 hover:text-white rounded-xl transition shrink-0" title="Cerrar panel">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-3 space-y-2.5 custom-scrollbar">
+          <div class="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-wider">Contenido & Multimedia</div>
+          <div class="grid grid-cols-2 gap-2">
+            <button onclick="addNewBlock('text')" class="p-2.5 sm:p-3 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 hover:border-brand-500/60 text-left transition group">
+              <i data-lucide="type" class="w-4 h-4 text-brand-400 mb-1.5"></i>
+              <div class="text-xs font-bold text-slate-200 group-hover:text-white">Texto</div>
+              <div class="text-[10px] text-slate-400">Párrafo o explicación</div>
+            </button>
+            <button onclick="addNewBlock('math')" class="p-2.5 sm:p-3 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 hover:border-brand-500/60 text-left transition group">
+              <i data-lucide="function-square" class="w-4 h-4 text-amber-400 mb-1.5"></i>
+              <div class="text-xs font-bold text-slate-200 group-hover:text-white">KaTeX</div>
+              <div class="text-[10px] text-slate-400">Fórmulas nítidas</div>
+            </button>
+            <button onclick="addNewBlock('video')" class="p-2.5 sm:p-3 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 hover:border-brand-500/60 text-left transition group">
+              <i data-lucide="video" class="w-4 h-4 text-rose-400 mb-1.5"></i>
+              <div class="text-xs font-bold text-slate-200 group-hover:text-white">Video</div>
+              <div class="text-[10px] text-slate-400">YouTube 16:9</div>
+            </button>
+            <button onclick="addNewBlock('callout')" class="p-2.5 sm:p-3 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 hover:border-brand-500/60 text-left transition group">
+              <i data-lucide="info" class="w-4 h-4 text-blue-400 mb-1.5"></i>
+              <div class="text-xs font-bold text-slate-200 group-hover:text-white">Nota</div>
+              <div class="text-[10px] text-slate-400">Caja destacada</div>
+            </button>
+          </div>
+
+          <div class="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-wider pt-2">Herramientas Externas</div>
+          <div class="grid grid-cols-2 gap-2">
+            <button onclick="addNewBlock('genially')" class="p-2.5 sm:p-3 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 hover:border-brand-500/60 text-left transition group">
+              <i data-lucide="sparkles" class="w-4 h-4 text-pink-400 mb-1.5"></i>
+              <div class="text-xs font-bold text-slate-200 group-hover:text-white">Genially</div>
+              <div class="text-[10px] text-slate-400">Juego / Presentación</div>
+            </button>
+            <button onclick="addNewBlock('educaplay')" class="p-2.5 sm:p-3 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 hover:border-brand-500/60 text-left transition group">
+              <i data-lucide="gamepad-2" class="w-4 h-4 text-emerald-400 mb-1.5"></i>
+              <div class="text-xs font-bold text-slate-200 group-hover:text-white">Educaplay</div>
+              <div class="text-[10px] text-slate-400">Actividad gamificada</div>
+            </button>
+          </div>
+
+          <div class="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-wider pt-2">Actividades Interactivas</div>
+          <div class="grid grid-cols-2 gap-2">
+            <button onclick="addNewBlock('interactive_table')" class="p-2.5 sm:p-3 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 hover:border-brand-500/60 text-left transition group">
+              <i data-lucide="table" class="w-4 h-4 text-emerald-400 mb-1.5"></i>
+              <div class="text-xs font-bold text-slate-200 group-hover:text-white">Tabla Cálculo</div>
+              <div class="text-[10px] text-slate-400">Tipo Fibonacci</div>
+            </button>
+            <button onclick="addNewBlock('quiz_multiple')" class="p-2.5 sm:p-3 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 hover:border-brand-500/60 text-left transition group">
+              <i data-lucide="check-square" class="w-4 h-4 text-purple-400 mb-1.5"></i>
+              <div class="text-xs font-bold text-slate-200 group-hover:text-white">Cuestionario</div>
+              <div class="text-[10px] text-slate-400">Opción múltiple</div>
+            </button>
+            <button onclick="addNewBlock('cloze_fill')" class="p-2.5 sm:p-3 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 hover:border-brand-500/60 text-left transition group">
+              <i data-lucide="edit-3" class="w-4 h-4 text-cyan-400 mb-1.5"></i>
+              <div class="text-xs font-bold text-slate-200 group-hover:text-white">Rellenar</div>
+              <div class="text-[10px] text-slate-400">Banco palabras</div>
+            </button>
+            <button onclick="addNewBlock('accordion')" class="p-2.5 sm:p-3 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 hover:border-brand-500/60 text-left transition group">
+              <i data-lucide="list-collapse" class="w-4 h-4 text-amber-400 mb-1.5"></i>
+              <div class="text-xs font-bold text-slate-200 group-hover:text-white">Pasos</div>
+              <div class="text-[10px] text-slate-400">Acordeón Euclides</div>
+            </button>
+          </div>
+
+          <div class="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-wider pt-2">Estructura OVA</div>
+          <div class="grid grid-cols-2 gap-2">
+            <button onclick="addNewBlock('objectives_list')" class="p-2.5 sm:p-3 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 hover:border-brand-500/60 text-left transition group">
+              <i data-lucide="target" class="w-4 h-4 text-emerald-400 mb-1.5"></i>
+              <div class="text-xs font-bold text-slate-200 group-hover:text-white">Objetivos</div>
+              <div class="text-[10px] text-slate-400">Competencias</div>
+            </button>
+            <button onclick="addNewBlock('credits_team')" class="p-2.5 sm:p-3 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 hover:border-brand-500/60 text-left transition group">
+              <i data-lucide="users" class="w-4 h-4 text-blue-400 mb-1.5"></i>
+              <div class="text-xs font-bold text-slate-200 group-hover:text-white">Créditos</div>
+              <div class="text-[10px] text-slate-400">Equipo 3 col</div>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 3: Cover Designer Controls -->
+      <div id="drawerTabCover" class="flex-1 flex flex-col overflow-hidden hidden">
+        <div class="p-3 sm:p-4 border-b border-slate-800 flex items-center justify-between">
+          <div class="min-w-0 flex-1">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-200">Diseñador de Portada</h3>
+            <p class="text-[10px] sm:text-[11px] text-slate-500 truncate">Ajusta el banner inicial del OVA</p>
+          </div>
+          <button onclick="closeDrawerMobile()" class="md:hidden p-1.5 text-slate-400 hover:text-white rounded-xl transition shrink-0" title="Cerrar panel">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4 custom-scrollbar" id="coverDrawerControls">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+
+      <!-- Tab 4: General Settings -->
+      <div id="drawerTabSettings" class="flex-1 flex flex-col overflow-hidden hidden">
+        <div class="p-3 sm:p-4 border-b border-slate-800 flex items-center justify-between">
+          <div class="min-w-0 flex-1">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-200">Ajustes del Proyecto</h3>
+            <p class="text-[10px] sm:text-[11px] text-slate-500 truncate">Metadatos institucionales y pedagógicos</p>
+          </div>
+          <button onclick="closeDrawerMobile()" class="md:hidden p-1.5 text-slate-400 hover:text-white rounded-xl transition shrink-0" title="Cerrar panel">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4 custom-scrollbar" id="settingsDrawerControls">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+    </aside>
+
+    <!-- 3. Center Studio Canvas -->
+    <main class="flex-1 flex flex-col overflow-hidden bg-slate-950 w-full min-w-0">
+      <!-- Canvas Context Bar -->
+      <div class="h-10 sm:h-12 border-b border-slate-800/80 bg-slate-900/40 px-2.5 sm:px-6 flex items-center justify-between gap-2 select-none shrink-0">
+        <!-- Section title in-place -->
+        <div class="flex items-center gap-1.5 sm:gap-2.5 min-w-0 flex-1 max-w-[50%] sm:max-w-none">
+          <span id="canvasSectionBadge" class="text-[9px] sm:text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-brand-500/20 text-brand-300 border border-brand-500/30 shrink-0">
+            Contenido
+          </span>
+          <input 
+            id="sectionTitleInput" 
+            type="text" 
+            oninput="updateCurrentPageTitle(this.value)" 
+            class="text-xs sm:text-sm font-bold bg-transparent border-b border-transparent hover:border-slate-700 focus:border-brand-500 text-white focus:outline-none px-1 transition w-full truncate" 
+            title="Clic para renombrar sección"
+          />
+        </div>
+
+        <!-- Sub-slide tabs -->
+        <div id="subSlidesTabsContainer" class="flex items-center gap-1 sm:gap-1.5 overflow-x-auto py-1 custom-scrollbar shrink-0 max-w-[50%] sm:max-w-none">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+
+      <!-- Dedicated Sticky Toolbar Container (Always stays pinned at top during scroll) -->
+      <div id="docStickyToolbarContainer" class="hidden shrink-0 border-b border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-slate-900/95 backdrop-blur z-20 px-2 sm:px-4 md:px-6 py-1.5 sm:py-2 transition-all">
+        <!-- Rendered dynamically for Actividades -->
+      </div>
+
+      <!-- Dedicated Cover Studio Floating Toolbar Container -->
+      <div id="coverStickyToolbarContainer" class="hidden shrink-0 border-b border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-slate-900/95 backdrop-blur z-20 px-2 sm:px-4 md:px-6 py-1.5 sm:py-2 transition-all">
+        <!-- Rendered dynamically for Portada -->
+      </div>
+
+      <!-- Main Canvas Scroll Area -->
+      <div id="canvasContentArea" class="flex-1 overflow-y-auto p-2.5 sm:p-4 md:p-8 custom-scrollbar">
+        <!-- Dynamic Canvas Content -->
+      </div>
+    </main>
+  </div>

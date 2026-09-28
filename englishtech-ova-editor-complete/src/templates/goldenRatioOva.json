@@ -1,0 +1,560 @@
+{
+  "id": "ova-golden-ratio-01",
+  "editPin": "1234",
+  "version": "1.0.0",
+  "title": "El número de oro: entre lo divino y lo humano",
+  "subject": "Matemáticas y Geometría",
+  "description": "Objeto Virtual de Aprendizaje interactivo sobre la sucesión de Fibonacci, la proporción divina y el número de oro.",
+  "author": "CIER Sur - Universidad del Valle / EnglishTech",
+  "createdAt": "2026-09-03",
+  "updatedAt": "2026-09-03",
+  "theme": {
+    "primaryColor": "#AD3333",
+    "accentColor": "#d97706",
+    "isDarkMode": true
+  },
+  "cover": {
+    "title": "El número de oro: entre lo divino y lo humano",
+    "subtitle": "Descubre las proporciones áureas, la sucesión de Fibonacci y su presencia en el arte y la naturaleza.",
+    "badgeText": "OBJETO VIRTUAL DE APRENDIZAJE • MATEMÁTICAS",
+    "institution": "Universidad de Pamplona & CIER Sur",
+    "authorName": "Prof. César Augusto Delgado García",
+    "backgroundImage": "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?auto=format&fit=crop&w=1600&q=80",
+    "backgroundColor": "#0f172a",
+    "textColor": "#ffffff",
+    "overlayOpacity": 0.75,
+    "startButtonText": "Comenzar Recorrido",
+    "showEnglishTechBranding": true
+  },
+  "pages": [
+    {
+      "id": "page-intro",
+      "title": "Inicio",
+      "type": "cover",
+      "icon": "Home",
+      "subSlides": [
+        {
+          "id": "slide-cover",
+          "title": "Portada Interactiva",
+          "blocks": [
+            {
+              "id": "blk-cover-hero",
+              "type": "callout",
+              "title": "¡Bienvenido al Recorrido!",
+              "content": "En este Objeto Virtual de Aprendizaje explorarás la proporción divina, la sucesión de Fibonacci y el Número de Oro. Puedes editar todo este contenido libremente tipo Canva.",
+              "metadata": {
+                "calloutType": "tip"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "page-objectives",
+      "title": "Objetivos de aprendizaje",
+      "type": "objectives",
+      "icon": "Target",
+      "subSlides": [
+        {
+          "id": "slide-obj-1",
+          "title": "Competencias y Habilidades",
+          "blocks": [
+            {
+              "id": "blk-obj-main",
+              "type": "objectives_list",
+              "title": "Metas del Objeto de Aprendizaje",
+              "content": "Al terminar de desarrollar las actividades interactivas podrás:",
+              "metadata": {
+                "mainGoal": "Reconocer las relaciones existentes en los diferentes conjuntos numéricos y su aplicación en fenómenos reales.",
+                "skills": [
+                  "Reconocer y obtener piezas de información a partir de diferentes representaciones visuales y simbólicas.",
+                  "Seleccionar la información relevante y establecer relaciones entre variables en el análisis de problemas.",
+                  "Comparar diferentes alternativas para la solución de una situación geométrica y algebraica.",
+                  "Identificar las fallas o limitaciones de la información matemática presentada.",
+                  "Proponer soluciones pertinentes a las condiciones presentadas en los modelos matemáticos."
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "page-activities",
+      "title": "Actividades",
+      "type": "activity",
+      "icon": "FileText",
+      "subSlides": [
+        {
+          "id": "slide-act-main",
+          "title": "Hoja de Actividades y Recursos",
+          "blocks": [
+            {
+              "id": "blk-act-header",
+              "type": "text",
+              "content": "<h1 class=\"font-playfair text-3xl font-extrabold text-brand-600 dark:text-brand-400 mb-3\">Taller de Actividades: La Proporción Divina y Fibonacci</h1><p class=\"font-merriweather text-base leading-relaxed text-slate-700 dark:text-slate-300\">Bienvenido a la <strong>hoja de actividades interactivas</strong>. En este espacio puedes interactuar con actividades pedagógicas integradas de <em>Genially</em> y <em>Educaplay</em>, ver lecciones en video y resolver tablas de cálculo analítico.</p>"
+            },
+            {
+              "id": "blk-act-genially",
+              "type": "genially",
+              "title": "Actividad Interactiva en Genially",
+              "content": "Explora los elementos geométricos interactivos en la presentación de Genially a continuación:",
+              "metadata": {
+                "url": "https://view.genial.ly/65e9b897e68fa70014b2eb6e"
+              }
+            },
+            {
+              "id": "blk-act-trans-1",
+              "type": "text",
+              "content": "<h2 class=\"font-merriweather text-xl font-bold text-slate-900 dark:text-white mt-6 mb-2\">Desafío Lúdico en Educaplay</h2><p class=\"font-inter text-sm text-slate-600 dark:text-slate-400\">Aplica los conceptos que has aprendido sobre conjuntos numéricos y patrones en este juego interactivo:</p>"
+            },
+            {
+              "id": "blk-act-educaplay",
+              "type": "educaplay",
+              "title": "Juego Educativo en Educaplay",
+              "content": "Supera el reto de vocabulario y conceptos clave de la proporción divina:",
+              "metadata": {
+                "url": "https://es.educaplay.com/juego/1052601-los_numeros_reales.html"
+              }
+            },
+            {
+              "id": "blk-act-callout",
+              "type": "callout",
+              "title": "Pista Pedagógica Importante",
+              "content": "Fíjate en cómo cada número de Fibonacci se obtiene sumando los dos términos anteriores: 1, 1, 2, 3, 5, 8, 13, 21... La razón entre términos consecutivos se acerca cada vez más al número de oro Φ = 1.6180339887...",
+              "metadata": {
+                "calloutType": "tip"
+              }
+            },
+            {
+              "id": "blk-act-video",
+              "type": "video",
+              "title": "Video de Apoyo: Euclides y la Razón Áurea",
+              "content": "Observa con atención este análisis audiovisual para verificar cómo se deduce la media y extrema razón:",
+              "metadata": {
+                "videoUrl": "https://www.youtube.com/embed/GTxtz6RIrj8"
+              }
+            },
+            {
+              "id": "blk-act-table",
+              "type": "interactive_table",
+              "title": "Laboratorio de Cálculo: Sucesión de Parejas de Conejos",
+              "content": "Rellena los valores numéricos correspondientes al modelo reproductivo de Fibonacci y comprueba tus resultados:",
+              "metadata": {
+                "tableHeaders": [
+                  "Mes de Reproducción",
+                  "Parejas de Conejos"
+                ],
+                "tableRows": [
+                  {
+                    "cells": [
+                      {
+                        "value": "Mes 1"
+                      },
+                      {
+                        "value": "1",
+                        "isInput": false
+                      }
+                    ]
+                  },
+                  {
+                    "cells": [
+                      {
+                        "value": "Mes 2"
+                      },
+                      {
+                        "value": "1",
+                        "isInput": false
+                      }
+                    ]
+                  },
+                  {
+                    "cells": [
+                      {
+                        "value": "Mes 3"
+                      },
+                      {
+                        "value": "",
+                        "isInput": true,
+                        "expectedAnswer": "2"
+                      }
+                    ]
+                  },
+                  {
+                    "cells": [
+                      {
+                        "value": "Mes 4"
+                      },
+                      {
+                        "value": "",
+                        "isInput": true,
+                        "expectedAnswer": "3"
+                      }
+                    ]
+                  },
+                  {
+                    "cells": [
+                      {
+                        "value": "Mes 5"
+                      },
+                      {
+                        "value": "",
+                        "isInput": true,
+                        "expectedAnswer": "5"
+                      }
+                    ]
+                  },
+                  {
+                    "cells": [
+                      {
+                        "value": "Mes 6"
+                      },
+                      {
+                        "value": "",
+                        "isInput": true,
+                        "expectedAnswer": "8"
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "id": "blk-act-quiz",
+              "type": "quiz_multiple",
+              "title": "Autoevaluación Rápida de la Actividad",
+              "metadata": {
+                "questions": [
+                  {
+                    "id": "q-act-1",
+                    "title": "Pregunta de Razonamiento",
+                    "question": "¿Cuál es la expresión exacta del número de oro Phi (Φ)?",
+                    "options": [
+                      {
+                        "id": "o1",
+                        "text": "Φ = (1 + √5) / 2",
+                        "isCorrect": true
+                      },
+                      {
+                        "id": "o2",
+                        "text": "Φ = (1 - √5) / 2",
+                        "isCorrect": false
+                      },
+                      {
+                        "id": "o3",
+                        "text": "Φ = √2 / 2",
+                        "isCorrect": false
+                      },
+                      {
+                        "id": "o4",
+                        "text": "Φ = 3.14159...",
+                        "isCorrect": false
+                      }
+                    ],
+                    "feedbackGood": "¡Excelente! La solución a la ecuación cuadrática x² - x - 1 = 0 es exactamente (1 + √5) / 2 ≈ 1.618.",
+                    "feedbackBad": "Revisa la fórmula de la razón media y extrema de Euclides: (1 + √5) / 2."
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "page-quiz",
+      "title": "Prueba",
+      "type": "activity",
+      "icon": "CheckCircle2",
+      "subSlides": [
+        {
+          "id": "slide-quiz-1",
+          "title": "1. Relaciones de Conjuntos Numéricos",
+          "blocks": [
+            {
+              "id": "blk-quiz-sets",
+              "type": "quiz_multiple",
+              "title": "Verdadero o Falso: Conjuntos R, Q, I",
+              "content": "Considera los conjuntos R (Reales), Q (Racionales) e I (Irracionales). Determina el valor de verdad:",
+              "metadata": {
+                "questions": [
+                  {
+                    "id": "qs1",
+                    "title": "Proposición A",
+                    "question": "I ∩ Q = ∅ (La intersección entre irracionales y racionales es vacía)",
+                    "options": [
+                      {
+                        "id": "qa1",
+                        "text": "Verdadera",
+                        "isCorrect": true
+                      },
+                      {
+                        "id": "qa2",
+                        "text": "Falsa",
+                        "isCorrect": false
+                      }
+                    ],
+                    "feedbackGood": "¡Correcto! Racionales e irracionales son disjuntos.",
+                    "feedbackBad": "Incorrecto. Ningún número puede ser ambos a la vez."
+                  },
+                  {
+                    "id": "qs2",
+                    "title": "Proposición B",
+                    "question": "I ∪ Q = R (La unión de irracionales y racionales da los Reales)",
+                    "options": [
+                      {
+                        "id": "qb1",
+                        "text": "Verdadera",
+                        "isCorrect": true
+                      },
+                      {
+                        "id": "qb2",
+                        "text": "Falsa",
+                        "isCorrect": false
+                      }
+                    ],
+                    "feedbackGood": "¡Correcto! Todo número real es racional o irracional.",
+                    "feedbackBad": "Incorrecto. R se compone exactamente de Q e I."
+                  },
+                  {
+                    "id": "qs3",
+                    "title": "Proposición C",
+                    "question": "I ⊂ R (Los irracionales son un subconjunto de los reales)",
+                    "options": [
+                      {
+                        "id": "qc1",
+                        "text": "Verdadera",
+                        "isCorrect": true
+                      },
+                      {
+                        "id": "qc2",
+                        "text": "Falsa",
+                        "isCorrect": false
+                      }
+                    ],
+                    "feedbackGood": "¡Correcto! Todos los irracionales pertenecen a la recta real.",
+                    "feedbackBad": "Incorrecto. Los irracionales forman parte de los reales."
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "slide-quiz-2",
+          "title": "2. Problema del Área Cuadrada",
+          "blocks": [
+            {
+              "id": "blk-quiz-geom",
+              "type": "quiz_multiple",
+              "title": "Longitud y Razón Irracional",
+              "content": "Analiza la siguiente situación geométrica:",
+              "metadata": {
+                "questions": [
+                  {
+                    "id": "qg1",
+                    "title": "Área de cuadrado = 5 cm²",
+                    "question": "Si el área A de un cuadrado es A = l^2 = 5 cm^2, ¿qué podemos afirmar de la longitud de su lado l?",
+                    "options": [
+                      {
+                        "id": "og1",
+                        "text": "La longitud del lado es un número irracional (l = √5 cm).",
+                        "isCorrect": true
+                      },
+                      {
+                        "id": "og2",
+                        "text": "La longitud del lado es un número racional.",
+                        "isCorrect": false
+                      },
+                      {
+                        "id": "og3",
+                        "text": "No se puede determinar.",
+                        "isCorrect": false
+                      }
+                    ],
+                    "feedbackGood": "¡Muy bien! l = √5 es un número irracional.",
+                    "feedbackBad": "Incorrecto. 5 no es cuadrado perfecto, por lo que √5 es irracional."
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "page-conclusion",
+      "title": "Conclusión",
+      "type": "conclusion",
+      "icon": "Award",
+      "subSlides": [
+        {
+          "id": "slide-concl-1",
+          "title": "Síntesis y Cierre",
+          "blocks": [
+            {
+              "id": "blk-concl-summary",
+              "type": "callout",
+              "title": "Homogenización de Ideas y Conceptos",
+              "content": "En este Objeto Virtual de Aprendizaje conectamos:\n1. La sucesión de Fibonacci: generada mediante números naturales por una relación simple.\n2. Las razones entre términos sucesivos: que pertenecen al conjunto de los números racionales Q.\n3. La proporción divina (Φ): a la cual convergen dichas razones, siendo un número irracional con valor exacto (1 + √5)/2.\n4. La presencia del número áureo en la estética humana, la botánica y la arquitectura.",
+              "metadata": {
+                "calloutType": "success"
+              }
+            },
+            {
+              "id": "blk-concl-math",
+              "type": "math",
+              "title": "El Valor Exacto de Φ",
+              "content": "La constante de armonía matemática:",
+              "metadata": {
+                "latex": "\\Phi = \\frac{1 + \\sqrt{5}}{2} \\approx 1.6180339887..."
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "page-credits",
+      "title": "Créditos",
+      "type": "credits",
+      "icon": "Users",
+      "subSlides": [
+        {
+          "id": "slide-cred-1",
+          "title": "Equipo de Creación y Desarrollo",
+          "blocks": [
+            {
+              "id": "blk-credits-grid",
+              "type": "credits_team",
+              "title": "Créditos del Proyecto",
+              "content": "Instituciones y profesionales involucrados en la concepción pedagógica y tecnológica:",
+              "metadata": {
+                "creditColumns": [
+                  {
+                    "category": "Directivas Institucionales",
+                    "members": [
+                      {
+                        "name": "Centro de Innovación Educativa Regional Sur (CIER Sur)",
+                        "role": "Institución Líder"
+                      },
+                      {
+                        "name": "Universidad del Valle",
+                        "role": "Institución Académica"
+                      },
+                      {
+                        "name": "Gloria Isabel Toro Córdoba",
+                        "role": "Directora del Proyecto"
+                      },
+                      {
+                        "name": "Área de Medios Educativos de la Dintev",
+                        "role": "Asesoría de Contenidos Digitales"
+                      },
+                      {
+                        "name": "Mónica Florián Díaz",
+                        "role": "Asistente de Proyecto"
+                      }
+                    ]
+                  },
+                  {
+                    "category": "Autores y Pedagogía",
+                    "members": [
+                      {
+                        "name": "César Augusto Delgado García",
+                        "role": "Contenido Educativo y Matemáticas",
+                        "institution": "Facultad de Ciencias - Univalle"
+                      },
+                      {
+                        "name": "Gloria Isabel Toro Córdoba",
+                        "role": "Metodología Educativa",
+                        "institution": "CIER Sur - Fac. Salud"
+                      },
+                      {
+                        "name": "Andrés Felipe Lerma",
+                        "role": "Asesor Pedagógico"
+                      },
+                      {
+                        "name": "Octavio Martínez",
+                        "role": "Diseñador Pedagógico"
+                      }
+                    ]
+                  },
+                  {
+                    "category": "Equipo Tecnológico & Adaptación",
+                    "members": [
+                      {
+                        "name": "EnglishTech Core Team",
+                        "role": "Modernización y Arquitectura Web",
+                        "institution": "Universidad de Pamplona"
+                      },
+                      {
+                        "name": "Daniela Palomino Soto & Romy Cuevas",
+                        "role": "Diseño Multimedial Original"
+                      },
+                      {
+                        "name": "Daniel E. Gaviria & Mario Payán",
+                        "role": "Programación Original"
+                      },
+                      {
+                        "name": "Raúl Ernesto González",
+                        "role": "Ingeniería"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "page-copyright",
+      "title": "Derechos de autor",
+      "type": "copyright",
+      "icon": "ShieldCheck",
+      "subSlides": [
+        {
+          "id": "slide-cr-1",
+          "title": "Licencia y Condiciones de Uso",
+          "blocks": [
+            {
+              "id": "blk-cr-matrix",
+              "type": "license_matrix",
+              "title": "Licenciamiento Abierto para la Educación",
+              "content": "Este recurso educativo ha sido adaptado con fines formativos bajo estándares de Recursos Educativos Abiertos (REA).",
+              "metadata": {
+                "licenseName": "Creative Commons Reconocimiento - NoComercial - CompartirIgual 4.0 Internacional (CC BY-NC-SA 4.0)",
+                "licenseYear": "2026",
+                "licenseHolder": "Universidad del Valle / CIER Sur / EnglishTech",
+                "permissions": [
+                  {
+                    "action": "Ver y Explorar",
+                    "allowed": true
+                  },
+                  {
+                    "action": "Editar y Personalizar en el Editor",
+                    "allowed": true
+                  },
+                  {
+                    "action": "Imprimir y Generar PDF",
+                    "allowed": true
+                  },
+                  {
+                    "action": "Copiar y Distribuir",
+                    "allowed": true
+                  },
+                  {
+                    "action": "Descargar Proyecto Portable",
+                    "allowed": true
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

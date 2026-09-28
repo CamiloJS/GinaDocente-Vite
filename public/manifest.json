@@ -1,0 +1,25 @@
+{
+  "name": "English TECH Unipamplona",
+  "short_name": "English TECH",
+  "description": "Plataforma de clases de inglés de la profesora Gina Marcela Quintana Delgado (Universidad de Pamplona).",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#AD3333",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,70 @@
+﻿  <!-- Hidden Canvas for Canva Cover PNG Export -->
+  <canvas id="coverExportCanvas" width="1280" height="720" class="hidden"></canvas>
+
+  <!-- Integration in EnglishTech Modal -->
+  <div id="modalIntegrate" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-5">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-brand-500/20 text-brand-400 flex items-center justify-center border border-brand-500/30">
+            <i data-lucide="code-2" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white">Integración en EnglishTech</h3>
+            <p class="text-xs text-slate-400">Cómo implantar este editor o visualizador en englishtech.vercel.app</p>
+          </div>
+        </div>
+        <button onclick="closeIntegrateModal()" class="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <p class="text-slate-300">
+          Puedes implantar los Objetos Virtuales de Aprendizaje en tu plataforma EnglishTech de dos formas muy sencillas:
+        </p>
+
+        <!-- Option A: React Component -->
+        <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-brand-400">Opción 1: Como Componente React Nativo (Recomendado)</span>
+            <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Vite / Next.js / React</span>
+          </div>
+          <p class="text-slate-400">
+            Copia los archivos <code class="text-brand-300">OvaViewer.tsx</code> y <code class="text-brand-300">types.ts</code> generados en la carpeta <code class="text-slate-300">src/components/</code> a tu proyecto de EnglishTech, y utilízalos así:
+          </p>
+          <pre class="bg-slate-900 p-3 rounded-lg text-[11px] font-mono text-slate-200 overflow-x-auto border border-slate-800"><code>import { OvaViewer } from '@/components/OvaViewer';
+import goldenRatioData from '@/templates/goldenRatioOva.json';
+
+export default function ModuloOva() {
+  return (
+    &lt;div className="min-h-screen bg-slate-950"&gt;
+      &lt;OvaViewer data={goldenRatioData} /&gt;
+    &lt;/div&gt;
+  );
+}</code></pre>
+        </div>
+
+        <!-- Option B: Standalone Web Package -->
+        <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-blue-400">Opción 2: Como Módulo HTML Autónomo</span>
+            <span class="text-[10px] px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">Cero dependencias</span>
+          </div>
+          <p class="text-slate-400">
+            Descarga el archivo con el botón <strong>«Descargar OVA»</strong> y colócalo en tu carpeta <code class="text-slate-300">public/ova/index.html</code> de EnglishTech. Puedes acceder directamente en <code class="text-brand-300">https://englishtech.vercel.app/ova/</code> o mostrarlo dentro de un <code class="text-slate-300">&lt;iframe src="/ova/index.html" /&gt;</code>.
+          </p>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+        <button onclick="closeIntegrateModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200">
+          Cerrar
+        </button>
+        <button onclick="copySnippetCode()" class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-xs font-semibold text-white shadow-md shadow-brand-500/20">
+          <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+          <span id="btnCopySnippetText">Copiar Snippet React</span>
+        </button>
+      </div>
+    </div>
+  </div>

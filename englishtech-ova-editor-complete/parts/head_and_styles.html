@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>English TECH • OVA Studio</title>
+  <link rel="icon" href="https://englishtech.vercel.app/icono.png" type="image/png" />
+
+  <!-- Local Compiled Tailwind CSS (100% offline & mobile resilient) -->
+  <link rel="stylesheet" href="./tailwind.min.css" />
+  <link rel="stylesheet" href="/ova-studio/tailwind.min.css" />
+
+  <!-- Tailwind CSS Configuration & Play CDN (CDN script loaded first, then config assigned to Proxy) -->
+  <script>
+    window.tailwind = window.tailwind || {};
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    if (typeof tailwind !== 'undefined') {
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              brand: {
+                50: '#fdf2f2',
+                100: '#fde8e8',
+                200: '#fbd5d5',
+                300: '#f8b4b4',
+                400: '#f98080',
+                500: '#AD3333',
+                600: '#942929',
+                700: '#7a2222',
+                800: '#611b1b',
+                900: '#481414',
+                950: '#2d0a0a'
+              },
+              slate: {
+                850: '#15202b',
+                900: '#0f172a',
+                950: '#0a0f1d'
+              }
+            }
+          }
+        }
+      };
+    }
+  </script>
+
+  <!-- Google Fonts preconnect -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Comic+Neue:ital,wght@0,400;0,700;1,400&family=Fira+Code:wght@400;500;600&family=Great+Vibes&family=Inter:wght@300;400;500;600;700;800;900&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300;1,400&family=Montserrat:ital,wght@0,400;0,600;0,700;0,800;0,900;1,400&family=Outfit:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,900;1,400&family=Poppins:ital,wght@0,400;0,600;0,700;0,800;1,400&display=swap" />
+
+  <!-- KaTeX for math formulas -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- JSZip for SCORM 1.2 Export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+  <!-- Canvas Confetti for Educational Rewards -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+
+  <style>
+    /* Baseline layout and dark/light mode background guarantees */
+    html, body {
+      background-color: #0a0f1d;
+      color: #f8fafc;
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    html.dark, html.dark body {
+      background-color: #0a0f1d !important;
+      color: #f8fafc !important;
+    }
+    html:not(.dark), html:not(.dark) body {
+      background-color: #f1f5f9 !important;
+      color: #0f172a !important;
+    }
+    .font-inter { font-family: 'Inter', system-ui, sans-serif; }
+    .font-merriweather { font-family: 'Merriweather', Georgia, serif; }
+    .font-playfair { font-family: 'Playfair Display', serif; }
+    .font-fira { font-family: 'Fira Code', monospace; }
+    .font-comic { font-family: 'Comic Neue', cursive, sans-serif; }
+    .font-montserrat { font-family: 'Montserrat', sans-serif; }
+    .font-outfit { font-family: 'Outfit', sans-serif; }
+    .font-poppins { font-family: 'Poppins', sans-serif; }
+    .font-bebas { font-family: 'Bebas Neue', cursive, sans-serif; letter-spacing: 0.05em; }
+    .font-vibes { font-family: 'Great Vibes', cursive; }
+
+    /* Cover Freeform Drag & Drop Elements */
+    .cover-draggable-item {
+      position: absolute;
+      cursor: grab;
+      user-select: none;
+      touch-action: none;
+      transition: outline 0.15s, box-shadow 0.15s;
+      z-index: 15;
+    }
+    .cover-draggable-item:active {
+      cursor: grabbing;
+    }
+    .cover-draggable-item.is-selected {
+      outline: 2px dashed #ad3333;
+      outline-offset: 4px;
+      box-shadow: 0 0 0 4px rgba(173, 51, 51, 0.25);
+      border-radius: 8px;
+      z-index: 25 !important;
+    }
+    .cover-draggable-item.is-selected .drag-handle-pill {
+      display: flex !important;
+    }
+
+    /* Word / Studio Document Sheet Styling */
+    .document-sheet {
+      background-color: #ffffff;
+      color: #0f172a;
+      box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05);
+      border-radius: 1.25rem;
+      min-height: 460px;
+    }
+    @media (min-width: 641px) {
+      .document-sheet {
+        min-height: 650px;
+      }
+    }
+    html.dark .document-sheet {
+      background-color: #0f172a;
+      color: #f8fafc;
+      box-shadow: 0 15px 35px -5px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08);
+    }
+    .document-sheet [contenteditable="true"] {
+      outline: none;
+    }
+    .document-sheet [contenteditable="true"]:hover {
+      background-color: rgba(173, 51, 51, 0.02);
+      border-radius: 6px;
+    }
+    .document-sheet [contenteditable="true"]:focus {
+      background-color: rgba(173, 51, 51, 0.04);
+      box-shadow: 0 0 0 2px rgba(173, 51, 51, 0.25);
+      border-radius: 6px;
+    }
+    .document-toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 25;
+      backdrop-filter: blur(16px);
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.4);
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.3);
+      border-radius: 9999px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: rgba(173, 51, 51, 0.6);
+    }
+    .katex-display {
+      margin: 0.5em 0 !important;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 0.3em 0;
+    }
+
+    /* ========================================================= */
+    /* Light Mode Comprehensive Theme (Canva Clean Architecture) */
+    /* ========================================================= */
+    html:not(.dark) body {
+      background-color: #f1f5f9 !important;
+      color: #0f172a !important;
+    }
+    html:not(.dark) header {
+      background-color: #ffffff !important;
+      border-color: #e2e8f0 !important;
+      color: #0f172a !important;
+      box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05) !important;
+    }
+    html:not(.dark) #projectTitleInput,
+    html:not(.dark) #sectionTitleInput {
+      color: #0f172a !important;
+    }
+    html:not(.dark) #projectTitleInput:hover,
+    html:not(.dark) #projectTitleInput:focus,
+    html:not(.dark) #sectionTitleInput:hover,
+    html:not(.dark) #sectionTitleInput:focus {
+      background-color: #f8fafc !important;
+      border-color: #cbd5e1 !important;
+    }
+    html:not(.dark) #editorContainer nav,
+    html:not(.dark) #dockNav {
+      background-color: #ffffff !important;
+      border-color: #e2e8f0 !important;
+    }
+    html:not(.dark) #editorContainer nav button:not(.bg-brand-500),
+    html:not(.dark) #dockNav button:not(.bg-brand-500) {
+      color: #64748b !important;
+    }
+    html:not(.dark) #editorContainer nav button:not(.bg-brand-500):hover,
+    html:not(.dark) #dockNav button:not(.bg-brand-500):hover {
+      background-color: #f1f5f9 !important;
+      color: #0f172a !important;
+    }
+    html:not(.dark) #canvaDrawer {
+      background-color: #ffffff !important;
+      border-color: #e2e8f0 !important;
+      box-shadow: 4px 0 24px rgba(0, 0, 0, 0.03) !important;
+    }
+    html:not(.dark) #canvaDrawer .border-b,
+    html:not(.dark) #canvaDrawer .border-t {
+      border-color: #e2e8f0 !important;
+    }
+    html:not(.dark) #canvaDrawer h3,
+    html:not(.dark) #canvaDrawer h4 {
+      color: #0f172a !important;
+    }
+    html:not(.dark) #canvaDrawer p {
+      color: #64748b !important;
+    }
+    html:not(.dark) #pageTreeList > div {
+      background-color: #f8fafc !important;
+      border-color: #e2e8f0 !important;
+    }
+    html:not(.dark) #pageTreeList > div:hover {
+      background-color: #f1f5f9 !important;
+      border-color: #cbd5e1 !important;
+    }
+    html:not(.dark) #pageTreeList .text-white,
+    html:not(.dark) #pageTreeList .text-slate-200 {
+      color: #0f172a !important;
+    }
+    html:not(.dark) #pageTreeList .text-slate-400 {
+      color: #64748b !important;
+    }
+    html:not(.dark) #drawerTabElements button {
+      background-color: #f8fafc !important;
+      border-color: #e2e8f0 !important;
+    }
+    html:not(.dark) #drawerTabElements button:hover {
+      background-color: #ffffff !important;
+      border-color: #ad3333 !important;
+      box-shadow: 0 4px 12px rgba(173, 51, 51, 0.1) !important;
+    }
+    html:not(.dark) #drawerTabElements .text-slate-200,
+    html:not(.dark) #drawerTabElements .text-white {
+      color: #0f172a !important;
+    }
+    html:not(.dark) #drawerTabElements .text-slate-400,
+    html:not(.dark) #drawerTabElements .text-slate-500 {
+      color: #64748b !important;
+    }
+    html:not(.dark) main {
+      background-color: #f1f5f9 !important;
+    }
+    html:not(.dark) main > div:first-child {
+      background-color: #ffffff !important;
+      border-color: #e2e8f0 !important;
+    }
+    html:not(.dark) #subSlidesTabsContainer button:not(.bg-brand-500) {
+      background-color: #f1f5f9 !important;
+      color: #475569 !important;
+      border-color: #e2e8f0 !important;
+    }
+    html:not(.dark) #subSlidesTabsContainer button:not(.bg-brand-500):hover {
+      background-color: #e2e8f0 !important;
+      color: #0f172a !important;
+    }
+    html:not(.dark) [id^="blockCard_"] {
+      background-color: #ffffff !important;
+      border-color: #e2e8f0 !important;
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.02) !important;
+    }
+    html:not(.dark) [id^="blockCard_"]:hover {
+      border-color: #cbd5e1 !important;
+    }
+    html:not(.dark) [id^="blockCard_"] .border-b,
+    html:not(.dark) [id^="blockCard_"] .border-t {
+      border-color: #f1f5f9 !important;
+    }
+    html:not(.dark) [id^="blockCard_"] input,
+    html:not(.dark) [id^="blockCard_"] textarea,
+    html:not(.dark) [id^="blockCard_"] select,
+    html:not(.dark) input.bg-slate-950,
+    html:not(.dark) textarea.bg-slate-950,
+    html:not(.dark) input.bg-slate-900,
+    html:not(.dark) textarea.bg-slate-900,
+    html:not(.dark) #settingsDrawerControls input,
+    html:not(.dark) #settingsDrawerControls textarea {
+      background-color: #f8fafc !important;
+      border-color: #cbd5e1 !important;
+      color: #0f172a !important;
+    }
+    html:not(.dark) input:focus,
+    html:not(.dark) textarea:focus,
+    html:not(.dark) select:focus {
+      background-color: #ffffff !important;
+      border-color: #ad3333 !important;
+    }
+    html:not(.dark) [id^="blockCard_"] .bg-slate-950,
+    html:not(.dark) [id^="blockCard_"] .bg-slate-900,
+    html:not(.dark) [id^="blockCard_"] .bg-slate-900\/60 {
+      background-color: #f8fafc !important;
+      border-color: #e2e8f0 !important;
+    }
+    html:not(.dark) .text-white:not(.bg-brand-500) {
+      color: #0f172a !important;
+    }
+    html:not(.dark) .text-slate-100,
+    html:not(.dark) .text-slate-200 {
+      color: #1e293b !important;
+    }
+    html:not(.dark) .text-slate-300 {
+      color: #334155 !important;
+    }
+    html:not(.dark) .text-slate-400 {
+      color: #64748b !important;
+    }
+    /* Explicitly preserve text colors for badges, media, and buttons */
+    html:not(.dark) #coverInteractiveCanvas,
+    html:not(.dark) #coverInteractiveCanvas *,
+    html:not(.dark) #viewerCoverCanvas,
+    html:not(.dark) #viewerCoverCanvas *,
+    html:not(.dark) .aspect-video,
+    html:not(.dark) .aspect-video *,
+    html:not(.dark) .bg-brand-500,
+    html:not(.dark) .bg-brand-500 *,
+    html:not(.dark) .bg-brand-600,
+    html:not(.dark) .bg-brand-600 *,
+    html:not(.dark) .bg-purple-600,
+    html:not(.dark) .bg-purple-600 *,
+    html:not(.dark) .bg-rose-600,
+    html:not(.dark) .bg-rose-600 * {
+      color: #ffffff !important;
+    }
+    html:not(.dark) [id^="katexPreview_"] {
+      color: #0f172a !important;
+    }
+    html:not(.dark) .text-amber-300:not(button) {
+      color: #b45309 !important;
+    }
+    html:not(.dark) #exportMenu {
+      background-color: #ffffff !important;
+      border-color: #e2e8f0 !important;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1) !important;
+    }
+    html:not(.dark) #exportMenu button:hover {
+      background-color: #f1f5f9 !important;
+    }
+    html:not(.dark) #themeToggleBtn {
+      background-color: #f1f5f9 !important;
+      border-color: #cbd5e1 !important;
+      color: #334155 !important;
+    }
+    html:not(.dark) #themeToggleBtn:hover {
+      background-color: #e2e8f0 !important;
+      color: #0f172a !important;
+    }
+    html:not(.dark) #viewerContainer {
+      background-color: #f1f5f9 !important;
+    }
+    html:not(.dark) #viewerContainer nav {
+      background-color: #ffffff !important;
+      border-color: #e2e8f0 !important;
+    }
+    html:not(.dark) #viewerContainer footer {
+      background-color: #ffffff !important;
+      border-color: #e2e8f0 !important;
+    }
+    html:not(.dark) #viewerBtnPrev {
+      background-color: #f1f5f9 !important;
+      border-color: #cbd5e1 !important;
+      color: #334155 !important;
+    }
+    html:not(.dark) #viewerBtnPrev:hover {
+      background-color: #e2e8f0 !important;
+      color: #0f172a !important;
+    }
+    html:not(.dark) #viewerNavList button:not(.bg-brand-500) {
+      color: #475569 !important;
+    }
+    html:not(.dark) #viewerNavList button:not(.bg-brand-500):hover {
+      background-color: #f1f5f9 !important;
+      color: #0f172a !important;
+    }
+    html:not(.dark) #viewerMainCard > div:not(.aspect-video) {
+      background-color: #ffffff !important;
+      border-color: #e2e8f0 !important;
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05) !important;
+    }
+    html:not(.dark) .custom-scrollbar::-webkit-scrollbar-track {
+      background: rgba(241, 245, 249, 0.6) !important;
+    }
+    html:not(.dark) .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.5) !important;
+    }
+    html, body {
+      height: 100% !important;
+      height: 100vh !important;
+      height: 100dvh !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow: hidden !important;
+    }
+    #editorContainer {
+      height: calc(100vh - 3.5rem) !important;
+      height: calc(100dvh - 3.5rem) !important;
+      overflow: hidden !important;
+      min-height: 0 !important;
+      position: relative;
+    }
+    @media (max-width: 640px) {
+      #editorContainer,
+      #viewerContainer {
+        height: calc(100vh - 3rem) !important;
+        height: calc(100dvh - 3rem) !important;
+      }
+    }
+    main {
+      min-height: 0 !important;
+      height: 100% !important;
+      overflow: hidden !important;
+    }
+    #canvasContentArea {
+      min-height: 0 !important;
+      flex: 1 1 0% !important;
+      overflow-y: auto !important;
+      position: relative;
+    }
+    #viewerContainer {
+      height: calc(100vh - 3.5rem) !important;
+      height: calc(100dvh - 3.5rem) !important;
+      overflow: hidden !important;
+      min-height: 0 !important;
+    }
+    #viewerContentScroll {
+      min-height: 0 !important;
+      flex: 1 1 0% !important;
+      overflow-y: auto !important;
+    }
+    #docStickyToolbarContainer,
+    #coverStickyToolbarContainer {
+      position: sticky !important;
+      top: 0 !important;
+      z-index: 30 !important;
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.2), 0 2px 6px -1px rgba(0, 0, 0, 0.1) !important;
+      max-height: 120px;
+    }
+    html:not(.dark) #docStickyToolbarContainer,
+    html:not(.dark) #coverStickyToolbarContainer {
+      background-color: rgba(255, 255, 255, 0.98) !important;
+      border-color: #e2e8f0 !important;
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.08), 0 2px 6px -1px rgba(0, 0, 0, 0.04) !important;
+    }
+    html:not(.dark) .document-sheet {
+      background-color: #ffffff !important;
+      color: #0f172a !important;
+      box-shadow: 0 10px 35px -5px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.06) !important;
+    }
+    html:not(.dark) .document-sheet .doc-embed-card {
+      background-color: #f8fafc !important;
+      border-color: #e2e8f0 !important;
+    }
+    html:not(.dark) .document-toolbar {
+      background-color: rgba(255, 255, 255, 0.95) !important;
+      border-color: #e2e8f0 !important;
+    }
+
+    /* Container Queries and Responsive Scaling for Cover Canvas */
+    #coverInteractiveCanvas,
+    #viewerCoverCanvas {
+      container-type: inline-size;
+      container-name: coverCanvas;
+    }
+    .cover-title-text {
+      font-size: 24px;
+      font-size: clamp(14px, 5.2vw, 48px);
+      font-size: clamp(14px, 5.2cqw, 48px);
+      line-height: 1.15;
+    }
+    .cover-subtitle-text {
+      font-size: 13px;
+      font-size: clamp(11px, 2.3vw, 18px);
+      font-size: clamp(11px, 2.3cqw, 18px);
+      line-height: 1.25;
+    }
+    .cover-badge-text {
+      font-size: 10px;
+      font-size: clamp(9px, 1.6cqw, 12px);
+      padding: 3px 8px;
+      padding: clamp(2px, 0.5cqw, 4px) clamp(6px, 1.2cqw, 14px);
+    }
+    .cover-institution-text {
+      font-size: 11px;
+      font-size: clamp(9px, 1.7cqw, 13px);
+      padding: 3px 8px;
+      padding: clamp(2px, 0.5cqw, 4px) clamp(6px, 1.2cqw, 12px);
+    }
+    .cover-brand-text {
+      font-size: 10px;
+      font-size: clamp(9px, 1.6cqw, 12px);
+      padding: 3px 8px;
+      padding: clamp(2px, 0.5cqw, 4px) clamp(6px, 1.2cqw, 12px);
+    }
+    .cover-author-text {
+      font-size: 11px;
+      font-size: clamp(9px, 1.7cqw, 13px);
+    }
+    .cover-btn-text {
+      font-size: 12px;
+      font-size: clamp(10px, 1.8cqw, 13px);
+      padding: 6px 14px;
+      padding: clamp(4px, 0.8cqw, 10px) clamp(8px, 1.8cqw, 24px);
+    }
+    .cover-free-text {
+      font-size: 16px;
+      font-size: clamp(11px, 2.2vw, 26px);
+      font-size: clamp(11px, 2.2cqw, 26px);
+    }
+
+    /* Mobile Bottom Navigation & Bottom Sheet Drawer (< 640px) */
+    @media (max-width: 640px) {
+      #editorContainer {
+        position: relative !important;
+        flex-direction: column-reverse !important;
+      }
+      #dockNav {
+        width: 100% !important;
+        height: 3.25rem !important;
+        flex-direction: row !important;
+        justify-content: space-around !important;
+        padding: 0 0.5rem !important;
+        border-right: none !important;
+        border-top: 1px solid rgba(148, 163, 184, 0.2) !important;
+        z-index: 40 !important;
+      }
+      #dockNav .dock-btn {
+        flex-direction: column !important;
+        height: 2.6rem !important;
+        width: 3.8rem !important;
+        padding: 0.2rem 0 !important;
+        gap: 1px !important;
+      }
+      #dockNav .dock-collapse-wrapper {
+        display: none !important;
+      }
+      #canvaDrawer {
+        position: absolute !important;
+        top: 0 !important;
+        bottom: 3.25rem !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        z-index: 35 !important;
+        border-right: none !important;
+        border-top: 1px solid rgba(148, 163, 184, 0.25) !important;
+        box-shadow: 0 -10px 35px -5px rgba(0, 0, 0, 0.7) !important;
+        transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease !important;
+      }
+      #canvaDrawer.is-drawer-closed {
+        transform: translateY(115%) !important;
+        pointer-events: none !important;
+        opacity: 0 !important;
+      }
+      #canvaDrawer:not(.is-drawer-closed) {
+        transform: translateY(0) !important;
+        pointer-events: auto !important;
+        opacity: 1 !important;
+      }
+      #drawerBackdrop {
+        display: block !important;
+      }
+      #drawerBackdrop.is-backdrop-hidden {
+        display: none !important;
+      }
+    }
+
+    /* Tablet / Compact Desktop View (641px - 1024px): Left Slim Dock + Overlay Drawer */
+    @media (min-width: 641px) and (max-width: 1024px) {
+      #editorContainer {
+        position: relative !important;
+        flex-direction: row !important;
+      }
+      #canvaDrawer {
+        position: absolute !important;
+        top: 0 !important;
+        bottom: 0 !important;
+        left: 3.5rem !important;
+        z-index: 35 !important;
+        width: 300px !important;
+        max-width: calc(100% - 4rem) !important;
+        box-shadow: 10px 0 35px -5px rgba(0, 0, 0, 0.7) !important;
+        border-right: 1px solid rgba(148, 163, 184, 0.25) !important;
+        transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease !important;
+      }
+      #canvaDrawer.is-drawer-closed {
+        transform: translateX(-120%) !important;
+        pointer-events: none !important;
+        opacity: 0 !important;
+      }
+      #canvaDrawer:not(.is-drawer-closed) {
+        transform: translateX(0) !important;
+        pointer-events: auto !important;
+        opacity: 1 !important;
+      }
+      #drawerBackdrop {
+        display: block !important;
+      }
+      #drawerBackdrop.is-backdrop-hidden {
+        display: none !important;
+      }
+    }
+
+    /* Wide Desktop View (> 1024px): In-flow Collapsible Drawer */
+    @media (min-width: 1025px) {
+      #drawerBackdrop {
+        display: none !important;
+      }
+      #canvaDrawer.is-drawer-closed {
+        margin-left: -20rem !important;
+      }
+    }
+
+    /* Scrollbars utility */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 h-screen overflow-hidden flex flex-col antialiased selection:bg-brand-500 selection:text-white">
