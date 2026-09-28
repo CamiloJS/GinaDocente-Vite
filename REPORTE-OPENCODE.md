@@ -1,3 +1,45 @@
+# RESCATE Y UNIFICACION (28/09/2026) - opencode
+
+## Que paso (causa raiz)
+- En el PC nuevo, Antigravity clono el repo de GitHub, que estaba **congelado desde el 20/08/2026**.
+- "Recupero" el despliegue del 21/08 (proyecto Vercel `englishtech`) y lo volvio a subir, reemplazando la pagina.
+- Resultado: `englishtech.vercel.app` quedo con una version vieja (sin OVA Studio, sin ruleta, sin busqueda global, etc.).
+- La version buena (compilada el **08/09/2026**, con TODO) seguia viva en el proyecto `gina-docente-qq2s`.
+
+## Que se hizo
+1. Se descargo el **codigo fuente completo** de la version buena desde Vercel (despliegue `dpl_AKoxFufG2qFjsRJYzsHogxUCjs87`, proyecto `gina-docente-qq2s`).
+2. Se aplicaron encima los 4 commits nuevos de Antigravity:
+   - `feat: agregar publicaciones tipo encuesta con seleccion simple y multiple`
+   - `feat: desglose de preguntas y respuestas de evaluaciones, feedback docente y reporte excel avanzado`
+   - `fix: comprehensive stability and runtime bug fixes across components and App`
+   - `fix(ui): style offline contact names in gray and suppress duplicate/top video embeds on posts`
+   Resolviendo los conflictos a mano (union de ambas versiones, sin perder funcionalidad).
+3. Se compilo (`npm run build`, moderno + legacy) y se verifico en local y en vivo.
+4. Se desplego la version unificada en los **dos proyectos** de Vercel.
+
+## URLs activas (las tres con la MISMA version unificada)
+- https://englishtech.vercel.app  (principal)
+- https://gina-docente.vercel.app
+- https://gina-docente-qq2s.vercel.app
+
+## Proyectos Vercel (team `gina-docente`)
+- `englishtech` -> `prj_roOkRrAGo2pgIvYUnxrvV1HhGDmz` -> dominio englishtech.vercel.app
+- `gina-docente-qq2s` -> `prj_IIBJ7zet81xzoSXtWfbCq7w7mwvk` -> dominios gina-docente.vercel.app y gina-docente-qq2s.vercel.app
+- `habitflow` y `gina-docente` (legacy, HTML monolitico) son otros proyectos, no tocar.
+
+## Firebase
+- Proyecto: `ginadocente-unipamplona` (compartido por todas las versiones -> los datos NUNCA estuvieron en riesgo).
+- Revisar en Firebase Console > Authentication > Settings > Authorized domains que esten:
+  `englishtech.vercel.app`, `gina-docente.vercel.app`, `gina-docente-qq2s.vercel.app`.
+
+## PENDIENTE IMPORTANTE (hacer cuanto antes)
+1. **Subir este codigo a GitHub** (`CamiloJS/GinaDocente-Vite`, rama `main`). El repo no tiene nada posterior al 20/08: esa desincronizacion fue la causa del desastre.
+2. **Conectar Vercel a GitHub** (proyecto `englishtech`: Settings > Git) para que cada push despliegue solo, y ningun agente vuelva a clonar codigo viejo.
+3. Copia de seguridad del codigo fuente crudo descargado de Vercel: carpeta `_recuperacion/gina_docente_08sep` (fuera de este repo).
+
+
+---
+
 # REPORTE-OPENCODE.md — Log de trabajo del proyecto
 
 ## TRANSICIÓN A AUTONOMÍA TOTAL (16/08/2026) — opencode se despide
