@@ -388,6 +388,10 @@ function App() {
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [viewingResultsFor, setViewingResultsFor] = useState(null);
   const [editingGrade, setEditingGrade] = useState({ id: null, score: '' });
+  const [selectedStudentGradeForReview, setSelectedStudentGradeForReview] = useState(null);
+  const [reviewFeedbackText, setReviewFeedbackText] = useState('');
+  const [isSavingFeedback, setIsSavingFeedback] = useState(false);
+  const [showQuestionBankModal, setShowQuestionBankModal] = useState(false);
 
   const [isChatOpen, setIsChatOpen] = useState(false); 
   const [botTrainingInfo, setBotTrainingInfo] = useState("");
@@ -1566,6 +1570,27 @@ function App() {
     } catch (err) {
       console.error(err);
       showMessage("Error al actualizar la nota.");
+    }
+  };
+
+  const handleSaveTeacherFeedback = async () => {
+    if (!selectedStudentGradeForReview) return;
+    setIsSavingFeedback(true);
+    try {
+      const feedbackClean = (reviewFeedbackText || '').trim();
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'grades', selectedStudentGradeForReview.id), {
+        teacherFeedback: feedbackClean
+      });
+      setSelectedStudentGradeForReview(prev => prev ? ({
+        ...prev,
+        teacherFeedback: feedbackClean
+      }) : null);
+      showMessage("✅ Retroalimentación guardada para el estudiante.");
+    } catch (err) {
+      console.error(err);
+      showMessage("❌ Error al guardar la retroalimentación.");
+    } finally {
+      setIsSavingFeedback(false);
     }
   };
 
@@ -7274,7 +7299,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                   );
               }
 
-              // Función de Exportación a Excel (.xlsx) con desglose por preguntas y promedio general
+              // Función de Exportación a Excel (.xlsx) con preguntas, respuestas del estudiante y feedback
               const exportEvaluationToExcel = (evaluation, gradesList) => {
                   if (!evaluation) return;
                   const evalGrades = (gradesList || []).filter(g => g.evaluationId === evaluation.id);
@@ -7289,51 +7314,174 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                       return lastNameA.localeCompare(lastNameB, 'es', { sensitivity: 'base' });
                   });
 
-                  // 2. Filas de cada estudiante con desglose por pregunta
+                  // 2. Hoja 1: Calificaciones y Respuestas
                   const rows = sortedGrades.map((g, index) => {
                       const row = {
                           'N°': index + 1,
                           'Estudiante': g.studentName || 'Estudiante',
+                          'Estado': g.status === 'cancelled_tab_change' ? 'Anulada (Anti-trampas)' : 'Completada',
+                          'Nota Final (0.0 - 5.0)': typeof g.score === 'number' ? g.score.toFixed(1) : Number(g.score || 0).toFixed(1),
                       };
+
+                      let correctCount = 0;
 
                       questions.forEach((q, qIdx) => {
                           const qAns = g.answers?.[qIdx];
                           let isCorrect = false;
+                          let studentAnswerText = '';
+                          let correctAnswerText = '';
+
+                          const rawQuestionText = (q.text || q.question || `Pregunta ${qIdx + 1}`).replace(/\r?\n/g, ' ').trim();
+                          const qColTitle = `P${qIdx + 1}: ${rawQuestionText.length > 60 ? rawQuestionText.slice(0, 57) + '...' : rawQuestionText}`;
+
                           if (q.type === 'multiple') {
-                              const correctOpts = (q.options || []).map((opt, oIdx) => opt.isCorrect ? oIdx : null).filter(o => o !== null);
+                              const correctIndices = (q.options || []).map((opt, oIdx) => opt.isCorrect ? oIdx : null).filter(o => o !== null);
                               const ansArr = Array.isArray(qAns) ? qAns : [];
-                              isCorrect = correctOpts.length > 0 && ansArr.length === correctOpts.length && correctOpts.every(i => ansArr.includes(i));
+                              isCorrect = correctIndices.length > 0 && ansArr.length === correctIndices.length && correctIndices.every(i => ansArr.includes(i));
+                              
+                              studentAnswerText = ansArr.length > 0 
+                                  ? ansArr.map(idx => q.options?.[idx]?.text || `Opción ${idx + 1}`).join('; ')
+                                  : '(Sin respuesta)';
+                              correctAnswerText = correctIndices.map(idx => q.options?.[idx]?.text || `Opción ${idx + 1}`).join('; ');
                           } else {
+                              studentAnswerText = qAns !== undefined && qAns !== null && String(qAns).trim() ? String(qAns).trim() : '(Sin respuesta)';
+                              correctAnswerText = (q.correctAnswer || '').trim();
                               isCorrect = String(qAns ?? '').trim().toLowerCase() === String(q.correctAnswer ?? '').trim().toLowerCase();
                           }
-                          row[`Pregunta ${qIdx + 1}`] = isCorrect ? 'Correcta' : 'Incorrecta';
+
+                          if (isCorrect) correctCount++;
+
+                          if (isCorrect) {
+                              row[qColTitle] = `[✔ CORRECTA] ${studentAnswerText}`;
+                          } else if (studentAnswerText === '(Sin respuesta)') {
+                              row[qColTitle] = `[⚠ SIN RESPONDER] (Correcta: "${correctAnswerText}")`;
+                          } else {
+                              row[qColTitle] = `[✘ INCORRECTA] Respondió: "${studentAnswerText}" | Correcta: "${correctAnswerText}"`;
+                          }
                       });
 
-                      row['Nota Final (0.0 - 5.0)'] = typeof g.score === 'number' ? g.score.toFixed(1) : Number(g.score || 0).toFixed(1);
+                      row['Aciertos'] = `${correctCount} / ${questions.length}`;
+                      row['Retroalimentación del Docente'] = g.teacherFeedback || '';
                       row['Fecha de Entrega'] = g.submittedAt ? new Date(g.submittedAt).toLocaleDateString('es-ES') + ' ' + new Date(g.submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-';
                       return row;
                   });
 
-                  // 3. Promedio general del grupo
+                  // Fila de resumen inferior
                   const averageScore = evalGrades.length > 0
                       ? (evalGrades.reduce((sum, g) => sum + (Number(g.score) || 0), 0) / evalGrades.length).toFixed(2)
                       : '0.00';
 
-                  // Fila de resumen inferior
                   const summaryRow = {
                       'N°': '',
                       'Estudiante': 'PROMEDIO GENERAL DEL GRUPO',
+                      'Estado': `Total evaluados: ${evalGrades.length}`,
+                      'Nota Final (0.0 - 5.0)': `${averageScore} / 5.0`,
                   };
-                  questions.forEach((_, qIdx) => {
-                      summaryRow[`Pregunta ${qIdx + 1}`] = '';
+
+                  questions.forEach((q, qIdx) => {
+                      const rawQuestionText = (q.text || q.question || `Pregunta ${qIdx + 1}`).replace(/\r?\n/g, ' ').trim();
+                      const qColTitle = `P${qIdx + 1}: ${rawQuestionText.length > 60 ? rawQuestionText.slice(0, 57) + '...' : rawQuestionText}`;
+                      let qCorrectCount = 0;
+                      evalGrades.forEach(g => {
+                          const qAns = g.answers?.[qIdx];
+                          if (q.type === 'multiple') {
+                              const correctIndices = (q.options || []).map((opt, oIdx) => opt.isCorrect ? oIdx : null).filter(o => o !== null);
+                              const ansArr = Array.isArray(qAns) ? qAns : [];
+                              if (correctIndices.length > 0 && ansArr.length === correctIndices.length && correctIndices.every(i => ansArr.includes(i))) qCorrectCount++;
+                          } else {
+                              if (typeof qAns === 'string' && qAns.trim().toLowerCase() === (q.correctAnswer || '').trim().toLowerCase()) qCorrectCount++;
+                          }
+                      });
+                      const pct = evalGrades.length > 0 ? Math.round((qCorrectCount / evalGrades.length) * 100) : 0;
+                      summaryRow[qColTitle] = `${qCorrectCount}/${evalGrades.length} acertaron (${pct}%)`;
                   });
-                  summaryRow['Nota Final (0.0 - 5.0)'] = `${averageScore} / 5.0`;
-                  summaryRow['Fecha de Entrega'] = `Total evaluados: ${evalGrades.length}`;
+                  summaryRow['Aciertos'] = '';
+                  summaryRow['Retroalimentación del Docente'] = '';
+                  summaryRow['Fecha de Entrega'] = '';
                   rows.push(summaryRow);
 
-                  const worksheet = XLSX.utils.json_to_sheet(rows);
+                  // 3. Hoja 2: Banco de Preguntas y Clave de Respuestas
+                  const questionRows = questions.map((q, qIdx) => {
+                      let correctAnswersText = '';
+                      let optionsText = '';
+                      if (q.type === 'multiple') {
+                          optionsText = (q.options || []).map((opt, oIdx) => `${String.fromCharCode(65 + oIdx)}) ${opt.text}${opt.isCorrect ? ' [✔ CORRECTA]' : ''}`).join('  |  ');
+                          correctAnswersText = (q.options || []).filter(o => o.isCorrect).map(o => o.text).join('; ');
+                      } else {
+                          optionsText = 'Respuesta libre / escrita';
+                          correctAnswersText = q.correctAnswer || '';
+                      }
+
+                      let qCorrectCount = 0;
+                      evalGrades.forEach(g => {
+                          const qAns = g.answers?.[qIdx];
+                          if (q.type === 'multiple') {
+                              const correctIndices = (q.options || []).map((opt, oIdx) => opt.isCorrect ? oIdx : null).filter(o => o !== null);
+                              const ansArr = Array.isArray(qAns) ? qAns : [];
+                              if (correctIndices.length > 0 && ansArr.length === correctIndices.length && correctIndices.every(i => ansArr.includes(i))) qCorrectCount++;
+                          } else {
+                              if (typeof qAns === 'string' && qAns.trim().toLowerCase() === (q.correctAnswer || '').trim().toLowerCase()) qCorrectCount++;
+                          }
+                      });
+                      const pct = evalGrades.length > 0 ? ((qCorrectCount / evalGrades.length) * 100).toFixed(1) + '%' : '0%';
+
+                      return {
+                          'N° Pregunta': qIdx + 1,
+                          'Enunciado': q.text || q.question || '',
+                          'Tipo de Pregunta': q.type === 'multiple' ? 'Selección Múltiple' : 'Respuesta Escrita',
+                          'Opciones Disponibles': optionsText,
+                          'Respuesta(s) Correcta(s)': correctAnswersText,
+                          'Estudiantes que Acertaron': qCorrectCount,
+                          'Estudiantes que Fallaron': evalGrades.length - qCorrectCount,
+                          '% de Acierto': pct
+                      };
+                  });
+
+                  // 4. Hoja 3: Detalle Vertical Estudiante x Pregunta (ideal para feedback individual)
+                  const detailedFeedbackRows = [];
+                  sortedGrades.forEach((g) => {
+                      questions.forEach((q, qIdx) => {
+                          const qAns = g.answers?.[qIdx];
+                          let isCorrect = false;
+                          let studentAnswerText = '';
+                          let correctAnswerText = '';
+
+                          if (q.type === 'multiple') {
+                              const correctIndices = (q.options || []).map((opt, oIdx) => opt.isCorrect ? oIdx : null).filter(o => o !== null);
+                              const ansArr = Array.isArray(qAns) ? qAns : [];
+                              isCorrect = correctIndices.length > 0 && ansArr.length === correctIndices.length && correctIndices.every(i => ansArr.includes(i));
+                              studentAnswerText = ansArr.length > 0 ? ansArr.map(idx => q.options?.[idx]?.text || `Opción ${idx + 1}`).join('; ') : '(Sin respuesta)';
+                              correctAnswerText = correctIndices.map(idx => q.options?.[idx]?.text || `Opción ${idx + 1}`).join('; ');
+                          } else {
+                              studentAnswerText = typeof qAns === 'string' && qAns.trim() ? qAns.trim() : '(Sin respuesta)';
+                              correctAnswerText = (q.correctAnswer || '').trim();
+                              isCorrect = typeof qAns === 'string' && qAns.trim().toLowerCase() === correctAnswerText.toLowerCase();
+                          }
+
+                          detailedFeedbackRows.push({
+                              'Estudiante': g.studentName || 'Estudiante',
+                              'N° Pregunta': qIdx + 1,
+                              'Enunciado de la Pregunta': q.text || q.question || '',
+                              'Tipo': q.type === 'multiple' ? 'Selección Múltiple' : 'Escrita',
+                              'Respuesta del Estudiante': studentAnswerText,
+                              'Respuesta Correcta Esperada': correctAnswerText,
+                              'Resultado': isCorrect ? 'CORRECTA' : (studentAnswerText === '(Sin respuesta)' ? 'SIN RESPONDER' : 'INCORRECTA'),
+                              'Puntaje (1.0 / 0.0)': isCorrect ? 1.0 : 0.0,
+                              'Retroalimentación del Docente': g.teacherFeedback || ''
+                          });
+                      });
+                  });
+
                   const workbook = XLSX.utils.book_new();
-                  XLSX.utils.book_append_sheet(workbook, worksheet, 'Calificaciones');
+                  const ws1 = XLSX.utils.json_to_sheet(rows);
+                  XLSX.utils.book_append_sheet(workbook, ws1, 'Calificaciones y Respuestas');
+
+                  const ws2 = XLSX.utils.json_to_sheet(questionRows);
+                  XLSX.utils.book_append_sheet(workbook, ws2, 'Banco de Preguntas');
+
+                  const ws3 = XLSX.utils.json_to_sheet(detailedFeedbackRows);
+                  XLSX.utils.book_append_sheet(workbook, ws3, 'Detalle para Feedback');
+
                   const safeTitle = (evaluation.title || 'Evaluacion').replace(/[^a-zA-Z0-9_\u00C0-\u017F]/g, '_').toLowerCase();
                   XLSX.writeFile(workbook, `reporte_${safeTitle}.xlsx`);
               };
@@ -7355,12 +7503,21 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                       return lastNameA.localeCompare(lastNameB, 'es', { sensitivity: 'base' });
                   });
 
+                  // Navegación entre estudiantes en el modal de revisión
+                  const currentStudentIndex = selectedStudentGradeForReview 
+                      ? sortedEvalGrades.findIndex(g => g.id === selectedStudentGradeForReview.id)
+                      : -1;
+
                   return (
                       <div className="space-y-5 max-w-4xl mx-auto pb-20 md:pb-8 animate-in fade-in">
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                               <div className="flex items-center gap-3">
                                   <button 
-                                      onClick={() => setViewingResultsFor(null)} 
+                                      onClick={() => {
+                                          setViewingResultsFor(null);
+                                          setSelectedStudentGradeForReview(null);
+                                          setShowQuestionBankModal(false);
+                                      }} 
                                       className={`p-2 rounded-xl border transition-colors ${isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-200 hover:bg-gray-700' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}
                                       title="Volver a evaluaciones"
                                   >
@@ -7376,16 +7533,28 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                   </div>
                               </div>
 
-                              <button
-                                  type="button"
-                                  onClick={() => exportEvaluationToExcel(viewingResultsFor, grades)}
-                                  disabled={evalGrades.length === 0}
-                                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-bold text-xs flex items-center gap-2 shadow-xs transition-all active:scale-95 shrink-0 cursor-pointer"
-                                  title="Exportar reporte completo a Microsoft Excel (.xlsx)"
-                              >
-                                  <Download size={15} />
-                                  <span>Descargar Excel (.xlsx)</span>
-                              </button>
+                              <div className="flex items-center gap-2">
+                                  <button
+                                      type="button"
+                                      onClick={() => setShowQuestionBankModal(true)}
+                                      className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition-all active:scale-95 shrink-0"
+                                      title="Ver todas las preguntas y respuestas correctas de la evaluación"
+                                  >
+                                      <FileText size={15} />
+                                      <span>Ver cuestionario</span>
+                                  </button>
+
+                                  <button
+                                      type="button"
+                                      onClick={() => exportEvaluationToExcel(viewingResultsFor, grades)}
+                                      disabled={evalGrades.length === 0}
+                                      className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-bold text-xs flex items-center gap-2 shadow-xs transition-all active:scale-95 shrink-0"
+                                      title="Exportar reporte completo con preguntas y respuestas a Excel (.xlsx)"
+                                  >
+                                      <Download size={15} />
+                                      <span>Descargar Excel (.xlsx)</span>
+                                  </button>
+                              </div>
                           </div>
 
                           {/* Métricas Generales del Grupo */}
@@ -7442,7 +7611,24 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                           return (
                                               <tr key={grade.id} className={`transition-colors ${isCancelled ? 'bg-red-50/40 dark:bg-red-950/20 hover:bg-red-50/60' : 'hover:bg-gray-50/60 dark:hover:bg-gray-800/40'}`}>
                                                   <td className="p-3.5 font-bold text-gray-900 dark:text-gray-100">
-                                                      <div>{grade.studentName}</div>
+                                                      <div 
+                                                          className="flex items-center gap-1.5 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors group"
+                                                          onClick={() => {
+                                                              setSelectedStudentGradeForReview(grade);
+                                                              setReviewFeedbackText(grade.teacherFeedback || '');
+                                                          }}
+                                                          title="Haz clic para ver las preguntas y respuestas de este estudiante"
+                                                      >
+                                                          <span>{grade.studentName}</span>
+                                                          <Eye size={13} className="text-blue-500 opacity-70 group-hover:opacity-100 shrink-0" />
+                                                      </div>
+                                                      {grade.teacherFeedback && (
+                                                          <div className="mt-1">
+                                                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-md border border-indigo-200 dark:border-indigo-800">
+                                                                  <MessageCircle size={10} /> Con retroalimentación
+                                                              </span>
+                                                          </div>
+                                                      )}
                                                       {isCancelled && (
                                                           <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-950/80 px-2 py-0.5 rounded-md border border-red-200 dark:border-red-800 mt-1">
                                                               <ShieldAlert size={11} /> Cancelada por cambio de pestaña
@@ -7496,7 +7682,19 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                        })()}
                                                   </td>
                                                    <td className="p-3.5 text-center">
-                                                       <div className="flex items-center justify-center gap-2">
+                                                       <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                                                            <button 
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setSelectedStudentGradeForReview(grade);
+                                                                    setReviewFeedbackText(grade.teacherFeedback || '');
+                                                                }}
+                                                                className="px-2.5 py-1 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] flex items-center gap-1 shadow-xs transition-transform active:scale-95 shrink-0"
+                                                                title="Ver respuestas del estudiante y dar feedback"
+                                                            >
+                                                                <Eye size={12} />
+                                                                <span>Ver respuestas</span>
+                                                            </button>
                                                            {isCancelled ? (
                                                                <button 
                                                                    type="button"
@@ -7530,6 +7728,452 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                   </tbody>
                               </table>
                           </div>
+
+                          {/* Modal 1: Revisión Completa de Examen y Retroalimentación */}
+                          {selectedStudentGradeForReview && (
+                              <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in">
+                                  <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl shadow-2xl max-w-3xl w-full max-h-[92vh] flex flex-col overflow-hidden my-auto">
+                                      {/* Header del modal */}
+                                      <div className="p-4 sm:p-5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between gap-3 bg-gray-50/70 dark:bg-gray-800/40">
+                                          <div>
+                                              <div className="flex items-center gap-2">
+                                                  <span className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+                                                      <Eye size={16} />
+                                                  </span>
+                                                  <div>
+                                                      <h3 className="text-base sm:text-lg font-black text-gray-900 dark:text-gray-100">
+                                                          {selectedStudentGradeForReview.studentName}
+                                                      </h3>
+                                                      <p className="text-[11px] text-gray-500 font-medium">
+                                                          Evaluación: <strong>{viewingResultsFor.title}</strong>
+                                                      </p>
+                                                  </div>
+                                              </div>
+                                          </div>
+
+                                          <div className="flex items-center gap-2">
+                                              {/* Controles de navegación entre estudiantes */}
+                                              {sortedEvalGrades.length > 1 && (
+                                                  <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-xl p-0.5 border border-gray-200 dark:border-gray-700">
+                                                      <button
+                                                          type="button"
+                                                          disabled={currentStudentIndex <= 0}
+                                                          onClick={() => {
+                                                              const prevStudent = sortedEvalGrades[currentStudentIndex - 1];
+                                                              if (prevStudent) {
+                                                                  setSelectedStudentGradeForReview(prevStudent);
+                                                                  setReviewFeedbackText(prevStudent.teacherFeedback || '');
+                                                              }
+                                                          }}
+                                                          className="p-1 rounded-lg hover:bg-white dark:hover:bg-gray-700 disabled:opacity-30 transition-colors"
+                                                          title="Estudiante anterior"
+                                                      >
+                                                          <ChevronLeft size={16} />
+                                                      </button>
+                                                      <span className="text-[10px] font-bold px-2 text-gray-500">
+                                                          {currentStudentIndex + 1} / {sortedEvalGrades.length}
+                                                      </span>
+                                                      <button
+                                                          type="button"
+                                                          disabled={currentStudentIndex < 0 || currentStudentIndex >= sortedEvalGrades.length - 1}
+                                                          onClick={() => {
+                                                              const nextStudent = sortedEvalGrades[currentStudentIndex + 1];
+                                                              if (nextStudent) {
+                                                                  setSelectedStudentGradeForReview(nextStudent);
+                                                                  setReviewFeedbackText(nextStudent.teacherFeedback || '');
+                                                              }
+                                                          }}
+                                                          className="p-1 rounded-lg hover:bg-white dark:hover:bg-gray-700 disabled:opacity-30 transition-colors"
+                                                          title="Estudiante siguiente"
+                                                      >
+                                                          <ChevronRight size={16} />
+                                                      </button>
+                                                  </div>
+                                              )}
+
+                                              <button
+                                                  type="button"
+                                                  onClick={() => setSelectedStudentGradeForReview(null)}
+                                                  className="p-2 rounded-xl text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                                  title="Cerrar revisión"
+                                              >
+                                                  <X size={18} />
+                                              </button>
+                                          </div>
+                                      </div>
+
+                                      {/* Barra de métricas del estudiante */}
+                                      {(() => {
+                                          let studentCorrect = 0;
+                                          questions.forEach((q, qIdx) => {
+                                              const qAns = selectedStudentGradeForReview.answers?.[qIdx];
+                                              if (q.type === 'multiple') {
+                                                  const correctOpts = (q.options || []).map((opt, oIdx) => opt.isCorrect ? oIdx : null).filter(o => o !== null);
+                                                  const ansArr = Array.isArray(qAns) ? qAns : [];
+                                                  if (correctOpts.length > 0 && ansArr.length === correctOpts.length && correctOpts.every(i => ansArr.includes(i))) studentCorrect++;
+                                              } else {
+                                                  if (typeof qAns === 'string' && qAns.trim().toLowerCase() === (q.correctAnswer || '').trim().toLowerCase()) studentCorrect++;
+                                              }
+                                          });
+
+                                          return (
+                                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 sm:p-4 bg-gray-50/50 dark:bg-gray-800/20 border-b border-gray-100 dark:border-gray-800 text-center">
+                                                  <div className="p-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200/70 dark:border-gray-700">
+                                                      <span className="text-[10px] font-bold text-gray-500 uppercase">Nota Final</span>
+                                                      <p className={`text-lg font-black ${Number(selectedStudentGradeForReview.score) >= 3.0 ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
+                                                          {Number(selectedStudentGradeForReview.score).toFixed(1)} <span className="text-xs text-gray-400 font-normal">/ 5.0</span>
+                                                      </p>
+                                                  </div>
+                                                  <div className="p-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200/70 dark:border-gray-700">
+                                                      <span className="text-[10px] font-bold text-gray-500 uppercase">Aciertos</span>
+                                                      <p className="text-lg font-black text-gray-900 dark:text-gray-100">
+                                                          {studentCorrect} <span className="text-xs text-gray-400 font-normal">de {questions.length}</span>
+                                                      </p>
+                                                  </div>
+                                                  <div className="p-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200/70 dark:border-gray-700">
+                                                      <span className="text-[10px] font-bold text-gray-500 uppercase">Porcentaje</span>
+                                                      <p className="text-lg font-black text-blue-600 dark:text-blue-400">
+                                                          {questions.length > 0 ? Math.round((studentCorrect / questions.length) * 100) : 0}%
+                                                      </p>
+                                                  </div>
+                                                  <div className="p-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200/70 dark:border-gray-700">
+                                                      <span className="text-[10px] font-bold text-gray-500 uppercase">Entrega</span>
+                                                      <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mt-1 truncate">
+                                                          {selectedStudentGradeForReview.submittedAt ? new Date(selectedStudentGradeForReview.submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                                                      </p>
+                                                  </div>
+                                              </div>
+                                          );
+                                      })()}
+
+                                      {/* Lista de preguntas con respuestas del estudiante */}
+                                      <div className="overflow-y-auto p-4 sm:p-6 space-y-4 flex-1">
+                                          {selectedStudentGradeForReview.status === 'cancelled_tab_change' && (
+                                              <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-start gap-2.5 text-xs text-red-700 dark:text-red-300">
+                                                  <ShieldAlert size={18} className="text-red-500 shrink-0 mt-0.5" />
+                                                  <div>
+                                                      <strong className="font-bold">Prueba anulada por sistema anti-trampas:</strong>
+                                                      <p className="text-[11px] mt-0.5">El estudiante cambió de pestaña o minimizó la aplicación antes de finalizar la evaluación.</p>
+                                                  </div>
+                                              </div>
+                                          )}
+
+                                          <div className="flex items-center justify-between">
+                                              <h4 className="text-xs font-extrabold uppercase tracking-wider text-gray-500">
+                                                  Desglose Pregunta por Pregunta ({questions.length})
+                                              </h4>
+                                              <span className="text-[11px] text-gray-500 font-medium">
+                                                  🟢 Correctas &nbsp;|&nbsp; 🔴 Incorrectas &nbsp;|&nbsp; 🟡 Sin responder
+                                              </span>
+                                          </div>
+
+                                          {questions.map((q, qIdx) => {
+                                              const qAns = selectedStudentGradeForReview.answers?.[qIdx];
+                                              let isCorrect = false;
+                                              let isUnanswered = false;
+
+                                              if (q.type === 'multiple') {
+                                                  const correctOpts = (q.options || []).map((opt, oIdx) => opt.isCorrect ? oIdx : null).filter(o => o !== null);
+                                                  const ansArr = Array.isArray(qAns) ? qAns : [];
+                                                  isUnanswered = ansArr.length === 0;
+                                                  isCorrect = correctOpts.length > 0 && ansArr.length === correctOpts.length && correctOpts.every(i => ansArr.includes(i));
+                                              } else {
+                                                  isUnanswered = !qAns || (typeof qAns === 'string' && !qAns.trim());
+                                                  isCorrect = typeof qAns === 'string' && qAns.trim().toLowerCase() === (q.correctAnswer || '').trim().toLowerCase();
+                                              }
+
+                                              return (
+                                                  <div 
+                                                      key={qIdx} 
+                                                      className={`p-4 rounded-2xl border transition-all ${
+                                                          isCorrect 
+                                                              ? 'bg-emerald-50/30 dark:bg-emerald-950/10 border-emerald-300 dark:border-emerald-800/60' 
+                                                              : isUnanswered
+                                                                  ? 'bg-amber-50/30 dark:bg-amber-950/10 border-amber-300 dark:border-amber-800/60'
+                                                                  : 'bg-red-50/30 dark:bg-red-950/10 border-red-300 dark:border-red-800/60'
+                                                      }`}
+                                                  >
+                                                      {/* Cabecera de la pregunta */}
+                                                      <div className="flex items-start justify-between gap-2 mb-2">
+                                                          <div className="flex items-center gap-2">
+                                                              <span className="w-6 h-6 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                                                                  {qIdx + 1}
+                                                              </span>
+                                                              <span className="text-[11px] font-bold text-gray-500 uppercase">
+                                                                  {q.type === 'multiple' ? 'Selección Múltiple' : 'Respuesta Escrita'}
+                                                              </span>
+                                                          </div>
+
+                                                          {isCorrect ? (
+                                                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/80 px-2.5 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-800">
+                                                                  <CheckCircle2 size={12} /> Correcta (+1.0)
+                                                              </span>
+                                                          ) : isUnanswered ? (
+                                                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/80 px-2.5 py-0.5 rounded-full border border-amber-300 dark:border-amber-800">
+                                                                  <AlertTriangle size={12} /> Sin responder (0.0)
+                                                              </span>
+                                                          ) : (
+                                                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-950/80 px-2.5 py-0.5 rounded-full border border-red-300 dark:border-red-800">
+                                                                  <X size={12} /> Incorrecta (0.0)
+                                                              </span>
+                                                          )}
+                                                      </div>
+
+                                                      {/* Enunciado de la pregunta */}
+                                                      <p className="text-xs sm:text-sm font-bold text-gray-900 dark:text-gray-100 mb-3 pl-8">
+                                                          {q.text || q.question || 'Pregunta sin enunciado'}
+                                                      </p>
+
+                                                      {/* Respuestas detalladas */}
+                                                      {q.type === 'multiple' ? (
+                                                          <div className="space-y-1.5 pl-8">
+                                                              {(q.options || []).map((opt, oIdx) => {
+                                                                  const wasSelected = (Array.isArray(qAns) ? qAns : []).includes(oIdx);
+                                                                  const isOptCorrect = opt.isCorrect;
+
+                                                                  let cardClass = "border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 bg-white/60 dark:bg-gray-800/40 opacity-70";
+                                                                  let badge = null;
+
+                                                                  if (wasSelected && isOptCorrect) {
+                                                                      cardClass = "bg-emerald-100/70 dark:bg-emerald-950/50 border-emerald-500 text-emerald-900 dark:text-emerald-200 font-bold shadow-xs";
+                                                                      badge = (
+                                                                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-white bg-emerald-600 px-2 py-0.5 rounded-md shrink-0">
+                                                                              <CheckCircle2 size={11} /> Seleccionó (Correcta)
+                                                                          </span>
+                                                                      );
+                                                                  } else if (wasSelected && !isOptCorrect) {
+                                                                      cardClass = "bg-red-100/70 dark:bg-red-950/50 border-red-500 text-red-900 dark:text-red-200 font-bold shadow-xs";
+                                                                      badge = (
+                                                                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-white bg-red-600 px-2 py-0.5 rounded-md shrink-0">
+                                                                              <X size={11} /> Seleccionó (Incorrecta)
+                                                                          </span>
+                                                                      );
+                                                                  } else if (!wasSelected && isOptCorrect) {
+                                                                      cardClass = "bg-emerald-50/50 dark:bg-emerald-950/20 border-2 border-dashed border-emerald-500/70 text-emerald-800 dark:text-emerald-300 font-semibold";
+                                                                      badge = (
+                                                                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/60 px-2 py-0.5 rounded-md shrink-0">
+                                                                              <CheckCircle2 size={11} /> Opción correcta
+                                                                          </span>
+                                                                      );
+                                                                  }
+
+                                                                  return (
+                                                                      <div 
+                                                                          key={oIdx} 
+                                                                          className={`p-2.5 rounded-xl border flex items-center justify-between gap-2.5 text-xs transition-all ${cardClass}`}
+                                                                      >
+                                                                          <div className="flex items-center gap-2">
+                                                                              <span className="w-5 h-5 rounded-md bg-gray-200/80 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-black text-[10px] flex items-center justify-center shrink-0">
+                                                                                  {String.fromCharCode(65 + oIdx)}
+                                                                              </span>
+                                                                              <span>{opt.text}</span>
+                                                                          </div>
+                                                                          {badge}
+                                                                      </div>
+                                                                  );
+                                                              })}
+                                                          </div>
+                                                      ) : (
+                                                          <div className="space-y-2 pl-8">
+                                                              <div className={`p-3 rounded-xl border text-xs ${
+                                                                  isCorrect 
+                                                                      ? 'bg-emerald-100/60 dark:bg-emerald-950/40 border-emerald-400 text-emerald-900 dark:text-emerald-200 font-medium' 
+                                                                      : isUnanswered
+                                                                          ? 'bg-amber-100/60 dark:bg-amber-950/40 border-amber-400 text-amber-900 dark:text-amber-200'
+                                                                          : 'bg-red-100/60 dark:bg-red-950/40 border-red-400 text-red-900 dark:text-red-200 font-medium'
+                                                              }`}>
+                                                                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-0.5">
+                                                                      Respuesta del estudiante:
+                                                                  </p>
+                                                                  <p className="font-bold text-xs sm:text-sm">
+                                                                      {qAns && typeof qAns === 'string' && qAns.trim() ? `"${qAns.trim()}"` : <span className="italic text-gray-400">(Sin respuesta escrita)</span>}
+                                                                  </p>
+                                                              </div>
+
+                                                              {!isCorrect && (
+                                                                  <div className="p-3 rounded-xl border border-blue-300 dark:border-blue-800 bg-blue-50/70 dark:bg-blue-950/30 text-xs">
+                                                                      <p className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-0.5">
+                                                                          Respuesta correcta esperada:
+                                                                      </p>
+                                                                      <p className="font-bold text-blue-900 dark:text-blue-100 text-xs sm:text-sm">
+                                                                          "{q.correctAnswer}"
+                                                                      </p>
+                                                                  </div>
+                                                              )}
+                                                          </div>
+                                                      )}
+                                                  </div>
+                                              );
+                                          })}
+
+                                          {/* Sección de Retroalimentación del Docente */}
+                                          <div className="mt-6 p-4 rounded-2xl border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/50 dark:bg-indigo-950/20 space-y-2.5">
+                                              <div className="flex items-center justify-between">
+                                                  <label className="text-xs font-bold text-indigo-900 dark:text-indigo-200 flex items-center gap-1.5">
+                                                      <MessageCircle size={14} className="text-indigo-600"/>
+                                                      Retroalimentación personalizada para {selectedStudentGradeForReview.studentName}
+                                                  </label>
+                                                  {selectedStudentGradeForReview.teacherFeedback && (
+                                                      <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                                                          <CheckCircle2 size={11} /> Guardada
+                                                      </span>
+                                                  )}
+                                              </div>
+                                              <textarea
+                                                  value={reviewFeedbackText}
+                                                  onChange={(e) => setReviewFeedbackText(e.target.value)}
+                                                  placeholder="Escribe comentarios, observaciones sobre sus respuestas o sugerencias para este estudiante..."
+                                                  className={`${glassInput} !py-2 text-xs h-20 resize-none font-medium`}
+                                              />
+                                              <div className="flex items-center justify-between pt-1">
+                                                  <p className="text-[10px] text-gray-500 italic">
+                                                      Esta nota se incluirá en el reporte de Excel y se mostrará al estudiante.
+                                                  </p>
+                                                  <button
+                                                      type="button"
+                                                      onClick={handleSaveTeacherFeedback}
+                                                      disabled={isSavingFeedback}
+                                                      className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition-all active:scale-95 disabled:opacity-50"
+                                                  >
+                                                      {isSavingFeedback ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
+                                                      <span>Guardar retroalimentación</span>
+                                                  </button>
+                                              </div>
+                                          </div>
+                                      </div>
+
+                                      {/* Footer del modal */}
+                                      <div className="p-3.5 sm:p-4 border-t border-gray-100 dark:border-gray-800 flex justify-end gap-2 bg-gray-50/70 dark:bg-gray-800/40">
+                                          <button
+                                              type="button"
+                                              onClick={() => setSelectedStudentGradeForReview(null)}
+                                              className="px-5 py-2 rounded-xl bg-gray-200 hover:bg-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 font-bold text-xs transition-colors"
+                                          >
+                                              Cerrar revisión
+                                          </button>
+                                      </div>
+                                  </div>
+                              </div>
+                          )}
+
+                          {/* Modal 2: Banco de Preguntas Original de la Evaluación */}
+                          {showQuestionBankModal && (
+                              <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in">
+                                  <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl shadow-2xl max-w-3xl w-full max-h-[92vh] flex flex-col overflow-hidden my-auto">
+                                      <div className="p-4 sm:p-5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between gap-3 bg-gray-50/70 dark:bg-gray-800/40">
+                                          <div className="flex items-center gap-2">
+                                              <span className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+                                                  <FileText size={16} />
+                                              </span>
+                                              <div>
+                                                  <h3 className="text-base sm:text-lg font-black text-gray-900 dark:text-gray-100">
+                                                      Banco de Preguntas del Examen
+                                                  </h3>
+                                                  <p className="text-[11px] text-gray-500 font-medium">
+                                                      {viewingResultsFor.title} &nbsp;•&nbsp; {questions.length} preguntas en total
+                                                  </p>
+                                              </div>
+                                          </div>
+                                          <button
+                                              type="button"
+                                              onClick={() => setShowQuestionBankModal(false)}
+                                              className="p-2 rounded-xl text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                          >
+                                              <X size={18} />
+                                          </button>
+                                      </div>
+
+                                      <div className="overflow-y-auto p-4 sm:p-6 space-y-4 flex-1">
+                                          {questions.map((q, qIdx) => {
+                                              // Calcular estadística de aciertos en esta pregunta
+                                              let qCorrectCount = 0;
+                                              evalGrades.forEach(g => {
+                                                  const qAns = g.answers?.[qIdx];
+                                                  if (q.type === 'multiple') {
+                                                      const correctOpts = (q.options || []).map((opt, oIdx) => opt.isCorrect ? oIdx : null).filter(o => o !== null);
+                                                      const ansArr = Array.isArray(qAns) ? qAns : [];
+                                                      if (correctOpts.length > 0 && ansArr.length === correctOpts.length && correctOpts.every(i => ansArr.includes(i))) qCorrectCount++;
+                                                  } else {
+                                                      if (typeof qAns === 'string' && qAns.trim().toLowerCase() === (q.correctAnswer || '').trim().toLowerCase()) qCorrectCount++;
+                                                  }
+                                              });
+                                              const pct = evalGrades.length > 0 ? Math.round((qCorrectCount / evalGrades.length) * 100) : 0;
+
+                                              return (
+                                                  <div key={qIdx} className={`${glassCard} !p-4 rounded-2xl border border-gray-200/80 dark:border-gray-800 space-y-2.5`}>
+                                                      <div className="flex items-center justify-between gap-2">
+                                                          <div className="flex items-center gap-2">
+                                                              <span className="w-6 h-6 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                                                                  {qIdx + 1}
+                                                              </span>
+                                                              <span className="text-[11px] font-bold text-gray-500 uppercase">
+                                                                  {q.type === 'multiple' ? 'Selección Múltiple' : 'Respuesta Escrita'}
+                                                              </span>
+                                                          </div>
+                                                          <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
+                                                              {qCorrectCount}/{evalGrades.length} acertaron ({pct}%)
+                                                          </span>
+                                                      </div>
+
+                                                      <p className="text-xs sm:text-sm font-bold text-gray-900 dark:text-gray-100 pl-8">
+                                                          {q.text || q.question || 'Sin enunciado'}
+                                                      </p>
+
+                                                      {q.type === 'multiple' ? (
+                                                          <div className="space-y-1.5 pl-8">
+                                                              {(q.options || []).map((opt, oIdx) => (
+                                                                  <div 
+                                                                      key={oIdx} 
+                                                                      className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 text-xs ${
+                                                                          opt.isCorrect 
+                                                                              ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-400 text-emerald-900 dark:text-emerald-200 font-bold' 
+                                                                              : 'border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 bg-gray-50/50 dark:bg-gray-800/30'
+                                                                      }`}
+                                                                  >
+                                                                      <div className="flex items-center gap-2">
+                                                                          <span className="w-5 h-5 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-black text-[10px] flex items-center justify-center shrink-0">
+                                                                              {String.fromCharCode(65 + oIdx)}
+                                                                          </span>
+                                                                          <span>{opt.text}</span>
+                                                                      </div>
+                                                                      {opt.isCorrect && (
+                                                                          <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                                                                              <CheckCircle2 size={11} /> Correcta
+                                                                          </span>
+                                                                      )}
+                                                                  </div>
+                                                              ))}
+                                                          </div>
+                                                      ) : (
+                                                          <div className="pl-8">
+                                                              <div className="p-2.5 rounded-xl border border-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 text-xs">
+                                                                  <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider block mb-0.5">
+                                                                      Respuesta correcta esperada:
+                                                                  </span>
+                                                                  <span className="font-bold text-emerald-900 dark:text-emerald-200 text-xs sm:text-sm">
+                                                                      "{q.correctAnswer}"
+                                                                  </span>
+                                                              </div>
+                                                          </div>
+                                                      )}
+                                                  </div>
+                                              );
+                                          })}
+                                      </div>
+
+                                      <div className="p-3.5 sm:p-4 border-t border-gray-100 dark:border-gray-800 flex justify-end bg-gray-50/70 dark:bg-gray-800/40">
+                                          <button
+                                              type="button"
+                                              onClick={() => setShowQuestionBankModal(false)}
+                                              className="px-5 py-2 rounded-xl bg-gray-200 hover:bg-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 font-bold text-xs transition-colors"
+                                          >
+                                              Cerrar cuestionario
+                                          </button>
+                                      </div>
+                                  </div>
+                              </div>
+                          )}
+
                       </div>
                   );
               }
@@ -7962,14 +8606,26 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                            Cancelada por cambio de pestaña
                                                        </span>
                                                    </div>
-                                               ) : (
-                                                   <div className="w-full flex items-center justify-between">
-                                                       <span className="text-xs font-bold text-gray-500">Tu calificación:</span>
-                                                        <span className={`text-sm font-black px-2.5 py-0.5 rounded-lg ${(Number(studentGrade?.score) || 0) >= 3.0 ? 'bg-green-500/10 text-green-600' : 'bg-red-500/10 text-red-600'}`}>
-                                                            {(Number(studentGrade?.score) || 0).toFixed(1)} / 5.0
-                                                       </span>
-                                                   </div>
-                                               )
+                                                ) : (
+                                                    <div className="w-full">
+                                                        <div className="w-full flex items-center justify-between">
+                                                            <span className="text-xs font-bold text-gray-500">Tu calificación:</span>
+                                                            <span className={`text-sm font-black px-2.5 py-0.5 rounded-lg ${(Number(studentGrade?.score) || 0) >= 3.0 ? 'bg-green-500/10 text-green-600' : 'bg-red-500/10 text-red-600'}`}>
+                                                                {(Number(studentGrade?.score) || 0).toFixed(1)} / 5.0
+                                                            </span>
+                                                        </div>
+                                                        {studentGrade?.teacherFeedback && (
+                                                            <div className="w-full mt-2.5 p-2.5 rounded-xl bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-800/60 text-left">
+                                                                <p className="text-[10px] font-bold text-indigo-700 dark:text-indigo-300 flex items-center gap-1 mb-0.5">
+                                                                    <MessageCircle size={11} /> Mensaje de la profesora:
+                                                                </p>
+                                                                <p className="text-xs text-gray-700 dark:text-gray-300 font-medium italic">
+                                                                    "{studentGrade.teacherFeedback}"
+                                                                </p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )
                                            ) : isExpired ? (
                                                <button disabled className="w-full bg-gray-100 dark:bg-gray-800 text-gray-400 font-bold py-1.5 rounded-xl text-xs cursor-not-allowed">
                                                    Evaluación cerrada
