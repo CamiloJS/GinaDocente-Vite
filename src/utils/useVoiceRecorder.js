@@ -32,6 +32,10 @@ export const useVoiceRecorder = (folderName = 'audio', showMessage = () => {}) =
 
   const startRecording = async () => {
     if (recorderRef.current && recorderRef.current.state !== 'inactive') return;
+    if (!navigator?.mediaDevices?.getUserMedia) {
+      showMessage('Tu navegador no permite la grabación de audio.');
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream

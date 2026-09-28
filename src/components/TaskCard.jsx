@@ -723,7 +723,13 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                 return c;
             });
         }
+        try {
         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), { comments: updatedComments });
+        } catch (err) {
+            console.error("Error al eliminar comentario:", err);
+            showMessage("Hubo un error al eliminar el comentario.");
+        }
+
     };
 
     const handleSaveEditedTask = async () => {
@@ -853,7 +859,7 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                 new Promise((_, reject) => setTimeout(() => reject(new Error("La conexión con el servidor tardó demasiado")), ms))
             ]);
 
-            await withTimeout(setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), { ...task, comments: [...(task.comments || []), newComment] }));
+            await withTimeout(updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), { comments: [...(task.comments || []), newComment] }));
             
             setCommentTitle(""); setCommentText(""); setCommentImageUrl(""); setCommentImageUrls([]); setCommentFileUrl(""); setCommentFileName(""); setAudioCom("");
             setShowCommentImageInput(false); setShowAttachmentMenu(false); setShowEmojiPicker(false); setReplyingTo(null);
@@ -1110,7 +1116,15 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                                         <button onClick={() => setIsEditingTask(true)} className="p-1 rounded-lg text-gray-400 hover:text-blue-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" title="Editar">
                                             <Edit3 size={15} />
                                         </button>
-                                        <button onClick={() => confirmAction("¿Desea eliminar esta publicación definitivamente?", () => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id)))} className="p-1 rounded-lg text-gray-400 hover:text-red-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" title="Eliminar">
+                                        <button onClick={() => confirmAction("¿Desea eliminar esta publicación definitivamente?", async () => {
+                                            try {
+                                                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id));
+                                                showMessage("✅ Publicación eliminada.");
+                                            } catch (e) {
+                                                console.error("Error al eliminar publicación:", e);
+                                                showMessage("❌ Error al eliminar la publicación.");
+                                            }
+                                        })} className="p-1 rounded-lg text-gray-400 hover:text-red-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" title="Eliminar">
                                             <Trash2 size={15} />
                                         </button>
                                     </>
@@ -1424,8 +1438,11 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
 
                                                 {showVoters && (
                                                     <div className="flex flex-wrap gap-1 mt-1.5 p-2 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/60 dark:border-indigo-800/40 animate-in fade-in duration-150">
-                                                        {opt.voterIds.map(uid => {
-                                                            const studentName = userMappings?.[uid]?.name || uid.replace(/^uid_|^name_/, '');
+                                                        {(opt.voterIds || []).map(uid => {
+                                                            const isTeacher = uid === 'teacher' || uid === 'teacher_gina' || (typeof uid === 'string' && uid.startsWith('teacher'));
+                                                            const studentName = isTeacher 
+                                                                ? (TEACHER_NAME || 'Prof. Gina Quintana')
+                                                                : (userMappings?.[uid]?.fullName || userMappings?.[uid]?.name || String(uid || '').replace(/^uid_|^name_/, ''));
                                                             return (
                                                                 <span key={uid} className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-white dark:bg-gray-800 text-indigo-800 dark:text-indigo-200 border border-indigo-200/60 dark:border-indigo-700/60 shadow-2xs">
                                                                     <UserIcon size={10} /> {studentName}
@@ -1928,7 +1945,7 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                                                 {isReply && c.replyTo?.author && (
                                                     <span className="text-[10.5px] text-gray-400 dark:text-gray-500 font-medium inline-flex items-center gap-0.5">
                                                         <span>respondió a</span>
-                                                        <span className="font-bold text-emerald-600 dark:text-emerald-400 hover:underline">@{c.replyTo.author.split(' ')[0]}</span>
+                                                        <span className="font-bold text-emerald-600 dark:text-emerald-400 hover:underline">@{String(c.replyTo.author || '').split(' ')[0]}</span>
                                                     </span>
                                                 )}
 
@@ -1966,7 +1983,7 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                                         {c.title && !isReply && (
                                             <div className="mt-1.5 pb-1 border-b border-emerald-500/20">
                                                 <h5 className="font-extrabold text-xs uppercase tracking-wide text-emerald-800 dark:text-emerald-300 leading-snug">
-                                                    {c.title.toUpperCase()}
+                                                    {String(c.title || '').toUpperCase()}
                                                 </h5>
                                             </div>
                                         )}

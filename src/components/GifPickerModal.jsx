@@ -54,7 +54,7 @@ const GifPickerModal = ({ onSelect, onClose, isDarkMode }) => {
         <div className="flex-1 overflow-y-auto p-4 grid grid-cols-2 gap-2 max-h-64 bg-black/5">
           {results.length === 0 && !loading && <p className="col-span-2 text-center text-gray-500 text-sm py-4">Escribe algo y presiona buscar.</p>}
           {results.map((gif) => (
-            <img key={gif.id} src={gif.url} className="w-full h-24 object-cover rounded-xl cursor-pointer hover:scale-105 hover:shadow-lg transition-all" onClick={() => onSelect?.(gif.url)} alt="GIF" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+            <img key={gif.id} src={gif.url} className="w-full h-24 object-cover rounded-xl cursor-pointer hover:scale-105 hover:shadow-lg transition-all" onClick={() => { onSelect?.(gif.url); onClose?.(); }} alt="GIF" onError={(e) => { e.currentTarget.style.display = "none"; }} />
           ))}
         </div>
       </div>

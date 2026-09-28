@@ -574,6 +574,7 @@ function App() {
   const submitEvaluationRef = useRef(null);
   const onboardingFileInputRef = useRef(null);
   const isSendingChatAppMessageRef = useRef(false);
+  const markingReadRef = useRef(false);
   // Fix closure bug: ref siempre tiene el valor actual de soundEnabled
   // (el listener uUnread captura el closure inicial y no ve los cambios de estado)
   const soundEnabledRef = useRef(soundEnabled);
@@ -1361,9 +1362,9 @@ function App() {
     try {
       const cancelData = {
         evaluationId: targetEval.id,
-        studentId: user?.uid || myChatId || '',
+        studentId: user?.uid || myChatId || 'student_user',
         studentEmail: user?.email || '',
-        studentName: loggedInName,
+        studentName: loggedInName || 'Estudiante',
         score: 0.0,
         status: 'cancelled_tab_change',
         statusReason: 'Cancelada por cambio de pestaña o pantalla',
@@ -1507,10 +1508,10 @@ function App() {
       const score = calculateScore(activeTakingEval, currentAnswers);
       const gradeData = {
         evaluationId: activeTakingEval.id,
-        studentId: user?.uid || myChatId || '',
+        studentId: user?.uid || myChatId || 'student_user',
         studentEmail: user?.email || '',
-        studentName: loggedInName,
-        score: parseFloat(score.toFixed(1)),
+        studentName: loggedInName || 'Estudiante',
+        score: parseFloat((Number(score) || 0).toFixed(1)),
         answers: currentAnswers,
         submittedAt: Date.now()
       };
@@ -3174,15 +3175,22 @@ useEffect(() => {
           // Efecto para marcar los mensajes como leídos cuando entras al chat
           useEffect(() => {
               if (!activeChat || !myChatId || chatMessages.length === 0) return;
+              if (markingReadRef.current) return;
+
+              const unreadMessages = chatMessages.filter(m => m.authorId !== myChatId && m.status !== 'read');
+              if (unreadMessages.length === 0) return;
 
               const markAsRead = async () => {
-                  const isMyMsg = (m) => m.authorId === myChatId || (role === 'teacher' && (m.authorId === 'teacher' || m.authorId === 'teacher_gina'));
-                  const unreadMessages = chatMessages.filter(m => !isMyMsg(m) && m.status !== 'read');
-                  if (unreadMessages.length > 0) {
+                  markingReadRef.current = true;
+                  try {
+                      const isMyMsg = (m) => m.authorId === myChatId || (role === 'teacher' && (m.authorId === 'teacher' || m.authorId === 'teacher_gina'));
+                      const unreadMessages = chatMessages.filter(m => !isMyMsg(m) && m.status !== 'read');
                       await Promise.all(unreadMessages.map(msg => {
                           const msgRef = doc(db, 'artifacts', appId, 'public', 'data', 'chats', activeChat.id, 'messages', msg.id);
                           return updateDoc(msgRef, { status: 'read', readAt: Date.now() }).catch(() => {});
                       }));
+                  } finally {
+                      markingReadRef.current = false;
                   }
               };
 
@@ -3548,7 +3556,7 @@ useEffect(() => {
       try {
           setIsUploadingGroupAvatar(true);
           const compressed = await compressImage(file);
-          const url = await uploadImageToStorage(compressed, `group_avatars/${activeChat.id}_${Date.now()}.jpg`);
+          const url = await uploadImageToStorage(compressed, 'group_avatars');
           const grp = chatGroups.find(g => g.id === activeChat.id || `group_${g.id}` === activeChat.id || `acad_${g.academicGroupId}` === activeChat.id || `acad_${g.id}` === activeChat.id);
           if (grp) {
               await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', grp.id), { avatarUrl: url });
@@ -4135,8 +4143,8 @@ useEffect(() => {
 
             await withTimeout(addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'userPosts'), {
                 authorId: user?.uid || myChatId || 'user', 
-                authorUsername: myChatId, 
-                authorName: loggedInName,
+                authorUsername: myChatId || '', 
+                authorName: loggedInName || 'Usuario',
                 title: (profilePostTitle || '').trim(), 
                 text: (profilePostText || '').trim(), 
                 imageUrl: profilePostImage || '',
@@ -4298,7 +4306,14 @@ useEffect(() => {
                 {/* Cabecera del Perfil Compacta con Indicador de Presencia */}
                 <div className={`flex flex-col sm:flex-row items-center gap-4 sm:gap-6 p-5 sm:p-6 relative rounded-2xl shadow-xs border ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} ${!isMyProfile ? 'pt-14 sm:pt-6 sm:pl-14' : ''}`}>
                     {!isMyProfile && (
-                        <button onClick={() => {setViewingProfileId(null); changeTab('chat');}} className={`absolute top-4 left-4 z-20 p-2 rounded-xl transition shadow-xs ${isDarkMode ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} title="Volver al chat">
+                        <button onClick={() => {
+                            setViewingProfileId(null);
+                            if (window.history.length > 1) {
+                                window.history.back();
+                            } else {
+                                changeTab(role === 'teacher' ? 'directory' : 'tasks');
+                            }
+                        }} className={`absolute top-4 left-4 z-20 p-2 rounded-xl transition shadow-xs ${isDarkMode ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} title="Volver">
                             <ArrowLeftIcon size={18}/>
                         </button>
                     )}
@@ -6411,7 +6426,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                 <span>Ver alumnos</span>
                                             </button>
                                         </div>
-                                        {isManaging && (
+{isManaging && (
                                             <div onClick={e => e.stopPropagation()} className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-2.5 animate-in fade-in">
                                                 <div className="flex flex-wrap items-center gap-2">
                                                     <select value={codeExpiryDays} onChange={e => setCodeExpiryDays(e.target.value)} className={`text-xs font-medium rounded-lg border px-2 py-1.5 outline-none ${isDarkMode ? 'bg-gray-900 border-gray-700 text-gray-200' : 'bg-white border-gray-300 text-gray-700'}`}>
@@ -6651,6 +6666,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                         <button 
                                             type="button"
                                             onClick={() => confirmAction(`¿Eliminar a "${data.fullName}" (@${userKey}) del sistema? Su enlace de perfil será eliminado permanentemente.`, async () => {
+                                                try {
                                                 await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userMappings', userKey));
                                                 for (const g of academicGroups) {
                                                     await removeStudentFromGroupHelper(g.id, userKey);
@@ -6661,6 +6677,11 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                     window.location.hash = 'directory';
                                                 }
                                                 showMessage("Estudiante eliminado y enlace invalidado.");
+                                                } catch (err) {
+                                                    console.error("Error al eliminar estudiante:", err);
+                                                    showMessage("Error al eliminar el estudiante.");
+                                                }
+
                                             })} 
                                             className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-xl transition-all"
                                             title="Eliminar estudiante"
@@ -10731,7 +10752,7 @@ Bot:`;
                                                       setTaskTitle(parsed.params.title);
                                                       setTaskDesc(parsed.params.description || '');
                                                       if (parsed.params.group) {
-                                                          const grp = academicGroups.find(g => g.name.toLowerCase().includes(parsed.params.group.toLowerCase()));
+                                                          const grp = academicGroups.find(g => (g?.name || '').toLowerCase().includes(String(parsed.params?.group || '').toLowerCase()));
                                                           if (grp) setPostTargetGroup(grp.id);
                                                       }
                                                       changeTab('tasks');
@@ -10792,11 +10813,11 @@ Bot:`;
                                                   break;
                                               case 'top_students':
                                                   const sorted = Object.entries(gradesByStudent).map(([n,s]) => ({ name: n, avg: s.reduce((acc,v) => acc + (parseFloat(v.split(': ')[1]) || 0), 0) / (s.length || 1) })).sort((a,b) => b.avg - a.avg).slice(0,5);
-                                                  cleanReply = `Top 5 estudiantes:\n${sorted.map((s,i) => `${i+1}. ${s.name}: ${s.avg.toFixed(1)}/5.0`).join('\n')}`;
+                                                  cleanReply = `Top 5 estudiantes:\n${sorted.map((s,i) => `${i+1}. ${s.name}: ${(Number(s.avg) || 0).toFixed(1)}/5.0`).join('\n')}`;
                                                   break;
                                               case 'worst_students':
                                                   const sortedW = Object.entries(gradesByStudent).map(([n,s]) => ({ name: n, avg: s.reduce((acc,v) => acc + (parseFloat(v.split(': ')[1]) || 0), 0) / (s.length || 1) })).sort((a,b) => a.avg - b.avg).slice(0,5);
-                                                  cleanReply = `Estudiantes con menor rendimiento:\n${sortedW.map((s,i) => `${i+1}. ${s.name}: ${s.avg.toFixed(1)}/5.0`).join('\n')}`;
+                                                  cleanReply = `Estudiantes con menor rendimiento:\n${sortedW.map((s,i) => `${i+1}. ${s.name}: ${(Number(s.avg) || 0).toFixed(1)}/5.0`).join('\n')}`;
                                                   break;
                                               // Grupos
                                               case 'list_groups':
