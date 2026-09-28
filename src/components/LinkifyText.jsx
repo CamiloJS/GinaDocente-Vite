@@ -265,7 +265,7 @@ const parseBlockFormatting = (text, keyPrefix = 'blk', emojiSize = '1.25em') => 
   });
 };
 
-const LinkifyText = ({ text, isDarkMode = false, isEmojiOnly = false }) => {
+const LinkifyText = ({ text, isDarkMode = false, isEmojiOnly = false, embedVideos = true }) => {
   if (!text) return null;
   const emojiSize = isEmojiOnly ? '2.4em' : '1.25em';
   const urlRegex = /(https?:\/\/[^\s]+)/g;

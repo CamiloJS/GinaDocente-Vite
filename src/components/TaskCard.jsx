@@ -1276,7 +1276,7 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                                 </button>
                             </div>
                             <p className={`text-sm leading-relaxed whitespace-pre-wrap w-full ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>
-                                <LinkifyText text={translatedDescription} />
+                                <LinkifyText text={translatedDescription} isDarkMode={isDarkMode} embedVideos={!task.videoUrl && !task.imageUrl && !task.fileUrl && !task.audioUrl} />
                             </p>
                         </div>
                     ) : (
@@ -1291,7 +1291,7 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                                 </button>
                             )}
                             <p className={`text-sm leading-relaxed whitespace-pre-wrap w-full ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>
-                                <LinkifyText text={task.description} />
+                                <LinkifyText text={task.description} isDarkMode={isDarkMode} embedVideos={!task.videoUrl && !task.imageUrl && !task.fileUrl && !task.audioUrl} />
                             </p>
                         </div>
                     )}
