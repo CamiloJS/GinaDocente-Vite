@@ -1,7 +1,7 @@
 // src/components/TasksTab.jsx
 import React, { useState, useRef } from 'react'
 import {
-  Book, BookOpen, CheckCheck, ChevronRight, Globe, ImageIcon, Mic, NavNotebook, PaperclipIcon, Plus, SearchIcon, Sparkles, Square, Target, Loader2, Undo2, X, Play, Pause, MessageCircle
+  Book, BookOpen, CheckCheck, ChevronRight, Globe, ImageIcon, Mic, NavNotebook, PaperclipIcon, Plus, SearchIcon, Sparkles, Square, Target, Loader2, Undo2, X, Play, Pause, MessageCircle, BarChart2, Vote
 } from './Icons.jsx'
 import TaskCard from './TaskCard.jsx'
 import EmptyState from './EmptyState.jsx'
@@ -51,6 +51,8 @@ const TasksTab = React.memo(({
     const [localWallSearchTerm, setLocalWallSearchTerm] = useState("");
     const taskDescRef = useRef(null);
     const [dynamicPlaceholder, setDynamicPlaceholder] = useState(() => getTeacherDynamicPlaceholder(loggedInName));
+    const [pollOptions, setPollOptions] = useState(["", ""]);
+    const [isMultipleChoice, setIsMultipleChoice] = useState(false);
     const wallSearchTerm = propWallSearchTerm !== undefined ? propWallSearchTerm : localWallSearchTerm;
     const setWallSearchTerm = propSetWallSearchTerm || setLocalWallSearchTerm;
     const { isRecording: recPub, audioUrl: audioPub, isUploading: upPub, recordingTime: recTimePub, setAudioUrl: setAudioPub, startRecording: startPub, stopRecording: stopPub, cancelRecording: cancelPub } = useVoiceRecorder('tasks_audios', showMessage);
@@ -365,6 +367,13 @@ const TasksTab = React.memo(({
                                 </button>
                                 <button 
                                     type="button" 
+                                    onClick={(e) => { e.stopPropagation(); setPostType('poll'); setIsFormExpanded(true); }} 
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-950/60 transition-colors shrink-0 whitespace-nowrap"
+                                >
+                                    <BarChart2 size={15} /> Encuesta
+                                </button>
+                                <button 
+                                    type="button" 
                                     onClick={(e) => { e.stopPropagation(); setIsFormExpanded(true); setShowPostAttachmentMenu(true); }} 
                                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors shrink-0 whitespace-nowrap"
                                 >
@@ -424,6 +433,13 @@ const TasksTab = React.memo(({
                                         className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${postType === 'post' ? 'bg-white dark:bg-gray-900 shadow-sm text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'}`}
                                     >
                                         <BookOpen size={14} /> Publicación
+                                    </button>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setPostType('poll')} 
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${postType === 'poll' ? 'bg-white dark:bg-gray-900 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'}`}
+                                    >
+                                        <BarChart2 size={14} /> Encuesta
                                     </button>
                                 </div>
                                 
@@ -487,7 +503,7 @@ const TasksTab = React.memo(({
                             <input 
                                 value={taskTitle} 
                                 onChange={(e) => setTaskTitle(e.target.value)} 
-                                placeholder={postType === 'task' ? "Título claro de la tarea..." : postType === 'forum' ? "Tema central del foro de debate..." : "Título de la publicación..."} 
+                                placeholder={postType === 'task' ? "Título claro de la tarea..." : postType === 'forum' ? "Tema central del foro de debate..." : postType === 'poll' ? "Pregunta de la encuesta (ej. ¿Cuál es tu horario preferido?)..." : "Título de la publicación..."} 
                                 className="w-full text-base font-bold bg-transparent outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 pb-2 border-b border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100" 
                                 required 
                             />
@@ -496,7 +512,7 @@ const TasksTab = React.memo(({
                                 <RichVisualEditor 
                                     value={taskDesc}
                                     onChange={setTaskDesc}
-                                    placeholder={postType === 'forum' ? "Escribe la pregunta detonante, pautas o tema de discusión para el debate..." : "Escribe las instrucciones detalladas, indicaciones o una idea general..."}
+                                    placeholder={postType === 'forum' ? "Escribe la pregunta detonante, pautas o tema de discusión para el debate..." : postType === 'poll' ? "Detalles, contexto o indicaciones adicionales de la encuesta (opcional)..." : "Escribe las instrucciones detalladas, indicaciones o una idea general..."}
                                     isDarkMode={isDarkMode}
                                     minHeight="110px"
                                 />
@@ -774,12 +790,96 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                             </div>
                         </div>
 
-                        {/* Parámetros de Entrega y Cierre (Tareas y Foros) */}
-                        {(postType === 'task' || postType === 'forum') && (
+                        {/* Configuración específica de Encuestas */}
+                        {postType === 'poll' && (
+                            <div className="p-4 rounded-2xl border border-indigo-200 dark:border-indigo-800/60 bg-indigo-50/40 dark:bg-indigo-950/20 space-y-3.5 mt-2 animate-in fade-in duration-200">
+                                <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-indigo-200/60 dark:border-indigo-800/40">
+                                    <span className="text-xs font-extrabold text-indigo-900 dark:text-indigo-200 flex items-center gap-1.5">
+                                        <BarChart2 size={16} className="text-indigo-600 dark:text-indigo-400" />
+                                        Modo de selección de la encuesta
+                                    </span>
+                                    <div className="flex items-center gap-1 bg-white dark:bg-gray-900 p-1 rounded-xl border border-indigo-200 dark:border-indigo-800 shadow-2xs">
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsMultipleChoice(false)}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                                !isMultipleChoice 
+                                                    ? 'bg-indigo-600 text-white shadow-xs' 
+                                                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                                            }`}
+                                        >
+                                            Selección única
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsMultipleChoice(true)}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                                isMultipleChoice 
+                                                    ? 'bg-indigo-600 text-white shadow-xs' 
+                                                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                                            }`}
+                                        >
+                                            Selección múltiple
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">
+                                        Opciones de respuesta <span className="text-red-500">*</span> (mínimo 2, máximo 8):
+                                    </label>
+                                    {pollOptions.map((opt, idx) => (
+                                        <div key={idx} className="flex items-center gap-2">
+                                            <div className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 text-xs font-bold flex items-center justify-center shrink-0">
+                                                {idx + 1}
+                                            </div>
+                                            <input
+                                                type="text"
+                                                value={opt}
+                                                onChange={(e) => {
+                                                    const next = [...pollOptions];
+                                                    next[idx] = e.target.value;
+                                                    setPollOptions(next);
+                                                }}
+                                                placeholder={`Opción ${idx + 1}...`}
+                                                className="flex-1 py-2 px-3 text-xs font-medium rounded-xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-indigo-500"
+                                            />
+                                            {pollOptions.length > 2 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setPollOptions(pollOptions.filter((_, i) => i !== idx));
+                                                    }}
+                                                    className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                                                    title="Eliminar opción"
+                                                >
+                                                    <X size={15} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+
+                                    {pollOptions.length < 8 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setPollOptions([...pollOptions, ""])}
+                                            className="mt-1 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 flex items-center gap-1.5 py-1.5 px-3 rounded-xl hover:bg-indigo-100/60 dark:hover:bg-indigo-950/50 transition-colors"
+                                        >
+                                            <Plus size={14} /> Añadir otra opción
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Parámetros de Entrega y Cierre (Tareas, Foros y Encuestas) */}
+                        {(postType === 'task' || postType === 'forum' || postType === 'poll') && (
                             <div className={`p-4 rounded-2xl border mt-2 space-y-3 ${
                                 postType === 'forum' 
                                     ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/60' 
-                                    : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                                    : postType === 'poll'
+                                        ? 'bg-indigo-50/50 dark:bg-indigo-950/20 border-indigo-200 dark:border-indigo-800/60'
+                                        : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700'
                             }`}>
                                 <div className="flex items-center justify-between pb-2 border-b border-gray-200/60 dark:border-gray-700/60">
                                     <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -787,10 +887,21 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                             type="checkbox" 
                                             checked={hasDueDate} 
                                             onChange={(e) => setHasDueDate(e.target.checked)} 
-                                            className={`w-4 h-4 rounded ${postType === 'forum' ? 'accent-emerald-600' : 'accent-[#AD3333]'}`} 
+                                            className={`w-4 h-4 rounded ${
+                                                postType === 'forum' 
+                                                    ? 'accent-emerald-600' 
+                                                    : postType === 'poll'
+                                                        ? 'accent-indigo-600'
+                                                        : 'accent-[#AD3333]'
+                                            }`} 
                                         />
                                         <span className="text-xs font-bold text-gray-800 dark:text-gray-200">
-                                            {postType === 'forum' ? 'Establecer fecha límite de cierre' : 'Establecer fecha y hora límite de entrega'}
+                                            {postType === 'forum' 
+                                                ? 'Establecer fecha límite de cierre' 
+                                                : postType === 'poll'
+                                                    ? 'Establecer fecha y hora límite de votación'
+                                                    : 'Establecer fecha y hora límite de entrega'
+                                            }
                                         </span>
                                     </label>
                                     {!hasDueDate && (
@@ -804,27 +915,29 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                     <div className="flex flex-wrap gap-4 items-center animate-in fade-in duration-200">
                                         <div>
                                             <label className="text-xs font-bold text-gray-600 dark:text-gray-300 block mb-1">
-                                                {postType === 'forum' ? 'Fecha de cierre' : 'Fecha límite'}
+                                                {postType === 'forum' ? 'Fecha de cierre' : postType === 'poll' ? 'Cierre de votación' : 'Fecha límite'}
                                             </label>
                                             <input type="date" value={taskDate} onChange={(e) => setTaskDate(e.target.value)} className="py-1.5 px-3 text-xs font-bold rounded-xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500" required={hasDueDate} />
                                         </div>
                                         <div>
                                             <label className="text-xs font-bold text-gray-600 dark:text-gray-300 block mb-1">
-                                                {postType === 'forum' ? 'Hora de cierre' : 'Hora límite'}
+                                                {postType === 'forum' ? 'Hora de cierre' : postType === 'poll' ? 'Hora de cierre' : 'Hora límite'}
                                             </label>
                                             <input type="time" value={taskTime} onChange={(e) => setTaskTime(e.target.value)} className="py-1.5 px-3 text-xs font-bold rounded-xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500" required={hasDueDate} />
                                         </div>
-                                        <label className="flex items-center gap-2 cursor-pointer pt-4">
-                                            <input 
-                                                type="checkbox" 
-                                                checked={allowLate} 
-                                                onChange={(e) => setAllowLate(e.target.checked)} 
-                                                className={`w-4 h-4 rounded ${postType === 'forum' ? 'accent-emerald-600' : 'accent-[#AD3333]'}`} 
-                                            />
-                                            <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
-                                                {postType === 'forum' ? 'Permitir aportes tardíos' : 'Permitir entregas tardías'}
-                                            </span>
-                                        </label>
+                                        {postType !== 'poll' && (
+                                            <label className="flex items-center gap-2 cursor-pointer pt-4">
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={allowLate} 
+                                                    onChange={(e) => setAllowLate(e.target.checked)} 
+                                                    className={`w-4 h-4 rounded ${postType === 'forum' ? 'accent-emerald-600' : 'accent-[#AD3333]'}`} 
+                                                />
+                                                <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                                                    {postType === 'forum' ? 'Permitir aportes tardíos' : 'Permitir entregas tardías'}
+                                                </span>
+                                            </label>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -871,12 +984,31 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                     if (!cleanTitle && !cleanDesc && !hasAttachments) {
                                         return showMessage("Por favor ingresa al menos un título o descripción para publicar.");
                                     }
+
+                                    const currentPostType = postType || 'task';
+                                    let validPoll = null;
+                                    if (currentPostType === 'poll') {
+                                        if (!cleanTitle) {
+                                            return showMessage("⚠️ Por favor ingresa la pregunta principal de la encuesta.");
+                                        }
+                                        const validOptions = pollOptions.map(o => (o || '').trim()).filter(Boolean);
+                                        if (validOptions.length < 2) {
+                                            return showMessage("⚠️ La encuesta debe tener al menos 2 opciones de respuesta con texto.");
+                                        }
+                                        validPoll = {
+                                            isMultipleChoice: Boolean(isMultipleChoice),
+                                            options: validOptions.map((optText, idx) => ({
+                                                id: `opt_${Date.now()}_${idx}`,
+                                                text: optText,
+                                                voterIds: []
+                                            }))
+                                        };
+                                    }
                                     isPublishingRef.current = true;
                                     setIsPublishing(true);
                                     const finalTargetGroup = fixedTargetGroup || postTargetGroup || 'all';
                                     const cleanTargetId = String(finalTargetGroup).replace(/^acad_/i, '').trim().toLowerCase();
-                                    const currentPostType = postType || 'task';
-                                    const isTimed = (currentPostType === 'task' || currentPostType === 'forum') && Boolean(hasDueDate);
+                                    const isTimed = (currentPostType === 'task' || currentPostType === 'forum' || currentPostType === 'poll') && Boolean(hasDueDate);
                                     const targetGrpObj = academicGroups?.find(g => {
                                         if (!g) return false;
                                         const gClean = String(g.id || '').replace(/^acad_/i, '').trim().toLowerCase();
@@ -926,13 +1058,14 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                             fileName: postFileName || '', 
                                             dueDate: (isTimed && taskDate) ? String(taskDate) : null, 
                                             dueTime: (isTimed && taskTime) ? String(taskTime) : null, 
-                                            allowLate: isTimed ? Boolean(allowLate) : true,
+                                            allowLate: (isTimed && currentPostType !== 'poll') ? Boolean(allowLate) : (currentPostType === 'poll' ? false : true),
                                             hideDate: Boolean(hidePublicationDate),
                                             createdAt: Date.now(), 
                                             comments: [], 
                                             reactions: {} 
                                         };
 
+                                        if (validPoll) payload.poll = validPoll;
                                         if (postVideoUrl && postVideoUrl.trim()) payload.videoUrl = postVideoUrl.trim();
                                         if (postGeniallyUrl && postGeniallyUrl.trim()) payload.geniallyUrl = extractGeniallyUrl(postGeniallyUrl.trim());
                                         if (audioPub && typeof audioPub === 'string' && audioPub.trim()) payload.audioUrl = audioPub.trim();
@@ -962,13 +1095,14 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                                 fileName: postFileName || '',
                                                 dueDate: isTimed && taskDate ? String(taskDate) : null,
                                                 dueTime: isTimed && taskTime ? String(taskTime) : null,
-                                                allowLate: isTimed ? Boolean(allowLate) : true,
+                                                allowLate: (isTimed && currentPostType !== 'poll') ? Boolean(allowLate) : (currentPostType === 'poll' ? false : true),
                                                 hideDate: Boolean(hidePublicationDate),
                                                 createdAt: Date.now(),
                                                 comments: [],
                                                 reactions: {}
                                             };
                                             if (postGeniallyUrl && postGeniallyUrl.trim()) basicPayload.geniallyUrl = extractGeniallyUrl(postGeniallyUrl.trim());
+                                            if (validPoll) basicPayload.poll = validPoll;
                                             await withTimeout(addDoc(collection(effectiveDb, 'artifacts', effectiveAppId, 'public', 'data', 'tasks'), basicPayload), 10000);
                                         }
 
@@ -982,6 +1116,8 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                         if (typeof setPostFileUrl === 'function') setPostFileUrl("");
                                         if (typeof setPostFileName === 'function') setPostFileName("");
                                         if (typeof setAudioPub === 'function') setAudioPub(""); 
+                                        setPollOptions(["", ""]);
+                                        setIsMultipleChoice(false);
                                         setShowImageInput(false);
                                         setShowVideoInput(false);
                                         setShowPostAttachmentMenu(false); 
@@ -994,7 +1130,7 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                         setHasDueDate(true);
                                         setIsFormExpanded(false);
                                         setPostTargetGroup(fixedTargetGroup || "all");
-                                        showMessage(currentPostType === 'forum' ? "Foro de debate publicado con éxito." : currentPostType === 'task' ? "Tarea publicada con éxito." : "Publicación compartida con éxito.");
+                                        showMessage(currentPostType === 'poll' ? "Encuesta publicada con éxito." : currentPostType === 'forum' ? "Foro de debate publicado con éxito." : currentPostType === 'task' ? "Tarea publicada con éxito." : "Publicación compartida con éxito.");
                                     } catch (err) {
                                         console.error("Error al publicar:", err);
                                         showMessage(`Error al publicar: ${err?.message || 'Intenta nuevamente.'}`);
@@ -1008,13 +1144,15 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                 } ${
                                     postType === 'forum' 
                                         ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/30' 
-                                        : postType === 'post'
-                                            ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/30'
-                                            : `${redButton} shadow-red-600/30`
+                                        : postType === 'poll'
+                                            ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/30'
+                                            : postType === 'post'
+                                                ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/30'
+                                                : `${redButton} shadow-red-600/30`
                                 }`}
                             >
                                 {isPublishing && <Loader2 size={15} className="animate-spin" />}
-                                <span>{postType === 'forum' ? 'Publicar foro' : 'Publicar ahora'}</span>
+                                <span>{postType === 'forum' ? 'Publicar foro' : postType === 'poll' ? 'Publicar encuesta' : 'Publicar ahora'}</span>
                             </button>
                         </div>
                     </div>

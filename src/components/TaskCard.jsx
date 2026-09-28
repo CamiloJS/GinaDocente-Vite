@@ -3,7 +3,7 @@ import React, { useState, useRef } from 'react'
 import ReactDOM from 'react-dom'
 import * as XLSX from 'xlsx'
 import {
-  CheckCheck, CheckCircle2, CheckLine, Clock, Edit3, EyeOff, FileDocIcon, FileText, ImageIcon, Loader2, Lock, MessageSquareText, Mic, PaperclipIcon, Plus, ReplyIcon, Send, SmileIcon, Square, Star, Pin, Trash2, Upload, X, XLine, Volume2, Languages, UserIcon, BookOpen, NavNotebook, Play, Pause, Download, MessageCircle
+  CheckCheck, CheckCircle2, CheckLine, Clock, Edit3, EyeOff, FileDocIcon, FileText, ImageIcon, Loader2, Lock, MessageSquareText, Mic, PaperclipIcon, Plus, ReplyIcon, Send, SmileIcon, Square, Star, Pin, Trash2, Upload, X, XLine, Volume2, Languages, UserIcon, BookOpen, NavNotebook, Play, Pause, Download, MessageCircle, BarChart2, Vote
 } from './Icons.jsx'
 import {
   compressImage, containsBadWords, checkBadWordsAsync, uploadImageToStorage, uploadRawFileToStorage, TEACHER_NAME, COMMENT_EMOJIS, REACTION_EMOJIS, speakText, splitNameFirstAndLast, FALLBACK_MAP, format12HourTime, formatDateTime12H
@@ -101,7 +101,8 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
 
     const isTask = task?.type === 'task';
     const isForum = task?.type === 'forum';
-    const isPost = task?.type === 'post' || (!isTask && !isForum);
+    const isPoll = task?.type === 'poll' || Boolean(task?.poll);
+    const isPost = task?.type === 'post' || (!isTask && !isForum && !isPoll);
     const isTaskType = isTask || isForum;
 
     const [filterOnlyUngraded, setFilterOnlyUngraded] = useState(false);
@@ -166,10 +167,73 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
         const deadline = parsedDeadline && !isNaN(parsedDeadline.getTime()) ? parsedDeadline : null;
     const isExpired = deadline ? new Date() > deadline : false;
     const isAllowLate = Boolean(task.allowLate === true || task.allowLate === 'true' || task.allowLate === 1 || task.allowLate === '1');
-    // Si permite entrega tardía, o es un foro de discusión, nunca bloquea la valoración
-    const isLocked = isTask ? (isExpired && !isAllowLate) : (isExpired && !isAllowLate);
+    // Para encuestas, si expiró la fecha de cierre, se bloquea la votación
+    const isLocked = isPoll ? isExpired : (isTask ? (isExpired && !isAllowLate) : (isExpired && !isAllowLate));
+    const [isVoting, setIsVoting] = useState(false);
+    const [activeVotersOptionId, setActiveVotersOptionId] = useState(null);
 
 
+
+    const handleVote = async (optionId) => {
+        if (isLocked) {
+            showMessage("ℹ️ La votación para esta encuesta ya ha finalizado.");
+            return;
+        }
+        if (!currentUserId || currentUserId === 'undefined') {
+            showMessage("⚠️ Debes tener una sesión activa para votar.");
+            return;
+        }
+        if (isVoting) return;
+        setIsVoting(true);
+
+        try {
+            if (!auth.currentUser) {
+                try { await signInAnonymously(auth); } catch (e) {}
+            }
+
+            const isMultiple = Boolean(task.poll?.isMultipleChoice);
+            const currentOptions = task.poll?.options || [];
+            let updatedOptions;
+
+            if (isMultiple) {
+                updatedOptions = currentOptions.map(opt => {
+                    if (opt.id === optionId) {
+                        const currentList = opt.voterIds || [];
+                        const hasVoted = currentList.includes(currentUserId);
+                        return {
+                            ...opt,
+                            voterIds: hasVoted 
+                                ? currentList.filter(id => id !== currentUserId)
+                                : [...currentList, currentUserId]
+                        };
+                    }
+                    return opt;
+                });
+            } else {
+                const alreadyVotedThis = (currentOptions.find(o => o.id === optionId)?.voterIds || []).includes(currentUserId);
+                updatedOptions = currentOptions.map(opt => {
+                    const currentList = (opt.voterIds || []).filter(id => id !== currentUserId);
+                    if (opt.id === optionId && !alreadyVotedThis) {
+                        currentList.push(currentUserId);
+                    }
+                    return {
+                        ...opt,
+                        voterIds: currentList
+                    };
+                });
+            }
+
+            const taskRef = doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id);
+            await updateDoc(taskRef, {
+                'poll.options': updatedOptions
+            });
+        } catch (err) {
+            console.error("Error al registrar voto:", err);
+            showMessage("❌ Error al registrar tu voto.");
+        } finally {
+            setIsVoting(false);
+        }
+    };
 
     const handleTranslate = async (lang) => {
         if (!commentText.trim()) {
@@ -1017,6 +1081,13 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                                     <Pin size={9} className="shrink-0" /> Fijado
                                 </span>
                             )}
+
+                            {isPoll && (
+                                <span className="inline-flex items-center gap-1 text-[9.5px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/60 shrink-0 whitespace-nowrap">
+                                    <BarChart2 size={10} className="shrink-0" />
+                                    {task.poll?.isMultipleChoice ? 'Encuesta múltiple' : 'Encuesta'}
+                                </span>
+                            )}
                         </div>
 
                         {/* Acciones de docente (Editar, Fijar, Borrar) */}
@@ -1219,6 +1290,171 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                 </div>
             )}
 
+            {/* Módulo Interactivo de Encuesta (Poll) */}
+            {isPoll && task.poll?.options?.length > 0 && (() => {
+                const poll = task.poll;
+                const isMultiple = Boolean(poll.isMultipleChoice);
+                const options = poll.options || [];
+
+                // Conjunto de todos los votantes únicos
+                const allVotersSet = new Set();
+                options.forEach(opt => (opt.voterIds || []).forEach(uid => allVotersSet.add(uid)));
+                const totalVoters = allVotersSet.size;
+                const hasUserVoted = allVotersSet.has(currentUserId);
+
+                return (
+                    <div className="my-3 p-4 rounded-2xl border border-indigo-100 dark:border-indigo-900/60 bg-gradient-to-br from-indigo-50/50 via-white to-purple-50/30 dark:from-indigo-950/20 dark:via-gray-900/40 dark:to-purple-950/10 shadow-xs space-y-3">
+                        {/* Cabecera de la encuesta */}
+                        <div className="flex items-center justify-between gap-2 flex-wrap pb-2 border-b border-indigo-100/80 dark:border-indigo-900/40">
+                            <div className="flex items-center gap-2">
+                                <div className="p-1.5 rounded-lg bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400">
+                                    <BarChart2 size={16} />
+                                </div>
+                                <div>
+                                    <span className="text-xs font-extrabold text-indigo-950 dark:text-indigo-200">
+                                        {isMultiple ? "Encuesta • Selección múltiple" : "Encuesta • Selección única"}
+                                    </span>
+                                    <span className="text-[11px] text-gray-500 dark:text-gray-400 block font-medium">
+                                        {totalVoters} {totalVoters === 1 ? 'estudiante ha participado' : 'estudiantes han participado'}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                                {isLocked ? (
+                                    <span className="text-[10px] font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 px-2.5 py-1 rounded-full border border-red-200 dark:border-red-900/50">
+                                        Votación cerrada
+                                    </span>
+                                ) : hasUserVoted ? (
+                                    <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 px-2.5 py-1 rounded-full border border-indigo-200 dark:border-indigo-800/60 flex items-center gap-1">
+                                        <CheckCheck size={11} /> Voto registrado
+                                    </span>
+                                ) : (
+                                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-900/50">
+                                        Abierta
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Lista de opciones de votación */}
+                        <div className="space-y-2">
+                            {options.map((opt) => {
+                                const voteCount = opt.voterIds?.length || 0;
+                                const pct = totalVoters > 0 ? Math.round((voteCount / totalVoters) * 100) : 0;
+                                const isSelectedByMe = (opt.voterIds || []).includes(currentUserId);
+                                const showVoters = activeVotersOptionId === opt.id;
+
+                                return (
+                                    <div key={opt.id} className="space-y-1">
+                                        <div 
+                                            onClick={() => !isLocked && handleVote(opt.id)}
+                                            className={`relative overflow-hidden rounded-xl border transition-all duration-200 select-none ${
+                                                isLocked ? 'cursor-default' : 'cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-600'
+                                            } ${
+                                                isSelectedByMe 
+                                                    ? 'border-indigo-500 bg-indigo-50/40 dark:bg-indigo-950/30 shadow-xs' 
+                                                    : 'border-gray-200/90 dark:border-gray-700/80 bg-white/80 dark:bg-gray-800/60'
+                                            }`}
+                                        >
+                                            {/* Barra de progreso de fondo */}
+                                            <div 
+                                                className={`absolute top-0 bottom-0 left-0 transition-all duration-700 ease-out ${
+                                                    isSelectedByMe 
+                                                        ? 'bg-indigo-500/20 dark:bg-indigo-500/30' 
+                                                        : 'bg-gray-200/50 dark:bg-gray-700/40'
+                                                }`}
+                                                style={{ width: `${pct}%` }} 
+                                            />
+
+                                            {/* Contenido de la opción */}
+                                            <div className="relative z-10 p-3 flex items-center justify-between gap-3">
+                                                <div className="flex items-center gap-2.5 min-w-0">
+                                                    {isMultiple ? (
+                                                        <div className={`w-4 h-4 rounded-md flex items-center justify-center shrink-0 border transition-all ${
+                                                            isSelectedByMe 
+                                                                ? 'bg-indigo-600 border-indigo-600 text-white' 
+                                                                : 'border-gray-400 dark:border-gray-500 bg-white dark:bg-gray-900'
+                                                        }`}>
+                                                            {isSelectedByMe && <CheckCheck size={11} />}
+                                                        </div>
+                                                    ) : (
+                                                        <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 border transition-all ${
+                                                            isSelectedByMe 
+                                                                ? 'border-indigo-600 bg-indigo-600' 
+                                                                : 'border-gray-400 dark:border-gray-500 bg-white dark:bg-gray-900'
+                                                        }`}>
+                                                            {isSelectedByMe && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                                                        </div>
+                                                    )}
+
+                                                    <span className={`text-xs font-bold leading-snug break-words ${
+                                                        isSelectedByMe ? 'text-indigo-950 dark:text-indigo-100 font-extrabold' : 'text-gray-800 dark:text-gray-200'
+                                                    }`}>
+                                                        {opt.text}
+                                                    </span>
+                                                </div>
+
+                                                <div className="flex items-center gap-1.5 shrink-0 text-right">
+                                                    <span className={`text-xs font-black ${
+                                                        isSelectedByMe ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-700 dark:text-gray-300'
+                                                    }`}>
+                                                        {pct}%
+                                                    </span>
+                                                    <span className="text-[10px] text-gray-400 dark:text-gray-500 font-semibold">
+                                                        ({voteCount})
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Vista detallada de votantes para el docente */}
+                                        {role === 'teacher' && voteCount > 0 && (
+                                            <div className="px-1 text-[11px]">
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setActiveVotersOptionId(showVoters ? null : opt.id);
+                                                    }}
+                                                    className="text-[10.5px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+                                                >
+                                                    {showVoters ? "▾ Ocultar votantes" : `▸ Ver quiénes votaron (${voteCount})`}
+                                                </button>
+
+                                                {showVoters && (
+                                                    <div className="flex flex-wrap gap-1 mt-1.5 p-2 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/60 dark:border-indigo-800/40 animate-in fade-in duration-150">
+                                                        {opt.voterIds.map(uid => {
+                                                            const studentName = userMappings?.[uid]?.name || uid.replace(/^uid_|^name_/, '');
+                                                            return (
+                                                                <span key={uid} className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-white dark:bg-gray-800 text-indigo-800 dark:text-indigo-200 border border-indigo-200/60 dark:border-indigo-700/60 shadow-2xs">
+                                                                    <UserIcon size={10} /> {studentName}
+                                                                </span>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Pie de encuesta / Indicación */}
+                        <div className="pt-1 text-center">
+                            {!isLocked && (
+                                <p className="text-[11px] text-gray-400 dark:text-gray-500 italic">
+                                    {isMultiple 
+                                        ? "💡 Puedes seleccionar una o más opciones. Vuelve a pulsar sobre una opción para desmarcarla." 
+                                        : "💡 Puedes cambiar tu voto haciendo clic sobre otra opción en cualquier momento."}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                );
+            })()}
+
             {/* Audio adjunto */}
             {task.audioUrl && (
                 <div className="mt-2.5">
@@ -1368,6 +1604,8 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                     <div className="flex items-center gap-2">
                         {isForum ? (
                             <MessageCircle size={15} className="text-emerald-600 dark:text-emerald-400" />
+                        ) : isPoll ? (
+                            <BarChart2 size={15} className="text-indigo-600 dark:text-indigo-400" />
                         ) : isTask ? (
                             <MessageSquareText size={15} className="text-[#AD3333]" />
                         ) : (
@@ -1375,8 +1613,20 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                         )}
                         <span>
                             {task.comments?.length > 0 
-                                ? (isForum ? `${task.comments.length} aporte${task.comments.length > 1 ? 's' : ''} en el foro` : `${task.comments.length} comentario${task.comments.length > 1 ? 's' : ''} y entregas`)
-                                : (isForum ? 'Participar en el foro de debate' : isTask ? (role === 'teacher' ? 'Ver entregas y comentarios' : 'Entregar tarea o comentar') : 'Escribir un comentario')
+                                ? (isForum 
+                                    ? `${task.comments.length} aporte${task.comments.length > 1 ? 's' : ''} en el foro` 
+                                    : isPoll 
+                                        ? `${task.comments.length} comentario${task.comments.length > 1 ? 's' : ''}` 
+                                        : `${task.comments.length} comentario${task.comments.length > 1 ? 's' : ''} y entregas`
+                                  )
+                                : (isForum 
+                                    ? 'Participar en el foro de debate' 
+                                    : isPoll 
+                                        ? 'Comentar sobre la encuesta' 
+                                        : isTask 
+                                            ? (role === 'teacher' ? 'Ver entregas y comentarios' : 'Entregar tarea o comentar') 
+                                            : 'Escribir un comentario'
+                                  )
                             }
                         </span>
                     </div>
@@ -1411,6 +1661,11 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                                         <>
                                             <MessageCircle className="text-emerald-600 dark:text-emerald-400" size={20} />
                                             <span>Foro de debate</span>
+                                        </>
+                                    ) : isPoll ? (
+                                        <>
+                                            <BarChart2 className="text-indigo-600 dark:text-indigo-400" size={20} />
+                                            <span>Comentarios de la encuesta</span>
                                         </>
                                     ) : isTask ? (
                                         <>
@@ -2130,9 +2385,11 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                                   placeholder={
                                       isForum 
                                           ? "Escribe tu aporte o punto de vista..." 
-                                          : isTask && role !== 'teacher' 
-                                              ? "Escribe o adjunta tu entrega..." 
-                                              : "Escribe un comentario..."
+                                          : isPoll
+                                              ? "Escribe tu opinión sobre la encuesta..."
+                                              : isTask && role !== 'teacher' 
+                                                  ? "Escribe o adjunta tu entrega..." 
+                                                  : "Escribe un comentario..."
                                   } 
                                   className="min-w-0 flex-1 bg-transparent border-none outline-none py-1.5 px-2 text-xs font-medium placeholder-gray-400" 
                               />
@@ -2144,9 +2401,11 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                                   className={`py-2 px-3.5 rounded-xl shadow-xs transition-all disabled:opacity-50 flex items-center justify-center gap-1.5 font-bold text-xs shrink-0 text-white ${
                                       isForum 
                                           ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20' 
-                                          : isTask && role !== 'teacher'
-                                              ? 'bg-[#AD3333] hover:bg-[#8a2828] shadow-red-700/20'
-                                              : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/20'
+                                          : isPoll
+                                              ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/20'
+                                              : isTask && role !== 'teacher'
+                                                  ? 'bg-[#AD3333] hover:bg-[#8a2828] shadow-red-700/20'
+                                                  : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/20'
                                   }`}
                               >
                                   {isProcessing ? (
