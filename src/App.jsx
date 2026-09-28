@@ -10430,6 +10430,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                       const isBusy = presenceStatus === 'busy';
                                                       const isConnected = isOnline || isAway || isBusy;
                                                       const isDisconnected = !isConnected;
+                                                      const isOffline = isDisconnected;
                                                       
                                                       const statusDotColor = isOnline ? 'bg-green-500' : isAway ? 'bg-orange-400' : isBusy ? 'bg-red-500' : 'bg-gray-400';
                                                       const photo = u.profilePicUrl || userMappings[u.id]?.profilePicUrl;

@@ -303,7 +303,7 @@ const LinkifyText = ({ text, isDarkMode = false, isEmojiOnly = false }) => {
   return (
     <>
       {elements}
-      {ytIds.slice(0, 1).map((videoId, idx) => (
+      {embedVideos && ytIds.slice(0, 1).map((videoId, idx) => (
         <div key={'yt-' + idx} className="mt-2.5 max-w-full">
           <CustomVideoPlayer videoId={videoId} title="Video de la clase" isDarkMode={isDarkMode} />
         </div>
