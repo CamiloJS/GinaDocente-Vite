@@ -5,11 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "check": "node scripts/check.mjs",
-    "prebuild": "node scripts/check.mjs",
+    "check": "node scripts/check.mjs && node scripts/test-ai-eval.mjs",
+    "prebuild": "node scripts/check.mjs && node scripts/test-ai-eval.mjs",
     "build": "vite build",
     "preview": "vite preview",
-    "smoke": "vite --port 5199 --host 127.0.0.1"
+    "smoke": "vite --port 5199 --host 127.0.0.1",
+    "test": "node scripts/test-ai-eval.mjs"
   },
   "dependencies": {
     "canvas-confetti": "^1.9.4",

@@ -1,3 +1,34 @@
+# NUEVA FUNCION: GENERADOR DE EVALUACIONES CON IA (29/09/2026) - opencode
+
+## Que hace
+- Boton **"Generar con IA"** dentro de la creacion de evaluaciones (al lado de "Preguntas (x/20)").
+- La docente escribe el **tema/instrucciones**, el **numero exacto de preguntas** (1 a 20), la **dificultad** (facil/media/alta), el **idioma** (espanol / ingles / bilingue) y el **tipo**:
+  - Mitad y mitad (automatico)
+  - Solo seleccion multiple
+  - Solo respuesta escrita
+  - Personalizado (cantidades exactas de cada tipo)
+- La IA genera **preguntas + respuestas** (seleccion multiple con la correcta marcada, y escritas con la respuesta esperada).
+- Antes de usarlas se muestra una **vista previa** con las respuestas correctas resaltadas y avisos si algo quedo dudoso.
+- Al aceptar: **"Reemplazar las actuales"** o **"Agregar al final"** (respetando el maximo de 20 preguntas).
+
+## Como esta hecho (para mantenimiento)
+- `src/utils/aiEvalGenerator.js` (logica pura, sin interfaz):
+  - `construirPrompt()` arma el prompt con las reglas estrictas (JSON puro, cantidad exacta, 3-4 opciones, una sola correcta, sin repetir, sin numerar).
+  - `parsearEvaluacion()` limpia bloques de codigo, repara comas finales y comillas tipograficas, valida/normaliza cada pregunta, elimina repetidas, deduce la opcion correcta si la IA solo trae `correctAnswer`, y reporta problemas.
+  - `generarPreguntasConIA()` pide a la IA y, si la respuesta no cumple, **reintenta una vez** con un prompt correctivo.
+- `src/components/AiEvalGeneratorModal.jsx`: la interfaz (modal con formulario, estado de carga, vista previa e insercion).
+- `callGemini(prompt, timeoutMs)` ahora acepta timeout (el generador usa 150 s).
+
+## Pruebas (corren solas antes de cada build)
+- `npm run test` -> 17 casos del generador (prompt, parseo, reparaciones, reintento).
+- `scripts/smoke/ai-eval.html` -> prueba de la interfaz con IA simulada (sin gastar cuota).
+- `npm run check` ejecuta ambas + el chequeo de variables indefinidas/importaciones.
+
+## Pendiente sugerido
+- Si la docente quiere, se puede agregar: banco de preguntas reutilizable, copiar una pregunta ya generada, o revision automatica de la clave de respuestas.
+
+---
+
 # RONDA 2 - OPTIMIZACION Y CORRECCIONES (29/09/2026) - opencode
 
 ## Blindaje (para no repetir el bug que tumbo la pagina)

@@ -38,6 +38,7 @@ import EmptyState from './components/EmptyState.jsx'
 import ScrollToTop from './components/ScrollToTop.jsx'
 import LinkifyText from './components/LinkifyText.jsx'
 import AppleEmoji from './components/AppleEmoji.jsx'
+import AiEvalGeneratorModal from './components/AiEvalGeneratorModal.jsx'
 import RichTextToolbar from './components/RichTextToolbar.jsx'
 import TeacherToolsTab from './components/TeacherToolsTab.jsx'
 import PublicOvaViewer from './components/PublicOvaViewer.jsx'
@@ -382,6 +383,7 @@ function App() {
     targetGroupName: "Todos los estudiantes (Global)",
     questions: []
   });
+  const [showAiEvalModal, setShowAiEvalModal] = useState(false);
   const [activeTakingEval, setActiveTakingEval] = useState(null);
   const [studentAnswers, setStudentAnswers] = useState({});
   const [timeRemaining, setTimeRemaining] = useState(0);
@@ -1880,10 +1882,10 @@ function App() {
               setSavedAccounts(cleaned);
           }, []);
 
-          const callGemini = async (promptText) => {
+          const callGemini = async (promptText, timeoutMs = 60000) => {
             try {
               const controller = new AbortController();
-              const timeoutId = setTimeout(() => controller.abort(), 60000);
+              const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
               const tokenIA = auth?.currentUser ? await auth.currentUser.getIdToken().catch(() => null) : null;
               const res = await fetch('/api/gemini', { 
                 method: 'POST', 
@@ -8306,11 +8308,41 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                               </div>
 
                               <div className="space-y-3">
-                                  <div className="flex justify-between items-center px-1">
+                                  <div className="flex justify-between items-center px-1 gap-2">
                                       <h3 className="font-bold text-sm text-gray-800 dark:text-gray-200">
                                           Preguntas ({evalFormData.questions.length}/20)
                                       </h3>
+                                      <button
+                                          type="button"
+                                          onClick={() => setShowAiEvalModal(true)}
+                                          className="flex items-center gap-1.5 text-[11px] font-black px-3 py-1.5 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-sm hover:opacity-90 transition-all active:scale-95 cursor-pointer"
+                                          title="La IA crea la evaluacion completa y tu la revisas antes de guardar"
+                                      >
+                                          <Sparkles size={13} /> Generar con IA
+                                      </button>
                                   </div>
+
+                                  <AiEvalGeneratorModal
+                                      isOpen={showAiEvalModal}
+                                      onClose={() => setShowAiEvalModal(false)}
+                                      callGemini={callGemini}
+                                      isDarkMode={isDarkMode}
+                                      existingCount={evalFormData.questions.length}
+                                      onInsert={(preguntas, modo, meta) => {
+                                          const actuales = evalFormData.questions || [];
+                                          let nuevas = modo === 'agregar' ? [...actuales, ...preguntas] : [...preguntas];
+                                          if (nuevas.length > 20) nuevas = nuevas.slice(0, 20);
+                                          setEvalFormData((prev) => ({
+                                              ...prev,
+                                              questions: nuevas,
+                                              title: prev.title && prev.title.trim() ? prev.title : (meta?.tema ? meta.tema.slice(0, 90) : prev.title),
+                                          }));
+                                          setShowAiEvalModal(false);
+                                          showMessage(modo === 'agregar'
+                                              ? `Se agregaron ${preguntas.length} preguntas generadas. Revisalas antes de guardar.`
+                                              : `Se cargaron ${preguntas.length} preguntas generadas. Revisalas y guarda la evaluacion.`);
+                                      }}
+                                  />
 
                                   {evalFormData.questions.map((q, qIndex) => (
                                       <div key={qIndex} className={`${glassCard} !p-4 relative rounded-3xl border border-gray-200 dark:border-gray-800 space-y-2.5 animate-in fade-in`}>
