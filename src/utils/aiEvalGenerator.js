@@ -2,6 +2,8 @@
 // Generador de evaluaciones completas con IA.
 // La logica esta separada de la interfaz para poder probarla (ver scripts/test-ai-eval.mjs).
 
+import { textoPlano } from './textFormat.js';
+
 export const MAX_PREGUNTAS = 20;
 export const MIN_PREGUNTAS = 1;
 
@@ -125,6 +127,7 @@ export function construirPrompt({ tema, total, multiple, text, dificultad = 'med
     'No repitas preguntas ni el mismo enfoque; varia el vocabulario, el contexto y el tipo de ejercicio.',
     'No numeres los enunciados ni incluyas la respuesta dentro del enunciado.',
     'No uses comillas dobles dentro de los textos (usa comillas simples si necesitas).',
+    'Escribe TODO en texto plano: sin asteriscos, sin almohadillas, sin guiones de lista y sin etiquetas (nada de markdown ni HTML).',
     'Cada enunciado debe ser claro y resolverse sin material adicional.',
   ];
 
@@ -163,7 +166,7 @@ function repararJSON(t) {
     .replace(/[\u2018\u2019]/g, "'");
 }
 
-const limpiar = (v, max = 600) => String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max);
+const limpiar = (v, max = 600) => textoPlano(String(v == null ? '' : v)).slice(0, max);
 
 /** Normaliza y valida una pregunta generada. Devuelve { pregunta, problema }. */
 function normalizarPregunta(q) {

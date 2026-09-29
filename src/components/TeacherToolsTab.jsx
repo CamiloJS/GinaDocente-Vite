@@ -549,6 +549,11 @@ export default function TeacherToolsTab({
     }
     if (isSpinning) return;
 
+    if (!eligibleStudents || eligibleStudents.length === 0) {
+        showMessage('No hay estudiantes elegibles para girar la ruleta.');
+        return;
+    }
+
     if ('speechSynthesis' in window) {
       try { window.speechSynthesis.cancel(); } catch (e) {}
     }

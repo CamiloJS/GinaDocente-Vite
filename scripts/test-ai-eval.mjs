@@ -161,5 +161,15 @@ const iaVF = async () => { llamadasVF++; return llamadasVF === 1 ? sinVF : conVF
 const genVF = await generarPreguntasConIA({ tema: "X", total: 3, tipos: tiposPedidos }, iaVF);
 chequear("reintenta cuando la mezcla de V/F viene mal", genVF.ok && llamadasVF === 2 && genVF.preguntas.filter((p) => clasificarPregunta(p) === "vf").length === 2, `llamadas=${llamadasVF} problemas=${JSON.stringify(genVF.problemas)}`);
 
+// ---------- 9) Texto plano en las preguntas generadas ----------
+console.log("\n== Texto plano en preguntas generadas ==");
+r = parsearEvaluacion(JSON.stringify([
+  { type: "text", text: "**Escribe** el pasado de [color=#fff]go[/color]", options: [], correctAnswer: "went" },
+  { type: "multiple", text: "Elige ~~bien~~", options: [{ text: "**uno**", isCorrect: true }, { text: "dos", isCorrect: false }, { text: "tres", isCorrect: false }], correctAnswer: "" },
+]), 2);
+chequear("los enunciados quedan en texto plano", r.ok && !r.preguntas[0].text.includes("**") && !r.preguntas[0].text.includes("[color="), r.preguntas[0]?.text);
+chequear("las opciones quedan en texto plano", r.ok && !r.preguntas[1].options[0].text.includes("**"), r.preguntas[1]?.options?.[0]?.text);
+chequear("no se pierde el contenido", r.preguntas[0].text.includes("Escribe") && r.preguntas[0].text.includes("go"), r.preguntas[0]?.text);
+
 console.log(`\nRESULTADO: ${ok} OK, ${fallos} fallos\n`);
 process.exit(fallos ? 1 : 0);

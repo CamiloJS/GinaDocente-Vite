@@ -1,5 +1,5 @@
 // Pruebas del normalizador de marcado (que no se vean etiquetas crudas).
-import { normalizarMarcado } from "../src/utils/textFormat.js";
+import { normalizarMarcado, textoPlano } from "../src/utils/textFormat.js";
 
 let ok = 0, fallos = 0;
 const chequear = (nombre, cond, extra = "") => {
@@ -50,6 +50,13 @@ chequear("texto normal intacto", normalizarMarcado("Hola, ¿cómo están? 2 * 3 
 chequear("corrige saltos de linea de Windows", normalizarMarcado("a\r\nb") === "a\nb");
 chequear("lista con guiones intacta", normalizarMarcado("- uno\n- dos") === "- uno\n- dos");
 chequear("encabezado intacto", normalizarMarcado("# Titulo") === "# Titulo");
+
+console.log("\n== textoPlano (para Excel y datos guardados) ==");
+chequear("quita negritas y resaltados", normalizarMarcado("**a** ~~b~~ ==c==") === "**a** ~~b~~ ==c==" && textoPlano("**a** ~~b~~ ==c==") === "a b c");
+chequear("quita etiquetas de color", textoPlano("[color=#fff]hola[/color] mundo") === "hola mundo");
+chequear("quita subrayado", textoPlano("<u>hola</u>") === "hola");
+chequear("normaliza espacios", textoPlano("  varios    espacios  ") === "varios espacios");
+chequear("conserva el texto normal", textoPlano("Hola, ¿cómo están?") === "Hola, ¿cómo están?");
 
 console.log(`\nRESULTADO: ${ok} OK, ${fallos} fallos\n`);
 process.exit(fallos ? 1 : 0);

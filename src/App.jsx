@@ -49,6 +49,7 @@ import DocumentPreviewModal from './components/DocumentPreviewModal.jsx'
 import CommandPaletteModal from './components/CommandPaletteModal.jsx'
 import { extractTextFromPDF } from './utils/pdfExtractor.js'
 import { calculateScore, normalizarRespuesta } from './utils/evalScoring.js'
+import { textoPlano } from './utils/textFormat.js';
 import { desordenarPalabras } from './utils/palabras.js'
 import { useClickOutside } from './utils/hooks.js'
 
@@ -7403,7 +7404,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                   </div>
                                               ) : (
                                                   <div className="flex flex-wrap items-center gap-2">
-                                                      <button type="button" onClick={() => { grabadoraExamen.setAudioUrl?.(''); setGrabandoParaPregunta(qIndex); grabadoraExamen.startRecording(); }} disabled={grabadoraExamen.isUploading} className="text-[11px] font-bold px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white flex items-center gap-1.5 cursor-pointer disabled:opacity-40"><Mic size={12} /> Grabar mi respuesta</button>
+                                                      <button type="button" onClick={() => { if (grabadoraExamen.isRecording) { showMessage('Ya estas grabando otra respuesta: deten la grabacion primero.'); return; } grabadoraExamen.setAudioUrl?.(''); setGrabandoParaPregunta(qIndex); grabadoraExamen.startRecording(); }} disabled={grabadoraExamen.isUploading} className="text-[11px] font-bold px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white flex items-center gap-1.5 cursor-pointer disabled:opacity-40"><Mic size={12} /> Grabar mi respuesta</button>
                                                       {grabadoraExamen.isUploading && <span className="text-[11px] text-gray-500 flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> Subiendo audio...</span>}
                                                   </div>
                                               )}
@@ -7470,9 +7471,10 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                           let studentAnswerText = '';
                           let correctAnswerText = '';
 
-                          const rawQuestionText = (q.text || q.question || `Pregunta ${qIdx + 1}`).replace(/\r?\n/g, ' ').trim();
+                          const rawQuestionText = textoPlano(q.text || q.question || `Pregunta ${qIdx + 1}`).slice(0, 400);
                           const qColTitle = `P${qIdx + 1}: ${rawQuestionText.length > 60 ? rawQuestionText.slice(0, 57) + '...' : rawQuestionText}`;
 
+                          let parcialExcel = null;
                           if ((q.type === 'multiple' || q.type === 'listening') && Array.isArray(q.options) && q.options.length >= 2) {
                               const correctIndices = (q.options || []).map((opt, oIdx) => opt.isCorrect ? oIdx : null).filter(o => o !== null);
                               const ansArr = Array.isArray(qAns) ? qAns : [];
@@ -7490,6 +7492,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                               const paresM = q.pairs || [];
                               const elegidasM = (qAns && typeof qAns === 'object') ? qAns : {};
                               const aciertosM = paresM.filter((p, pIdx) => normalizarRespuesta(elegidasM[pIdx]) === normalizarRespuesta(p.right)).length;
+                              if (!isCorrect && aciertosM > 0) parcialExcel = aciertosM + ' de ' + paresM.length;
                               studentAnswerText = paresM.map((p, pIdx) => `${p.left} -> ${elegidasM[pIdx] || '(sin elegir)'}`).join(' | ');
                               correctAnswerText = paresM.map((p) => `${p.left} -> ${p.right}`).join(' | ');
                               isCorrect = paresM.length > 0 && aciertosM === paresM.length;
@@ -7503,6 +7506,8 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
 
                           if (q.type === 'speaking') {
                               row[qColTitle] = qAns ? '[AUDIO] Respuesta grabada (calificacion manual)' : '[AUDIO] Sin responder';
+                          } else if (parcialExcel) {
+                              row[qColTitle] = `[PARCIAL ${parcialExcel}] Respondio: "${studentAnswerText}" | Correcta: "${correctAnswerText}"`;
                           } else if (isCorrect) {
                               row[qColTitle] = `[✔ CORRECTA] ${studentAnswerText}`;
                           } else if (studentAnswerText === '(Sin respuesta)') {
@@ -8028,6 +8033,8 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                               const qAns = selectedStudentGradeForReview.answers?.[qIdx];
                                               let isCorrect = false;
                                               let isUnanswered = false;
+                                              let esParcial = false;
+                                              let detalleParcial = '';
 
                                               if (q.type === 'multiple') {
                                                   const correctOpts = (q.options || []).map((opt, oIdx) => opt.isCorrect ? oIdx : null).filter(o => o !== null);
@@ -8044,6 +8051,8 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                   const aciertosR = paresR.filter((p, pIdx) => normalizarRespuesta(elegidasR[pIdx]) === normalizarRespuesta(p.right)).length;
                                                   isUnanswered = paresR.length > 0 && paresR.every((p, pIdx) => !elegidasR[pIdx]);
                                                   isCorrect = paresR.length > 0 && aciertosR === paresR.length;
+                                                  esParcial = !isCorrect && !isUnanswered && aciertosR > 0;
+                                                  if (esParcial) detalleParcial = aciertosR + ' de ' + paresR.length;
                                               } else {
                                                   isUnanswered = !qAns || (typeof qAns === 'string' && !qAns.trim());
                                                   isCorrect = typeof qAns === 'string' && qAns.trim().toLowerCase() === (q.correctAnswer || '').trim().toLowerCase();
@@ -8082,6 +8091,10 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                           ) : isUnanswered ? (
                                                               <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/80 px-2.5 py-0.5 rounded-full border border-amber-300 dark:border-amber-800">
                                                                   <AlertTriangle size={12} /> Sin responder (0.0)
+                                                              </span>
+                                                          ) : esParcial ? (
+                                                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 dark:text-blue-400">
+                                                                  <CheckLine size={12} /> {`Parcial (${detalleParcial} correctas)`}
                                                               </span>
                                                           ) : (
                                                               <span className="inline-flex items-center gap-1 text-[11px] font-bold text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-950/80 px-2.5 py-0.5 rounded-full border border-red-300 dark:border-red-800">

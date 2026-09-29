@@ -99,4 +99,19 @@ export function normalizarMarcado(input) {
   return t;
 }
 
+/** Version de texto plano: normaliza y quita los marcadores restantes (para Excel y datos guardados). */
+export function textoPlano(input) {
+  return normalizarMarcado(input)
+    .replace(/\[color=[^\]]+\]/gi, '')
+    .replace(/\[\/color\]/gi, '')
+    .replace(/\[highlight\]/gi, '')
+    .replace(/\[\/highlight\]/gi, '')
+    .replace(/\*\*/g, '')
+    .replace(/~~/g, '')
+    .replace(/==/g, '')
+    .replace(/<\/?u>/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export default normalizarMarcado;
