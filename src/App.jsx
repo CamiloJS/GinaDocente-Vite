@@ -406,6 +406,9 @@ function App() {
   const [lastMessages, setLastMessages] = useState({});
   const [activeChat, setActiveChat] = useState(null); 
   const [chatMessages, setChatMessages] = useState([]);
+  const [chatWindow, setChatWindow] = useState(300); // cuantos mensajes del chat se cargan
+  const cargandoMasRef = useRef(false);
+  useEffect(() => { setChatWindow(300); cargandoMasRef.current = false; }, [activeChat?.id]);
   const [chatGroups, setChatGroups] = useState([]);
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
     const [academicGroups, setAcademicGroups] = useState([]);
@@ -3139,7 +3142,7 @@ useEffect(() => {
               let isInitialLoad = true;
 
               // Solo los ultimos 300 mensajes (antes cargaba TODO el historial del chat)
-              const unsubscribe = onSnapshot(query(collection(db, ...base, 'chats', activeChat.id, 'messages'), orderBy('createdAt', 'desc'), limit(300)), s => {
+              const unsubscribe = onSnapshot(query(collection(db, ...base, 'chats', activeChat.id, 'messages'), orderBy('createdAt', 'desc'), limit(chatWindow)), s => {
                   const msgs = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.createdAt - b.createdAt);
 
                   // Si no es la carga inicial y se agregó un mensaje nuevo
@@ -3171,7 +3174,7 @@ useEffect(() => {
               }, err => console.error('Chat messages listener error:', err));
 
               return () => unsubscribe();
-          }, [activeChat?.id, myChatId]);
+          }, [activeChat?.id, myChatId, chatWindow]);
 
           // Efecto para marcar los mensajes como leídos cuando entras al chat
           useEffect(() => {
@@ -3200,6 +3203,7 @@ useEffect(() => {
 
           // Efecto para asegurar auto-scroll siempre que cambien los mensajes o se abra/maximice el chat
           useEffect(() => {
+          if (cargandoMasRef.current) { cargandoMasRef.current = false; return; }
               if (activeChat && (!isChatMinimized || isChatAppOpen)) {
                   scrollToChatBottom('smooth');
                   const t = setTimeout(() => scrollToChatBottom('smooth'), 100);
@@ -11705,6 +11709,17 @@ Bot:`;
                                               </div>
                                           )}
 
+                                          {chatMessages.length >= chatWindow && (
+                                              <div className="flex justify-center pb-1">
+                                                  <button
+                                                      type="button"
+                                                      onClick={() => { cargandoMasRef.current = true; setChatWindow((w) => w + 300); }}
+                                                      className={`text-[11px] font-bold px-3 py-1.5 rounded-full transition-colors ${isDarkMode ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                                                  >
+                                                      Ver mensajes anteriores
+                                                  </button>
+                                              </div>
+                                          )}
                                           {chatMessages.map((m, index) => {
                                               const prevMsg = chatMessages[index - 1];
                                               const nextMsg = chatMessages[index + 1];
