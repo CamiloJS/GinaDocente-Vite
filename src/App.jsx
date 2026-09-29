@@ -1881,9 +1881,10 @@ function App() {
             try {
               const controller = new AbortController();
               const timeoutId = setTimeout(() => controller.abort(), 60000);
+              const tokenIA = auth?.currentUser ? await auth.currentUser.getIdToken().catch(() => null) : null;
               const res = await fetch('/api/gemini', { 
                 method: 'POST', 
-                headers: { 'Content-Type': 'application/json' }, 
+                headers: { 'Content-Type': 'application/json', ...(tokenIA ? { Authorization: 'Bearer ' + tokenIA } : {}) },
                 body: JSON.stringify({ promptText: promptText }),
                 signal: controller.signal
               });

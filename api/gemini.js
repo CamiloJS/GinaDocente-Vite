@@ -1,8 +1,56 @@
 // api/gemini.js - Multi-Provider Fallback AI Handler (Gemini + Groq)
 
+// --- Control de acceso: solo usuarios de la app (token de Firebase) + limite por usuario ---
+// La llave web de Firebase es publica por diseno (va en el cliente).
+const FIREBASE_WEB_API_KEY = process.env.FIREBASE_WEB_API_KEY || 'AIzaSyB-BDGpMhiNjSfGiGiGHHd6jbu5nQvoOfs';
+const LIMITE_PETICIONES = 60; // por usuario
+const VENTANA_MS = 5 * 60 * 1000; // 5 minutos
+const registro = new Map(); // uid -> { n, reset }
+
+async function verificarUsuario(req) {
+  const cabecera = req.headers?.authorization || req.headers?.Authorization || '';
+  const token = String(cabecera).replace(/^Bearer\s+/i, '').trim();
+  if (!token) return null;
+  try {
+    const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_WEB_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken: token }),
+    });
+    const j = await r.json();
+    const u = j && Array.isArray(j.users) ? j.users[0] : null;
+    return u && u.localId ? { uid: u.localId } : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function dentroDelLimite(uid) {
+  const ahora = Date.now();
+  const reg = registro.get(uid);
+  if (!reg || ahora > reg.reset) {
+    registro.set(uid, { n: 1, reset: ahora + VENTANA_MS });
+    return true;
+  }
+  reg.n += 1;
+  return reg.n <= LIMITE_PETICIONES;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Método no permitido' });
+  }
+
+  // --- Solo usuarios autenticados de la app pueden usar la IA ---
+  const usuario = await verificarUsuario(req);
+  if (!usuario) {
+    return res.status(401).json({ error: 'Inicia sesión en la aplicación para usar la IA.' });
+  }
+  if (!dentroDelLimite(usuario.uid)) {
+    return res.status(429).json({
+      error: 'Muchas solicitudes seguidas. Espera unos minutos e inténtalo de nuevo.',
+      isQuotaExceeded: true,
+    });
   }
 
   const { promptText, contents, model } = req.body || {};

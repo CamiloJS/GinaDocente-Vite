@@ -243,9 +243,10 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                 result = await callGemini(prompt);
             }
             if (!result) {
+                const tokenIA = auth?.currentUser ? await auth.currentUser.getIdToken().catch(() => null) : null;
                 const res = await fetch('/api/gemini', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', ...(tokenIA ? { Authorization: 'Bearer ' + tokenIA } : {}) },
                     body: JSON.stringify({ promptText: prompt })
                 });
                 if (res.ok) {
