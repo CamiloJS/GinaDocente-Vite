@@ -2702,13 +2702,13 @@ useEffect(() => {
             setHasUnreadChat(!!data.hasUnread);
             setUnreadChats(data.chats || {});
         }
-    });
+    }, (err) => { console.error('[alertas de chat] fallo la escucha:', err); });
 
     const uLastMsgs = onSnapshot(collection(db, ...base, 'lastMessages'), s => {
         const msgs = {};
         s.docs.forEach(d => msgs[d.id] = d.data());
         setLastMessages(msgs);
-    });
+    }, (err) => { console.error('[lista de chats] fallo la escucha:', err); });
 
     const uChatPrefs = onSnapshot(doc(db, 'artifacts', appId, 'users', uidKey, 'preferences', 'chat'), d => {
         if (d.exists()) setChatPreferences(d.data().prefs || {});
@@ -3033,7 +3033,7 @@ useEffect(() => {
                                   callerName: call.callerName || 'Alguien',
                                   offer: call.offer,
                                   targetId: call.initiator
-                              })
+                              }, (err) => console.error('[llamadas] fallo la escucha:', err))
                               break
                           }
                       } else {

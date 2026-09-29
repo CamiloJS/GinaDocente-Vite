@@ -13,7 +13,6 @@ import { auth, signInAnonymously, db as defaultDb, appId as defaultAppId, collec
 import AudioPlayer, { AudioRecordingVisualizer } from './AudioPlayer.jsx'
 import CustomVideoPlayer from './CustomVideoPlayer.jsx'
 import GeniallyEmbedPlayer, { extractGeniallyUrl } from './GeniallyEmbedPlayer.jsx'
-import { getTeacherDynamicPlaceholder } from '../utils/teacherPlaceholders.js'
 
 const TasksTab = React.memo(({
 
@@ -50,21 +49,31 @@ const TasksTab = React.memo(({
     const [showGeniallyInput, setShowGeniallyInput] = useState(false);
     const [localWallSearchTerm, setLocalWallSearchTerm] = useState("");
     const taskDescRef = useRef(null);
-    const [dynamicPlaceholder, setDynamicPlaceholder] = useState(() => getTeacherDynamicPlaceholder(loggedInName));
+    const [dynamicPlaceholder, setDynamicPlaceholder] = useState('Comparte algo con tu clase...');
     const [pollOptions, setPollOptions] = useState(["", ""]);
     const [isMultipleChoice, setIsMultipleChoice] = useState(false);
     const wallSearchTerm = propWallSearchTerm !== undefined ? propWallSearchTerm : localWallSearchTerm;
     const setWallSearchTerm = propSetWallSearchTerm || setLocalWallSearchTerm;
     const { isRecording: recPub, audioUrl: audioPub, isUploading: upPub, recordingTime: recTimePub, setAudioUrl: setAudioPub, startRecording: startPub, stopRecording: stopPub, cancelRecording: cancelPub } = useVoiceRecorder('tasks_audios', showMessage);
 
-    // Rotar o recalcular el placeholder dinámico al cambiar de usuario o periódicamente
+    // Frases del banner: se descargan despues de montar y SOLO para la docente
+    // (asi los estudiantes no bajan 237 KB que no usan).
+    const frasesRef = useRef(null);
     React.useEffect(() => {
-        setDynamicPlaceholder(getTeacherDynamicPlaceholder(loggedInName));
+        if (role !== 'teacher') return;
+        let vivo = true;
+        import('../utils/teacherPlaceholders.js')
+            .then((m) => {
+                if (!vivo) return;
+                frasesRef.current = m.getTeacherDynamicPlaceholder;
+                setDynamicPlaceholder(m.getTeacherDynamicPlaceholder(loggedInName));
+            })
+            .catch(() => {});
         const interval = setInterval(() => {
-            setDynamicPlaceholder(getTeacherDynamicPlaceholder(loggedInName));
-        }, 180000); // Cada 3 minutos rota sutilmente
-        return () => clearInterval(interval);
-    }, [loggedInName]);
+            if (frasesRef.current) setDynamicPlaceholder(frasesRef.current(loggedInName));
+        }, 180000);
+        return () => { vivo = false; clearInterval(interval); };
+    }, [loggedInName, role]);
 
     // Sincronizar postTargetGroup si cambia fixedTargetGroup
     React.useEffect(() => {
