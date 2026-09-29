@@ -18,10 +18,30 @@ const RESPUESTA_IA = JSON.stringify([
     correctAnswer: "",
   },
   {
+    type: "truefalse",
+    text: "The past simple of 'go' is 'went'.",
+    correctAnswer: "verdadero",
+  },
+  {
     type: "text",
     text: "Write the past simple of 'buy'.",
     options: [],
     correctAnswer: "bought",
+    acceptedAnswers: ["bought (comprar)"],
+  },
+  {
+    type: "order",
+    text: "Ordena la oración",
+    words: ["she", "went", "to", "school"],
+  },
+  {
+    type: "match",
+    text: "Une cada palabra con su traducción",
+    pairs: [
+      { left: "dog", right: "perro" },
+      { left: "cat", right: "gato" },
+      { left: "bird", right: "pájaro" },
+    ],
   },
   {
     type: "multiple",

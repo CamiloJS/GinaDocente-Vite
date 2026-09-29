@@ -1,5 +1,5 @@
 // Pruebas del generador de evaluaciones con IA (sin navegador, sin gastar cuota).
-import { construirPrompt, parsearEvaluacion, generarPreguntasConIA, TIPOS_MEZCLA, IDIOMAS } from "../src/utils/aiEvalGenerator.js";
+import { construirPrompt, parsearEvaluacion, generarPreguntasConIA, TIPOS_MEZCLA, IDIOMAS, PRESETS } from "../src/utils/aiEvalGenerator.js";
 
 let ok = 0, fallos = 0;
 const chequear = (nombre, cond, extra = "") => {
@@ -84,7 +84,38 @@ const pUna = construirPrompt({ tema: "X", total: 4, multiple: 2, text: 2 });
 chequear("prompt por defecto una sola correcta", pUna.includes("exactamente UNA opci\u00f3n correcta"));
 chequear("prompt pide variantes aceptadas", pUna.includes("acceptedAnswers"));
 
-// ---------- 4) reintento automatico ----------
+// ---------- 5) tipos nuevos: verdadero/falso, ordenar, relacionar ----------
+console.log("\n== Tipos nuevos ==");
+r = parsearEvaluacion(JSON.stringify([
+  { type: "truefalse", text: "The past of 'go' is 'went'.", correctAnswer: "verdadero" },
+  { type: "order", text: "Ordena la oracion", words: ["she", "went", "to", "school"] },
+  { type: "match", text: "Une cada palabra", pairs: [{ left: "dog", right: "perro" }, { left: "cat", right: "gato" }, { left: "bird", right: "pajaro" }] },
+]), 3);
+chequear("acepta verdadero/falso", r.ok && r.preguntas[0].type === "multiple" && r.preguntas[0].options[0].isCorrect === true && r.preguntas[0].options[1].isCorrect === false, JSON.stringify(r.problemas));
+chequear("acepta ordenar la oracion", r.preguntas[1].type === "order" && r.preguntas[1].words.length === 4);
+chequear("acepta relacionar columnas", r.preguntas[2].type === "match" && r.preguntas[2].pairs.length === 3);
+r = parsearEvaluacion(JSON.stringify([{ type: "truefalse", text: "Falso: el sol es frio.", correctAnswer: "falso" }]), 1);
+chequear("V/F marca Falso cuando corresponde", r.ok && r.preguntas[0].options[1].isCorrect === true && r.preguntas[0].options[0].isCorrect === false);
+chequear("detecta V/F sin marca", !parsearEvaluacion(JSON.stringify([{ type: "truefalse", text: "x" }]), 1).ok);
+chequear("detecta ordenar sin palabras suficientes", !parsearEvaluacion(JSON.stringify([{ type: "order", text: "x", words: ["a"] }]), 1).ok);
+chequear("detecta relacionar con pocas parejas", !parsearEvaluacion(JSON.stringify([{ type: "match", text: "x", pairs: [{ left: "a", right: "b" }] }]), 1).ok);
+chequear("detecta relacionar con respuestas repetidas", !parsearEvaluacion(JSON.stringify([{ type: "match", text: "x", pairs: [{ left: "a", right: "b" }, { left: "c", right: "b" }, { left: "d", right: "e" }] }]), 1).ok);
+
+// ---------- 6) presets de mezcla ----------
+console.log("\n== Presets de mezcla ==");
+const suma = (d) => d.multiple + d.vf + d.text + d.orden + d.match;
+chequear("preset variada suma exacto (10)", suma(PRESETS.variada.calc(10)) === 10, JSON.stringify(PRESETS.variada.calc(10)));
+chequear("preset variada usa todos los tipos", ["multiple", "vf", "text", "orden"].every((k) => PRESETS.variada.calc(10)[k] > 0));
+chequear("preset variada suma exacto en varios tamanos", [1, 2, 3, 4, 5, 7, 12, 20].every((t) => suma(PRESETS.variada.calc(t)) === t));
+chequear("preset mitad y mitad suma exacto", suma(PRESETS.mitad.calc(9)) === 9 && PRESETS.mitad.calc(9).vf === 0);
+chequear("preset solo multiple", suma(PRESETS.multiple.calc(6)) === 6 && PRESETS.multiple.calc(6).multiple === 6);
+chequear("preset solo escrita", suma(PRESETS.text.calc(6)) === 6 && PRESETS.text.calc(6).text === 6);
+const pTipos = construirPrompt({ tema: "X", total: 6, tipos: { multiple: 2, vf: 1, text: 1, orden: 2, match: 0 } });
+chequear("prompt detalla cada tipo pedido", pTipos.includes("2 de selecci\u00f3n m\u00faltiple") && pTipos.includes("1 de Verdadero o Falso") && pTipos.includes("2 de ordenar la oraci\u00f3n"));
+chequear("prompt explica el formato de order", pTipos.includes('"type":"order"') && pTipos.includes("words"));
+chequear("prompt respeta total exacto", pTipos.includes("EXACTAMENTE 6 preguntas"));
+
+// ---------- 7) reintento automatico ----------
 console.log("\n== Reintento automatico ==");
 let llamadas = 0;
 const iaFalsa = async () => {

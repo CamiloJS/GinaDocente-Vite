@@ -1,5 +1,6 @@
 // Pruebas del motor de calificacion de evaluaciones (sin navegador).
 import { calculateScore, normalizarRespuesta, respuestasValidasDe, puntajeDe, tienePreguntasManuales } from "../src/utils/evalScoring.js";
+import { desordenarPalabras } from "../src/utils/palabras.js";
 
 let ok = 0, fallos = 0;
 const chequear = (nombre, cond, extra = "") => {
@@ -70,6 +71,18 @@ chequear("evaluacion nula -> 0.0", calculateScore(null, {}) === 0.0);
 chequear("answers nulo -> 0.0", calculateScore({ questions: [multiple([1])] }, null) === 0.0);
 chequear("normaliza tildes y espacios", normalizarRespuesta("  Comprensi\u00f3n   Lectora ") === "comprension lectora");
 chequear("respuestasValidasDe une todo", respuestasValidasDe(escrita("color", ["colour", "COLOR "])).length === 3);
+
+console.log("\n== Desordenar palabras (ordenar la oracion) ==");
+const palabras = ["she", "went", "to", "school", "yesterday"];
+const d1 = desordenarPalabras(palabras, "semilla-1");
+const d2 = desordenarPalabras(palabras, "semilla-1");
+chequear("orden estable con la misma semilla", JSON.stringify(d1) === JSON.stringify(d2));
+chequear("mismas palabras que la oracion", d1.map((x) => x.w).sort().join(" ") === [...palabras].sort().join(" "));
+chequear("guarda el indice original de cada palabra", d1.every((x) => palabras[x.idx] === x.w));
+chequear("no queda en el orden correcto", !d1.every((x, i) => x.idx === i));
+chequear("con una sola palabra no rompe", desordenarPalabras(["hola"], "s").length === 1);
+chequear("con lista vacia no rompe", desordenarPalabras([], "s").length === 0);
+chequear("palabras repetidas se conservan", desordenarPalabras(["the", "cat", "and", "the", "dog"], "x").filter((p) => p.w === "the").length === 2);
 
 console.log(`\nRESULTADO: ${ok} OK, ${fallos} fallos\n`);
 process.exit(fallos ? 1 : 0);

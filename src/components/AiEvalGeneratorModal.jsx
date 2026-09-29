@@ -5,8 +5,8 @@ import React, { useState } from 'react'
 import { X, Sparkles, Loader2, AlertTriangle, Undo2, CheckCircle2 } from './Icons.jsx'
 import {
   MAX_PREGUNTAS,
-  TIPOS_MEZCLA,
-  IDIOMAS,
+  PRESETS,
+  TIPOS_ETIQUETAS,
   generarPreguntasConIA,
 } from '../utils/aiEvalGenerator.js'
 
@@ -18,11 +18,13 @@ const OPCIONES_IDIOMA = [
   { valor: 'bilingue_fr', etiqueta: 'Biling\u00fce (franc\u00e9s + espa\u00f1ol)' },
 ]
 
+const CLAVES_TIPOS = ['multiple', 'vf', 'text', 'orden', 'match']
+
 const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMode, existingCount = 0 }) => {
   const [tema, setTema] = useState('')
   const [total, setTotal] = useState(10)
-  const [mezcla, setMezcla] = useState('auto')
-  const [customMultiple, setCustomMultiple] = useState(5)
+  const [preset, setPreset] = useState('variada')
+  const [dist, setDist] = useState(() => PRESETS.variada.calc(10))
   const [dificultad, setDificultad] = useState('media')
   const [idioma, setIdioma] = useState('es')
   const [variasCorrectas, setVariasCorrectas] = useState(false)
@@ -33,25 +35,41 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
   if (!isOpen) return null
 
   const espacioLibre = Math.max(0, MAX_PREGUNTAS - existingCount)
+  const sumaDist = CLAVES_TIPOS.reduce((s, k) => s + (Number(dist[k]) || 0), 0)
+  const distOk = sumaDist === total
 
-  const calcularDistribucion = () => {
-    if (mezcla === 'custom') {
-      const m = Math.max(0, Math.min(total, Number(customMultiple) || 0))
-      return { multiple: m, text: Math.max(0, total - m) }
+  const aplicarPreset = (k) => {
+    setPreset(k)
+    if (k !== 'custom') {
+      const nuevo = PRESETS[k].calc(total)
+      if (nuevo) setDist(nuevo)
     }
-    return TIPOS_MEZCLA[mezcla].distribucion(total)
+  }
+
+  const cambiarTotal = (v) => {
+    const n = Math.max(1, Math.min(Number(v) || 1, MAX_PREGUNTAS))
+    setTotal(n)
+    if (preset !== 'custom') {
+      const nuevo = PRESETS[preset].calc(n)
+      if (nuevo) setDist(nuevo)
+    }
+  }
+
+  const cambiarTipo = (k, v) => {
+    setPreset('custom')
+    setDist((prev) => ({ ...prev, [k]: Math.max(0, Math.min(total, Number(v) || 0)) }))
   }
 
   const generar = async () => {
     if (!tema.trim()) { setError('Escribe el tema o las instrucciones de la evaluaci\u00f3n.'); return; }
-    const dist = calcularDistribucion();
-    if (dist.multiple + dist.text !== total) { setError('La suma de preguntas por tipo debe ser igual al total.'); return; }
+    if (!distOk) { setError(`La suma de los tipos debe ser ${total} (ahora es ${sumaDist}).`); return; }
+    if (sumaDist === 0) { setError('Elige al menos un tipo de pregunta.'); return; }
     setError('');
     setResultado(null);
     setGenerando(true);
     try {
       const r = await generarPreguntasConIA(
-        { tema: tema.trim(), total, multiple: dist.multiple, text: dist.text, dificultad, idioma, variasCorrectas },
+        { tema: tema.trim(), total, tipos: dist, dificultad, idioma, variasCorrectas },
         callGemini
       );
       setResultado(r);
@@ -71,9 +89,15 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
     onInsert(resultado.preguntas, modo, { tema: tema.trim(), total });
   }
 
-  const tipoBadge = (q) => q.type === 'multiple'
-    ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-blue-500/15 text-blue-600 dark:text-blue-400">{'Selecci\u00f3n m\u00faltiple'}</span>
-    : <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-purple-500/15 text-purple-600 dark:text-purple-400">Respuesta escrita</span>
+  const etiquetaTipoDe = (q) => {
+    if (q.type === 'order') return TIPOS_ETIQUETAS.orden;
+    if (q.type === 'match') return TIPOS_ETIQUETAS.match;
+    if (q.type === 'listening') return 'Comprensi\u00f3n auditiva';
+    if (q.type === 'speaking') return 'Speaking';
+    if (q.type === 'text') return TIPOS_ETIQUETAS.text;
+    const esVF = Array.isArray(q.options) && q.options.length === 2 && /^verdadero$/i.test(String(q.options[0]?.text || '').trim());
+    return esVF ? TIPOS_ETIQUETAS.vf : TIPOS_ETIQUETAS.multiple;
+  }
 
   const input = 'w-full px-3 py-2 rounded-xl border text-xs font-semibold outline-none focus:ring-2 focus:ring-blue-500 ' + (isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-100' : 'bg-white border-gray-300 text-gray-800')
   const label = 'block text-[11px] font-bold mb-1 ' + (isDarkMode ? 'text-gray-300' : 'text-gray-600')
@@ -106,7 +130,7 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
               rows={3}
               value={tema}
               onChange={(e) => setTema(e.target.value)}
-              placeholder={'Ej: Pass\u00e9 compos\u00e9 de verbos irregulares, nivel A2. Incluye 2 preguntas de comprensi\u00f3n lectora corta.'}
+              placeholder={'Ej: Past simple de verbos irregulares, nivel A2. Incluye 2 preguntas de comprensi\u00f3n lectora corta.'}
               className={`${input} resize-y leading-relaxed`}
               disabled={generando}
             />
@@ -119,7 +143,7 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
               <input
                 type="number" min={1} max={Math.min(MAX_PREGUNTAS, espacioLibre || MAX_PREGUNTAS)}
                 value={total}
-                onChange={(e) => setTotal(Math.max(1, Math.min(Number(e.target.value) || 1, MAX_PREGUNTAS)))}
+                onChange={(e) => cambiarTotal(e.target.value)}
                 className={input}
                 disabled={generando}
               />
@@ -143,34 +167,40 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
           </div>
 
           <div>
-            <label className={label}>Tipo de preguntas</label>
+            <label className={label}>Mezcla de tipos</label>
             <div className="flex flex-wrap gap-1.5">
-              {[['auto', TIPOS_MEZCLA.auto.etiqueta], ['multiple', TIPOS_MEZCLA.multiple.etiqueta], ['text', TIPOS_MEZCLA.text.etiqueta], ['custom', 'Personalizado']].map(([k, etiqueta]) => (
+              {Object.entries(PRESETS).map(([k, p]) => (
                 <button
                   key={k} type="button" disabled={generando}
-                  onClick={() => setMezcla(k)}
-                  className={`text-[11px] font-bold px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${mezcla === k
+                  onClick={() => aplicarPreset(k)}
+                  className={`text-[11px] font-bold px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${preset === k
                     ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
                     : (isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-300 hover:border-blue-500' : 'bg-white border-gray-300 text-gray-600 hover:border-blue-500')}`}
                 >
-                  {etiqueta}
+                  {p.etiqueta}
                 </button>
               ))}
             </div>
-            {mezcla === 'custom' && (
-              <div className="grid grid-cols-2 gap-3 mt-3">
-                <div>
-                  <label className={label}>{'Selecci\u00f3n m\u00faltiple'}</label>
-                  <input type="number" min={0} max={total} value={customMultiple} onChange={(e) => { const v = Math.max(0, Math.min(total, Number(e.target.value) || 0)); setCustomMultiple(v); }} className={input} disabled={generando} />
-                </div>
-                <div>
-                  <label className={label}>Respuesta escrita</label>
-                  <input type="number" min={0} max={total} value={Math.max(0, total - (Number(customMultiple) || 0))} onChange={(e) => { const v = Math.max(0, Math.min(total, Number(e.target.value) || 0)); setCustomMultiple(Math.max(0, total - v)); }} className={input} disabled={generando} />
-                </div>
-              </div>
-            )}
 
-            <label className="flex items-start gap-2 pt-2.5 cursor-pointer">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-3">
+              {CLAVES_TIPOS.map((k) => (
+                <div key={k}>
+                  <label className="block text-[10px] font-bold text-gray-500 mb-0.5 leading-tight">{TIPOS_ETIQUETAS[k]}</label>
+                  <input
+                    type="number" min={0} max={total}
+                    value={dist[k] || 0}
+                    onChange={(e) => cambiarTipo(k, e.target.value)}
+                    className={`${input} !py-1.5 text-center`}
+                    disabled={generando}
+                  />
+                </div>
+              ))}
+            </div>
+            <p className={`text-[10px] font-bold mt-1.5 ${distOk ? 'text-gray-500' : 'text-amber-600 dark:text-amber-400'}`}>
+              {distOk ? `Total: ${total} preguntas` : `Ajusta la mezcla: la suma es ${sumaDist} y debe ser ${total}`}
+            </p>
+
+            <label className="flex items-start gap-2 pt-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={variasCorrectas}
@@ -224,12 +254,13 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
                       <div className="min-w-0 flex-1 space-y-1.5">
                         <p className={`text-xs font-bold leading-snug ${isDarkMode ? 'text-gray-100' : 'text-gray-800'}`}>{q.text}</p>
                         <div className="flex items-center gap-1.5">
-                          {tipoBadge(q)}
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-blue-500/15 text-blue-600 dark:text-blue-400">{etiquetaTipoDe(q)}</span>
                           {q.points && Number(q.points) !== 1 ? (
                             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400">{q.points} pts</span>
                           ) : null}
                         </div>
-                        {q.type === 'multiple' ? (
+
+                        {q.type === 'multiple' && (
                           <ul className="space-y-0.5">
                             {q.options.map((o, oi) => (
                               <li key={oi} className={`text-[11px] font-medium flex items-start gap-1.5 ${o.isCorrect ? 'text-green-600 dark:text-green-400 font-bold' : 'text-gray-500'}`}>
@@ -238,13 +269,32 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
                               </li>
                             ))}
                           </ul>
-                        ) : (
+                        )}
+
+                        {q.type === 'text' && (
                           <div className="space-y-0.5">
                             <p className="text-[11px] font-bold text-green-600 dark:text-green-400">Respuesta esperada: {q.correctAnswer}</p>
                             {q.acceptedAnswers?.length > 0 && (
                               <p className="text-[10px] text-gray-500 font-medium">{'Tambi\u00e9n v\u00e1lido: '}{q.acceptedAnswers.join(', ')}</p>
                             )}
                           </div>
+                        )}
+
+                        {q.type === 'order' && (
+                          <p className="text-[11px] text-gray-500 font-medium">
+                            {'Orden correcto: '}<span className="text-green-600 dark:text-green-400 font-bold">{(q.words || []).join(' ')}</span>
+                            <span className="text-[10px] block">{'Al estudiante se le muestran las palabras desordenadas.'}</span>
+                          </p>
+                        )}
+
+                        {q.type === 'match' && (
+                          <ul className="space-y-0.5">
+                            {(q.pairs || []).map((p, pi) => (
+                              <li key={pi} className="text-[11px] font-medium text-gray-500">
+                                <span className={isDarkMode ? 'text-gray-200' : 'text-gray-700'}>{p.left}</span> {'\u2192'} <span className="text-green-600 dark:text-green-400 font-bold">{p.right}</span>
+                              </li>
+                            ))}
+                          </ul>
                         )}
                       </div>
                     </div>

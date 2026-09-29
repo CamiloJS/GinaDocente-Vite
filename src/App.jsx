@@ -46,7 +46,8 @@ import RichVisualEditor from './components/RichVisualEditor.jsx'
 import DocumentPreviewModal from './components/DocumentPreviewModal.jsx'
 import CommandPaletteModal from './components/CommandPaletteModal.jsx'
 import { extractTextFromPDF } from './utils/pdfExtractor.js'
-import { calculateScore } from './utils/evalScoring.js'
+import { calculateScore, normalizarRespuesta } from './utils/evalScoring.js'
+import { desordenarPalabras } from './utils/palabras.js'
 import { useClickOutside } from './utils/hooks.js'
 
 const TasksTab = React.lazy(() => import('./components/TasksTab.jsx'))
@@ -135,6 +136,14 @@ const safeDecodeURIComponent = (str) => {
     return str;
   }
 };
+
+// Una pregunta de Verdadero/Falso es una seleccion multiple con las dos opciones tipicas.
+const esVerdaderoFalso = (q) =>
+    q?.type === 'multiple' &&
+    Array.isArray(q.options) &&
+    q.options.length === 2 &&
+    /^verdadero$/i.test(String(q.options[0]?.text || '').trim()) &&
+    /^falso$/i.test(String(q.options[1]?.text || '').trim());
 
 function App() {
   // --- HELPERS BÁSICOS Y CONSTANTES INICIALES ---
@@ -7278,6 +7287,38 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                   );
                                               })}
                                           </div>
+                                      ) : q.type === 'order' ? (
+                                          <div className="pt-1 pl-8 space-y-2">
+                                              <div className={`min-h-[42px] flex flex-wrap items-center gap-1.5 p-2 rounded-xl border-2 border-dashed ${isDarkMode ? 'border-gray-700 bg-gray-800/40' : 'border-gray-300 bg-gray-50'}`}>
+                                                  {(Array.isArray(studentAnswers[qIndex]) ? studentAnswers[qIndex] : []).map((w, wi) => (
+                                                      <button key={wi} type="button" onClick={() => setStudentAnswers({ ...studentAnswers, [qIndex]: (studentAnswers[qIndex] || []).filter((_, x) => x !== wi) })} className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold cursor-pointer transition-all active:scale-95">
+                                                          {w}
+                                                      </button>
+                                                  ))}
+                                                  {!(Array.isArray(studentAnswers[qIndex]) && studentAnswers[qIndex].length > 0) && (
+                                                      <span className="text-xs text-gray-400 font-medium">{'Toca las palabras en orden para armar la oraci\u00f3n...'}</span>
+                                                  )}
+                                              </div>
+                                              <div className="flex flex-wrap gap-1.5">
+                                                  {(() => {
+                                                      const respuesta = Array.isArray(studentAnswers[qIndex]) ? studentAnswers[qIndex] : [];
+                                                      const usado = respuesta.reduce((acc, w) => { acc[w] = (acc[w] || 0) + 1; return acc; }, {});
+                                                      const visto = {};
+                                                      return desordenarPalabras(q.words || [], q.text || String(qIndex)).map(({ w, idx }) => {
+                                                          visto[w] = (visto[w] || 0) + 1;
+                                                          const usada = visto[w] <= (usado[w] || 0);
+                                                          return (
+                                                              <button key={idx} type="button" disabled={usada} onClick={() => setStudentAnswers({ ...studentAnswers, [qIndex]: [...respuesta, w] })} className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${usada ? 'opacity-30 cursor-default' : 'cursor-pointer hover:scale-105'} ${isDarkMode ? 'bg-gray-800 border border-blue-600 text-blue-300' : 'bg-white border border-blue-400 text-blue-700'}`}>
+                                                                  {w}
+                                                              </button>
+                                                          );
+                                                      });
+                                                  })()}
+                                              </div>
+                                              {Array.isArray(studentAnswers[qIndex]) && studentAnswers[qIndex].length > 0 && (
+                                                  <button type="button" onClick={() => setStudentAnswers({ ...studentAnswers, [qIndex]: [] })} className="text-[11px] font-bold text-gray-500 hover:text-red-500 underline cursor-pointer">{'Borrar todo'}</button>
+                                              )}
+                                          </div>
                                       ) : (
                                           <div className="pt-1 pl-8">
                                               <input 
@@ -7352,6 +7393,17 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                   ? ansArr.map(idx => q.options?.[idx]?.text || `Opción ${idx + 1}`).join('; ')
                                   : '(Sin respuesta)';
                               correctAnswerText = correctIndices.map(idx => q.options?.[idx]?.text || `Opción ${idx + 1}`).join('; ');
+                          } else if (q.type === 'order') {
+                              studentAnswerText = Array.isArray(qAns) && qAns.length ? qAns.join(' ') : '(Sin respuesta)';
+                              correctAnswerText = (q.words || []).join(' ');
+                              isCorrect = studentAnswerText !== '(Sin respuesta)' && normalizarRespuesta(studentAnswerText) === normalizarRespuesta(correctAnswerText);
+                          } else if (q.type === 'match') {
+                              const paresM = q.pairs || [];
+                              const elegidasM = (qAns && typeof qAns === 'object') ? qAns : {};
+                              const aciertosM = paresM.filter((p, pIdx) => normalizarRespuesta(elegidasM[pIdx]) === normalizarRespuesta(p.right)).length;
+                              studentAnswerText = paresM.map((p, pIdx) => `${p.left} -> ${elegidasM[pIdx] || '(sin elegir)'}`).join(' | ');
+                              correctAnswerText = paresM.map((p) => `${p.left} -> ${p.right}`).join(' | ');
+                              isCorrect = paresM.length > 0 && aciertosM === paresM.length;
                           } else {
                               studentAnswerText = qAns !== undefined && qAns !== null && String(qAns).trim() ? String(qAns).trim() : '(Sin respuesta)';
                               correctAnswerText = (q.correctAnswer || '').trim();
@@ -7891,6 +7943,16 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                   const ansArr = Array.isArray(qAns) ? qAns : [];
                                                   isUnanswered = ansArr.length === 0;
                                                   isCorrect = correctOpts.length > 0 && ansArr.length === correctOpts.length && correctOpts.every(i => ansArr.includes(i));
+                                              } else if (q.type === 'order') {
+                                                  const secuencia = Array.isArray(qAns) ? qAns : [];
+                                                  isUnanswered = secuencia.length === 0;
+                                                  isCorrect = !isUnanswered && normalizarRespuesta(secuencia.join(' ')) === normalizarRespuesta((q.words || []).join(' '));
+                                              } else if (q.type === 'match') {
+                                                  const paresR = q.pairs || [];
+                                                  const elegidasR = (qAns && typeof qAns === 'object') ? qAns : {};
+                                                  const aciertosR = paresR.filter((p, pIdx) => normalizarRespuesta(elegidasR[pIdx]) === normalizarRespuesta(p.right)).length;
+                                                  isUnanswered = paresR.length > 0 && paresR.every((p, pIdx) => !elegidasR[pIdx]);
+                                                  isCorrect = paresR.length > 0 && aciertosR === paresR.length;
                                               } else {
                                                   isUnanswered = !qAns || (typeof qAns === 'string' && !qAns.trim());
                                                   isCorrect = typeof qAns === 'string' && qAns.trim().toLowerCase() === (q.correctAnswer || '').trim().toLowerCase();
@@ -7983,6 +8045,30 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                                               <span>{opt.text}</span>
                                                                           </div>
                                                                           {badge}
+                                                                      </div>
+                                                                  );
+                                                              })}
+                                                          </div>
+                                                      ) : q.type === 'order' ? (
+                                                          <div className="space-y-2 pl-8">
+                                                              <div className={`p-3 rounded-xl border text-xs ${isCorrect ? 'bg-emerald-100/60 dark:bg-emerald-950/40 border-emerald-400 text-emerald-700 dark:text-emerald-300' : isUnanswered ? 'bg-amber-100/60 dark:bg-amber-950/40 border-amber-400 text-amber-700 dark:text-amber-300' : 'bg-red-100/60 dark:bg-red-950/40 border-red-400 text-red-700 dark:text-red-300'}`}>
+                                                                  <p className="font-bold mb-1">{'Oraci\u00f3n del estudiante:'}</p>
+                                                                  <p className="font-semibold">{Array.isArray(qAns) && qAns.length ? qAns.join(' ') : '(sin responder)'}</p>
+                                                                  {!isCorrect && (
+                                                                      <p className="mt-1.5 text-[11px]"><span className="font-bold">{'Orden correcto: '}</span>{(q.words || []).join(' ')}</p>
+                                                                  )}
+                                                              </div>
+                                                          </div>
+                                                      ) : q.type === 'match' ? (
+                                                          <div className="space-y-1.5 pl-8">
+                                                              {(q.pairs || []).map((p, pIdx) => {
+                                                                  const elegida = (qAns && typeof qAns === 'object') ? qAns[pIdx] : '';
+                                                                  const bienPar = normalizarRespuesta(elegida) === normalizarRespuesta(p.right);
+                                                                  return (
+                                                                      <div key={pIdx} className={`p-2.5 rounded-xl border text-xs flex items-center justify-between gap-2 ${bienPar ? 'bg-emerald-100/60 dark:bg-emerald-950/40 border-emerald-400 text-emerald-700 dark:text-emerald-300' : 'bg-red-100/60 dark:bg-red-950/40 border-red-400 text-red-700 dark:text-red-300'}`}>
+                                                                          <span className="font-bold">{p.left}</span>
+                                                                          <span>{elegida || '(sin elegir)'}</span>
+                                                                          {!bienPar && <span className="text-[10px] font-bold">{'Correcto: ' + p.right}</span>}
                                                                       </div>
                                                                   );
                                                               })}
@@ -8330,24 +8416,18 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                   <span className="w-6 h-6 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
                                                       {qIndex + 1}
                                                   </span>
-                                                  <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 p-0.5 rounded-xl text-[11px] font-bold">
-                                                      <button 
-                                                          type="button" 
-                                                          onClick={() => {
-                                                              const newQ = [...evalFormData.questions]; newQ[qIndex] = {...newQ[qIndex], type: 'multiple', options: (newQ[qIndex].options && newQ[qIndex].options.length >= 2) ? newQ[qIndex].options.map(o => ({...o})) : [{text:'',isCorrect:false},{text:'',isCorrect:false}]}; setEvalFormData({...evalFormData, questions: newQ});
-                                                          }}
-                                                          className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${q.type === 'multiple' ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-xs' : 'text-gray-500'}`}
-                                                      >
-                                                          Selección múltiple
+                                                  <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 p-0.5 rounded-xl text-[11px] font-bold flex-wrap">
+                                                      <button type="button" onClick={() => { const newQ = [...evalFormData.questions]; const esVF = esVerdaderoFalso(newQ[qIndex]); newQ[qIndex] = { ...newQ[qIndex], type: 'multiple', options: (newQ[qIndex].options && newQ[qIndex].options.length >= 2 && !esVF) ? newQ[qIndex].options.map((o) => ({ ...o })) : [{ text: 'Verdadero', isCorrect: false }, { text: 'Falso', isCorrect: false }] }; setEvalFormData({ ...evalFormData, questions: newQ }); }} className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${q.type === 'multiple' ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-xs' : 'text-gray-500'}`}>
+                                                          {'Selecci\u00f3n m\u00faltiple'}
                                                       </button>
-                                                      <button 
-                                                          type="button" 
-                                                          onClick={() => {
-                                                              const newQ = [...evalFormData.questions]; newQ[qIndex] = {...newQ[qIndex], type: 'text'}; setEvalFormData({...evalFormData, questions: newQ});
-                                                          }}
-                                                          className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${q.type === 'text' ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-xs' : 'text-gray-500'}`}
-                                                      >
+                                                      <button type="button" onClick={() => { const newQ = [...evalFormData.questions]; newQ[qIndex] = { ...newQ[qIndex], type: 'multiple', options: [{ text: 'Verdadero', isCorrect: false }, { text: 'Falso', isCorrect: false }] }; setEvalFormData({ ...evalFormData, questions: newQ }); }} className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${esVerdaderoFalso(q) ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-xs' : 'text-gray-500'}`}>
+                                                          Verdadero / Falso
+                                                      </button>
+                                                      <button type="button" onClick={() => { const newQ = [...evalFormData.questions]; newQ[qIndex] = { ...newQ[qIndex], type: 'text' }; setEvalFormData({ ...evalFormData, questions: newQ }); }} className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${q.type === 'text' ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-xs' : 'text-gray-500'}`}>
                                                           Respuesta escrita
+                                                      </button>
+                                                      <button type="button" onClick={() => { const newQ = [...evalFormData.questions]; const actual = newQ[qIndex]; const palabras = (actual.words && actual.words.length ? actual.words : String(actual.correctAnswer || '').split(/\s+/).filter(Boolean)); newQ[qIndex] = { ...actual, type: 'order', words: palabras }; setEvalFormData({ ...evalFormData, questions: newQ }); }} className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${q.type === 'order' ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-xs' : 'text-gray-500'}`}>
+                                                          {'Ordenar la oraci\u00f3n'}
                                                       </button>
                                                   </div>
                                               </div>
@@ -8420,6 +8500,21 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                           <Plus size={12}/> Agregar opción
                                                       </button>
                                                   )}
+                                              </div>
+                                          ) : q.type === 'order' ? (
+                                              <div className="space-y-1.5 pl-4 sm:pl-7 border-l-2 border-blue-500/30">
+                                                  <p className="text-[11px] font-bold text-gray-500">{'Escribe la oraci\u00f3n correcta (al estudiante se le mostrar\u00e1 desordenada):'}</p>
+                                                  <input
+                                                      value={(q.words || []).join(' ')}
+                                                      onChange={(e) => {
+                                                          const newQ = [...evalFormData.questions];
+                                                          newQ[qIndex] = { ...newQ[qIndex], words: e.target.value.split(/\s+/).filter(Boolean) };
+                                                          setEvalFormData({ ...evalFormData, questions: newQ });
+                                                      }}
+                                                      placeholder="Ej: she went to school yesterday"
+                                                      className={`${glassInput} !py-1.5 text-xs border-blue-500/40 bg-blue-500/10`}
+                                                  />
+                                                  <p className="text-[10px] text-gray-500">{(q.words || []).length} palabras</p>
                                               </div>
                                           ) : (
                                               <div className="pl-4 sm:pl-7 border-l-2 border-blue-500/30">
