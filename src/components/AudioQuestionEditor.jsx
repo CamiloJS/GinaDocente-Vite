@@ -1,11 +1,13 @@
 // src/components/AudioQuestionEditor.jsx
 // Editor de audio reutilizable: graba con el microfono o sube un archivo, con vista previa.
+// Nota: usa la carpeta chat_audios de Storage (la misma de las notas de voz) porque las reglas
+// de Storage se administran en la consola de Firebase y esa ruta ya esta permitida.
 import React, { useRef, useState } from 'react'
 import { Mic, Square, Trash2, Upload, Loader2 } from './Icons.jsx'
 import { useVoiceRecorder } from '../utils/useVoiceRecorder.js'
 import { uploadRawFileToStorage } from '../utils/helpers.js'
 
-const AudioQuestionEditor = ({ audioUrl = '', onChange, isDarkMode = false, folder = 'eval_audios', showMessage = () => {} }) => {
+const AudioQuestionEditor = ({ audioUrl = '', onChange, isDarkMode = false, folder = 'chat_audios', showMessage = () => {} }) => {
   const grabadora = useVoiceRecorder(folder, showMessage)
   const fileRef = useRef(null)
   const [subiendo, setSubiendo] = useState(false)

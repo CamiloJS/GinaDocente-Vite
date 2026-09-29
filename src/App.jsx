@@ -1350,7 +1350,7 @@ function App() {
   };
 
   // Grabadora para las respuestas de speaking (se califican a mano)
-  const grabadoraExamen = useVoiceRecorder('eval_audios', showMessage);
+  const grabadoraExamen = useVoiceRecorder('chat_audios', showMessage);
   const [grabandoParaPregunta, setGrabandoParaPregunta] = useState(null);
   useEffect(() => {
       if (grabadoraExamen.audioUrl && grabandoParaPregunta !== null) {
