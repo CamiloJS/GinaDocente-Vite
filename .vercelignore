@@ -1,0 +1,3 @@
+# Archivos que Vercel NO debe subir a los despliegues
+functions/serviceAccountKey.json
+serviceAccountKey.json

@@ -6,3 +6,8 @@ dist/
 *.log
 Thumbs.db
 .DS_Store
+
+# Credenciales: NUNCA subir esto
+functions/serviceAccountKey.json
+serviceAccountKey.json
+*-firebase-adminsdk-*.json
