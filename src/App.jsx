@@ -4523,7 +4523,7 @@ useEffect(() => {
                                 <div className="space-y-2 min-w-0 w-full">
                                     {post.title && <h4 className={`font-black text-base sm:text-lg leading-tight pr-14 break-words ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>{post.title}</h4>}
                                     {post.imageUrl && <img src={post.imageUrl} loading="lazy" onClick={() => setFullScreenImage(post.imageUrl)} alt="Post" className={`w-full max-h-96 object-cover rounded-xl cursor-pointer shadow-xs border ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`} />}
-                                    {post.text && <p className={`text-xs sm:text-sm leading-relaxed break-words whitespace-pre-line ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}><LinkifyText text={post.text} /></p>}
+                                    {post.text && <div className={`text-xs sm:text-sm leading-relaxed break-words whitespace-pre-line ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}><LinkifyText text={post.text} /></div>}
                                 </div>
                             )}
                             
@@ -11857,14 +11857,14 @@ Bot:`;
                                                                                                           <Languages size={10} /> Ver original
                                                                                                       </button>
                                                                                                   </div>
-                                                                                                  <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap pr-6">
+                                                                                                  <div className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap pr-6">
                                                                                                       <LinkifyText text={chatTranslations[m.id]} />
-                                                                                                  </p>
+                                                                                                  </div>
                                                                                               </div>
                                                                                           ) : (
-                                                                                              <p className={isEmojiOnly ? "text-4xl drop-shadow-md leading-none py-1" : "text-xs sm:text-sm leading-relaxed whitespace-pre-wrap pr-6"}>
+                                                                                              <div className={isEmojiOnly ? "text-4xl drop-shadow-md leading-none py-1" : "text-xs sm:text-sm leading-relaxed whitespace-pre-wrap pr-6"}>
                                                                                                   <LinkifyText text={m.text} />
-                                                                                              </p>
+                                                                                              </div>
                                                                                           )}
                                                                                           {translatingMsgIds[m.id] && (
                                                                                               <span className="text-[10px] italic opacity-80 animate-pulse block mt-0.5">Traduciendo...</span>

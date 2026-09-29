@@ -1278,9 +1278,9 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                                     Ver original
                                 </button>
                             </div>
-                            <p className={`text-sm leading-relaxed whitespace-pre-wrap w-full ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+                            <div className={`text-sm leading-relaxed whitespace-pre-wrap w-full ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>
                                 <LinkifyText text={translatedDescription} isDarkMode={isDarkMode} embedVideos={!task.videoUrl && !task.imageUrl && !task.fileUrl && !task.audioUrl} />
-                            </p>
+                            </div>
                         </div>
                     ) : (
                         <div className="space-y-1.5 w-full">
@@ -1293,9 +1293,9 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                                     <Languages size={12} /> Ver traducción al español
                                 </button>
                             )}
-                            <p className={`text-sm leading-relaxed whitespace-pre-wrap w-full ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+                            <div className={`text-sm leading-relaxed whitespace-pre-wrap w-full ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>
                                 <LinkifyText text={task.description} isDarkMode={isDarkMode} embedVideos={!task.videoUrl && !task.imageUrl && !task.fileUrl && !task.audioUrl} />
-                            </p>
+                            </div>
                         </div>
                     )}
 
@@ -1834,7 +1834,7 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                                                             Contenido original antes de ser eliminado:
                                                         </span>
                                                         {(c.originalText || c.text) && (
-                                                            <p className={`text-xs leading-relaxed whitespace-pre-wrap ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>
+                                                            <div className={`text-xs leading-relaxed whitespace-pre-wrap ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>
                                                                 <LinkifyText text={(() => {
                                                                     const isPlaceholder = (s) => (s || '').toLowerCase().includes('mensaje fue eliminado') || (s || '').toLowerCase().includes('mensaje eliminado') || (s || '').toLowerCase().includes('comentario eliminado');
                                                                     if (c.originalText && !isPlaceholder(c.originalText)) return c.originalText;
@@ -1845,7 +1845,7 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                                                                     if (c.text && !isPlaceholder(c.text)) return c.text;
                                                                     return c.originalText || c.text || '(Sin texto previo)';
                                                                 })()} />
-                                                            </p>
+                                                            </div>
                                                         )}
                                                         {(c.originalImageUrls?.length > 0 || c.originalImageUrl) && (
                                                             <div className="mt-2 max-w-sm">
@@ -2005,7 +2005,7 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                                                         <p className="line-through opacity-90 whitespace-pre-wrap">{c.editHistory[0]?.text}</p>
                                                     </div>
                                                 )}
-                                                {c.text && <p className={`text-xs leading-relaxed ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>{<LinkifyText text={c.text} />}</p>}
+                                                {c.text && <div className={`text-xs leading-relaxed ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>{<LinkifyText text={c.text} />}</div>}
                                                 {c.imageUrl && <img src={c.imageUrl} loading="lazy" decoding="async" alt="Adjunto" onClick={() => setLocalFullScreenImage(c.imageUrl)} className="w-24 h-24 rounded-xl border object-cover shadow-xs cursor-pointer hover:opacity-80 transition-opacity" onError={(e) => e.target.style.display = 'none'} />}
                                                 {c.audioUrl && <div className="mt-1"><AudioPlayer src={c.audioUrl} title="" isDarkMode={isDarkMode} compact={true} /></div>}
                                                 {c.fileUrl && (
