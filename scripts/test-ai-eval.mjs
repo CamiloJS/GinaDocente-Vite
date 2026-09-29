@@ -106,6 +106,7 @@ console.log("\n== Presets de mezcla ==");
 const suma = (d) => d.multiple + d.vf + d.text + d.orden + d.match;
 chequear("preset variada suma exacto (10)", suma(PRESETS.variada.calc(10)) === 10, JSON.stringify(PRESETS.variada.calc(10)));
 chequear("preset variada usa todos los tipos", ["multiple", "vf", "text", "orden"].every((k) => PRESETS.variada.calc(10)[k] > 0));
+chequear("preset variada incluye relacionar en examenes largos", PRESETS.variada.calc(10).match === 1 && PRESETS.variada.calc(5).match === 0);
 chequear("preset variada suma exacto en varios tamanos", [1, 2, 3, 4, 5, 7, 12, 20].every((t) => suma(PRESETS.variada.calc(t)) === t));
 chequear("preset mitad y mitad suma exacto", suma(PRESETS.mitad.calc(9)) === 9 && PRESETS.mitad.calc(9).vf === 0);
 chequear("preset solo multiple", suma(PRESETS.multiple.calc(6)) === 6 && PRESETS.multiple.calc(6).multiple === 6);

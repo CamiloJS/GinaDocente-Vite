@@ -10,13 +10,14 @@ export const PRESETS = {
   variada: {
     etiqueta: 'Variada (recomendada)',
     calc: (total) => {
+      const match = total >= 8 ? 1 : 0;
       const multiple = Math.max(1, Math.round(total * 0.4));
       const vf = total >= 4 ? Math.max(1, Math.round(total * 0.2)) : 0;
       const text = Math.max(1, Math.round(total * 0.2));
-      let orden = total - multiple - vf - text;
-      const tipos = { multiple, vf, text, orden: Math.max(0, orden), match: 0 };
+      const orden = Math.max(0, total - multiple - vf - text - match);
+      const tipos = { multiple, vf, text, orden, match };
       // ajuste de seguridad para que la suma sea exacta
-      const suma = tipos.multiple + tipos.vf + tipos.text + tipos.orden;
+      const suma = tipos.multiple + tipos.vf + tipos.text + tipos.orden + tipos.match;
       if (suma !== total) tipos.multiple = Math.max(0, tipos.multiple + (total - suma));
       return tipos;
     },

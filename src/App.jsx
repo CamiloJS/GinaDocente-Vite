@@ -3979,6 +3979,13 @@ useEffect(() => {
                           firstError = `Pregunta ${i+1}: Marca al menos 1 opción correcta.`;
                           break;
                       }
+                  } else if (q.type === 'order') {
+                      if (!q.words || q.words.length < 2) { firstError = `Pregunta ${i + 1}: Escribe la oracion completa (al menos 2 palabras).`; break; }
+                  } else if (q.type === 'match') {
+                      const paresVal = q.pairs || [];
+                      const derechas = new Set(paresVal.map((p) => String(p.right || '').trim().toLowerCase()).filter(Boolean));
+                      if (paresVal.length < 3 || paresVal.some((p) => !String(p.left || '').trim() || !String(p.right || '').trim())) { firstError = `Pregunta ${i + 1}: Completa al menos 3 parejas (izquierda y derecha).`; break; }
+                      if (derechas.size !== paresVal.length) { firstError = `Pregunta ${i + 1}: Las respuestas de la derecha deben ser distintas entre si.`; break; }
                   } else {
                       if (!q.correctAnswer || !q.correctAnswer.trim()) {
                           firstError = `Pregunta ${i+1}: Escribe la respuesta esperada.`;
@@ -7319,6 +7326,44 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                   <button type="button" onClick={() => setStudentAnswers({ ...studentAnswers, [qIndex]: [] })} className="text-[11px] font-bold text-gray-500 hover:text-red-500 underline cursor-pointer">{'Borrar todo'}</button>
                                               )}
                                           </div>
+                                      ) : q.type === 'match' ? (
+                                          <div className="space-y-2 pl-4 sm:pl-7 border-l-2 border-blue-500/30">
+                                              <p className="text-[11px] font-bold text-gray-500">{'Escribe las parejas (izquierda y su respuesta correcta). Minimo 3:'}</p>
+                                              {(q.pairs || []).map((par, pIndex) => (
+                                                  <div key={pIndex} className="flex gap-2 items-center">
+                                                      <span className="text-[10px] font-bold text-gray-400 w-4 shrink-0">{pIndex + 1}</span>
+                                                      <input value={par.left} onChange={(e) => { const newQ = [...evalFormData.questions]; const pares = [...(newQ[qIndex].pairs || [])]; pares[pIndex] = { ...pares[pIndex], left: e.target.value }; newQ[qIndex] = { ...newQ[qIndex], pairs: pares }; setEvalFormData({ ...evalFormData, questions: newQ }); }} placeholder="Ej: dog" className={`${glassInput} !py-1.5 flex-1 text-xs`} />
+                                                      <span className="text-gray-400 text-xs">{'\u2192'}</span>
+                                                      <input value={par.right} onChange={(e) => { const newQ = [...evalFormData.questions]; const pares = [...(newQ[qIndex].pairs || [])]; pares[pIndex] = { ...pares[pIndex], right: e.target.value }; newQ[qIndex] = { ...newQ[qIndex], pairs: pares }; setEvalFormData({ ...evalFormData, questions: newQ }); }} placeholder="Ej: perro" className={`${glassInput} !py-1.5 flex-1 text-xs border-green-500/40 bg-green-500/10`} />
+                                                      {(q.pairs || []).length > 3 && (
+                                                          <button type="button" onClick={() => { const newQ = [...evalFormData.questions]; const pares = [...(newQ[qIndex].pairs || [])]; pares.splice(pIndex, 1); newQ[qIndex] = { ...newQ[qIndex], pairs: pares }; setEvalFormData({ ...evalFormData, questions: newQ }); }} className="text-gray-400 hover:text-red-500 p-1 cursor-pointer" title="Eliminar pareja"><X size={14} /></button>
+                                                      )}
+                                                  </div>
+                                              ))}
+                                              {(q.pairs || []).length < 6 && (
+                                                  <button type="button" onClick={() => { const newQ = [...evalFormData.questions]; newQ[qIndex] = { ...newQ[qIndex], pairs: [...(newQ[qIndex].pairs || []), { left: '', right: '' }] }; setEvalFormData({ ...evalFormData, questions: newQ }); }} className="text-[11px] font-bold text-blue-600 hover:underline pt-1 flex items-center gap-1 cursor-pointer">
+                                                      <Plus size={12} /> Agregar pareja
+                                                  </button>
+                                              )}
+                                          </div>
+                                      ) : q.type === 'match' ? (
+                                          <div className="pt-1 pl-8 space-y-2">
+                                              <p className="text-[11px] text-gray-500 font-medium">{'Elige la respuesta correcta para cada elemento:'}</p>
+                                              {(q.pairs || []).map((par, pIndex) => {
+                                                  const elegida = (studentAnswers[qIndex] && typeof studentAnswers[qIndex] === 'object') ? studentAnswers[qIndex][pIndex] : '';
+                                                  return (
+                                                      <div key={pIndex} className="flex items-center gap-2">
+                                                          <span className={`text-xs font-bold w-28 sm:w-40 truncate ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>{par.left}</span>
+                                                          <select value={elegida || ''} onChange={(e) => setStudentAnswers({ ...studentAnswers, [qIndex]: { ...(studentAnswers[qIndex] || {}), [pIndex]: e.target.value } })} className={`${glassInput} !py-1.5 flex-1 text-xs font-semibold cursor-pointer`}>
+                                                              <option value="">{'-- Elige --'}</option>
+                                                              {desordenarPalabras((q.pairs || []).map((p) => p.right), (q.text || '') + pIndex).map(({ w, idx }) => (
+                                                                  <option key={idx} value={w}>{w}</option>
+                                                              ))}
+                                                          </select>
+                                                      </div>
+                                                  );
+                                              })}
+                                          </div>
                                       ) : (
                                           <div className="pt-1 pl-8">
                                               <input 
@@ -8428,6 +8473,9 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                       </button>
                                                       <button type="button" onClick={() => { const newQ = [...evalFormData.questions]; const actual = newQ[qIndex]; const palabras = (actual.words && actual.words.length ? actual.words : String(actual.correctAnswer || '').split(/\s+/).filter(Boolean)); newQ[qIndex] = { ...actual, type: 'order', words: palabras }; setEvalFormData({ ...evalFormData, questions: newQ }); }} className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${q.type === 'order' ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-xs' : 'text-gray-500'}`}>
                                                           {'Ordenar la oraci\u00f3n'}
+                                                      </button>
+                                                      <button type="button" onClick={() => { const newQ = [...evalFormData.questions]; const actual = newQ[qIndex]; const pares = (actual.pairs && actual.pairs.length >= 3) ? actual.pairs : [{ left: '', right: '' }, { left: '', right: '' }, { left: '', right: '' }]; newQ[qIndex] = { ...actual, type: 'match', pairs: pares }; setEvalFormData({ ...evalFormData, questions: newQ }); }} className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${q.type === 'match' ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-xs' : 'text-gray-500'}`}>
+                                                          Relacionar columnas
                                                       </button>
                                                   </div>
                                               </div>
