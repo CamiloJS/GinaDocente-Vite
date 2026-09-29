@@ -2,6 +2,7 @@ import React from 'react';
 import CustomVideoPlayer, { extractYouTubeId } from './CustomVideoPlayer.jsx';
 import GeniallyEmbedPlayer, { isGeniallyUrl, extractGeniallyUrl } from './GeniallyEmbedPlayer.jsx';
 import AppleEmoji, { EMOJI_REGEX } from './AppleEmoji.jsx';
+import { normalizarMarcado } from '../utils/textFormat.js';
 
 const COLOR_MAP = {
   rojo: '#ef4444',
@@ -269,11 +270,12 @@ const LinkifyText = ({ text, isDarkMode = false, isEmojiOnly = false, embedVideo
   if (!text) return null;
   const emojiSize = isEmojiOnly ? '2.4em' : '1.25em';
   const urlRegex = /(https?:\/\/[^\s]+)/g;
-  const parts = String(text).split(urlRegex);
+  // Limpia el marcado roto del editor (etiquetas partidas entre lineas, asteriscos sueltos)
+  const partes = String(normalizarMarcado(text)).split(urlRegex);
   const ytIds = [];
   const geniallyUrls = [];
   const isUrl = (s) => typeof s === 'string' && (s.startsWith('http://') || s.startsWith('https://'));
-  const elements = parts.map((part, idx) => {
+  const elements = partes.map((part, idx) => {
     if (isUrl(part)) {
       const videoId = extractYouTubeId(part);
       if (videoId && !ytIds.includes(videoId)) {

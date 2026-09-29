@@ -6,6 +6,10 @@ import { createRoot } from "react-dom/client";
 import "../../src/index.css";
 import TaskCard from "../../src/components/TaskCard.jsx";
 import AudioQuestionEditor from "../../src/components/AudioQuestionEditor.jsx";
+import LinkifyText from "../../src/components/LinkifyText.jsx";
+
+const TEXTO_REAL =
+  "Buenas tardes estimados estudiantes, [color=#e5e7eb]\n[/color]\nTeniendo en cuenta las respuestas de la mitad + 1 de los estudiantes que asistieron a la clase anterior, la próxima clase será mañana a las 6:10 am en el salón **SVR 212.\n**Recuerden el deber de consulta.\n\nMuchas gracias por su atención y de ser posible, **traigan su computador.**";
 
 const noop = () => {};
 const log = (...a) => console.log("[showMessage]", ...a);
@@ -73,6 +77,12 @@ const App = () => (
     <div id="prueba-audio" className="p-4 rounded-2xl border space-y-2">
       <p className="text-xs font-bold">Probando editor de audio (listening/dictado):</p>
       <AudioQuestionEditor audioUrl="" onChange={noop} isDarkMode={false} showMessage={log} />
+    </div>
+    <div id="prueba-marcado" className="p-4 rounded-2xl border space-y-2">
+      <p className="text-xs font-bold">Prueba de marcado (publicación real de la docente):</p>
+      <div className="text-sm whitespace-pre-wrap">
+        <LinkifyText text={TEXTO_REAL} />
+      </div>
     </div>
   </div>
 );
