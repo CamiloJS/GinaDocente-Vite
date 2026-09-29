@@ -1,3 +1,41 @@
+# SISTEMA DE EVALUACIONES: NUEVOS TIPOS Y CALIFICACION (29/09/2026) - opencode
+
+## Publicado (fases 1 a 3)
+
+### Fase 1 - mejoras a lo que ya existia
+- **Puntaje por pregunta**: `q.points` (por defecto 1). La nota se calcula sobre el total de puntos.
+- **Respuestas escritas con variantes**: `q.acceptedAnswers` (lista) ademas de `correctAnswer`.
+- **Tolerancia**: se ignoran mayusculas, tildes y espacios de mas (`normalizarRespuesta`).
+- **Varias respuestas correctas**: el motor y la UI del estudiante ya lo soportaban; ahora el generador de IA tambien puede producirlas (casilla "Permitir varias respuestas correctas").
+- El motor se extrajo a **`src/utils/evalScoring.js`** y se probo con **`scripts/test-scoring.mjs`**.
+
+### Fase 2 - tipos nuevos
+- **Verdadero/Falso**: se guarda como `multiple` con 2 opciones ("Verdadero"/"Falso"). Boton dedicado en el editor; la IA lo genera con `type: "truefalse"`.
+- **Ordenar la oracion**: `type: 'order'` con `words` (orden correcto). Al estudiante se le muestran desordenadas (`src/utils/palabras.js`, orden estable y sin dejar la frase ya ordenada). Califica automaticamente comparando la secuencia.
+
+### Fase 3 - relacionar columnas
+- **`type: 'match'`** con `pairs: [{left, right}]` (3 a 6 parejas, derechas distintas).
+- El estudiante elige con un selector por elemento; **puntaje parcial** por pareja correcta.
+
+### Generador con IA (actualizado)
+- Presets de mezcla: **Variada** (multiple + verdadero/falso + escrita + ordenar + relacionar en examenes largos), Mitad y mitad, Solo multiple, Solo escrita y **Personalizado** (cantidades por tipo, con validacion de que la suma cuadre).
+- Genera los 4 tipos de texto y pide `acceptedAnswers` para las escritas.
+- Valida: cantidad exacta, sin repetidas, formatos correctos, y **reintenta una vez** con un prompt correctivo si algo falla.
+
+### Reportes
+- La vista **"Ver respuestas"** y la **exportacion a Excel** muestran correctamente los tipos nuevos (orden correcto, parejas, puntaje, etc.).
+
+### Pruebas automaticas (corren antes de cada build)
+- `scripts/test-ai-eval.mjs` (~49 casos): prompt, parseo, reparaciones, presets, tipos nuevos, reintento.
+- `scripts/test-scoring.mjs` (~45 casos): multiple, varias correctas, escritas con variantes y tolerancia, puntaje, ordenar, relacionar con parcial, speaking manual, casos borde y utilidad de desordenar.
+- `scripts/check.mjs`: variables indefinidas, importaciones rotas, conflictos y escapes en texto JSX.
+
+## Pendiente (fases 4 y 5)
+- **Fase 4**: Comprension auditiva (listening) y **Dictado**. Requiere: subir o grabar un audio por pregunta (se reutiliza `useVoiceRecorder` + Storage) y el reproductor en el examen.
+- **Fase 5**: **Speaking** (respuesta grabada). El estudiante graba su voz, se sube a Storage y la docente la escucha y califica en la vista de respuestas (calificacion manual; ya existe `tienePreguntasManuales` en el motor).
+
+---
+
 # NUEVA FUNCION: GENERADOR DE EVALUACIONES CON IA (29/09/2026) - opencode
 
 ## Que hace
