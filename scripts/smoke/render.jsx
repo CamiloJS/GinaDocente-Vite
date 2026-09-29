@@ -5,6 +5,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import "../../src/index.css";
 import TaskCard from "../../src/components/TaskCard.jsx";
+import AudioQuestionEditor from "../../src/components/AudioQuestionEditor.jsx";
 
 const noop = () => {};
 const log = (...a) => console.log("[showMessage]", ...a);
@@ -69,6 +70,10 @@ const App = () => (
     <p id="resultado-prueba" className="text-xs font-bold text-green-600">
       RENDER_OK
     </p>
+    <div id="prueba-audio" className="p-4 rounded-2xl border space-y-2">
+      <p className="text-xs font-bold">Probando editor de audio (listening/dictado):</p>
+      <AudioQuestionEditor audioUrl="" onChange={noop} isDarkMode={false} showMessage={log} />
+    </div>
   </div>
 );
 

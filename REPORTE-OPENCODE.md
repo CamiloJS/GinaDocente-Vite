@@ -1,3 +1,41 @@
+# FASES 4 Y 5: LISTENING, DICTADO Y SPEAKING (29/09/2026) - opencode
+
+## Fase 4 - Comprension auditiva y Dictado
+- **Listening (`type: 'listening'`)**: audio + enunciado + opciones (se califica como seleccion multiple). El estudiante escucha el audio en el examen y marca.
+- **Dictado (`type: 'dictation'`)**: audio + respuesta escrita; se califica con la tolerancia normal (mayusculas/tildes/espacios) y admite variantes.
+- **Editor**: nuevo componente reutilizable **`src/components/AudioQuestionEditor.jsx`** con dos opciones:
+  - **Grabar audio** con el microfono (usa `useVoiceRecorder`, sube a Storage en `eval_audios`).
+  - **Subir archivo** (MP3, WAV, M4A, etc. via `uploadRawFileToStorage`).
+  - Vista previa con reproductor y botones "Cambiar" / "Quitar audio".
+- El audio es **obligatorio** para guardar una pregunta de listening/dictado (validacion al guardar).
+
+## Fase 5 - Speaking (respuesta grabada)
+- **`type: 'speaking'`**: el estudiante **graba su voz** respondiendo (mismo grabador, se sube a Storage) y puede volver a grabar.
+- La respuesta queda guardada en `answers[qIndex]` como URL del audio.
+- **Calificacion manual**: el motor excluye estas preguntas del calculo automatico (`tienePreguntasManuales`), y en la vista "Ver respuestas" la docente **escucha el audio** y ve el aviso "Calificación manual" (la nota se ajusta con el lápiz de la tabla de notas).
+
+## Reportes
+- Excel: listening usa las opciones; dictado se compara como texto; speaking se marca como `[AUDIO] Respuesta grabada (calificacion manual)`.
+- Vista "Ver respuestas": badge azul "Calificación manual" + reproductor del audio del estudiante.
+
+## Pruebas
+- `scripts/test-scoring.mjs`: +7 casos de listening (con/sin opciones), dictado (exacto, tolerante, incorrecto) y speaking manual. Total ~52.
+- `scripts/test-ai-eval.mjs`: ~49 casos del generador de IA.
+- `scripts/smoke/render.jsx` incluye el editor de audio (render verificado en navegador, 0 errores).
+- Nota: la IA no genera listening/dictado/speaking (no puede crear el audio): esas se agregan a mano con el grabador o subiendo un archivo.
+
+## Estado de las 5 fases pedidas
+| Fase | Estado |
+|---|---|
+| 1. Puntaje por pregunta, variantes y tolerancia, varias correctas | Publicada |
+| 2. Verdadero/Falso y Ordenar la oracion | Publicada |
+| 3. Relacionar columnas (con puntaje parcial) | Publicada |
+| 4. Listening y Dictado (audio) | Publicada |
+| 5. Speaking (respuesta grabada, calificacion manual) | Publicada |
+| 11. Puntaje por pregunta | Publicada (fase 1) |
+
+---
+
 # SISTEMA DE EVALUACIONES: NUEVOS TIPOS Y CALIFICACION (29/09/2026) - opencode
 
 ## Publicado (fases 1 a 3)

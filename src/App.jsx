@@ -39,6 +39,8 @@ import ScrollToTop from './components/ScrollToTop.jsx'
 import LinkifyText from './components/LinkifyText.jsx'
 import AppleEmoji from './components/AppleEmoji.jsx'
 import AiEvalGeneratorModal from './components/AiEvalGeneratorModal.jsx'
+import AudioQuestionEditor from './components/AudioQuestionEditor.jsx'
+import { useVoiceRecorder } from './utils/useVoiceRecorder.js'
 import RichTextToolbar from './components/RichTextToolbar.jsx'
 import TeacherToolsTab from './components/TeacherToolsTab.jsx'
 import PublicOvaViewer from './components/PublicOvaViewer.jsx'
@@ -1346,6 +1348,17 @@ function App() {
       console.log('Error reproduciendo sonido:', e);
     }
   };
+
+  // Grabadora para las respuestas de speaking (se califican a mano)
+  const grabadoraExamen = useVoiceRecorder('eval_audios', showMessage);
+  const [grabandoParaPregunta, setGrabandoParaPregunta] = useState(null);
+  useEffect(() => {
+      if (grabadoraExamen.audioUrl && grabandoParaPregunta !== null) {
+          const idxPreg = grabandoParaPregunta;
+          setStudentAnswers((prev) => ({ ...prev, [idxPreg]: grabadoraExamen.audioUrl }));
+          setGrabandoParaPregunta(null);
+      }
+  }, [grabadoraExamen.audioUrl]);
 
   const handleCheatCancellation = async (currentEval) => {
     const targetEval = currentEval || activeTakingEval;
@@ -3966,7 +3979,10 @@ useEffect(() => {
                       firstError = `Pregunta ${i+1}: El enunciado no puede estar vacío.`;
                       break;
                   }
-                  if (q.type === 'multiple') {
+                  if (q.type === 'listening' || q.type === 'dictation') {
+                      if (!q.audioUrl) { firstError = `Pregunta ${i + 1}: Falta el audio de la pregunta.`; break; }
+                  }
+                  if (q.type === 'multiple' || q.type === 'listening') {
                       if (!q.options || q.options.length < 2) {
                           firstError = `Pregunta ${i+1}: Mínimo 2 opciones.`;
                           break;
@@ -7263,7 +7279,14 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                           </h3>
                                       </div>
                                       
-                                      {q.type === 'multiple' ? (
+                                      {(q.type === 'listening' || q.type === 'dictation') && q.audioUrl && (
+                                          <div className="pl-8">
+                                              <audio controls src={q.audioUrl} className="w-full max-w-md h-10" />
+                                              <p className="text-[11px] text-gray-500 font-medium mt-1">{'Escucha el audio y responde.'}</p>
+                                          </div>
+                                      )}
+
+                                      {q.type === 'multiple' || q.type === 'listening' ? (
                                           <div className="space-y-2 pt-1 pl-8">
                                               {(q.options || []).map((opt, oIndex) => {
                                                   const isSelected = Array.isArray(studentAnswers[qIndex]) && studentAnswers[qIndex].includes(oIndex);
@@ -7364,6 +7387,27 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                   );
                                               })}
                                           </div>
+                                      ) : q.type === 'speaking' ? (
+                                          <div className="pt-1 pl-8 space-y-2">
+                                              {studentAnswers[qIndex] ? (
+                                                  <div className="space-y-1.5">
+                                                      <audio controls src={studentAnswers[qIndex]} className="w-full max-w-md h-10" />
+                                                      <button type="button" onClick={() => { setStudentAnswers({ ...studentAnswers, [qIndex]: '' }); grabadoraExamen.setAudioUrl?.(''); }} className="text-[11px] font-bold text-gray-500 hover:text-red-500 underline cursor-pointer">Grabar de nuevo</button>
+                                                  </div>
+                                              ) : grabadoraExamen.isRecording && grabandoParaPregunta === qIndex ? (
+                                                  <div className="flex flex-wrap items-center gap-2">
+                                                      <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+                                                      <span className={`text-xs font-bold ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>Grabando... {grabadoraExamen.recordingTime}s</span>
+                                                      <button type="button" onClick={() => grabadoraExamen.stopRecording()} className="text-[11px] font-bold px-3 py-1.5 rounded-xl bg-green-600 hover:bg-green-700 text-white flex items-center gap-1.5 cursor-pointer"><Square size={12} /> Detener y guardar</button>
+                                                      <button type="button" onClick={() => { grabadoraExamen.cancelRecording(); setGrabandoParaPregunta(null); }} className="text-[11px] font-bold px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 cursor-pointer">Cancelar</button>
+                                                  </div>
+                                              ) : (
+                                                  <div className="flex flex-wrap items-center gap-2">
+                                                      <button type="button" onClick={() => { grabadoraExamen.setAudioUrl?.(''); setGrabandoParaPregunta(qIndex); grabadoraExamen.startRecording(); }} disabled={grabadoraExamen.isUploading} className="text-[11px] font-bold px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white flex items-center gap-1.5 cursor-pointer disabled:opacity-40"><Mic size={12} /> Grabar mi respuesta</button>
+                                                      {grabadoraExamen.isUploading && <span className="text-[11px] text-gray-500 flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> Subiendo audio...</span>}
+                                                  </div>
+                                              )}
+                                          </div>
                                       ) : (
                                           <div className="pt-1 pl-8">
                                               <input 
@@ -7429,7 +7473,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                           const rawQuestionText = (q.text || q.question || `Pregunta ${qIdx + 1}`).replace(/\r?\n/g, ' ').trim();
                           const qColTitle = `P${qIdx + 1}: ${rawQuestionText.length > 60 ? rawQuestionText.slice(0, 57) + '...' : rawQuestionText}`;
 
-                          if (q.type === 'multiple') {
+                          if ((q.type === 'multiple' || q.type === 'listening') && Array.isArray(q.options) && q.options.length >= 2) {
                               const correctIndices = (q.options || []).map((opt, oIdx) => opt.isCorrect ? oIdx : null).filter(o => o !== null);
                               const ansArr = Array.isArray(qAns) ? qAns : [];
                               isCorrect = correctIndices.length > 0 && ansArr.length === correctIndices.length && correctIndices.every(i => ansArr.includes(i));
@@ -7457,7 +7501,9 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
 
                           if (isCorrect) correctCount++;
 
-                          if (isCorrect) {
+                          if (q.type === 'speaking') {
+                              row[qColTitle] = qAns ? '[AUDIO] Respuesta grabada (calificacion manual)' : '[AUDIO] Sin responder';
+                          } else if (isCorrect) {
                               row[qColTitle] = `[✔ CORRECTA] ${studentAnswerText}`;
                           } else if (studentAnswerText === '(Sin respuesta)') {
                               row[qColTitle] = `[⚠ SIN RESPONDER] (Correcta: "${correctAnswerText}")`;
@@ -7708,7 +7754,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                           let correctCount = 0;
                                           questions.forEach((q, qIdx) => {
                                               const qAns = grade.answers?.[qIdx];
-                                              if (q.type === 'multiple') {
+                                              if ((q.type === 'multiple' || q.type === 'listening') && Array.isArray(q.options) && q.options.length >= 2) {
                                                   const correctOpts = (q.options || []).map((opt, oIdx) => opt.isCorrect ? oIdx : null).filter(o => o !== null);
                                                   const ansArr = Array.isArray(qAns) ? qAns : [];
                                                   if (correctOpts.length > 0 && ansArr.length === correctOpts.length && correctOpts.every(i => ansArr.includes(i))) correctCount++;
@@ -8025,7 +8071,11 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                               </span>
                                                           </div>
 
-                                                          {isCorrect ? (
+                                                          {q.type === 'speaking' ? (
+                                                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 dark:text-blue-400">
+                                                                  <Mic size={12} /> {'Calificación manual'}
+                                                              </span>
+                                                          ) : isCorrect ? (
                                                               <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/80 px-2.5 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-800">
                                                                   <CheckCircle2 size={12} /> Correcta (+1.0)
                                                               </span>
@@ -8046,7 +8096,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                       </p>
 
                                                       {/* Respuestas detalladas */}
-                                                      {q.type === 'multiple' ? (
+                                                      {(q.type === 'multiple' || q.type === 'listening') ? (
                                                           <div className="space-y-1.5 pl-8">
                                                               {(q.options || []).map((opt, oIdx) => {
                                                                   const wasSelected = (Array.isArray(qAns) ? qAns : []).includes(oIdx);
@@ -8117,6 +8167,20 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                                       </div>
                                                                   );
                                                               })}
+                                                          </div>
+                                                      ) : q.type === 'speaking' ? (
+                                                          <div className="space-y-2 pl-8">
+                                                              {qAns ? (
+                                                                  <div className="p-3 rounded-xl border border-blue-400 bg-blue-50/50 dark:bg-blue-950/30 space-y-1.5">
+                                                                      <p className="text-[11px] font-bold text-blue-700 dark:text-blue-300">{'Escucha la respuesta del estudiante:'}</p>
+                                                                      <audio controls src={qAns} className="w-full h-10" />
+                                                                      <p className="text-[10px] text-gray-500 font-medium">{'Califícala con el lápiz de la tabla de notas.'}</p>
+                                                                  </div>
+                                                              ) : (
+                                                                  <div className="p-3 rounded-xl border border-amber-400 bg-amber-50/50 dark:bg-amber-950/30">
+                                                                      <p className="text-[11px] font-bold text-amber-700 dark:text-amber-300">{'El estudiante no grabó respuesta.'}</p>
+                                                                  </div>
+                                                              )}
                                                           </div>
                                                       ) : (
                                                           <div className="space-y-2 pl-8">
@@ -8477,6 +8541,15 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                       <button type="button" onClick={() => { const newQ = [...evalFormData.questions]; const actual = newQ[qIndex]; const pares = (actual.pairs && actual.pairs.length >= 3) ? actual.pairs : [{ left: '', right: '' }, { left: '', right: '' }, { left: '', right: '' }]; newQ[qIndex] = { ...actual, type: 'match', pairs: pares }; setEvalFormData({ ...evalFormData, questions: newQ }); }} className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${q.type === 'match' ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-xs' : 'text-gray-500'}`}>
                                                           Relacionar columnas
                                                       </button>
+                                                      <button type="button" onClick={() => { const newQ = [...evalFormData.questions]; const actual = newQ[qIndex]; newQ[qIndex] = { ...actual, type: 'listening', audioUrl: actual.audioUrl || '', options: (actual.options && actual.options.length >= 2) ? actual.options : [{ text: '', isCorrect: false }, { text: '', isCorrect: false }] }; setEvalFormData({ ...evalFormData, questions: newQ }); }} className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${q.type === 'listening' ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-xs' : 'text-gray-500'}`}>
+                                                          Listening (audio)
+                                                      </button>
+                                                      <button type="button" onClick={() => { const newQ = [...evalFormData.questions]; const actual = newQ[qIndex]; newQ[qIndex] = { ...actual, type: 'dictation', audioUrl: actual.audioUrl || '', correctAnswer: actual.correctAnswer || '' }; setEvalFormData({ ...evalFormData, questions: newQ }); }} className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${q.type === 'dictation' ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-xs' : 'text-gray-500'}`}>
+                                                          Dictado
+                                                      </button>
+                                                      <button type="button" onClick={() => { const newQ = [...evalFormData.questions]; const actual = newQ[qIndex]; newQ[qIndex] = { ...actual, type: 'speaking' }; setEvalFormData({ ...evalFormData, questions: newQ }); }} className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${q.type === 'speaking' ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-xs' : 'text-gray-500'}`}>
+                                                          Speaking
+                                                      </button>
                                                   </div>
                                               </div>
                                               <div className="flex items-center gap-1.5 shrink-0">
@@ -8511,8 +8584,20 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                               className={`${glassInput} !py-2 text-xs font-semibold resize-none`} 
                                               required 
                                           />
+                                          {(q.type === 'listening' || q.type === 'dictation') && (
+                                              <div className="pl-4 sm:pl-7 pt-1 space-y-1">
+                                                  <p className="text-[11px] font-bold text-gray-500">Audio de la pregunta <span className="text-red-500">*</span></p>
+                                                  <AudioQuestionEditor
+                                                      audioUrl={q.audioUrl || ''}
+                                                      onChange={(url) => { const newQ = [...evalFormData.questions]; newQ[qIndex] = { ...newQ[qIndex], audioUrl: url }; setEvalFormData({ ...evalFormData, questions: newQ }); }}
+                                                      isDarkMode={isDarkMode}
+                                                      showMessage={showMessage}
+                                                  />
+                                              </div>
+                                          )}
 
-                                          {q.type === 'multiple' ? (
+
+                                          {(q.type === 'multiple' || q.type === 'listening') ? (
                                               <div className="space-y-1.5 pl-4 sm:pl-7 border-l-2 border-blue-500/30">
                                                   <p className="text-[11px] font-bold text-gray-500">Marca con el checkbox la(s) opción(es) correcta(s):</p>
                                                   {q.options.map((opt, oIndex) => (
@@ -8563,6 +8648,10 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                       className={`${glassInput} !py-1.5 text-xs border-blue-500/40 bg-blue-500/10`}
                                                   />
                                                   <p className="text-[10px] text-gray-500">{(q.words || []).length} palabras</p>
+                                              </div>
+                                          ) : q.type === 'speaking' ? (
+                                              <div className="pl-4 sm:pl-7 border-l-2 border-blue-500/30">
+                                                  <p className="text-[11px] font-medium text-gray-500">{'Sin respuesta escrita: el estudiante graba su voz y tú la calificas en "Ver respuestas".'}</p>
                                               </div>
                                           ) : (
                                               <div className="pl-4 sm:pl-7 border-l-2 border-blue-500/30">

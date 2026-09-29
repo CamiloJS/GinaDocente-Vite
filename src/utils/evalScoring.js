@@ -37,7 +37,7 @@ export function calculateScore(evalData, answers) {
     const ans = answers ? answers[i] : undefined;
     let factor = 0;
 
-    if (q.type === 'multiple' || q.type === 'listening') {
+    if ((q.type === 'multiple' || q.type === 'listening') && Array.isArray(q.options) && q.options.length >= 2) {
       const correctIndices = (q.options || []).map((opt, idx) => (opt?.isCorrect ? idx : -1)).filter((idx) => idx !== -1);
       const selectedIndices = Array.isArray(ans) ? ans : [];
       if (correctIndices.length > 0 && correctIndices.length === selectedIndices.length && correctIndices.every((idx) => selectedIndices.includes(idx))) {

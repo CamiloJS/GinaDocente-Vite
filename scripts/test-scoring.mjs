@@ -84,5 +84,17 @@ chequear("con una sola palabra no rompe", desordenarPalabras(["hola"], "s").leng
 chequear("con lista vacia no rompe", desordenarPalabras([], "s").length === 0);
 chequear("palabras repetidas se conservan", desordenarPalabras(["the", "cat", "and", "the", "dog"], "x").filter((p) => p.w === "the").length === 2);
 
+console.log("\n== Listening, dictado y speaking ==");
+const listeningOp = { type: "listening", text: "Escucha y responde", audioUrl: "https://x/a.mp3", options: [{ text: "a", isCorrect: true }, { text: "b", isCorrect: false }] };
+const listeningEscrito = { type: "listening", text: "Escucha y escribe", audioUrl: "https://x/a.mp3", correctAnswer: "hello", acceptedAnswers: ["hi"] };
+const dictado = { type: "dictation", text: "Escribe lo que oyes", audioUrl: "https://x/b.mp3", correctAnswer: "the cat is black", acceptedAnswers: [] };
+chequear("listening con opciones (bien) -> 5.0", calculateScore({ questions: [listeningOp] }, { 0: [0] }) === 5.0);
+chequear("listening con opciones (mal) -> 0.0", calculateScore({ questions: [listeningOp] }, { 0: [1] }) === 0.0);
+chequear("listening con respuesta escrita -> 5.0", calculateScore({ questions: [listeningEscrito] }, { 0: "hi" }) === 5.0);
+chequear("dictado exacto -> 5.0", calculateScore({ questions: [dictado] }, { 0: "the cat is black" }) === 5.0);
+chequear("dictado tolera mayusculas y espacios", calculateScore({ questions: [dictado] }, { 0: "  The Cat  Is Black " }) === 5.0);
+chequear("dictado incorrecto -> 0.0", calculateScore({ questions: [dictado] }, { 0: "the dog is black" }) === 0.0);
+chequear("listening sin audio no rompe", calculateScore({ questions: [{ type: "listening", text: "x", options: [{ text: "a", isCorrect: true }, { text: "b", isCorrect: false }] }] }, { 0: [0] }) === 5.0);
+
 console.log(`\nRESULTADO: ${ok} OK, ${fallos} fallos\n`);
 process.exit(fallos ? 1 : 0);
