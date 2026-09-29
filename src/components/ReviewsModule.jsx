@@ -3,7 +3,6 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import pptxgen from 'pptxgenjs'
 import {
   Wand2, Sparkles, Loader2, Download, Trash2, X, Plus, Maximize2,
   Minimize2, ChevronLeft, ChevronRight, BookOpen, Edit3, Copy,
@@ -22,6 +21,7 @@ export const exportReviewToPresentation = async (review) => {
 
   const displayTitle = review.slides?.[0]?.title || review.topic || 'Presentación de Diapositivas';
 
+  const { default: pptxgen } = await import('pptxgenjs');
   const pptx = new pptxgen();
   pptx.layout = 'LAYOUT_16x9';
   pptx.author = TEACHER_NAME;

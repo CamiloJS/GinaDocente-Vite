@@ -1,7 +1,6 @@
 // src/components/TaskCard.jsx
 import React, { useState, useRef } from 'react'
 import ReactDOM from 'react-dom'
-import * as XLSX from 'xlsx'
 import {
   CheckCheck, CheckCircle2, CheckLine, Clock, Edit3, EyeOff, FileDocIcon, FileText, ImageIcon, Loader2, Lock, MessageSquareText, Mic, PaperclipIcon, Plus, ReplyIcon, Send, SmileIcon, Square, Star, Pin, Trash2, Upload, X, XLine, Volume2, Languages, UserIcon, BookOpen, NavNotebook, Play, Pause, Download, MessageCircle, BarChart2, Vote
 } from './Icons.jsx'
@@ -19,6 +18,7 @@ import CustomVideoPlayer, { isDirectVideoUrl } from './CustomVideoPlayer.jsx'
 import GeniallyEmbedPlayer, { extractGeniallyUrl } from './GeniallyEmbedPlayer.jsx'
 import { useVoiceRecorder } from '../utils/useVoiceRecorder.js'
 import { auth, signInAnonymously, doc, setDoc, updateDoc, deleteDoc } from '../firebase/config.js'
+import { runTransaction } from 'firebase/firestore'
 import AudioPlayer, { AudioRecordingVisualizer } from './AudioPlayer.jsx'
 
 const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput: propGlassInput, callGemini, currentUser, showMessage, loggedInName, isDarkMode, confirmAction, handleOpenProfileByName, userMappings }) => {
@@ -191,41 +191,36 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                 try { await signInAnonymously(auth); } catch (e) {}
             }
 
-            const isMultiple = Boolean(task.poll?.isMultipleChoice);
-            const currentOptions = task.poll?.options || [];
-            let updatedOptions;
+            // Transaccion: lee el dato mas reciente y escribe una sola vez,
+            // asi dos estudiantes votando al mismo tiempo no se pisan el voto.
+            const taskRef = doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id);
+            await runTransaction(db, async (transaction) => {
+                const snap = await transaction.get(taskRef);
+                const freshPoll = snap.data()?.poll || {};
+                const freshOptions = freshPoll.options || [];
+                const multiple = Boolean(freshPoll.isMultipleChoice);
+                let updatedOptions;
 
-            if (isMultiple) {
-                updatedOptions = currentOptions.map(opt => {
-                    if (opt.id === optionId) {
-                        const currentList = opt.voterIds || [];
-                        const hasVoted = currentList.includes(currentUserId);
+                if (multiple) {
+                    updatedOptions = freshOptions.map((opt) => {
+                        if (opt.id !== optionId) return opt;
+                        const list = opt.voterIds || [];
+                        const yaVoto = list.includes(currentUserId);
                         return {
                             ...opt,
-                            voterIds: hasVoted 
-                                ? currentList.filter(id => id !== currentUserId)
-                                : [...currentList, currentUserId]
+                            voterIds: yaVoto ? list.filter((id) => id !== currentUserId) : [...list, currentUserId]
                         };
-                    }
-                    return opt;
-                });
-            } else {
-                const alreadyVotedThis = (currentOptions.find(o => o.id === optionId)?.voterIds || []).includes(currentUserId);
-                updatedOptions = currentOptions.map(opt => {
-                    const currentList = (opt.voterIds || []).filter(id => id !== currentUserId);
-                    if (opt.id === optionId && !alreadyVotedThis) {
-                        currentList.push(currentUserId);
-                    }
-                    return {
-                        ...opt,
-                        voterIds: currentList
-                    };
-                });
-            }
+                    });
+                } else {
+                    const alreadyVotedThis = (freshOptions.find((o) => o.id === optionId)?.voterIds || []).includes(currentUserId);
+                    updatedOptions = freshOptions.map((opt) => {
+                        const list = (opt.voterIds || []).filter((id) => id !== currentUserId);
+                        if (opt.id === optionId && !alreadyVotedThis) list.push(currentUserId);
+                        return { ...opt, voterIds: list };
+                    });
+                }
 
-            const taskRef = doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id);
-            await updateDoc(taskRef, {
-                'poll.options': updatedOptions
+                transaction.update(taskRef, { 'poll.options': updatedOptions });
             });
         } catch (err) {
             console.error("Error al registrar voto:", err);
@@ -453,7 +448,9 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
         }
     };
 
-    const exportTaskToExcel = () => {
+    const exportTaskToExcel = async () => {
+        const XLSX = await import('xlsx').catch(() => null);
+        if (!XLSX) { showMessage('No se pudo cargar el generador de Excel. Revisa tu conexi\u00f3n.'); return; }
         if (!task) return;
 
         // 1. Recopilar todos los estudiantes del curso o que hayan entregado
@@ -604,7 +601,12 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Calificaciones');
         
         const safeTaskTitle = (task.title || 'tarea').replace(/[^a-zA-Z0-9_\u00C0-\u017F]/g, '_').toLowerCase();
+        try {
         XLSX.writeFile(workbook, `calificaciones_${safeTaskTitle}_${grupoName.replace(/\s+/g, '_')}.xlsx`);
+        } catch (errExcel) {
+            console.error("Error al descargar la planilla:", errExcel);
+            showMessage("No se pudo descargar la planilla. Revisa tu conexi\\u00f3n.");
+        }
         showMessage("Planilla descargada en Excel (.xlsx)");
     };
 
@@ -1653,7 +1655,7 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                 {role === 'teacher' && isTask && (
                     <button 
                         type="button"
-                        onClick={exportTaskToExcel}
+                        onClick={() => { exportTaskToExcel().catch((errExcel) => console.error('Error al exportar a Excel:', errExcel)); }}
                         className="py-2 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 shrink-0"
                         title="Exportar planilla de calificaciones a Microsoft Excel (.xlsx)"
                     >
@@ -1704,7 +1706,7 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                                 {role === 'teacher' && isTask && (
                                     <button 
                                         type="button"
-                                        onClick={exportTaskToExcel} 
+                                        onClick={() => { exportTaskToExcel().catch((errExcel) => console.error('Error al exportar a Excel:', errExcel)); }} 
                                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs"
                                         title="Exportar planilla de calificaciones a Excel (.xlsx)"
                                     >

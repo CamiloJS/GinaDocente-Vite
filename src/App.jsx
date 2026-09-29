@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useRef, Suspense, useCallback, useMemo } from 'react'
 import ReactDOM from 'react-dom'
 import confetti from 'canvas-confetti'
-import * as XLSX from 'xlsx'
 import {
   auth, db, appId, secondaryAuth, collection, onSnapshot, doc, setDoc, getDocs, getDocsFromServer,
   deleteDoc, addDoc, updateDoc, getDoc, query, where, orderBy, limit,
@@ -7321,7 +7320,9 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
               }
 
               // Función de Exportación a Excel (.xlsx) con preguntas, respuestas del estudiante y feedback
-              const exportEvaluationToExcel = (evaluation, gradesList) => {
+              const exportEvaluationToExcel = async (evaluation, gradesList) => {
+                  const XLSX = await import('xlsx').catch(() => null);
+                  if (!XLSX) { showMessage('No se pudo cargar el generador de Excel. Revisa tu conexi\u00f3n e int\u00e9ntalo de nuevo.'); return; }
                   if (!evaluation) return;
                   const evalGrades = (gradesList || []).filter(g => g.evaluationId === evaluation.id);
                   const questions = evaluation.questions || [];
@@ -7504,7 +7505,12 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                   XLSX.utils.book_append_sheet(workbook, ws3, 'Detalle para Feedback');
 
                   const safeTitle = (evaluation.title || 'Evaluacion').replace(/[^a-zA-Z0-9_\u00C0-\u017F]/g, '_').toLowerCase();
+                  try {
                   XLSX.writeFile(workbook, `reporte_${safeTitle}.xlsx`);
+                  } catch (errExcel) {
+                      console.error("Error al descargar el Excel:", errExcel);
+                      showMessage("No se pudo descargar el Excel. Revisa tu conexi\\u00f3n e int\\u00e9ntalo de nuevo.");
+                  }
               };
 
               // Vista de Resultados (Docente revisando notas y métricas generales)
@@ -7567,7 +7573,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
 
                                   <button
                                       type="button"
-                                      onClick={() => exportEvaluationToExcel(viewingResultsFor, grades)}
+                                      onClick={() => { exportEvaluationToExcel(viewingResultsFor, grades).catch((errExcel) => { console.error('Error al exportar a Excel:', errExcel); showMessage('No se pudo generar el Excel. Int\u00e9ntalo de nuevo.'); }); }}
                                       disabled={evalGrades.length === 0}
                                       className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-bold text-xs flex items-center gap-2 shadow-xs transition-all active:scale-95 shrink-0"
                                       title="Exportar reporte completo con preguntas y respuestas a Excel (.xlsx)"
