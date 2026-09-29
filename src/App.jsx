@@ -3138,7 +3138,8 @@ useEffect(() => {
               const base = ['artifacts', appId, 'public', 'data'];
               let isInitialLoad = true;
 
-              const unsubscribe = onSnapshot(collection(db, ...base, 'chats', activeChat.id, 'messages'), s => {
+              // Solo los ultimos 300 mensajes (antes cargaba TODO el historial del chat)
+              const unsubscribe = onSnapshot(query(collection(db, ...base, 'chats', activeChat.id, 'messages'), orderBy('createdAt', 'desc'), limit(300)), s => {
                   const msgs = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.createdAt - b.createdAt);
 
                   // Si no es la carga inicial y se agregó un mensaje nuevo

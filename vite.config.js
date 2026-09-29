@@ -1,6 +1,5 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import legacy from '@vitejs/plugin-legacy'
 
 const currentBuildTime = Date.now();
 
@@ -21,10 +20,6 @@ const versionPlugin = (buildTime) => ({
 export default defineConfig({
   plugins: [
     react(),
-    legacy({
-      targets: ['chrome >= 49', 'firefox >= 52', 'safari >= 10', 'edge >= 15', 'not IE 11'],
-      renderLegacyChunks: true
-    }),
     versionPlugin(currentBuildTime)
   ],
   esbuild: {

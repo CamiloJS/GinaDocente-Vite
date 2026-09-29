@@ -1,3 +1,35 @@
+# RONDA 2 - OPTIMIZACION Y CORRECCIONES (29/09/2026) - opencode
+
+## Blindaje (para no repetir el bug que tumbo la pagina)
+- **Chequeo automatico antes de cada build**: `scripts/check.mjs` (variables indefinidas, importaciones rotas, marcas de conflicto). Corre en `prebuild`; si falla, **NO se publica**. Probado metiendo el bug de `embedVideos` a proposito.
+- **Prueba de render**: `npm run smoke` y abrir http://127.0.0.1:5199/scripts/smoke/index.html (renderiza muro/encuestas/comentarios falsos y avisa de errores).
+
+## Velocidad (medido)
+- **Carga inicial: 619 KB -> 371 KB comprimidos (-40%)**. `xlsx`, `pdfjs-dist` y `pptxgenjs` ahora son cargas diferidas (solo al exportar/importar).
+- **Frases del banner (237 KB)**: solo se descargan para la docente y despues de montar. TasksTab 322 KB -> 124 KB.
+- **Build "legacy" eliminado** (-52% de dist, build 1m -> 8s). El target moderno es es2018 (Chrome/Edge 63+, Safari 12+).
+- **Iconos**: icono.png 1207 KB -> 123 KB; icon-512 242 -> 121 KB; icon-192 35 -> 18 KB.
+- **Chat**: se cargan solo los ultimos 300 mensajes (antes, todo el historial).
+
+## Correcciones
+- **Votos de encuesta**: transaccion de Firestore (antes se podia perder un voto si dos votaban a la vez).
+- **HTML valido**: los `<p>` que envolvian `LinkifyText` (que dibuja `<div>` con videos) ahora son `<div>` (7 sitios). Se elimino el aviso de React.
+- **Listeners con manejo de error**: chat, lista de chats, alertas y llamadas entrantes ya no fallan en silencio.
+- Se elimino `scripts/apply_patches.mjs` (solo servia para el build legacy).
+
+## Seguridad aplicada
+- `/api/gemini` exige **sesion valida** (token de Firebase verificado contra Google) y limita a 60 peticiones / 5 min por usuario. Verificado en vivo: 401 sin token.
+- `.vercelignore` + `.gitignore` excluyen la llave de servicio de Firebase (`functions/serviceAccountKey.json`).
+
+## Pendiente (decisiones del usuario)
+- Reglas de Firestore (cerrar escrituras anonimas / proteger notas). **El usuario pidio dejarlo por ahora.**
+- Contrasena maestra `DANTE12345` (hoy visible en el bundle publico). **Decidida "dejarla por ahora".**
+- Revocar la llave de servicio de Google (estuvo en despliegues de Vercel).
+- Conectar Vercel <-> GitHub (necesita autorizar la app de Vercel en GitHub).
+- Paginacion con "cargar mas" en el chat (hoy se cortan en 300 sin boton).
+
+---
+
 # RESCATE Y UNIFICACION (28/09/2026) - opencode
 
 ## Que paso (causa raiz)
