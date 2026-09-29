@@ -71,7 +71,7 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
   }
 
   const tipoBadge = (q) => q.type === 'multiple'
-    ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-blue-500/15 text-blue-600 dark:text-blue-400">Selecci\u00f3n m\u00faltiple</span>
+    ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-blue-500/15 text-blue-600 dark:text-blue-400">{'Selecci\u00f3n m\u00faltiple'}</span>
     : <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-purple-500/15 text-purple-600 dark:text-purple-400">Respuesta escrita</span>
 
   const input = 'w-full px-3 py-2 rounded-xl border text-xs font-semibold outline-none focus:ring-2 focus:ring-blue-500 ' + (isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-100' : 'bg-white border-gray-300 text-gray-800')
@@ -88,8 +88,8 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
               <Sparkles size={16} />
             </span>
             <div>
-              <h3 className={`font-black text-sm ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Generar evaluaci\u00f3n con IA</h3>
-              <p className="text-[11px] text-gray-500 font-medium">La IA crea las preguntas y sus respuestas; t\u00fa las revisas antes de guardar.</p>
+              <h3 className={`font-black text-sm ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{'Generar evaluaci\u00f3n con IA'}</h3>
+              <p className="text-[11px] text-gray-500 font-medium">{'La IA crea las preguntas y sus respuestas; t\u00fa las revisas antes de guardar.'}</p>
             </div>
           </div>
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1.5 rounded-lg transition-colors cursor-pointer">
@@ -105,11 +105,11 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
               rows={3}
               value={tema}
               onChange={(e) => setTema(e.target.value)}
-              placeholder="Ej: Pass\u00e9 compos\u00e9 de verbos irregulares, nivel A2. Incluye 2 preguntas de comprensi\u00f3n lectora corta."
+              placeholder={'Ej: Pass\u00e9 compos\u00e9 de verbos irregulares, nivel A2. Incluye 2 preguntas de comprensi\u00f3n lectora corta.'}
               className={`${input} resize-y leading-relaxed`}
               disabled={generando}
             />
-            <p className="text-[10px] text-gray-500 mt-1">Mientras m\u00e1s espec\u00edfica seas (tema, nivel, idioma y enfoque), mejores preguntas salen.</p>
+            <p className="text-[10px] text-gray-500 mt-1">{'Mientras m\u00e1s espec\u00edfica seas (tema, nivel, idioma y enfoque), mejores preguntas salen.'}</p>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -126,7 +126,7 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
             <div>
               <label className={label}>Dificultad</label>
               <select value={dificultad} onChange={(e) => setDificultad(e.target.value)} className={input} disabled={generando}>
-                <option value="facil">F\u00e1cil</option>
+                <option value="facil">{'F\u00e1cil'}</option>
                 <option value="media">Media</option>
                 <option value="alta">Alta</option>
               </select>
@@ -159,7 +159,7 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
             {mezcla === 'custom' && (
               <div className="grid grid-cols-2 gap-3 mt-3">
                 <div>
-                  <label className={label}>Selecci\u00f3n m\u00faltiple</label>
+                  <label className={label}>{'Selecci\u00f3n m\u00faltiple'}</label>
                   <input type="number" min={0} max={total} value={customMultiple} onChange={(e) => { const v = Math.max(0, Math.min(total, Number(e.target.value) || 0)); setCustomMultiple(v); }} className={input} disabled={generando} />
                 </div>
                 <div>

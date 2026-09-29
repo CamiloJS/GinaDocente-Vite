@@ -103,6 +103,19 @@ for (const r of resultados) {
   }
 }
 
+// ---------- 4) Escapes \uXXXX en texto JSX o atributos (no se interpretan) ----------
+for (const f of srcFiles) {
+  const lineas = fs.readFileSync(f, "utf8").split("\n");
+  lineas.forEach((linea, i) => {
+    if (/>[^<>{}]*\\u[0-9a-fA-F]{4}[^<>{}]*</.test(linea)) {
+      errores.push(`${f}:${i + 1}: hay \\uXXXX en texto JSX (se veria literal). Envuelvelo en {'...'}`);
+    }
+    if (/[a-zA-Z-]+="[^"]*\\u[0-9a-fA-F]{4}[^"]*"/.test(linea)) {
+      errores.push(`${f}:${i + 1}: hay \\uXXXX en un atributo (se veria literal). Usa attr={'...'}`);
+    }
+  });
+}
+
 // ---------- Resultado ----------
 if (avisos.length) {
   console.log(`\nAvisos (${avisos.length}):`);
