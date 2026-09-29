@@ -2,11 +2,12 @@
 
 ## Que hace
 - Boton **"Generar con IA"** dentro de la creacion de evaluaciones (al lado de "Preguntas (x/20)").
-- La docente escribe el **tema/instrucciones**, el **numero exacto de preguntas** (1 a 20), la **dificultad** (facil/media/alta), el **idioma** (espanol / ingles / bilingue) y el **tipo**:
+- La docente escribe el **tema/instrucciones**, el **numero exacto de preguntas** (1 a 20), la **dificultad** (facil/media/alta), el **idioma** (espanol / ingles / frances / bilingue) y el **tipo**:
   - Mitad y mitad (automatico)
   - Solo seleccion multiple
   - Solo respuesta escrita
   - Personalizado (cantidades exactas de cada tipo)
+- Idiomas disponibles: espanol, ingles, frances y dos modos bilingues (ingles+espanol, frances+espanol).
 - La IA genera **preguntas + respuestas** (seleccion multiple con la correcta marcada, y escritas con la respuesta esperada).
 - Antes de usarlas se muestra una **vista previa** con las respuestas correctas resaltadas y avisos si algo quedo dudoso.
 - Al aceptar: **"Reemplazar las actuales"** o **"Agregar al final"** (respetando el maximo de 20 preguntas).

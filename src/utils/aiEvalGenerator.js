@@ -1,44 +1,46 @@
 // src/utils/aiEvalGenerator.js
 // Generador de evaluaciones completas con IA.
-// La logica esta separada de la interfaz para poder probarla (ver scripts/smoke).
+// La logica esta separada de la interfaz para poder probarla (ver scripts/test-ai-eval.mjs).
 
 export const MAX_PREGUNTAS = 20;
 export const MIN_PREGUNTAS = 1;
 
 export const TIPOS_MEZCLA = {
   auto: {
-    etiqueta: 'Automatica (mitad y mitad)',
+    etiqueta: 'Autom\u00e1tica (mitad y mitad)',
     distribucion: (total) => {
       const multiple = Math.max(1, Math.floor(total / 2));
       return { multiple, text: total - multiple };
     },
   },
-  multiple: { etiqueta: 'Solo seleccion multiple', distribucion: (total) => ({ multiple: total, text: 0 }) },
+  multiple: { etiqueta: 'Solo selecci\u00f3n m\u00faltiple', distribucion: (total) => ({ multiple: total, text: 0 }) },
   text: { etiqueta: 'Solo respuesta escrita', distribucion: (total) => ({ multiple: 0, text: total }) },
 };
 
 export const DIFICULTADES = {
-  facil: 'Facil (vocabulario basico, preguntas directas)',
-  media: 'Media (nivel de clase, requiere comprension)',
-  alta: 'Alta (analisis, distractores finos, menos pistas)',
+  facil: 'F\u00e1cil (vocabulario b\u00e1sico, preguntas directas)',
+  media: 'Media (nivel de clase, requiere comprensi\u00f3n)',
+  alta: 'Alta (an\u00e1lisis, distractores finos, menos pistas)',
 };
 
 export const IDIOMAS = {
-  es: 'Todo en espanol',
-  en: 'Todo en ingles',
-  bilingue: 'Bilingue: enunciado y opciones en ingles, con la traduccion al espanol entre parentesis',
+  es: 'Todo en espa\u00f1ol',
+  en: 'Todo en ingl\u00e9s',
+  fr: 'Todo en franc\u00e9s',
+  bilingue: 'Biling\u00fce: enunciado y opciones en ingl\u00e9s, con la traducci\u00f3n al espa\u00f1ol entre par\u00e9ntesis',
+  bilingue_fr: 'Biling\u00fce: enunciado y opciones en franc\u00e9s, con la traducci\u00f3n al espa\u00f1ol entre par\u00e9ntesis',
 };
 
 /** Arma el prompt que se le envia a la IA. */
 export function construirPrompt({ tema, total, multiple, text, dificultad = 'media', idioma = 'es', titulo = '', publico = 'estudiantes' }) {
   const reglas = [
     `Genera EXACTAMENTE ${total} preguntas en total.`,
-    `De esas ${total}: ${multiple} de seleccion multiple y ${text} de respuesta escrita.`,
+    `De esas ${total}: ${multiple} de selecci\u00f3n m\u00faltiple y ${text} de respuesta escrita.`,
     'Devuelve UNICAMENTE un arreglo JSON valido, sin texto antes ni despues, sin bloques de codigo ```.',
     'Formato exacto:',
     '[{"type":"multiple","text":"enunciado","options":[{"text":"opcion","isCorrect":true},{"text":"opcion","isCorrect":false}],"correctAnswer":""},' +
       '{"type":"text","text":"enunciado","options":[],"correctAnswer":"respuesta esperada corta"}]',
-    'En las de seleccion multiple usa entre 3 y 4 opciones y marca con isCorrect exactamente UNA opcion correcta (la demas en false).',
+    'En las de selecci\u00f3n m\u00faltiple usa entre 3 y 4 opciones y marca con isCorrect exactamente UNA opci\u00f3n correcta (las demas en false).',
     'En las de respuesta escrita, correctAnswer debe ser corta (1 a 4 palabras) y verificable.',
     'No repitas preguntas ni el mismo enfoque; varia el vocabulario, el contexto y el tipo de ejercicio.',
     'No numeres los enunciados ni incluyas la respuesta dentro del enunciado.',
@@ -63,7 +65,7 @@ export function construirPrompt({ tema, total, multiple, text, dificultad = 'med
     .join('\n');
 }
 
-/** Limpia bloques de codigo y caracteres problem�ticos para intentar parsear el JSON. */
+/** Limpia bloques de codigo y caracteres problematicos para intentar parsear el JSON. */
 function limpiarTexto(texto) {
   let t = String(texto || '').trim();
   t = t.replace(/```json/gi, '').replace(/```/g, '').trim();
@@ -109,7 +111,7 @@ function normalizarPregunta(q) {
     }
     if (opciones.length > 6) opciones = opciones.slice(0, 6);
     if (!opciones.some((o) => o.isCorrect)) {
-      return { problema: `la pregunta "${texto.slice(0, 40)}..." no tiene opcion correcta marcada` };
+      return { problema: `la pregunta "${texto.slice(0, 40)}..." no tiene opci\u00f3n correcta marcada` };
     }
     return { pregunta: { type: 'multiple', text: texto, options: opciones, correctAnswer: '' } };
   }
@@ -133,12 +135,12 @@ export function parsearEvaluacion(texto, totalEsperado = null) {
     try {
       datos = JSON.parse(repararJSON(bruto));
     } catch (e2) {
-      return { ok: false, preguntas: [], problemas: ['La IA no devolvio un JSON valido. Intenta de nuevo.'] };
+      return { ok: false, preguntas: [], problemas: ['La IA no devolvi\u00f3 un JSON v\u00e1lido. Intenta de nuevo.'] };
     }
   }
 
   const lista = Array.isArray(datos) ? datos : Array.isArray(datos?.questions) ? datos.questions : Array.isArray(datos?.preguntas) ? datos.preguntas : null;
-  if (!lista) return { ok: false, preguntas: [], problemas: ['La respuesta de la IA no traia una lista de preguntas.'] };
+  if (!lista) return { ok: false, preguntas: [], problemas: ['La respuesta de la IA no tra\u00eda una lista de preguntas.'] };
 
   const preguntas = [];
   const vistos = new Set();
@@ -152,7 +154,7 @@ export function parsearEvaluacion(texto, totalEsperado = null) {
   }
 
   if (totalEsperado && preguntas.length !== totalEsperado) {
-    problemas.push(`se pidieron ${totalEsperado} preguntas y llegaron ${preguntas.length} validas`);
+    problemas.push(`se pidieron ${totalEsperado} preguntas y llegaron ${preguntas.length} v\u00e1lidas`);
   }
 
   return { ok: problemas.length === 0 && preguntas.length > 0, preguntas, problemas };

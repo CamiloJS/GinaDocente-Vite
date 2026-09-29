@@ -6,17 +6,23 @@ import { X, Sparkles, Loader2, AlertTriangle, Undo2, CheckCircle2 } from './Icon
 import {
   MAX_PREGUNTAS,
   TIPOS_MEZCLA,
-  DIFICULTADES,
   IDIOMAS,
   generarPreguntasConIA,
 } from '../utils/aiEvalGenerator.js'
+
+const OPCIONES_IDIOMA = [
+  { valor: 'es', etiqueta: 'Todo en espa\u00f1ol' },
+  { valor: 'en', etiqueta: 'Todo en ingl\u00e9s' },
+  { valor: 'fr', etiqueta: 'Todo en franc\u00e9s' },
+  { valor: 'bilingue', etiqueta: 'Biling\u00fce (ingl\u00e9s + espa\u00f1ol)' },
+  { valor: 'bilingue_fr', etiqueta: 'Biling\u00fce (franc\u00e9s + espa\u00f1ol)' },
+]
 
 const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMode, existingCount = 0 }) => {
   const [tema, setTema] = useState('')
   const [total, setTotal] = useState(10)
   const [mezcla, setMezcla] = useState('auto')
   const [customMultiple, setCustomMultiple] = useState(5)
-  const [customText, setCustomText] = useState(5)
   const [dificultad, setDificultad] = useState('media')
   const [idioma, setIdioma] = useState('es')
   const [generando, setGenerando] = useState(false)
@@ -36,7 +42,7 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
   }
 
   const generar = async () => {
-    if (!tema.trim()) { setError('Escribe el tema o las instrucciones de la evaluacion.'); return; }
+    if (!tema.trim()) { setError('Escribe el tema o las instrucciones de la evaluaci\u00f3n.'); return; }
     const dist = calcularDistribucion();
     if (dist.multiple + dist.text !== total) { setError('La suma de preguntas por tipo debe ser igual al total.'); return; }
     setError('');
@@ -48,12 +54,12 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
         callGemini
       );
       setResultado(r);
-      if (!r.preguntas.length) setError('La IA no pudo generar preguntas. Intenta de nuevo con un tema mas especifico.');
+      if (!r.preguntas.length) setError('La IA no pudo generar preguntas. Intenta de nuevo con un tema m\u00e1s espec\u00edfico.');
     } catch (err) {
       const esCuota = err?.code === 'QUOTA_EXCEEDED' || String(err?.message || '').includes('QUOTA');
       setError(esCuota
-        ? 'Se agoto la cuota de IA por ahora. Espera unos minutos e intenta de nuevo.'
-        : 'No se pudo generar la evaluacion. Revisa tu conexion e intenta de nuevo.');
+        ? 'Se agot\u00f3 la cuota de IA por ahora. Espera unos minutos e intenta de nuevo.'
+        : 'No se pudo generar la evaluaci\u00f3n. Revisa tu conexi\u00f3n e intenta de nuevo.');
     } finally {
       setGenerando(false);
     }
@@ -65,7 +71,7 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
   }
 
   const tipoBadge = (q) => q.type === 'multiple'
-    ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-blue-500/15 text-blue-600 dark:text-blue-400">Seleccion multiple</span>
+    ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-blue-500/15 text-blue-600 dark:text-blue-400">Selecci\u00f3n m\u00faltiple</span>
     : <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-purple-500/15 text-purple-600 dark:text-purple-400">Respuesta escrita</span>
 
   const input = 'w-full px-3 py-2 rounded-xl border text-xs font-semibold outline-none focus:ring-2 focus:ring-blue-500 ' + (isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-100' : 'bg-white border-gray-300 text-gray-800')
@@ -78,15 +84,15 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
         {/* Encabezado */}
         <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3 border-b border-gray-200 dark:border-gray-800">
           <div className="flex items-center gap-2">
-            <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-sm">
+            <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-sm shrink-0">
               <Sparkles size={16} />
             </span>
             <div>
-              <h3 className={`font-black text-sm ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Generar evaluacion con IA</h3>
-              <p className="text-[11px] text-gray-500 font-medium">La IA crea las preguntas y sus respuestas; tu las revisas antes de guardar.</p>
+              <h3 className={`font-black text-sm ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Generar evaluaci\u00f3n con IA</h3>
+              <p className="text-[11px] text-gray-500 font-medium">La IA crea las preguntas y sus respuestas; t\u00fa las revisas antes de guardar.</p>
             </div>
           </div>
-          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1.5 rounded-lg transition-colors">
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1.5 rounded-lg transition-colors cursor-pointer">
             <X size={18} />
           </button>
         </div>
@@ -99,16 +105,16 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
               rows={3}
               value={tema}
               onChange={(e) => setTema(e.target.value)}
-              placeholder="Ej: Past simple de verbos irregulares, nivel A2. Incluye 2 preguntas de comprension lectora corta."
+              placeholder="Ej: Pass\u00e9 compos\u00e9 de verbos irregulares, nivel A2. Incluye 2 preguntas de comprensi\u00f3n lectora corta."
               className={`${input} resize-y leading-relaxed`}
               disabled={generando}
             />
-            <p className="text-[10px] text-gray-500 mt-1">Mientras mas especifica seas (tema, nivel, enfoque), mejores preguntas salen.</p>
+            <p className="text-[10px] text-gray-500 mt-1">Mientras m\u00e1s espec\u00edfica seas (tema, nivel, idioma y enfoque), mejores preguntas salen.</p>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <div>
-              <label className={label}>N. de preguntas</label>
+              <label className={label}>Cantidad de preguntas</label>
               <input
                 type="number" min={1} max={Math.min(MAX_PREGUNTAS, espacioLibre || MAX_PREGUNTAS)}
                 value={total}
@@ -120,17 +126,17 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
             <div>
               <label className={label}>Dificultad</label>
               <select value={dificultad} onChange={(e) => setDificultad(e.target.value)} className={input} disabled={generando}>
-                <option value="facil">Facil</option>
+                <option value="facil">F\u00e1cil</option>
                 <option value="media">Media</option>
                 <option value="alta">Alta</option>
               </select>
             </div>
-            <div className="col-span-2">
+            <div>
               <label className={label}>Idioma</label>
               <select value={idioma} onChange={(e) => setIdioma(e.target.value)} className={input} disabled={generando}>
-                <option value="es">Todo en espanol</option>
-                <option value="en">Todo en ingles</option>
-                <option value="bilingue">Bilingue (ingles + espanol)</option>
+                {OPCIONES_IDIOMA.map((o) => (
+                  <option key={o.valor} value={o.valor}>{o.etiqueta}</option>
+                ))}
               </select>
             </div>
           </div>
@@ -138,11 +144,11 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
           <div>
             <label className={label}>Tipo de preguntas</label>
             <div className="flex flex-wrap gap-1.5">
-              {[['auto', 'Mitad y mitad'], ['multiple', 'Solo seleccion multiple'], ['text', 'Solo respuesta escrita'], ['custom', 'Personalizado']].map(([k, etiqueta]) => (
+              {[['auto', TIPOS_MEZCLA.auto.etiqueta], ['multiple', TIPOS_MEZCLA.multiple.etiqueta], ['text', TIPOS_MEZCLA.text.etiqueta], ['custom', 'Personalizado']].map(([k, etiqueta]) => (
                 <button
                   key={k} type="button" disabled={generando}
                   onClick={() => setMezcla(k)}
-                  className={`text-[11px] font-bold px-3 py-1.5 rounded-xl border transition-all ${mezcla === k
+                  className={`text-[11px] font-bold px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${mezcla === k
                     ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
                     : (isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-300 hover:border-blue-500' : 'bg-white border-gray-300 text-gray-600 hover:border-blue-500')}`}
                 >
@@ -153,12 +159,12 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
             {mezcla === 'custom' && (
               <div className="grid grid-cols-2 gap-3 mt-3">
                 <div>
-                  <label className={label}>Seleccion multiple</label>
-                  <input type="number" min={0} max={total} value={customMultiple} onChange={(e) => { const v = Math.max(0, Math.min(total, Number(e.target.value) || 0)); setCustomMultiple(v); setCustomText(Math.max(0, total - v)); }} className={input} disabled={generando} />
+                  <label className={label}>Selecci\u00f3n m\u00faltiple</label>
+                  <input type="number" min={0} max={total} value={customMultiple} onChange={(e) => { const v = Math.max(0, Math.min(total, Number(e.target.value) || 0)); setCustomMultiple(v); }} className={input} disabled={generando} />
                 </div>
                 <div>
                   <label className={label}>Respuesta escrita</label>
-                  <input type="number" min={0} max={total} value={Math.max(0, total - (Number(customMultiple) || 0))} onChange={(e) => { const v = Math.max(0, Math.min(total, Number(e.target.value) || 0)); setCustomText(v); setCustomMultiple(Math.max(0, total - v)); }} className={input} disabled={generando} />
+                  <input type="number" min={0} max={total} value={Math.max(0, total - (Number(customMultiple) || 0))} onChange={(e) => { const v = Math.max(0, Math.min(total, Number(e.target.value) || 0)); setCustomMultiple(Math.max(0, total - v)); }} className={input} disabled={generando} />
                 </div>
               </div>
             )}
@@ -184,7 +190,7 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
                 <p className="text-xs font-black text-green-600 dark:text-green-400 flex items-center gap-1.5">
                   <CheckCircle2 size={14} /> {resultado.preguntas.length} preguntas listas para revisar
                 </p>
-                <button type="button" onClick={generar} disabled={generando} className="text-[11px] font-bold text-blue-600 hover:underline flex items-center gap-1">
+                <button type="button" onClick={generar} disabled={generando} className="text-[11px] font-bold text-blue-600 hover:underline flex items-center gap-1 cursor-pointer">
                   <Undo2 size={12} /> Generar otra vez
                 </button>
               </div>
@@ -227,24 +233,24 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
 
         {/* Pie */}
         <div className="flex flex-wrap items-center justify-end gap-2 px-4 sm:px-5 py-3 border-t border-gray-200 dark:border-gray-800">
-          <button type="button" onClick={onClose} className={`px-4 py-2 rounded-xl text-xs font-bold ${isDarkMode ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+          <button type="button" onClick={onClose} className={`px-4 py-2 rounded-xl text-xs font-bold cursor-pointer ${isDarkMode ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
             Cancelar
           </button>
           <button
             type="button" onClick={generar} disabled={generando || !tema.trim()}
-            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-xs font-black flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
+            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-xs font-black flex items-center gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer"
           >
             {generando ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-            {resultado ? 'Generar de nuevo' : 'Generar evaluacion'}
+            {resultado ? 'Generar de nuevo' : 'Generar evaluaci\u00f3n'}
           </button>
           {resultado?.preguntas?.length > 0 && (
             <>
               {existingCount > 0 && existingCount + resultado.preguntas.length <= MAX_PREGUNTAS && (
-                <button type="button" onClick={() => usar('agregar')} className="px-4 py-2 rounded-xl border border-blue-500 text-blue-600 dark:text-blue-400 text-xs font-black hover:bg-blue-500/10">
+                <button type="button" onClick={() => usar('agregar')} className="px-4 py-2 rounded-xl border border-blue-500 text-blue-600 dark:text-blue-400 text-xs font-black hover:bg-blue-500/10 cursor-pointer">
                   Agregar al final ({existingCount + resultado.preguntas.length}/{MAX_PREGUNTAS})
                 </button>
               )}
-              <button type="button" onClick={() => usar('reemplazar')} className="px-4 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-xs font-black shadow-sm transition-all active:scale-95">
+              <button type="button" onClick={() => usar('reemplazar')} className="px-4 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-xs font-black shadow-sm transition-all active:scale-95 cursor-pointer">
                 {existingCount > 0 ? 'Reemplazar las actuales' : 'Usar estas preguntas'}
               </button>
             </>
