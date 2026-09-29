@@ -8,6 +8,7 @@ import {
   PRESETS,
   TIPOS_ETIQUETAS,
   generarPreguntasConIA,
+  clasificarPregunta,
 } from '../utils/aiEvalGenerator.js'
 
 const OPCIONES_IDIOMA = [
@@ -238,6 +239,13 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
                   <Undo2 size={12} /> Generar otra vez
                 </button>
               </div>
+
+              {/* Resumen por tipo de lo que devolvio la IA */}
+              <p className="text-[10px] font-bold text-gray-500">{'Resumen por tipo: '}{(() => {
+                const conteo = {};
+                resultado.preguntas.forEach((q) => { const k = clasificarPregunta(q); conteo[k] = (conteo[k] || 0) + 1; });
+                return Object.entries(conteo).map(([k, n]) => `${n} ${TIPOS_ETIQUETAS[k] || k}`).join('  ·  ');
+              })()}</p>
 
               {resultado.problemas?.length > 0 && (
                 <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 text-[11px] font-semibold space-y-0.5">

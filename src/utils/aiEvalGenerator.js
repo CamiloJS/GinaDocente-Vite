@@ -89,25 +89,32 @@ export const IDIOMAS = {
   bilingue_fr: 'Biling\u00fce: enunciado y opciones en franc\u00e9s, con la traducci\u00f3n al espa\u00f1ol entre par\u00e9ntesis',
 };
 
+/** Texto con las cantidades por tipo (se usa en el prompt y en la correccion). */
+const desgloseDe = (t) =>
+  [
+    t.multiple > 0 ? `${t.multiple} de selecci\u00f3n m\u00faltiple (type "multiple", con options)` : '',
+    t.vf > 0 ? `${t.vf} de Verdadero o Falso (type "truefalse", correctAnswer "verdadero" o "falso")` : '',
+    t.text > 0 ? `${t.text} de respuesta escrita (type "text", con correctAnswer y acceptedAnswers)` : '',
+    t.orden > 0 ? `${t.orden} de ordenar la oraci\u00f3n (type "order" con words en el orden correcto)` : '',
+    t.match > 0 ? `${t.match} de relacionar columnas (type "match" con pairs [{"left":"...","right":"..."}])` : '',
+  ].filter(Boolean);
+
 /** Arma el prompt que se le envia a la IA. */
 export function construirPrompt({ tema, total, multiple, text, dificultad = 'media', idioma = 'es', titulo = '', publico = 'estudiantes', variasCorrectas = false, tipos }) {
   const t = normalizarTipos({ tipos, multiple, text });
-  const desglose = [
-    t.multiple > 0 ? `${t.multiple} de selecci\u00f3n m\u00faltiple (con options)` : '',
-    t.vf > 0 ? `${t.vf} de Verdadero o Falso (usa type "multiple" con exactamente 2 opciones: "Verdadero" y "Falso", y marca la correcta)` : '',
-    t.text > 0 ? `${t.text} de respuesta escrita (con correctAnswer y acceptedAnswers)` : '',
-    t.orden > 0 ? `${t.orden} de ordenar la oraci\u00f3n (type "order" con words: el arreglo de palabras EN EL ORDEN CORRECTO)` : '',
-    t.match > 0 ? `${t.match} de relacionar columnas (type "match" con pairs: [{"left":"...","right":"..."}])` : '',
-  ].filter(Boolean);
+  const desglose = desgloseDe(t);
 
   const reglas = [
-    `Genera EXACTAMENTE ${total} preguntas en total, asi: ${desglose.join('; ')}.`,
+    `Genera EXACTAMENTE ${total} preguntas en total, respetando estas cantidades por tipo: ${desglose.join('; ')}.`,
+    'Es OBLIGATORIO respetar esas cantidades exactas de cada tipo (ni una mas ni una menos de cada uno).',
     'Devuelve UNICAMENTE un arreglo JSON valido, sin texto antes ni despues, sin bloques de codigo ```.',
-    'Formatos exactos:',
+    'Formatos exactos por tipo:',
     '{"type":"multiple","text":"enunciado","options":[{"text":"opcion","isCorrect":true},{"text":"opcion","isCorrect":false}],"correctAnswer":""}',
+    '{"type":"truefalse","text":"afirmacion que puede ser verdadera o falsa","options":[],"correctAnswer":"verdadero"}',
     '{"type":"text","text":"enunciado","options":[],"correctAnswer":"respuesta corta","acceptedAnswers":["otra forma valida"]}',
     '{"type":"order","text":"Ordena la oracion","options":[],"words":["palabra1","palabra2","palabra3"],"correctAnswer":""}',
     '{"type":"match","text":"Une cada palabra con su significado","options":[],"pairs":[{"left":"word","right":"significado"},{"left":"word2","right":"significado2"}]}',
+    'Las de Verdadero o Falso SIEMPRE usan type "truefalse" (NO uses type "multiple" para ellas) y su correctAnswer es la palabra "verdadero" o "falso".',
     variasCorrectas
       ? 'En las de selecci\u00f3n m\u00faltiple usa entre 3 y 5 opciones y puede haber 1 o 2 opciones correctas: marca TODAS las correctas con isCorrect y las demas en false.'
       : 'En las de selecci\u00f3n m\u00faltiple usa entre 3 y 4 opciones y marca con isCorrect exactamente UNA opci\u00f3n correcta (las demas en false).',
@@ -235,11 +242,22 @@ function normalizarPregunta(q) {
   return { pregunta: { type: 'text', text: texto, options: [], correctAnswer: respuesta, acceptedAnswers: alternativas, points: puntos } };
 }
 
+/** Clasifica una pregunta ya normalizada en su tipo (para validar cantidades). */
+export function clasificarPregunta(q) {
+  if (!q) return 'multiple';
+  if (q.type === 'order') return 'orden';
+  if (q.type === 'match') return 'match';
+  if (q.type === 'text' || q.type === 'dictation') return 'text';
+  const textos = (q.options || []).map((o) => String(o?.text || '').trim().toLowerCase());
+  const esVF = textos.length === 2 && textos.includes('verdadero') && textos.includes('falso');
+  return esVF ? 'vf' : 'multiple';
+}
+
 /**
  * Parsea la respuesta de la IA y devuelve preguntas listas para el formulario.
  * @returns {{ ok: boolean, preguntas: Array, problemas: string[] }}
  */
-export function parsearEvaluacion(texto, totalEsperado = null) {
+export function parsearEvaluacion(texto, totalEsperado = null, tiposEsperados = null) {
   const problemas = [];
   const bruto = limpiarTexto(texto);
   let datos = null;
@@ -271,6 +289,18 @@ export function parsearEvaluacion(texto, totalEsperado = null) {
     problemas.push(`se pidieron ${totalEsperado} preguntas y llegaron ${preguntas.length} v\u00e1lidas`);
   }
 
+  // Revision por tipo: que la IA haya respetado las cantidades pedidas (por ejemplo V/F)
+  if (tiposEsperados) {
+    const conteo = { multiple: 0, vf: 0, text: 0, orden: 0, match: 0 };
+    preguntas.forEach((p) => { conteo[clasificarPregunta(p)] += 1; });
+    for (const k of ['multiple', 'vf', 'text', 'orden', 'match']) {
+      const esperado = Number(tiposEsperados[k]) || 0;
+      if (esperado > 0 && conteo[k] < esperado) {
+        problemas.push(`pediste ${esperado} de ${TIPOS_ETIQUETAS[k] || k} y llegaron ${conteo[k]}`);
+      }
+    }
+  }
+
   return { ok: problemas.length === 0 && preguntas.length > 0, preguntas, problemas };
 }
 
@@ -285,12 +315,16 @@ export async function generarPreguntasConIA(opciones, llamarIA) {
   const base = { ...opciones, total, tipos };
 
   const prompt = construirPrompt(base);
-  let r = parsearEvaluacion(await llamarIA(prompt, 150000), total);
+  let r = parsearEvaluacion(await llamarIA(prompt, 150000), total, tipos);
 
   if (!r.ok) {
     const aviso = r.problemas.slice(0, 4).join('; ');
-    const prompt2 = construirPrompt(base) + `\n\nCORRECCION OBLIGATORIA: tu respuesta anterior fallo por: ${aviso}. Devuelve SOLO el JSON con EXACTAMENTE ${total} preguntas validas.`;
-    const segundo = parsearEvaluacion(await llamarIA(prompt2, 150000), total);
+    const prompt2 =
+      construirPrompt(base) +
+      `\n\nCORRECCION OBLIGATORIA: tu respuesta anterior fallo por: ${aviso}.` +
+      `\nRecuerda: ${total} preguntas en total con esta mezcla exacta: ${desgloseDe(tipos).join('; ')}.` +
+      '\nLas de Verdadero o Falso llevan type "truefalse" (no "multiple"). Devuelve SOLO el JSON.';
+    const segundo = parsearEvaluacion(await llamarIA(prompt2, 150000), total, tipos);
     // si el segundo intento mejora, usarlo
     if (segundo.preguntas.length >= r.preguntas.length) r = segundo;
   }

@@ -1,5 +1,5 @@
 // Pruebas del generador de evaluaciones con IA (sin navegador, sin gastar cuota).
-import { construirPrompt, parsearEvaluacion, generarPreguntasConIA, TIPOS_MEZCLA, IDIOMAS, PRESETS } from "../src/utils/aiEvalGenerator.js";
+import { construirPrompt, parsearEvaluacion, generarPreguntasConIA, TIPOS_MEZCLA, IDIOMAS, PRESETS, clasificarPregunta } from "../src/utils/aiEvalGenerator.js";
 
 let ok = 0, fallos = 0;
 const chequear = (nombre, cond, extra = "") => {
@@ -129,6 +129,37 @@ const iaFalsa = async () => {
 };
 const gen = await generarPreguntasConIA({ tema: "Prueba", total: 2, ...TIPOS_MEZCLA.auto.distribucion(2), dificultad: "media", idioma: "fr" }, iaFalsa);
 chequear("reintenta y consigue 2 validas", gen.ok && gen.preguntas.length === 2 && llamadas === 2, `llamadas=${llamadas} problemas=${JSON.stringify(gen.problemas)}`);
+
+// ---------- 8) Validacion por tipo: el bug de verdadero/falso ----------
+console.log("\n== Validacion por tipo (Verdadero/Falso) ==");
+const tiposPedidos = { multiple: 1, vf: 2, text: 0, orden: 0, match: 0 };
+const opt3 = [{ text: "x", isCorrect: true }, { text: "y", isCorrect: false }, { text: "z", isCorrect: false }];
+const sinVF = JSON.stringify([
+  { type: "multiple", text: "a", options: opt3, correctAnswer: "" },
+  { type: "multiple", text: "b", options: opt3, correctAnswer: "" },
+  { type: "multiple", text: "c", options: opt3, correctAnswer: "" },
+]);
+r = parsearEvaluacion(sinVF, 3, tiposPedidos);
+chequear("detecta que faltan las de V/F", !r.ok && r.problemas.some((x) => x.includes("Verdadero")), JSON.stringify(r.problemas));
+const conVF = JSON.stringify([
+  { type: "truefalse", text: "El pasado de go es went.", correctAnswer: "verdadero" },
+  { type: "truefalse", text: "El sol es frio.", correctAnswer: "falso" },
+  { type: "multiple", text: "Elige", options: opt3, correctAnswer: "" },
+]);
+r = parsearEvaluacion(conVF, 3, tiposPedidos);
+chequear("acepta la mezcla correcta", r.ok, JSON.stringify(r.problemas));
+chequear("clasifica las V/F correctamente", r.preguntas.filter((p) => clasificarPregunta(p) === "vf").length === 2);
+const vfComoMultiple = JSON.stringify([{ type: "multiple", text: "af", options: [{ text: "Verdadero", isCorrect: true }, { text: "Falso", isCorrect: false }], correctAnswer: "" }]);
+chequear("V/F enviado como multiple tambien cuenta", clasificarPregunta(parsearEvaluacion(vfComoMultiple, 1).preguntas[0]) === "vf");
+const pVF = construirPrompt({ tema: "X", total: 3, tipos: tiposPedidos });
+chequear("el prompt pide type truefalse", pVF.includes('"type":"truefalse"'));
+chequear("el prompt exige respetar las cantidades", pVF.includes("OBLIGATORIO respetar esas cantidades"));
+chequear("el prompt prohibe usar multiple para V/F", pVF.includes('NO uses type "multiple" para ellas'));
+
+let llamadasVF = 0;
+const iaVF = async () => { llamadasVF++; return llamadasVF === 1 ? sinVF : conVF; };
+const genVF = await generarPreguntasConIA({ tema: "X", total: 3, tipos: tiposPedidos }, iaVF);
+chequear("reintenta cuando la mezcla de V/F viene mal", genVF.ok && llamadasVF === 2 && genVF.preguntas.filter((p) => clasificarPregunta(p) === "vf").length === 2, `llamadas=${llamadasVF} problemas=${JSON.stringify(genVF.problemas)}`);
 
 console.log(`\nRESULTADO: ${ok} OK, ${fallos} fallos\n`);
 process.exit(fallos ? 1 : 0);
