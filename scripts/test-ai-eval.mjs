@@ -67,7 +67,24 @@ chequear("detecta respuesta no-JSON", !r.ok && r.problemas[0].includes("JSON"));
 r = parsearEvaluacion(JSON.stringify([{ type: "multiple", text: "Repetida", options: [{ text: "a", isCorrect: true }, { text: "b", isCorrect: false }], correctAnswer: "" }, { type: "multiple", text: "Repetida", options: [{ text: "a", isCorrect: true }, { text: "b", isCorrect: false }], correctAnswer: "" }]), 2);
 chequear("elimina repetidas", r.preguntas.length === 1 && r.problemas.some((x) => x.includes("repetida")));
 
-// ---------- 3) reintento automatico ----------
+// ---------- 3) variantes aceptadas, puntaje y varias correctas ----------
+console.log("\n== Variantes, puntaje y varias correctas ==");
+const conAlt = JSON.stringify([
+  { type: "text", text: "Traduce 'color'", options: [], correctAnswer: "color", acceptedAnswers: ["colour", "Color"] },
+  { type: "multiple", text: "Pick", options: [{ text: "a", isCorrect: true }, { text: "b", isCorrect: false }], correctAnswer: "", points: 2 },
+]);
+r = parsearEvaluacion(conAlt, 2);
+chequear("conserva variantes aceptadas", r.ok && r.preguntas[0].acceptedAnswers.length === 2, JSON.stringify(r.problemas));
+chequear("conserva puntaje por pregunta", r.preguntas[1].points === 2);
+chequear("puntaje por defecto 1", parsearEvaluacion(JSON.stringify([{ type: "text", text: "x", options: [], correctAnswer: "y" }]), 1).preguntas[0].points === 1);
+chequear("acepta varias correctas del generador", parsearEvaluacion(JSON.stringify([{ type: "multiple", text: "m", options: [{ text: "a", isCorrect: true }, { text: "b", isCorrect: true }, { text: "c", isCorrect: false }], correctAnswer: "" }]), 1).ok);
+const pVar = construirPrompt({ tema: "X", total: 4, multiple: 2, text: 2, variasCorrectas: true });
+chequear("prompt permite varias correctas", pVar.includes("puede haber 1 o 2 opciones correctas"));
+const pUna = construirPrompt({ tema: "X", total: 4, multiple: 2, text: 2 });
+chequear("prompt por defecto una sola correcta", pUna.includes("exactamente UNA opci\u00f3n correcta"));
+chequear("prompt pide variantes aceptadas", pUna.includes("acceptedAnswers"));
+
+// ---------- 4) reintento automatico ----------
 console.log("\n== Reintento automatico ==");
 let llamadas = 0;
 const iaFalsa = async () => {

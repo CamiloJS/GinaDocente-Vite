@@ -32,15 +32,18 @@ export const IDIOMAS = {
 };
 
 /** Arma el prompt que se le envia a la IA. */
-export function construirPrompt({ tema, total, multiple, text, dificultad = 'media', idioma = 'es', titulo = '', publico = 'estudiantes' }) {
+export function construirPrompt({ tema, total, multiple, text, dificultad = 'media', idioma = 'es', titulo = '', publico = 'estudiantes', variasCorrectas = false }) {
   const reglas = [
     `Genera EXACTAMENTE ${total} preguntas en total.`,
     `De esas ${total}: ${multiple} de selecci\u00f3n m\u00faltiple y ${text} de respuesta escrita.`,
     'Devuelve UNICAMENTE un arreglo JSON valido, sin texto antes ni despues, sin bloques de codigo ```.',
     'Formato exacto:',
-    '[{"type":"multiple","text":"enunciado","options":[{"text":"opcion","isCorrect":true},{"text":"opcion","isCorrect":false}],"correctAnswer":""},' +
-      '{"type":"text","text":"enunciado","options":[],"correctAnswer":"respuesta esperada corta"}]',
-    'En las de selecci\u00f3n m\u00faltiple usa entre 3 y 4 opciones y marca con isCorrect exactamente UNA opci\u00f3n correcta (las demas en false).',
+    '[{"type":"multiple","text":"enunciado","options":[{"text":"opcion","isCorrect":true},{"text":"opcion","isCorrect":false}],"correctAnswer":"","acceptedAnswers":[]},' +
+      '{"type":"text","text":"enunciado","options":[],"correctAnswer":"respuesta esperada corta","acceptedAnswers":["otra forma valida"]}]',
+    variasCorrectas
+      ? 'En las de selecci\u00f3n m\u00faltiple usa entre 3 y 5 opciones y puede haber 1 o 2 opciones correctas: marca TODAS las correctas con isCorrect y las demas en false.'
+      : 'En las de selecci\u00f3n m\u00faltiple usa entre 3 y 4 opciones y marca con isCorrect exactamente UNA opci\u00f3n correcta (las demas en false).',
+    'En las de respuesta escrita agrega acceptedAnswers: un arreglo con otras formas validas de responder (sinonimos, variantes ortograficas, con o sin articulo). Si no hay, deja el arreglo vacio.',
     'En las de respuesta escrita, correctAnswer debe ser corta (1 a 4 palabras) y verificable.',
     'No repitas preguntas ni el mismo enfoque; varia el vocabulario, el contexto y el tipo de ejercicio.',
     'No numeres los enunciados ni incluyas la respuesta dentro del enunciado.',
@@ -101,6 +104,11 @@ function normalizarPregunta(q) {
 
   const esMultiple = (q.type || q.tipo) === 'multiple' && opciones.length >= 2;
   const respuesta = limpiar(q.correctAnswer || q.respuesta, 300);
+  const puntos = Number(q.points) > 0 ? Number(q.points) : 1;
+  const alternativas = (Array.isArray(q.acceptedAnswers || q.aceptadas) ? (q.acceptedAnswers || q.aceptadas) : [q.acceptedAnswers].filter(Boolean))
+    .map((s) => limpiar(s, 120))
+    .filter(Boolean)
+    .slice(0, 6);
 
   if (esMultiple) {
     // si la IA no marco ninguna correcta, intentar deducirla por la respuesta escrita
@@ -113,12 +121,12 @@ function normalizarPregunta(q) {
     if (!opciones.some((o) => o.isCorrect)) {
       return { problema: `la pregunta "${texto.slice(0, 40)}..." no tiene opci\u00f3n correcta marcada` };
     }
-    return { pregunta: { type: 'multiple', text: texto, options: opciones, correctAnswer: '' } };
+    return { pregunta: { type: 'multiple', text: texto, options: opciones, correctAnswer: '', points: puntos } };
   }
 
   // respuesta escrita
   if (!respuesta) return { problema: `la pregunta "${texto.slice(0, 40)}..." no trae respuesta esperada` };
-  return { pregunta: { type: 'text', text: texto, options: [], correctAnswer: respuesta } };
+  return { pregunta: { type: 'text', text: texto, options: [], correctAnswer: respuesta, acceptedAnswers: alternativas, points: puntos } };
 }
 
 /**

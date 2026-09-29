@@ -46,6 +46,7 @@ import RichVisualEditor from './components/RichVisualEditor.jsx'
 import DocumentPreviewModal from './components/DocumentPreviewModal.jsx'
 import CommandPaletteModal from './components/CommandPaletteModal.jsx'
 import { extractTextFromPDF } from './utils/pdfExtractor.js'
+import { calculateScore } from './utils/evalScoring.js'
 import { useClickOutside } from './utils/hooks.js'
 
 const TasksTab = React.lazy(() => import('./components/TasksTab.jsx'))
@@ -1304,28 +1305,6 @@ function App() {
     }
   };
 
-  const calculateScore = (evalData, answers) => {
-    if (!evalData?.questions || evalData.questions.length === 0) return 0;
-    let correct = 0;
-    evalData.questions.forEach((q, i) => {
-      const ans = answers ? answers[i] : undefined;
-      if (q.type === 'multiple') {
-        const correctIndices = (q.options || []).map((opt, idx) => opt.isCorrect ? idx : -1).filter(idx => idx !== -1);
-        const selectedIndices = Array.isArray(ans) ? ans : [];
-        if (correctIndices.length > 0 && correctIndices.length === selectedIndices.length && correctIndices.every(idx => selectedIndices.includes(idx))) {
-          correct++;
-        }
-      } else {
-        const studentText = String(ans ?? '').trim().toLowerCase();
-        const expectedText = String(q.correctAnswer ?? '').trim().toLowerCase();
-        if (expectedText.length > 0 && studentText === expectedText) {
-          correct++;
-        }
-      }
-    });
-    if (!evalData?.questions || evalData.questions.length === 0) return 0;
-    return Math.round(((correct / evalData.questions.length) * 5.0) * 10) / 10;
-  };
 
   const studentAnswersRef = useRef({});
   useEffect(() => {
@@ -8372,12 +8351,26 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                       </button>
                                                   </div>
                                               </div>
+                                              <div className="flex items-center gap-1.5 shrink-0">
+                                                  <input
+                                                      type="number" min="0.5" step="0.5" max="10"
+                                                      value={q.points ?? 1}
+                                                      onChange={(e) => {
+                                                          const newQ = [...evalFormData.questions];
+                                                          newQ[qIndex] = { ...newQ[qIndex], points: Math.max(0, Number(e.target.value) || 1) };
+                                                          setEvalFormData({ ...evalFormData, questions: newQ });
+                                                      }}
+                                                      className={`${glassInput} !py-1 !px-1.5 w-14 text-xs text-center`}
+                                                      title="Puntaje de esta pregunta (por defecto 1)"
+                                                  />
+                                                  <span className="text-[10px] font-bold text-gray-400">pts</span>
                                               <button type="button" onClick={() => {
                                                   const newQ = [...evalFormData.questions]; newQ.splice(qIndex, 1);
                                                   setEvalFormData({...evalFormData, questions: newQ});
                                               }} className="text-gray-400 hover:text-red-500 transition-colors p-1 cursor-pointer" title="Eliminar pregunta">
                                                   <Trash2 size={16}/>
                                               </button>
+                                              </div>
                                           </div>
                                           
                                           <textarea 
@@ -8440,6 +8433,18 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                       className={`${glassInput} !py-1.5 text-xs border-green-500/40 bg-green-500/10`} 
                                                       required 
                                                   />
+                                                  <p className="text-[11px] font-bold text-gray-500 mb-1 mt-2">{'Otras respuestas v\u00e1lidas (separadas por coma):'}</p>
+                                                  <input
+                                                      value={(q.acceptedAnswers || []).join(', ')}
+                                                      onChange={(e) => {
+                                                          const newQ = [...evalFormData.questions];
+                                                          newQ[qIndex] = { ...newQ[qIndex], acceptedAnswers: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) };
+                                                          setEvalFormData({ ...evalFormData, questions: newQ });
+                                                      }}
+                                                      placeholder="Ej: colour, color"
+                                                      className={`${glassInput} !py-1.5 text-xs`}
+                                                  />
+                                                  <p className="text-[10px] text-gray-500 mt-1">{'Se ignoran may\u00fasculas, tildes y espacios de m\u00e1s.'}</p>
                                               </div>
                                           )}
                                       </div>

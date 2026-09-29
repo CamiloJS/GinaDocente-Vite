@@ -25,6 +25,7 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
   const [customMultiple, setCustomMultiple] = useState(5)
   const [dificultad, setDificultad] = useState('media')
   const [idioma, setIdioma] = useState('es')
+  const [variasCorrectas, setVariasCorrectas] = useState(false)
   const [generando, setGenerando] = useState(false)
   const [resultado, setResultado] = useState(null)
   const [error, setError] = useState('')
@@ -50,7 +51,7 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
     setGenerando(true);
     try {
       const r = await generarPreguntasConIA(
-        { tema: tema.trim(), total, multiple: dist.multiple, text: dist.text, dificultad, idioma },
+        { tema: tema.trim(), total, multiple: dist.multiple, text: dist.text, dificultad, idioma, variasCorrectas },
         callGemini
       );
       setResultado(r);
@@ -168,6 +169,19 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
                 </div>
               </div>
             )}
+
+            <label className="flex items-start gap-2 pt-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={variasCorrectas}
+                onChange={(e) => setVariasCorrectas(e.target.checked)}
+                className="w-4 h-4 accent-blue-600 rounded mt-0.5 cursor-pointer"
+                disabled={generando}
+              />
+              <span className={`text-[11px] font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                {'Permitir varias respuestas correctas (la IA puede marcar m\u00e1s de una opci\u00f3n como correcta)'}
+              </span>
+            </label>
           </div>
 
           {error && (
@@ -209,7 +223,12 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
                       <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
                       <div className="min-w-0 flex-1 space-y-1.5">
                         <p className={`text-xs font-bold leading-snug ${isDarkMode ? 'text-gray-100' : 'text-gray-800'}`}>{q.text}</p>
-                        {tipoBadge(q)}
+                        <div className="flex items-center gap-1.5">
+                          {tipoBadge(q)}
+                          {q.points && Number(q.points) !== 1 ? (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400">{q.points} pts</span>
+                          ) : null}
+                        </div>
                         {q.type === 'multiple' ? (
                           <ul className="space-y-0.5">
                             {q.options.map((o, oi) => (
@@ -220,7 +239,12 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
                             ))}
                           </ul>
                         ) : (
-                          <p className="text-[11px] font-bold text-green-600 dark:text-green-400">Respuesta esperada: {q.correctAnswer}</p>
+                          <div className="space-y-0.5">
+                            <p className="text-[11px] font-bold text-green-600 dark:text-green-400">Respuesta esperada: {q.correctAnswer}</p>
+                            {q.acceptedAnswers?.length > 0 && (
+                              <p className="text-[10px] text-gray-500 font-medium">{'Tambi\u00e9n v\u00e1lido: '}{q.acceptedAnswers.join(', ')}</p>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>
