@@ -50,6 +50,7 @@ import CommandPaletteModal from './components/CommandPaletteModal.jsx'
 import { extractTextFromPDF } from './utils/pdfExtractor.js'
 import { calculateScore, normalizarRespuesta } from './utils/evalScoring.js'
 import { textoPlano } from './utils/textFormat.js';
+import { evaluacionVencida, describirPregunta, generarFeedbackIA } from './utils/aiFeedback.js';
 import { desordenarPalabras } from './utils/palabras.js'
 import { useClickOutside } from './utils/hooks.js'
 
@@ -401,6 +402,10 @@ function App() {
   const [studentAnswers, setStudentAnswers] = useState({});
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [viewingResultsFor, setViewingResultsFor] = useState(null);
+  // Retroalimentacion con IA (solo despues de que cierre la evaluacion)
+  const [feedbackIA, setFeedbackIA] = useState({});
+  const [feedbackCargando, setFeedbackCargando] = useState(null);
+  const [feedbackAbierto, setFeedbackAbierto] = useState(null);
   const [editingGrade, setEditingGrade] = useState({ id: null, score: '' });
   const [selectedStudentGradeForReview, setSelectedStudentGradeForReview] = useState(null);
   const [reviewFeedbackText, setReviewFeedbackText] = useState('');
@@ -7438,6 +7443,43 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
               }
 
               // Función de Exportación a Excel (.xlsx) con preguntas, respuestas del estudiante y feedback
+              // Genera (una sola vez) la explicacion con IA de las respuestas del estudiante.
+              // Regla: SOLO cuando la evaluacion ya vencio. Se guarda en la nota para no gastar IA de nuevo.
+              const generarFeedbackDeEvaluacion = async (ev, grade) => {
+                  if (!ev || !grade) return;
+                  if (!evaluacionVencida(ev)) {
+                      showMessage('La explicacion estara disponible cuando cierre la evaluacion.');
+                      return;
+                  }
+                  setFeedbackCargando(grade.id);
+                  try {
+                      const r = await generarFeedbackIA({
+                          evaluacion: ev,
+                          preguntas: ev.questions || [],
+                          respuestas: grade.answers || {},
+                          llamarIA: callGemini,
+                      });
+                      if (!r.ok || !r.feedback.some(Boolean)) {
+                          showMessage(r.problemas?.[0] || 'No se pudo generar la explicacion. Intenta de nuevo.');
+                          return;
+                      }
+                      setFeedbackIA((prev) => ({ ...prev, [grade.id]: r.feedback }));
+                      setFeedbackAbierto(grade.id);
+                      setGrades((prev) => prev.map((g) => (g.id === grade.id ? { ...g, feedbackIA: r.feedback } : g)));
+                      try {
+                          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'grades', grade.id), { feedbackIA: r.feedback, feedbackIAEn: Date.now() });
+                      } catch (errGuardar) {
+                          console.warn('No se pudo guardar la retroalimentacion (se muestra igual):', errGuardar);
+                      }
+                      showMessage('Explicacion generada.');
+                  } catch (err) {
+                      console.error('Error generando retroalimentacion con IA:', err);
+                      showMessage('No se pudo generar la explicacion con IA. Revisa tu conexion e intenta de nuevo.');
+                  } finally {
+                      setFeedbackCargando(null);
+                  }
+              };
+
               const exportEvaluationToExcel = async (evaluation, gradesList) => {
                   const XLSX = await import('xlsx').catch(() => null);
                   if (!XLSX) { showMessage('No se pudo cargar el generador de Excel. Revisa tu conexi\u00f3n e int\u00e9ntalo de nuevo.'); return; }
@@ -8106,6 +8148,9 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                       {/* Enunciado de la pregunta */}
                                                       <p className="text-xs sm:text-sm font-bold text-gray-900 dark:text-gray-100 mb-3 pl-8">
                                                           {q.text || q.question || 'Pregunta sin enunciado'}
+                                                          {selectedStudentGradeForReview?.feedbackIA?.[qIdx] && (
+                                                              <p className="text-[11px] text-blue-700 dark:text-blue-300 font-medium pl-8 mb-2">{'\ud83e\udd16 '}{selectedStudentGradeForReview.feedbackIA[qIdx]}</p>
+                                                          )}
                                                       </p>
 
                                                       {/* Respuestas detalladas */}
@@ -8937,6 +8982,49 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                                 <p className="text-xs text-gray-700 dark:text-gray-300 font-medium italic">
                                                                     "{studentGrade.teacherFeedback}"
                                                                 </p>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Retroalimentacion con IA: solo despues de que cierre la evaluacion */}
+                                                        {role === 'student' && isExpired && studentGrade && (
+                                                            <div className="w-full mt-2.5">
+                                                                {(feedbackIA[studentGrade.id] || studentGrade.feedbackIA) ? (
+                                                                    <div className="space-y-2">
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setFeedbackAbierto(feedbackAbierto === studentGrade.id ? null : studentGrade.id)}
+                                                                            className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
+                                                                        >
+                                                                            <Sparkles size={12} /> {feedbackAbierto === studentGrade.id ? 'Ocultar explicacion' : 'Ver explicacion de mis respuestas (IA)'}
+                                                                        </button>
+                                                                        {feedbackAbierto === studentGrade.id && (
+                                                                            <div className="space-y-2 p-2.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+                                                                                {(ev.questions || []).map((q, qIdx) => {
+                                                                                    const explicacion = (feedbackIA[studentGrade.id] || studentGrade.feedbackIA || [])[qIdx];
+                                                                                    if (!explicacion) return null;
+                                                                                    const detalle = describirPregunta(q, (studentGrade.answers || {})[qIdx]);
+                                                                                    return (
+                                                                                        <div key={qIdx} className="text-[11px] leading-relaxed">
+                                                                                            <p className="font-bold text-gray-700 dark:text-gray-200">{detalle.acierto ? '\u2705' : '\u274c'} {qIdx + 1}. {String(q.text || '').slice(0, 90)}</p>
+                                                                                            <p className="text-gray-600 dark:text-gray-300 pl-4">{explicacion}</p>
+                                                                                        </div>
+                                                                                    );
+                                                                                })}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                ) : (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => generarFeedbackDeEvaluacion(ev, studentGrade)}
+                                                                        disabled={feedbackCargando === studentGrade.id}
+                                                                        className="w-full text-[11px] font-bold px-3 py-2 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center gap-1.5 shadow-xs transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+                                                                    >
+                                                                        {feedbackCargando === studentGrade.id
+                                                                            ? <><Loader2 size={12} className="animate-spin" /> Generando explicacion...</>
+                                                                            : <><Sparkles size={12} /> Explicar mis respuestas con IA</>}
+                                                                    </button>
+                                                                )}
                                                             </div>
                                                         )}
                                                     </div>
