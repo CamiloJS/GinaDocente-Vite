@@ -236,3 +236,13 @@ El usuario decidió que Antigravity trabaje 100% solo, sin depender de opencode.
 (Fix) Recarga automática SW en controllerchange (bug "¡Ups!")
 
 ### ESTADO: EN MANOS DE ANTIGRAVITY (modo autónomo)
+
+## Retroalimentacion con IA automatica en las evaluaciones (30-sep-2026)
+
+- Explicacion con IA de cada respuesta (correcta, incorrecta o parcial) en las evaluaciones vencidas.
+- Es AUTOMATICA (sin boton), SIEMPRE en espanol, y cubre TODOS los tipos: multiple, listening, escrita,
+  dictado, ordenar, relacionar (con parcial) y speaking (explica que debia incluir + ejemplo).
+- Solo se genera despues del deadline: en la pantalla y en la logica (aiFeedback.js se niega antes).
+- Se guarda en la nota (feedbackIA) para no gastar IA dos veces; la docente la ve en 'Ver respuestas'.
+- Componente propio src/components/FeedbackIAEvaluacion.jsx (hooks validos) + src/utils/aiFeedback.js.
+- Pruebas: scripts/test-feedback.mjs (46 casos). Verificado con la IA real: 7/7 tipos explicados.
