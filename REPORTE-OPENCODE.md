@@ -245,4 +245,7 @@ El usuario decidió que Antigravity trabaje 100% solo, sin depender de opencode.
 - Solo se genera despues del deadline: en la pantalla y en la logica (aiFeedback.js se niega antes).
 - Se guarda en la nota (feedbackIA) para no gastar IA dos veces; la docente la ve en 'Ver respuestas'.
 - Componente propio src/components/FeedbackIAEvaluacion.jsx (hooks validos) + src/utils/aiFeedback.js.
-- Pruebas: scripts/test-feedback.mjs (46 casos). Verificado con la IA real: 7/7 tipos explicados.
+- Pruebas: scripts/test-feedback.mjs (51 casos). Verificado con la IA real: 7/7 tipos explicados.
+- El estudiante NO debe saber que hay IA detras: textos, emojis y mensajes de consola neutralizados;
+  el prompt prohibe delatarse ("nunca menciones que eres una IA") y limpiarMencionIA() borra cualquier
+  mencion que se escape. Verificado con la IA real: 0 menciones en 4 explicaciones.

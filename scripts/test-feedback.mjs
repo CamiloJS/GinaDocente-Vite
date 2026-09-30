@@ -1,5 +1,5 @@
 // Pruebas de la retroalimentacion con IA: automatica, SIEMPRE en espanol y para TODOS los tipos.
-import { evaluacionVencida, describirPregunta, construirPromptFeedback, parsearFeedback, generarFeedbackIA, pendientesDeFeedback } from "../src/utils/aiFeedback.js";
+import { evaluacionVencida, describirPregunta, construirPromptFeedback, parsearFeedback, generarFeedbackIA, pendientesDeFeedback, limpiarMencionIA } from "../src/utils/aiFeedback.js";
 
 let ok = 0, fallos = 0;
 const chequear = (nombre, cond, extra = "") => {
@@ -59,6 +59,7 @@ chequear("no inventa respuesta correcta en audio", !promptAudio.includes('Respue
 const promptParcial = construirPromptFeedback({ items: [describirPregunta({ type: 'match', text: 'Une', pairs: [{ left: 'a', right: 'b' }, { left: 'c', right: 'd' }] }, { 0: 'b', 1: 'mal' })] });
 chequear("informa respuestas parciales", promptParcial.includes('acerto 1 de las parejas'));
 chequear("pide no inventar", prompt.includes('no inventes'));
+chequear("prohibe revelar que es una IA", prompt.includes("nunca menciones que eres una IA"));
 
 console.log("\n== Parseo de la respuesta ==");
 let r = parsearFeedback('```json\n[{"i":1,"explicacion":"Bien hecho: dos es la opcion correcta."},{"i":2,"explicacion":"Casi: revisa la tercera persona."}]\n```', 2);
@@ -71,6 +72,11 @@ r = parsearFeedback('no soy json', 2);
 chequear("detecta respuesta invalida", !r.ok);
 r = parsearFeedback('[{"i":1,"explicacion":""},{"i":2,"explicacion":"ok"}]', 2);
 chequear("reporta explicaciones vacias", r.problemas.length === 1 && r.feedback[1] === 'ok');
+chequear("quita una frase que delata a la IA", limpiarMencionIA("¡Excelente! Como IA, no puedo oir tu audio.") === "¡Excelente!");
+chequear("quita la mencion a inteligencia artificial", !limpiarMencionIA("Muy bien. Esto lo genero una inteligencia artificial.").toLowerCase().includes("inteligencia"));
+chequear("no toca el texto normal", limpiarMencionIA("¡Muy bien hecho! Sigue asi.") === "¡Muy bien hecho! Sigue asi.");
+r = parsearFeedback(JSON.stringify([{ i: 1, explicacion: "Como IA, puedo decirte que 'went' es correcto." }]), 1);
+chequear("el parseo limpia las menciones de IA", r.ok && !/como ia/i.test(r.feedback[0]) && r.feedback[0].includes("went"), r.feedback);
 
 console.log("\n== Generacion completa (con IA simulada) ==");
 const evVencida = { title: 'Examen', dueDate: '2026-09-01', dueTime: '23:59' };

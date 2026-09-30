@@ -1,5 +1,5 @@
 // src/components/FeedbackIAEvaluacion.jsx
-// Explicacion con IA de las respuestas del estudiante en una evaluacion.
+// Explicacion de las respuestas del estudiante en una evaluacion.
 // Es AUTOMATICA (sin boton), SIEMPRE en espanol, cubre TODOS los tipos de pregunta
 // y solo se genera cuando la evaluacion YA VENCIO (regla tambien en aiFeedback.js).
 import React, { useEffect, useRef, useState } from 'react';
@@ -83,7 +83,7 @@ export default function FeedbackIAEvaluacion({ evaluacion, grade, onGenerado }) 
         llamarIA,
       }));
       if (!r.ok || !r.feedback.some(Boolean)) {
-        console.warn('Retroalimentacion con IA no disponible:', r.problemas);
+        console.warn('No se pudo preparar la explicacion de las respuestas:', r.problemas);
         if (vivoRef.current) setEstado('fallo');
         return;
       }
@@ -103,7 +103,7 @@ export default function FeedbackIAEvaluacion({ evaluacion, grade, onGenerado }) 
         onGenerado?.(r.feedback);
       }
     } catch (err) {
-      console.error('Error generando la retroalimentacion con IA:', err);
+      console.error('Error preparando la explicacion de las respuestas:', err);
       if (vivoRef.current) setEstado('fallo');
     } finally {
       enCursoRef.current = false;

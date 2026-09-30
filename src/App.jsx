@@ -8108,7 +8108,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                       <p className="text-xs sm:text-sm font-bold text-gray-900 dark:text-gray-100 mb-3 pl-8">
                                                           {q.text || q.question || 'Pregunta sin enunciado'}
                                                           {selectedStudentGradeForReview?.feedbackIA?.[qIdx] && (
-                                                              <p className="text-[11px] text-blue-700 dark:text-blue-300 font-medium pl-8 mb-2">{'\ud83e\udd16 '}{textoPlano(selectedStudentGradeForReview.feedbackIA[qIdx])}</p>
+                                                              <p className="text-[11px] text-blue-700 dark:text-blue-300 font-medium pl-8 mb-2">{'\ud83d\udcac '}{textoPlano(selectedStudentGradeForReview.feedbackIA[qIdx])}</p>
                                                           )}
                                                       </p>
 
@@ -8944,7 +8944,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                             </div>
                                                         )}
 
-                                                        {/* Explicacion de las respuestas con IA: automatica, siempre en espanol, solo tras el cierre */}
+                                                        {/* Explicacion de las respuestas: automatica, siempre en espanol, solo tras el cierre */}
                                                         {role === 'student' && isExpired && studentGrade && (
                                                             <FeedbackIAEvaluacion
                                                                 evaluacion={ev}

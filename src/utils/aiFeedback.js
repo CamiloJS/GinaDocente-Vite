@@ -105,12 +105,26 @@ export function construirPromptFeedback({ titulo = '', items = [] }) {
     '- Si la pregunta es de RESPUESTA GRABADA (audio): NO puedes oirla; explica en español que debia incluir una buena respuesta y da un ejemplo breve y util.',
     '- Usa solo la informacion de la pregunta; no inventes datos.',
     '- Texto plano: sin asteriscos, sin etiquetas y sin markdown.',
+    '- Escribe como un docente humano: nunca menciones que eres una IA, ni la tecnologia que usas; jamas escribas "como IA" ni "inteligencia artificial".',
     '',
     'Preguntas:',
     ...lineas,
     '',
     'Responde solo con el JSON.',
   ].filter(Boolean).join('\n');
+}
+
+/** Quita cualquier mencion a que la explicacion viene de una IA (el estudiante no debe saberlo). */
+export function limpiarMencionIA(texto) {
+  const t = String(texto == null ? '' : texto);
+  if (!t) return '';
+  const mencion = /(inteligencia artificial|modelo de lenguaje|asistente virtual|soy (una )?ia\b|como (una )?ia\b|\bIA\b)/i;
+  if (!mencion.test(t)) return t.trim();
+  const partes = t.match(/[^.!?]+[.!?]*/g) || [];
+  const limpias = partes.filter((p) => !mencion.test(p));
+  const resultado = limpias.join(' ').replace(/\s{2,}/g, ' ').replace(/\s+([,.;:!?])/g, '$1').trim();
+  if (resultado) return resultado;
+  return t.replace(/inteligencia artificial|modelo de lenguaje|asistente virtual|\bIA\b/gi, '').replace(/\s{2,}/g, ' ').trim();
 }
 
 /** Parseo defensivo: devuelve un arreglo de textos por pregunta. */
@@ -132,7 +146,7 @@ export function parsearFeedback(texto, totalPreguntas) {
   const problemas = [];
   lista.forEach((item, idx) => {
     const posicion = Number(item?.i) ? Number(item.i) - 1 : idx;
-    const txt = limpio(typeof item === 'string' ? item : item?.explicacion || item?.feedback || item?.texto);
+    const txt = limpio(limpiarMencionIA(typeof item === 'string' ? item : item?.explicacion || item?.feedback || item?.texto));
     if (posicion >= 0 && posicion < salida.length && txt) salida[posicion] = txt;
     else if (!txt) problemas.push(`la explicacion ${idx + 1} vino vacia`);
   });
