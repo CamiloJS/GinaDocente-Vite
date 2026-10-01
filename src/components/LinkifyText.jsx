@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import CustomVideoPlayer, { extractYouTubeId } from './CustomVideoPlayer.jsx';
 import GeniallyEmbedPlayer, { isGeniallyUrl, extractGeniallyUrl } from './GeniallyEmbedPlayer.jsx';
 import AppleEmoji, { EMOJI_REGEX } from './AppleEmoji.jsx';
 import { normalizarMarcado } from '../utils/textFormat.js';
+import { URL_REGEX, extraerUrls, esPublicacionLarga } from '../utils/postLinks.js';
+import { ChevronDown, ChevronUp } from './Icons.jsx';
 
 const COLOR_MAP = {
   rojo: '#ef4444',
@@ -29,7 +31,8 @@ const COLOR_MAP = {
   gray: '#6b7280',
 };
 
-// Definición de patrones de formato inline con soporte para anidación infinita
+// Definición de patrones de formato inline con soporte para anidación infinita.
+// Los enlaces van AL FINAL: asi el formato (color, negrita, etc.) puede envolverlos.
 const PATTERNS = [
   // 1. Colores: [color=#hex o nombre]...[/color] o <span style="color:...">...</span>
   {
@@ -66,6 +69,12 @@ const PATTERNS = [
     regex: /(?:\*([\s\S]+?)\*|_([\s\S]+?)_|<i>([\s\S]*?)<\/i>|<em>([\s\S]*?)<\/em>)/i,
     type: 'italic',
     extract: (m) => ({ content: m[1] || m[2] || m[3] || m[4] || '' })
+  },
+  // 7. Enlaces http(s) (el patron compartido con postLinks.js)
+  {
+    regex: URL_REGEX,
+    type: 'url',
+    extract: (m) => ({ url: m[0] })
   }
 ];
 
@@ -104,7 +113,7 @@ const buildAST = (text) => {
   nodes.push({
     type: pat.type,
     ...data,
-    children: buildAST(data.content)
+    children: pat.type === 'url' ? [] : buildAST(data.content)
   });
 
   if (afterText) {
@@ -142,8 +151,10 @@ const renderTextWithEmojis = (textVal, keyPrefix, emojiSize = '1.25em') => {
   );
 };
 
-// Renderizador React del AST
-const renderAST = (nodes, keyPrefix = 'ast', emojiSize = '1.25em') => {
+// Renderizador React del AST.
+// `enColor` indica que venimos dentro de un [color=...], para que los enlaces
+// hereden ese color en vez de forzar el azul por defecto.
+const renderAST = (nodes, keyPrefix = 'ast', emojiSize = '1.25em', enColor = false) => {
   if (!Array.isArray(nodes)) return null;
 
   return nodes.map((node, idx) => {
@@ -154,7 +165,7 @@ const renderAST = (nodes, keyPrefix = 'ast', emojiSize = '1.25em') => {
         const colorVal = COLOR_MAP[node.color?.toLowerCase()] || node.color || '#3b82f6';
         return (
           <span key={nodeKey} style={{ color: colorVal }} className="font-medium">
-            {renderAST(node.children, `${nodeKey}-c`, emojiSize)}
+            {renderAST(node.children, `${nodeKey}-c`, emojiSize, true)}
           </span>
         );
       }
@@ -164,32 +175,44 @@ const renderAST = (nodes, keyPrefix = 'ast', emojiSize = '1.25em') => {
             key={nodeKey}
             className="bg-amber-300 dark:bg-amber-500/40 text-gray-900 dark:text-amber-100 px-1 py-0.5 rounded font-medium"
           >
-            {renderAST(node.children, `${nodeKey}-h`, emojiSize)}
+            {renderAST(node.children, `${nodeKey}-h`, emojiSize, enColor)}
           </mark>
         );
       case 'bold':
         return (
           <strong key={nodeKey} className="font-bold text-inherit">
-            {renderAST(node.children, `${nodeKey}-b`, emojiSize)}
+            {renderAST(node.children, `${nodeKey}-b`, emojiSize, enColor)}
           </strong>
         );
       case 'underline':
         return (
           <span key={nodeKey} className="underline decoration-current underline-offset-2">
-            {renderAST(node.children, `${nodeKey}-u`, emojiSize)}
+            {renderAST(node.children, `${nodeKey}-u`, emojiSize, enColor)}
           </span>
         );
       case 'strike':
         return (
           <span key={nodeKey} className="line-through opacity-75">
-            {renderAST(node.children, `${nodeKey}-s`, emojiSize)}
+            {renderAST(node.children, `${nodeKey}-s`, emojiSize, enColor)}
           </span>
         );
       case 'italic':
         return (
           <em key={nodeKey} className="italic text-inherit">
-            {renderAST(node.children, `${nodeKey}-i`, emojiSize)}
+            {renderAST(node.children, `${nodeKey}-i`, emojiSize, enColor)}
           </em>
+        );
+      case 'url':
+        return (
+          <a
+            key={nodeKey}
+            href={node.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`${enColor ? 'text-inherit ' : 'text-blue-500 '}hover:underline break-all font-medium`}
+          >
+            {node.url}
+          </a>
         );
       case 'text':
       default:
@@ -266,51 +289,63 @@ const parseBlockFormatting = (text, keyPrefix = 'blk', emojiSize = '1.25em') => 
   });
 };
 
-const LinkifyText = ({ text, isDarkMode = false, isEmojiOnly = false, embedVideos = true }) => {
+const LinkifyText = ({ text, isDarkMode = false, isEmojiOnly = false, embedVideos = true, colapsable = false }) => {
+  const [expandido, setExpandido] = useState(false);
   if (!text) return null;
+
   const emojiSize = isEmojiOnly ? '2.4em' : '1.25em';
-  const urlRegex = /(https?:\/\/[^\s]+)/g;
   // Limpia el marcado roto del editor (etiquetas partidas entre lineas, asteriscos sueltos)
-  const partes = String(normalizarMarcado(text)).split(urlRegex);
+  const limpio = String(normalizarMarcado(text));
+
+  // Detección de videos / genially (sobre el texto ya limpio)
   const ytIds = [];
   const geniallyUrls = [];
-  const isUrl = (s) => typeof s === 'string' && (s.startsWith('http://') || s.startsWith('https://'));
-  const elements = partes.map((part, idx) => {
-    if (isUrl(part)) {
-      const videoId = extractYouTubeId(part);
-      if (videoId && !ytIds.includes(videoId)) {
-        ytIds.push(videoId);
-      }
-      if (isGeniallyUrl(part)) {
-        const gUrl = extractGeniallyUrl(part);
-        if (gUrl && !geniallyUrls.includes(gUrl)) {
-          geniallyUrls.push(gUrl);
-        }
-      }
-      return (
-        <a
-          key={idx}
-          href={part}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-blue-500 hover:underline break-all font-medium"
-        >
-          {part}
-        </a>
-      );
+  extraerUrls(limpio).forEach((u) => {
+    const videoId = extractYouTubeId(u);
+    if (videoId && !ytIds.includes(videoId)) {
+      ytIds.push(videoId);
     }
-    return <span key={idx}>{parseBlockFormatting(part, `blk-${idx}`, emojiSize)}</span>;
+    if (isGeniallyUrl(u)) {
+      const gUrl = extractGeniallyUrl(u);
+      if (gUrl && !geniallyUrls.includes(gUrl)) {
+        geniallyUrls.push(gUrl);
+      }
+    }
   });
+
+  // Publicación larga -> se muestra recortada con "Ver más"
+  const larga = colapsable && esPublicacionLarga(limpio);
+  const colapsado = larga && !expandido;
+  const mascara = colapsado
+    ? {
+        WebkitMaskImage: 'linear-gradient(to bottom, #000 55%, transparent 100%)',
+        maskImage: 'linear-gradient(to bottom, #000 55%, transparent 100%)',
+      }
+    : undefined;
 
   return (
     <>
-      {elements}
-      {embedVideos && ytIds.slice(0, 1).map((videoId, idx) => (
+      <span className={colapsado ? 'block max-h-52 overflow-hidden' : 'block'} style={mascara}>
+        {parseBlockFormatting(limpio, 'blk', emojiSize)}
+      </span>
+
+      {larga && (
+        <button
+          type="button"
+          onClick={() => setExpandido((v) => !v)}
+          className="mt-1.5 text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
+        >
+          {expandido ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+          {expandido ? 'Ver menos' : 'Ver más'}
+        </button>
+      )}
+
+      {!colapsado && embedVideos && ytIds.slice(0, 1).map((videoId, idx) => (
         <div key={'yt-' + idx} className="mt-2.5 max-w-full">
           <CustomVideoPlayer videoId={videoId} title="Video de la clase" isDarkMode={isDarkMode} />
         </div>
       ))}
-      {geniallyUrls.slice(0, 2).map((gUrl, idx) => (
+      {!colapsado && geniallyUrls.slice(0, 2).map((gUrl, idx) => (
         <div key={'genially-' + idx} className="mt-3 max-w-full">
           <GeniallyEmbedPlayer url={gUrl} isDarkMode={isDarkMode} />
         </div>

@@ -1,5 +1,6 @@
 // Pruebas del normalizador de marcado (que no se vean etiquetas crudas).
 import { normalizarMarcado, textoPlano } from "../src/utils/textFormat.js";
+import { URL_REGEX, extraerUrls, esPublicacionLarga } from "../src/utils/postLinks.js";
 
 let ok = 0, fallos = 0;
 const chequear = (nombre, cond, extra = "") => {
@@ -57,6 +58,23 @@ chequear("quita etiquetas de color", textoPlano("[color=#fff]hola[/color] mundo"
 chequear("quita subrayado", textoPlano("<u>hola</u>") === "hola");
 chequear("normaliza espacios", textoPlano("  varios    espacios  ") === "varios espacios");
 chequear("conserva el texto normal", textoPlano("Hola, ¿cómo están?") === "Hola, ¿cómo están?");
+
+
+console.log("\n== Enlaces dentro de publicaciones (color + link) ==");
+const casoEnlaces = "1.[color=#ef4444]https://www.youtube.com/watch?v=q6LMjurECZM[/color]\n2. [color=#10b981]https://share.gemini.google/2lo1F63zp5ao [/color]";
+const urls = extraerUrls(casoEnlaces);
+chequear("la URL no se come el cierre [/color]", urls[0] === "https://www.youtube.com/watch?v=q6LMjurECZM", urls);
+chequear("extrae las dos urls", urls.length === 2, urls);
+chequear("no incluye el punto final", (URL_REGEX.exec("mira https://ejemplo.com/pagina.") || [""])[0] === "https://ejemplo.com/pagina");
+chequear("una url sola", (URL_REGEX.exec("https://a.co") || [""])[0] === "https://a.co");
+chequear("el marcado de color con enlaces sobrevive", normalizarMarcado(casoEnlaces) === casoEnlaces, normalizarMarcado(casoEnlaces));
+
+console.log("\n== Ver mas en publicaciones largas ==");
+chequear("publicacion corta no se colapsa", esPublicacionLarga("Hola clase, nos vemos mañana a las 6.") === false);
+chequear("muchas lineas se colapsa", esPublicacionLarga(Array.from({ length: 12 }, (_, i) => "linea " + i).join("\n")) === true);
+chequear("mucho texto se colapsa", esPublicacionLarga("x".repeat(420)) === true);
+chequear("el enlace largo cuenta como texto", esPublicacionLarga(casoEnlaces + " " + "y".repeat(350)) === true);
+chequear("vacio no se colapsa", esPublicacionLarga("") === false);
 
 console.log(`\nRESULTADO: ${ok} OK, ${fallos} fallos\n`);
 process.exit(fallos ? 1 : 0);

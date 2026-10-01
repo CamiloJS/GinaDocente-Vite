@@ -1190,7 +1190,7 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
             ) : (
                 <div className="flex items-start justify-between gap-3 mb-2 w-full">
                     <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100 leading-snug flex-1">
-                        {task.title} {isLocked && <Lock size={16} className="text-red-500 inline shrink-0 ml-1" />}
+                        <LinkifyText text={task.title} isDarkMode={isDarkMode} embedVideos={false} /> {isLocked && <Lock size={16} className="text-red-500 inline shrink-0 ml-1" />}
                     </h3>
 
                     {/* Botón de Traducir y Escuchar arriba del texto (invisible hasta pasar mouse o tocar) */}
@@ -1279,7 +1279,7 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                                 </button>
                             </div>
                             <div className={`text-sm leading-relaxed whitespace-pre-wrap w-full ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>
-                                <LinkifyText text={translatedDescription} isDarkMode={isDarkMode} embedVideos={!task.videoUrl && !task.imageUrl && !task.fileUrl && !task.audioUrl} />
+                                <LinkifyText text={translatedDescription} isDarkMode={isDarkMode} colapsable embedVideos={!task.videoUrl && !task.imageUrl && !task.fileUrl && !task.audioUrl} />
                             </div>
                         </div>
                     ) : (
@@ -1294,7 +1294,7 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                                 </button>
                             )}
                             <div className={`text-sm leading-relaxed whitespace-pre-wrap w-full ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>
-                                <LinkifyText text={task.description} isDarkMode={isDarkMode} embedVideos={!task.videoUrl && !task.imageUrl && !task.fileUrl && !task.audioUrl} />
+                                <LinkifyText text={task.description} isDarkMode={isDarkMode} colapsable embedVideos={!task.videoUrl && !task.imageUrl && !task.fileUrl && !task.audioUrl} />
                             </div>
                         </div>
                     )}
@@ -1700,7 +1700,7 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                                     )}
                                 </h3>
                                 <p className={`text-xs font-medium mt-0.5 truncate max-w-[200px] sm:max-w-md ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                                    {task.title}
+                                    <LinkifyText text={task.title} isDarkMode={isDarkMode} embedVideos={false} />
                                 </p>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">

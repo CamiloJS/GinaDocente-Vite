@@ -4541,9 +4541,9 @@ useEffect(() => {
                                 </div>
                             ) : (
                                 <div className="space-y-2 min-w-0 w-full">
-                                    {post.title && <h4 className={`font-black text-base sm:text-lg leading-tight pr-14 break-words ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>{post.title}</h4>}
+                                    {post.title && <h4 className={`font-black text-base sm:text-lg leading-tight pr-14 break-words ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}><LinkifyText text={post.title} isDarkMode={isDarkMode} embedVideos={false} /></h4>}
                                     {post.imageUrl && <img src={post.imageUrl} loading="lazy" onClick={() => setFullScreenImage(post.imageUrl)} alt="Post" className={`w-full max-h-96 object-cover rounded-xl cursor-pointer shadow-xs border ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`} />}
-                                    {post.text && <div className={`text-xs sm:text-sm leading-relaxed break-words whitespace-pre-line ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}><LinkifyText text={post.text} /></div>}
+                                    {post.text && <div className={`text-xs sm:text-sm leading-relaxed break-words whitespace-pre-line ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}><LinkifyText text={post.text} colapsable /></div>}
                                 </div>
                             )}
                             

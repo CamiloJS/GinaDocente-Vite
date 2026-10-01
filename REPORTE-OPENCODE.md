@@ -249,3 +249,17 @@ El usuario decidió que Antigravity trabaje 100% solo, sin depender de opencode.
 - El estudiante NO debe saber que hay IA detras: textos, emojis y mensajes de consola neutralizados;
   el prompt prohibe delatarse ("nunca menciones que eres una IA") y limpiarMencionIA() borra cualquier
   mencion que se escape. Verificado con la IA real: 0 menciones en 4 explicaciones.
+
+## Arreglos en las publicaciones (01-oct-2026)
+
+- BUG reportado: al poner color a un texto con enlaces salian las etiquetas crudas
+  ([color=#ef4444]https://...[/color]). Causa: LinkifyText partia el texto por URLs antes de procesar
+  el formato. Ahora los enlaces son un patron mas del parser: el color (y negrita, subrayado, tachado,
+  resaltado) envuelve correctamente a los enlaces y el enlace hereda el color elegido.
+- La URL ya no se come el cierre [/color] ni la puntuacion final (punto, coma, parentesis).
+- Las publicaciones largas ahora se muestran recortadas con boton "Ver más" / "Ver menos"
+  (desvanecido suave); aplica al muro/tareas (TaskCard) y a las publicaciones del perfil.
+- Los titulos de las publicaciones tambien respetan color y enlaces (sin etiquetas crudas).
+- Pruebas: scripts/test-formato.mjs (+10) y verificacion visual en navegador
+  (scripts/smoke/posts.html): 8/8 enlaces con el color correcto (rgb(239,68,68) y rgb(16,185,129)),
+  0 etiquetas crudas, "Ver más" expande y encoje. 202 pruebas en total.
