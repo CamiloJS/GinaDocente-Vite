@@ -115,5 +115,45 @@ const ctrl = narrarSegmentos([{ idioma: "es", texto: "Hola" }], { onFin: () => {
 chequear("sin window llama onFin sin romper", fin === true && typeof ctrl.detener === "function");
 chequear("detener no lanza", (() => { try { ctrl.detener(); return true; } catch (e) { return false; } })());
 
+console.log("\n== Anti-eco: una sola reproduccion a la vez y sin disparos dobles ==");
+{
+  const audiosCreados = [];
+  global.window = {
+    speechSynthesis: {
+      getVoices: () => [{ name: 'Microsoft Raul - Spanish (Mexico)', lang: 'es-MX', localService: true }],
+      speak: (u) => { setTimeout(() => { try { u.onend && u.onend(); } catch (e) { /* nada */ } }, 1); },
+      cancel: () => {},
+    },
+    SpeechSynthesisUtterance: class { constructor(texto) { this.text = texto; } },
+    Audio: class {
+      constructor(src) { this.src = src; audiosCreados.push(src); }
+      play() { setTimeout(() => { try { this.onended && this.onended(); } catch (e) { /* nada */ } }, 1); return Promise.resolve(); }
+      pause() {}
+    },
+  };
+  const a = narrarSegmentos([{ idioma: 'es', texto: 'uno' }, { idioma: 'es', texto: 'dos' }], {});
+  narrarSegmentos([{ idioma: 'en', texto: 'three' }, { idioma: 'en', texto: 'four' }], {});
+  await new Promise((r) => setTimeout(r, 420));
+  const cuenta = (txt) => audiosCreados.filter((u) => u.includes(txt)).length;
+  chequear('la reproduccion anterior se corta (no suena "dos")', cuenta('dos') === 0, audiosCreados);
+  chequear('la nueva reproduccion no se duplica', cuenta('three') === 1 && cuenta('four') === 1, audiosCreados);
+  chequear('el controlador anterior queda inactivo', a.activo === false);
+
+  // Audio que falla: solo UN reintento por el servidor (antes se reintentaba dos veces = eco)
+  const audiosFalla = [];
+  const hablado = [];
+  global.window.Audio = class {
+    constructor(src) { this.src = src; audiosFalla.push(src); }
+    play() { setTimeout(() => { try { this.onerror && this.onerror(); } catch (e) { /* nada */ } }, 1); return Promise.reject(new Error('bloqueado')); }
+    pause() {}
+  };
+  global.window.speechSynthesis.speak = (u) => { hablado.push(u.text); setTimeout(() => { try { u.onend && u.onend(); } catch (e) { /* nada */ } }, 1); };
+  narrarSegmentos([{ idioma: 'en', texto: 'fallback' }], {});
+  await new Promise((r) => setTimeout(r, 400));
+  chequear('un solo reintento por el servidor (sin eco)', audiosFalla.filter((u) => u.startsWith('/api/voz')).length === 1, audiosFalla);
+  chequear('como ultimo respaldo usa la voz del equipo una vez', hablado.filter((t) => t === 'fallback').length === 1, hablado);
+  delete global.window;
+}
+
 console.log(`\nRESULTADO: ${ok} OK, ${fallos} fallos\n`);
 process.exit(fallos ? 1 : 0);

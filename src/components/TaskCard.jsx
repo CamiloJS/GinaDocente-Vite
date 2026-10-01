@@ -30,10 +30,12 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
     const [editTaskData, setEditTaskData] = useState({ title: task?.title || '', description: task?.description || '', dueDate: task?.dueDate || '', dueTime: task?.dueTime || '', allowLate: task?.allowLate || false, geniallyUrl: task?.geniallyUrl || '', hideDate: !!task?.hideDate });
     // Narracion de la publicacion: voz de mujer y deteccion del idioma de cada parte.
     const narracionRef = useRef(null);
+    const solicitudNarracionRef = useRef(0);
     const [narrando, setNarrando] = useState(false);
     const [preparandoNarracion, setPreparandoNarracion] = useState(false);
     const alternarNarracion = async () => {
         if (narrando || preparandoNarracion) {
+            solicitudNarracionRef.current += 1; // invalida cualquier preparacion pendiente
             try { narracionRef.current?.detener?.(); } catch (e) { /* nada */ }
             narracionRef.current = null;
             setNarrando(false);
@@ -42,16 +44,18 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
         }
         const texto = showTranslated && translatedDescription ? translatedDescription : task.description;
         if (!texto) return;
+        const ticket = ++solicitudNarracionRef.current;
         setPreparandoNarracion(true);
         try {
             const fragmentos = await prepararNarracion(texto, callGemini);
-            if (!fragmentos || !fragmentos.length) return;
+            // si mientras preparaba el usuario volvio a tocar, no arrancamos (evita voces encimadas)
+            if (ticket !== solicitudNarracionRef.current || !fragmentos || !fragmentos.length) return;
             setNarrando(true);
             narracionRef.current = narrarSegmentos(fragmentos, {
                 onFin: () => { setNarrando(false); narracionRef.current = null; },
             });
         } finally {
-            setPreparandoNarracion(false);
+            if (ticket === solicitudNarracionRef.current) setPreparandoNarracion(false);
         }
     };
     useEffect(() => () => { try { narracionRef.current?.detener?.(); } catch (e) { /* nada */ } }, []);

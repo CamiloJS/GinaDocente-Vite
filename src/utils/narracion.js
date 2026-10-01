@@ -288,6 +288,27 @@ const trocearParaNube = (texto, max = 170) => {
   return trozos;
 };
 
+/** Crea una frase de voz si el entorno lo permite (navegador). */
+const crearUtterance = (texto) => {
+  try {
+    if (typeof window !== 'undefined' && typeof window.SpeechSynthesisUtterance === 'function') return new window.SpeechSynthesisUtterance(texto);
+    if (typeof SpeechSynthesisUtterance === 'function') return new SpeechSynthesisUtterance(texto);
+  } catch (e) { /* sin voz */ }
+  return null;
+};
+
+/** Crea un reproductor de audio si el entorno lo permite (navegador). */
+const crearAudio = (url) => {
+  try {
+    if (typeof window !== 'undefined' && typeof window.Audio === 'function') return new window.Audio(url);
+    if (typeof Audio === 'function') return new Audio(url);
+  } catch (e) { /* sin audio */ }
+  return null;
+};
+
+/** Una sola reproduccion a la vez en toda la pagina (evita voces duplicadas o con eco). */
+let reproduccionActual = null;
+
 /**
  * Narra los fragmentos en orden, cambiando de idioma en cada uno.
  * Usa la mejor voz del equipo si es de calidad; si no (voces roboticas o sin voz del idioma),
@@ -299,6 +320,10 @@ export function narrarSegmentos(segmentos, opciones = {}) {
   if (typeof window === 'undefined' || !Array.isArray(segmentos) || !segmentos.length) {
     return terminarSinNada();
   }
+  // Si habia otra reproduccion en curso, se corta antes de empezar (evita eco/duplicado).
+  try { if (reproduccionActual) reproduccionActual.detener(); } catch (e) { /* nada */ }
+  reproduccionActual = null;
+  let controlador = null;
   const synth = 'speechSynthesis' in window ? window.speechSynthesis : null;
   let cancelado = false;
   let audioActual = null;
@@ -321,9 +346,13 @@ export function narrarSegmentos(segmentos, opciones = {}) {
 
   let i = 0;
   let ultimoSegmento = -1;
+  const fin = () => {
+    if (controlador && reproduccionActual === controlador) reproduccionActual = null;
+    if (typeof onFin === 'function') onFin();
+  };
   const siguiente = () => {
     if (cancelado) return;
-    if (i >= tareas.length) { if (typeof onFin === 'function') onFin(); return; }
+    if (i >= tareas.length) { fin(); return; }
     const tarea = tareas[i];
     i += 1;
     if (typeof onSegmento === 'function' && tarea.indiceSegmento !== ultimoSegmento) {
@@ -331,42 +360,52 @@ export function narrarSegmentos(segmentos, opciones = {}) {
       onSegmento(tarea.indiceSegmento, segmentos[tarea.indiceSegmento]);
     }
     if (tarea.tipo === 'voz') {
-      const u = new SpeechSynthesisUtterance(tarea.texto);
+      const u = crearUtterance(tarea.texto);
+      if (!u) { setTimeout(siguiente, 60); return; }
       u.lang = String(tarea.voz.lang || '').replace('_', '-') || 'es-ES';
       u.rate = /natural|neural|premium|enhanced|google/i.test(tarea.voz.name) ? 1 : 0.97;
       u.pitch = 1;
       try { u.voice = tarea.voz; } catch (e) { /* voz no aceptada: sigue con el idioma */ }
-      u.onend = () => { if (!cancelado) setTimeout(siguiente, 120); };
-      u.onerror = () => { if (!cancelado) setTimeout(siguiente, 120); };
-      try { synth.speak(u); } catch (e) { setTimeout(siguiente, 60); }
+      let avanzado = false;
+      const avanzar = () => { if (avanzado || cancelado) return; avanzado = true; setTimeout(siguiente, 120); };
+      u.onend = avanzar;
+      u.onerror = avanzar;
+      try { synth.speak(u); } catch (e) { avanzar(); }
       return;
     }
-    // voz neuronal en la nube (con un reintento por nuestro servidor)
-    const intentarAudio = (usarProxy) => {
-      const audio = new Audio(urlVozNube(tarea.texto, tarea.idioma, usarProxy));
+    // voz neuronal en la nube (con UN solo reintento por nuestro servidor)
+    const intentarAudio = (usarProxy, yaReintento) => {
+      if (cancelado) return;
+      const audio = crearAudio(urlVozNube(tarea.texto, tarea.idioma, usarProxy));
+      if (!audio) { setTimeout(siguiente, 60); return; }
       audioActual = audio;
-      audio.onended = () => { if (!cancelado) setTimeout(siguiente, 120); };
-      audio.onerror = () => {
-        if (cancelado) return;
-        if (!usarProxy) { intentarAudio(true); return; }
+      let avanzado = false;
+      const avanzar = () => { if (avanzado || cancelado) return; avanzado = true; setTimeout(siguiente, 120); };
+      const fallar = () => {
+        if (avanzado || cancelado) return;
+        avanzado = true;
+        if (!yaReintento) { intentarAudio(true, true); return; }
         // ultimo respaldo: la voz del equipo (aunque no sea ideal) para no quedarse en silencio
-        if (synth && typeof window.SpeechSynthesisUtterance === 'function') {
-          const u = new SpeechSynthesisUtterance(tarea.texto);
+        const u = synth ? crearUtterance(tarea.texto) : null;
+        if (u) {
           u.lang = tarea.idioma === 'en' ? 'en-US' : tarea.idioma === 'fr' ? 'fr-FR' : 'es-ES';
           u.pitch = 1;
-          u.onend = u.onerror = () => { if (!cancelado) setTimeout(siguiente, 120); };
+          let avanzadoVoz = false;
+          const finVoz = () => { if (avanzadoVoz || cancelado) return; avanzadoVoz = true; setTimeout(siguiente, 120); };
+          u.onend = finVoz;
+          u.onerror = finVoz;
           try { synth.speak(u); return; } catch (e) { /* nada */ }
         }
         setTimeout(siguiente, 80);
       };
+      audio.onended = avanzar;
+      audio.onerror = fallar;
       try {
         const p = audio.play();
-        if (p && typeof p.catch === 'function') p.catch(() => { if (!cancelado && !usarProxy) intentarAudio(true); });
-      } catch (e) {
-        if (!usarProxy) intentarAudio(true);
-      }
+        if (p && typeof p.catch === 'function') p.catch(() => fallar());
+      } catch (e) { fallar(); }
     };
-    intentarAudio(false);
+    intentarAudio(false, false);
   };
 
   if (voces.length > 0 || !synth) {
@@ -383,12 +422,15 @@ export function narrarSegmentos(segmentos, opciones = {}) {
     setTimeout(lanzar, 700);
   }
 
-  return {
+  controlador = {
     detener() {
       cancelado = true;
       try { if (synth) synth.cancel(); } catch (e) { /* nada */ }
       try { if (audioActual) { audioActual.pause(); audioActual.src = ''; } } catch (e) { /* nada */ }
+      if (reproduccionActual === controlador) reproduccionActual = null;
     },
     get activo() { return !cancelado; },
   };
+  reproduccionActual = controlador;
+  return controlador;
 }
