@@ -48,6 +48,7 @@ import RichVisualEditor from './components/RichVisualEditor.jsx'
 import DocumentPreviewModal from './components/DocumentPreviewModal.jsx'
 import CommandPaletteModal from './components/CommandPaletteModal.jsx'
 import FeedbackIAEvaluacion from './components/FeedbackIAEvaluacion.jsx';
+import SimulacroEvaluacion from './components/SimulacroEvaluacion.jsx';
 import { extractTextFromPDF } from './utils/pdfExtractor.js'
 import { calculateScore, normalizarRespuesta } from './utils/evalScoring.js'
 import { textoPlano } from './utils/textFormat.js';
@@ -398,6 +399,7 @@ function App() {
     questions: []
   });
   const [showAiEvalModal, setShowAiEvalModal] = useState(false);
+  const [showSimulacroEval, setShowSimulacroEval] = useState(false);
   const [activeTakingEval, setActiveTakingEval] = useState(null);
   const [studentAnswers, setStudentAnswers] = useState({});
   const [timeRemaining, setTimeRemaining] = useState(0);
@@ -7349,26 +7351,6 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                               </div>
                                               {Array.isArray(studentAnswers[qIndex]) && studentAnswers[qIndex].length > 0 && (
                                                   <button type="button" onClick={() => setStudentAnswers({ ...studentAnswers, [qIndex]: [] })} className="text-[11px] font-bold text-gray-500 hover:text-red-500 underline cursor-pointer">{'Borrar todo'}</button>
-                                              )}
-                                          </div>
-                                      ) : q.type === 'match' ? (
-                                          <div className="space-y-2 pl-4 sm:pl-7 border-l-2 border-blue-500/30">
-                                              <p className="text-[11px] font-bold text-gray-500">{'Escribe las parejas (izquierda y su respuesta correcta). Minimo 3:'}</p>
-                                              {(q.pairs || []).map((par, pIndex) => (
-                                                  <div key={pIndex} className="flex gap-2 items-center">
-                                                      <span className="text-[10px] font-bold text-gray-400 w-4 shrink-0">{pIndex + 1}</span>
-                                                      <input value={par.left} onChange={(e) => { const newQ = [...evalFormData.questions]; const pares = [...(newQ[qIndex].pairs || [])]; pares[pIndex] = { ...pares[pIndex], left: e.target.value }; newQ[qIndex] = { ...newQ[qIndex], pairs: pares }; setEvalFormData({ ...evalFormData, questions: newQ }); }} placeholder="Ej: dog" className={`${glassInput} !py-1.5 flex-1 text-xs`} />
-                                                      <span className="text-gray-400 text-xs">{'\u2192'}</span>
-                                                      <input value={par.right} onChange={(e) => { const newQ = [...evalFormData.questions]; const pares = [...(newQ[qIndex].pairs || [])]; pares[pIndex] = { ...pares[pIndex], right: e.target.value }; newQ[qIndex] = { ...newQ[qIndex], pairs: pares }; setEvalFormData({ ...evalFormData, questions: newQ }); }} placeholder="Ej: perro" className={`${glassInput} !py-1.5 flex-1 text-xs border-green-500/40 bg-green-500/10`} />
-                                                      {(q.pairs || []).length > 3 && (
-                                                          <button type="button" onClick={() => { const newQ = [...evalFormData.questions]; const pares = [...(newQ[qIndex].pairs || [])]; pares.splice(pIndex, 1); newQ[qIndex] = { ...newQ[qIndex], pairs: pares }; setEvalFormData({ ...evalFormData, questions: newQ }); }} className="text-gray-400 hover:text-red-500 p-1 cursor-pointer" title="Eliminar pareja"><X size={14} /></button>
-                                                      )}
-                                                  </div>
-                                              ))}
-                                              {(q.pairs || []).length < 6 && (
-                                                  <button type="button" onClick={() => { const newQ = [...evalFormData.questions]; newQ[qIndex] = { ...newQ[qIndex], pairs: [...(newQ[qIndex].pairs || []), { left: '', right: '' }] }; setEvalFormData({ ...evalFormData, questions: newQ }); }} className="text-[11px] font-bold text-blue-600 hover:underline pt-1 flex items-center gap-1 cursor-pointer">
-                                                      <Plus size={12} /> Agregar pareja
-                                                  </button>
                                               )}
                                           </div>
                                       ) : q.type === 'match' ? (

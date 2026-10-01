@@ -263,3 +263,19 @@ El usuario decidió que Antigravity trabaje 100% solo, sin depender de opencode.
 - Pruebas: scripts/test-formato.mjs (+10) y verificacion visual en navegador
   (scripts/smoke/posts.html): 8/8 enlaces con el color correcto (rgb(239,68,68) y rgb(16,185,129)),
   0 etiquetas crudas, "Ver más" expande y encoje. 202 pruebas en total.
+
+## Simulacro de evaluación antes de publicar (01-oct-2026)
+
+- Nuevo boton "Ver simulacro" en el formulario de evaluacion (junto a "Guardar evaluación"):
+  muestra la evaluacion EXACTAMENTE como la vera el estudiante, sin publicar ni guardar nada.
+- Componente nuevo src/components/SimulacroEvaluacion.jsx (portal a pantalla completa, estilo fiel al examen):
+  banner de simulacro, encabezado con cronometro (30:00), aviso anti-trampas, y los 8 tipos de pregunta
+  interactivos: multiple, verdadero/falso, listening (audio), escrita, ordenar, relacionar (selects),
+  dictado (audio) y speaking (boton de grabar deshabilitado). El boton "Enviar evaluación" sale desactivado.
+- Interruptor "Mostrar respuestas correctas" (solo en el simulacro): marca en verde las opciones correctas,
+  el orden correcto, las parejas correctas y la respuesta esperada, y muestra el puntaje total.
+- BUG ARREGLADO en el examen real: el bloque de preguntas "Relacionar" mostraba el editor de parejas
+  (con "Agregar pareja") dentro del examen del estudiante, dejando inalcanzable el selector de respuestas.
+  Ahora el estudiante ve el selector correcto (esto lo habria detectado el simulacro).
+- Verificado en navegador: 8/8 tipos se dibujan, 7/8 respondidas al interactuar, 0 errores de consola,
+  toggle de correctas con 3 aciertos marcados y puntaje total 8.
