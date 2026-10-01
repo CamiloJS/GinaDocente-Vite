@@ -8696,12 +8696,28 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                   )}
                               </div>
 
-                              <div className="flex justify-end pt-3">
+                              <div className="flex flex-wrap justify-end gap-2 pt-3">
+                                  <button
+                                      type="button"
+                                      onClick={() => setShowSimulacroEval(true)}
+                                      disabled={evalFormData.questions.length === 0}
+                                      title="Mira como quedara la evaluacion para el estudiante (no se publica nada)"
+                                      className={`py-2.5 px-5 rounded-xl font-bold text-xs flex items-center gap-2 border transition-all disabled:opacity-50 cursor-pointer ${isDarkMode ? 'border-gray-700 text-gray-300 hover:bg-gray-800' : 'border-gray-300 text-gray-700 hover:bg-gray-100'}`}
+                                  >
+                                      <Eye size={16}/> Ver simulacro
+                                  </button>
                                   <button type="submit" className="py-2.5 px-6 rounded-xl bg-[#AD3333] hover:bg-[#8a2828] text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-md transition-transform active:scale-95 cursor-pointer">
                                       <CheckCircle2 size={16}/> Guardar evaluación
                                   </button>
                               </div>
                           </form>
+                          {showSimulacroEval && (
+                              <SimulacroEvaluacion
+                                  evaluacion={evalFormData}
+                                  isDarkMode={isDarkMode}
+                                  onClose={() => setShowSimulacroEval(false)}
+                              />
+                          )}
                       </div>
                   );
               }
