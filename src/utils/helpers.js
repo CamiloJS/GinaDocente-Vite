@@ -4,6 +4,7 @@
 import { ref, uploadString, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { storage, appId } from '../firebase/config.js'
 import { autoOptimizeFile, compressImageSilently } from './fileCompressor.js'
+import { segmentosLocales, narrarSegmentos } from './narracion.js';
 
 // --- Constantes globales ---
 export const BAD_WORDS = [
@@ -443,49 +444,9 @@ export const selectBestFemaleVoice = (voices, lang = 'es-MX') => {
 export const speakText = (text) => {
   if (!('speechSynthesis' in window) || !text) return;
   try {
-    window.speechSynthesis.cancel();
-    
-    // Limpieza profunda del texto antes de la síntesis de voz
-    const cleanText = cleanTextForTTS(text);
-    if (!cleanText) return;
-
-    const lang = detectLanguage(cleanText);
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.lang = lang;
-    utterance.rate = 0.92;
-    utterance.pitch = 1.05; // Tono femenino natural
-
-    const doSpeak = (availableVoices) => {
-      if (availableVoices && availableVoices.length > 0) {
-        const bestFemaleVoice = selectBestFemaleVoice(availableVoices, lang);
-        if (bestFemaleVoice) {
-          utterance.voice = bestFemaleVoice;
-        }
-      }
-      window.speechSynthesis.speak(utterance);
-    };
-
-    const currentVoices = window.speechSynthesis.getVoices();
-    if (currentVoices && currentVoices.length > 0) {
-      doSpeak(currentVoices);
-    } else {
-      let spoken = false;
-      window.speechSynthesis.onvoiceschanged = () => {
-        if (spoken) return;
-        spoken = true;
-        try { window.speechSynthesis.onvoiceschanged = null; } catch(e) {}
-        const loadedVoices = window.speechSynthesis.getVoices();
-        doSpeak(loadedVoices);
-      };
-      setTimeout(() => {
-        if (!spoken && !window.speechSynthesis.speaking) {
-          spoken = true;
-          try { window.speechSynthesis.onvoiceschanged = null; } catch(e) {}
-          const fallbackVoices = window.speechSynthesis.getVoices();
-          doSpeak(fallbackVoices);
-        }
-      }, 250);
-    }
+    const fragmentos = segmentosLocales(text);
+    if (!fragmentos.length) return;
+    narrarSegmentos(fragmentos);
   } catch (e) {
     console.error('TTS error:', e);
   }

@@ -279,3 +279,21 @@ El usuario decidió que Antigravity trabaje 100% solo, sin depender de opencode.
   Ahora el estudiante ve el selector correcto (esto lo habria detectado el simulacro).
 - Verificado en navegador: 8/8 tipos se dibujan, 7/8 respondidas al interactuar, 0 errores de consola,
   toggle de correctas con 3 aciertos marcados y puntaje total 8.
+
+## Narración de publicaciones mejorada (01-oct-2026)
+
+- Nuevo modulo src/utils/narracion.js: limpieza profunda (no lee enlaces, ni numeros de lista "1.",
+  ni vinetas, ni etiquetas [color=...], ni **markdown**, ni emojis, ni decimales "1.5").
+- Detecta el idioma de cada parte y narra por fragmentos con la voz correcta de cada uno
+  (espanol, ingles, frances...). La IA prepara la separacion (prompt oculto, con cache); si falla,
+  un detector local hace el mismo trabajo: la narracion nunca se queda sin funcionar.
+- Voz SIEMPRE de mujer y de la mejor calidad disponible: puntua voces Natural/Neural/Premium/Online/Google,
+  suma nombres femeninos por idioma y descarta masculinas y roboticas (eSpeak). Verificado:
+  eligio "Microsoft Dalia Online (Natural)" para espanol y "Microsoft Aria Online (Natural)" para ingles.
+- El boton queda visualmente igual (mismo icono y estilo; solo cambia al icono de detener mientras narra).
+  Nada de la IA es visible para los usuarios.
+- Bug detectado por la prueba en navegador: si el navegador rechaza una voz, la narracion se rompia;
+  ahora la asignacion de voz esta protegida y sigue con el idioma correcto.
+- Pruebas: scripts/test-narracion.mjs (42 casos) + verificacion en navegador
+  (scripts/smoke/narracion.html) con speechSynthesis simulado: cadena es-MX -> en-US, detener() corta,
+  0 errores de consola. 284 pruebas en total.

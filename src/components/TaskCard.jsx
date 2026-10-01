@@ -1,11 +1,11 @@
 // src/components/TaskCard.jsx
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import ReactDOM from 'react-dom'
 import {
-  CheckCheck, CheckCircle2, CheckLine, Clock, Edit3, EyeOff, FileDocIcon, FileText, ImageIcon, Loader2, Lock, MessageSquareText, Mic, PaperclipIcon, Plus, ReplyIcon, Send, SmileIcon, Square, Star, Pin, Trash2, Upload, X, XLine, Volume2, Languages, UserIcon, BookOpen, NavNotebook, Play, Pause, Download, MessageCircle, BarChart2, Vote
+  CheckCheck, CheckCircle2, CheckLine, Clock, Edit3, EyeOff, FileDocIcon, FileText, ImageIcon, Loader2, Lock, MessageSquareText, Mic, PaperclipIcon, Plus, ReplyIcon, Send, SmileIcon, Square, Star, Pin, Trash2, Upload, X, XLine, Volume2, VolumeX, Languages, UserIcon, BookOpen, NavNotebook, Play, Pause, Download, MessageCircle, BarChart2, Vote
 } from './Icons.jsx'
 import {
-  compressImage, containsBadWords, checkBadWordsAsync, uploadImageToStorage, uploadRawFileToStorage, TEACHER_NAME, COMMENT_EMOJIS, REACTION_EMOJIS, speakText, splitNameFirstAndLast, FALLBACK_MAP, format12HourTime, formatDateTime12H
+  compressImage, containsBadWords, checkBadWordsAsync, uploadImageToStorage, uploadRawFileToStorage, TEACHER_NAME, COMMENT_EMOJIS, REACTION_EMOJIS, splitNameFirstAndLast, FALLBACK_MAP, format12HourTime, formatDateTime12H
 } from '../utils/helpers.js'
 import { glassCard, glassInput } from '../utils/styles.js'
 import { useClickOutside } from '../utils/hooks.js'
@@ -13,6 +13,7 @@ import ImageCarousel from './ImageCarousel.jsx'
 import LinkifyText from './LinkifyText.jsx'
 import RichTextToolbar from './RichTextToolbar.jsx'
 import RichVisualEditor from './RichVisualEditor.jsx'
+import { prepararNarracion, narrarSegmentos } from '../utils/narracion.js'
 import DocumentPreviewModal from './DocumentPreviewModal.jsx'
 import CustomVideoPlayer, { isDirectVideoUrl } from './CustomVideoPlayer.jsx'
 import GeniallyEmbedPlayer, { extractGeniallyUrl } from './GeniallyEmbedPlayer.jsx'
@@ -27,6 +28,34 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
     const [isEditingTask, setIsEditingTask] = useState(false);
     const [previewDoc, setPreviewDoc] = useState(null);
     const [editTaskData, setEditTaskData] = useState({ title: task?.title || '', description: task?.description || '', dueDate: task?.dueDate || '', dueTime: task?.dueTime || '', allowLate: task?.allowLate || false, geniallyUrl: task?.geniallyUrl || '', hideDate: !!task?.hideDate });
+    // Narracion de la publicacion: voz de mujer y deteccion del idioma de cada parte.
+    const narracionRef = useRef(null);
+    const [narrando, setNarrando] = useState(false);
+    const [preparandoNarracion, setPreparandoNarracion] = useState(false);
+    const alternarNarracion = async () => {
+        if (narrando || preparandoNarracion) {
+            try { narracionRef.current?.detener?.(); } catch (e) { /* nada */ }
+            narracionRef.current = null;
+            setNarrando(false);
+            setPreparandoNarracion(false);
+            return;
+        }
+        const texto = showTranslated && translatedDescription ? translatedDescription : task.description;
+        if (!texto) return;
+        setPreparandoNarracion(true);
+        try {
+            const fragmentos = await prepararNarracion(texto, callGemini);
+            if (!fragmentos || !fragmentos.length) return;
+            setNarrando(true);
+            narracionRef.current = narrarSegmentos(fragmentos, {
+                onFin: () => { setNarrando(false); narracionRef.current = null; },
+            });
+        } finally {
+            setPreparandoNarracion(false);
+        }
+    };
+    useEffect(() => () => { try { narracionRef.current?.detener?.(); } catch (e) { /* nada */ } }, []);
+
 
     const currentUserId = role === 'teacher' 
         ? 'teacher_gina' 
@@ -1211,11 +1240,12 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                             </button>
                             <button 
                                 type="button"
-                                onClick={() => speakText(showTranslated && translatedDescription ? translatedDescription : task.description)} 
+                                onClick={alternarNarracion}
+                                disabled={preparandoNarracion} 
                                 className="p-1.5 rounded-lg text-gray-400 hover:text-blue-500 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" 
                                 title="Escuchar pronunciación"
                             >
-                                <Volume2 size={14} />
+                                {narrando ? <VolumeX size={14} /> : <Volume2 size={14} />}
                             </button>
                         </div>
                     )}
