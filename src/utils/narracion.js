@@ -48,46 +48,85 @@ const PALABRAS = {
   fr: ['le', 'la', 'les', 'des', 'une', 'un', 'est', 'vous', 'nous', 'pour', 'avec', 'bonjour', 'merci', 'classe', 'devoirs', 'et', 'sont', 'dans', 'sur', 'votre', 'pas', 'que', 'qui', 'ce', 'cette', 'aux', 'du', 'au', 'par', 'tres', 'très', 'tout', 'tous', 'chaque', 'aussi', 'lire', 'ecrire', 'écrire'],
 };
 
-/** Idioma probable de un texto: 'es', 'en' o 'fr' (local, sin internet). */
-export function detectarIdioma(texto) {
+/** Idioma probable de un texto con su puntaje. idioma = null cuando no hay marcas claras. */
+export function analizarIdioma(texto) {
   const t = String(texto || '').toLowerCase();
-  if (!t.trim()) return 'es';
   const palabras = t.replace(/[^\p{L}\s]/gu, ' ').split(/\s+/).filter(Boolean);
   const puntos = { es: 0, en: 0, fr: 0 };
   for (const p of palabras) {
     for (const id of ['es', 'en', 'fr']) if (PALABRAS[id].includes(p)) puntos[id] += 1;
   }
   if (/[¿¡ñ]/.test(t)) puntos.es += 3;
+  if (/[áíóú]/i.test(t)) puntos.es += 1;
   if (/[çœ]/.test(t)) puntos.fr += 3;
-  if (/\b(?:the|and|you|your|with|that)\b/.test(t)) puntos.en += 2;
-  if (/\b(?:les|des|vous|nous|pour|avec)\b/.test(t)) puntos.fr += 2;
-  let mejor = 'es';
-  let max = -1;
-  for (const id of ['es', 'en', 'fr']) {
-    if (puntos[id] > max) { max = puntos[id]; mejor = id; }
-  }
-  return mejor;
+  if (/[èêëàùûôîï]/i.test(t)) puntos.fr += 1;
+  if (/\b(?:the|and|you|your|with|that|this|will|please)\b/.test(t)) puntos.en += 2;
+  if (/\b(?:les|des|vous|nous|pour|avec|merci|bonjour)\b/.test(t)) puntos.fr += 2;
+  const max = Math.max(puntos.es, puntos.en, puntos.fr);
+  if (max === 0) return { idioma: null, puntaje: 0 };
+  if (puntos.en === max) return { idioma: 'en', puntaje: max };
+  if (puntos.fr === max) return { idioma: 'fr', puntaje: max };
+  return { idioma: 'es', puntaje: max };
 }
 
-/** Separa por frases y agrupa las que comparten idioma (sin internet). */
+/** Idioma probable de un texto: 'es', 'en' o 'fr' (local, sin internet). */
+export function detectarIdioma(texto) {
+  return analizarIdioma(texto).idioma || 'es';
+}
+
+/** Parte el texto en frases y clausulas (para detectar cambios de idioma finos). */
+const partirEnPiezas = (texto) => {
+  const piezas = [];
+  for (const bloque of String(texto || '').split(/\n+/)) {
+    const oraciones = bloque.match(/[^.!?…]+[.!?…]*/g) || [];
+    for (const oracion of oraciones) {
+      const sub = oracion.match(/[^;:,]+[;:,]*/g) || [oracion];
+      for (const s of sub) {
+        const t = s.trim();
+        if (t) piezas.push(t);
+      }
+    }
+  }
+  return piezas;
+};
+
+/**
+ * Divide un texto en fragmentos por idioma, frase por frase.
+ * Las frases sin marcas claras heredan el idioma anterior (o el base).
+ */
+export function partirPorIdioma(texto, idiomaBase = 'es') {
+  const salida = [];
+  for (const pieza of partirEnPiezas(texto)) {
+    const { idioma } = analizarIdioma(pieza);
+    const previo = salida[salida.length - 1];
+    const efectivo = idioma || (previo ? previo.idioma : normalizarIdioma(idiomaBase));
+    if (previo && previo.idioma === efectivo) previo.texto += ' ' + pieza;
+    else salida.push({ idioma: efectivo, texto: pieza });
+  }
+  return salida;
+}
+
+/** Fragmentos por idioma de un texto de publicacion (limpiando antes lo que no se lee). */
 export function segmentosLocales(texto) {
   const limpio = limpiarParaNarrar(texto);
-  const frases = (limpio.match(/[^.!?\n]+[.!?]*/g) || []).map((s) => s.trim()).filter(Boolean);
-  const segmentos = [];
-  for (const frase of frases) {
-    const idioma = detectarIdioma(frase);
-    const ultimo = segmentos[segmentos.length - 1];
-    if (ultimo && ultimo.idioma === idioma) ultimo.texto += ' ' + frase;
-    else segmentos.push({ idioma, texto: frase });
+  if (!limpio) return [];
+  return partirPorIdioma(limpio, detectarIdioma(limpio));
+}
+
+/**
+ * Repasa los fragmentos (vengan de la IA o no) y vuelve a partirlos frase por frase,
+ * para que NADA quede leido en el idioma equivocado.
+ */
+export function refinarSegmentos(segmentos) {
+  const salida = [];
+  for (const seg of segmentos) {
+    for (const parte of partirPorIdioma(seg.texto, normalizarIdioma(seg.idioma))) {
+      const previo = salida[salida.length - 1];
+      if (previo && previo.idioma === parte.idioma) previo.texto += ' ' + parte.texto;
+      else salida.push({ ...parte });
+    }
   }
-  // frases muy cortas se pegan a la anterior (evita cambiar de voz por 2 palabras)
-  const fusionados = [];
-  for (const s of segmentos) {
-    const previo = fusionados[fusionados.length - 1];
-    if (previo && (s.texto.length < 12 || s.texto.split(/\s+/).length < 3)) previo.texto += ' ' + s.texto;
-    else fusionados.push({ ...s });
-  }
-  return fusionados;
+  return salida;
 }
 
 /** Prompt para que la IA limpie y separe el texto por idioma (nunca se le muestra a nadie). */
@@ -98,7 +137,7 @@ export function construirPromptNarracion(texto) {
     '[{"idioma":"es","texto":"..."},{"idioma":"en","texto":"..."}]',
     'Reglas:',
     '- Cada fragmento va en su IDIOMA ORIGINAL (no traduzcas): usa el codigo de dos letras (es, en, fr, pt...).',
-    '- Si el texto mezcla idiomas, separa un fragmento por idioma conservando el orden original.',
+    '- Si el texto mezcla idiomas, separa un fragmento por idioma conservando el orden original (aunque sean frases cortas dentro de un texto en otro idioma).',
     '- NO leas enlaces ni URLs, ni numeros de lista (1., 2., -), ni vinetas, ni simbolos raros, ni emojis, ni etiquetas tipo [color=...] o **.',
     '- Redacta frases naturales y bien puntuadas, listas para narrar en voz alta.',
     '- No agregues, resumas, traduzcas ni expliques nada: es el mismo texto, solo limpio y separado por idioma.',
@@ -179,6 +218,7 @@ export async function prepararNarracion(texto, llamarIA) {
     }
   }
   if (!segmentos || !segmentos.length) segmentos = segmentosLocales(limpio);
+  else segmentos = refinarSegmentos(segmentos);
   if (segmentos.length) cacheNarracion.set(clave, segmentos);
   return segmentos;
 }
@@ -211,75 +251,133 @@ export function elegirMejorVoz(idioma, voces) {
   const puntuar = (v) => {
     const n = String(v.name || '').toLowerCase();
     let s = calidadDeVoz(v);
+    if (/google/.test(n)) s += 65; // las voces de Google son buenas y femeninas
     if (FEMENINAS[base]?.some((f) => n.includes(f))) s += 35;
-    if (MASCULINAS.some((m) => n.includes(m))) s -= 70;
+    if (/female|mujer|femme/i.test(n)) s += 30;
+    if (MASCULINAS.some((m) => n.includes(m))) s -= 80;
     if (v.localService === false) s += 10; // voces en la nube suelen sonar mejor
+    if (/microsoft/.test(n) && !/natural|neural|online|premium|enhanced/.test(n)) s -= 20; // voces SAPI viejas (roboticas)
     if (v.default) s += 2;
     return s;
   };
   return candidatas.slice().sort((a, b) => puntuar(b) - puntuar(a))[0];
 }
 
+/** True si la voz es de alta calidad (neural/natural/Google). Si no, conviene la nube. */
+export const esVozBuena = (voz) => !!voz && /natural|neural|premium|enhanced|google/i.test(String(voz.name || ''));
+
+/** URL de voz neuronal en la nube. `usarProxy` pasa por nuestro propio servidor (respaldo). */
+export const urlVozNube = (texto, idioma, usarProxy = false) => {
+  const base = normalizarIdioma(idioma);
+  const tl = ['es', 'en', 'fr', 'pt', 'it', 'de'].includes(base) ? base : 'es';
+  const limpio = String(texto || '').slice(0, 300);
+  if (usarProxy) return '/api/voz?tl=' + tl + '&q=' + encodeURIComponent(limpio);
+  return 'https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&ttsspeed=1&tl=' + tl + '&q=' + encodeURIComponent(limpio);
+};
+
+/** Trocea un texto en pedazos cortos (la voz en la nube acepta ~180 caracteres por pedido). */
+const trocearParaNube = (texto, max = 170) => {
+  const palabras = String(texto || '').split(/\s+/).filter(Boolean);
+  const trozos = [];
+  let actual = '';
+  for (const p of palabras) {
+    if (actual && (actual + ' ' + p).length > max) { trozos.push(actual); actual = p; }
+    else actual = actual ? actual + ' ' + p : p;
+  }
+  if (actual) trozos.push(actual);
+  return trozos;
+};
+
 /**
- * Narra los fragmentos en orden, cambiando de voz segun el idioma.
- * Devuelve un controlador con detener().
+ * Narra los fragmentos en orden, cambiando de idioma en cada uno.
+ * Usa la mejor voz del equipo si es de calidad; si no (voces roboticas o sin voz del idioma),
+ * usa voz neuronal en la nube. Devuelve un controlador con detener().
  */
 export function narrarSegmentos(segmentos, opciones = {}) {
   const { onFin, onSegmento } = opciones || {};
   const terminarSinNada = () => { if (typeof onFin === 'function') onFin(); return { detener() {}, activo: false }; };
-  if (typeof window === 'undefined' || !('speechSynthesis' in window) || !Array.isArray(segmentos) || !segmentos.length) {
+  if (typeof window === 'undefined' || !Array.isArray(segmentos) || !segmentos.length) {
     return terminarSinNada();
   }
-  const synth = window.speechSynthesis;
+  const synth = 'speechSynthesis' in window ? window.speechSynthesis : null;
   let cancelado = false;
+  let audioActual = null;
   let voces = [];
-  try { voces = synth.getVoices() || []; } catch (e) { voces = []; }
+  try { voces = synth ? synth.getVoices() || [] : []; } catch (e) { voces = []; }
 
-  const crearUtters = () => segmentos.map((seg) => {
-    const u = new SpeechSynthesisUtterance(seg.texto);
+  // Cola de tareas: cada una se lee con voz del equipo (si es buena y del idioma) o con la nube.
+  const tareas = [];
+  segmentos.forEach((seg, indiceSegmento) => {
     const voz = elegirMejorVoz(seg.idioma, voces);
-    u.lang = seg.idioma === 'en' ? 'en-US' : seg.idioma === 'fr' ? 'fr-FR' : seg.idioma === 'pt' ? 'pt-BR' : 'es-ES';
-    if (voz) {
-      const langVoz = String(voz.lang || '').replace('_', '-');
-      if (langVoz) u.lang = langVoz;
-      try { u.voice = voz; } catch (e) { /* el navegador no acepto la voz: seguimos con el idioma */ }
+    const idiomaVoz = voz ? String(voz.lang || '').toLowerCase().replace('_', '-').slice(0, 2) : '';
+    const sirveLaVoz = !!synth && !!voz && esVozBuena(voz) && idiomaVoz === normalizarIdioma(seg.idioma);
+    if (sirveLaVoz) {
+      tareas.push({ tipo: 'voz', texto: seg.texto, voz, idioma: seg.idioma, indiceSegmento });
+    } else {
+      const trozos = trocearParaNube(seg.texto);
+      trozos.forEach((t, k) => tareas.push({ tipo: 'nube', texto: t, idioma: seg.idioma, indiceSegmento, primera: k === 0 }));
     }
-    u.rate = 0.97;
-    u.pitch = 1.03;
-    return u;
   });
 
-  let utters = [];
   let i = 0;
+  let ultimoSegmento = -1;
   const siguiente = () => {
     if (cancelado) return;
-    if (i >= utters.length) { if (typeof onFin === 'function') onFin(); return; }
-    const u = utters[i];
-    const posicion = i;
+    if (i >= tareas.length) { if (typeof onFin === 'function') onFin(); return; }
+    const tarea = tareas[i];
     i += 1;
-    u.onend = () => { if (!cancelado) siguiente(); };
-    u.onerror = () => { if (!cancelado) siguiente(); };
-    if (typeof onSegmento === 'function') onSegmento(posicion, segmentos[posicion]);
-    try { synth.speak(u); } catch (e) { siguiente(); }
+    if (typeof onSegmento === 'function' && tarea.indiceSegmento !== ultimoSegmento) {
+      ultimoSegmento = tarea.indiceSegmento;
+      onSegmento(tarea.indiceSegmento, segmentos[tarea.indiceSegmento]);
+    }
+    if (tarea.tipo === 'voz') {
+      const u = new SpeechSynthesisUtterance(tarea.texto);
+      u.lang = String(tarea.voz.lang || '').replace('_', '-') || 'es-ES';
+      u.rate = /natural|neural|premium|enhanced|google/i.test(tarea.voz.name) ? 1 : 0.97;
+      u.pitch = 1;
+      try { u.voice = tarea.voz; } catch (e) { /* voz no aceptada: sigue con el idioma */ }
+      u.onend = () => { if (!cancelado) setTimeout(siguiente, 120); };
+      u.onerror = () => { if (!cancelado) setTimeout(siguiente, 120); };
+      try { synth.speak(u); } catch (e) { setTimeout(siguiente, 60); }
+      return;
+    }
+    // voz neuronal en la nube (con un reintento por nuestro servidor)
+    const intentarAudio = (usarProxy) => {
+      const audio = new Audio(urlVozNube(tarea.texto, tarea.idioma, usarProxy));
+      audioActual = audio;
+      audio.onended = () => { if (!cancelado) setTimeout(siguiente, 120); };
+      audio.onerror = () => {
+        if (cancelado) return;
+        if (!usarProxy) { intentarAudio(true); return; }
+        // ultimo respaldo: la voz del equipo (aunque no sea ideal) para no quedarse en silencio
+        if (synth && typeof window.SpeechSynthesisUtterance === 'function') {
+          const u = new SpeechSynthesisUtterance(tarea.texto);
+          u.lang = tarea.idioma === 'en' ? 'en-US' : tarea.idioma === 'fr' ? 'fr-FR' : 'es-ES';
+          u.pitch = 1;
+          u.onend = u.onerror = () => { if (!cancelado) setTimeout(siguiente, 120); };
+          try { synth.speak(u); return; } catch (e) { /* nada */ }
+        }
+        setTimeout(siguiente, 80);
+      };
+      try {
+        const p = audio.play();
+        if (p && typeof p.catch === 'function') p.catch(() => { if (!cancelado && !usarProxy) intentarAudio(true); });
+      } catch (e) {
+        if (!usarProxy) intentarAudio(true);
+      }
+    };
+    intentarAudio(false);
   };
 
-  const arrancar = () => {
-    if (cancelado) return;
-    utters = crearUtters();
-    i = 0;
-    try { synth.cancel(); } catch (e) { /* nada */ }
-    setTimeout(() => { if (!cancelado) siguiente(); }, 120);
-  };
-
-  if (voces.length > 0) {
-    arrancar();
+  if (voces.length > 0 || !synth) {
+    setTimeout(siguiente, 60);
   } else {
     let lanzado = false;
     const lanzar = () => {
       if (lanzado || cancelado) return;
       lanzado = true;
       try { voces = synth.getVoices() || []; } catch (e) { voces = []; }
-      arrancar();
+      setTimeout(siguiente, 60);
     };
     try { if (synth.addEventListener) synth.addEventListener('voiceschanged', lanzar, { once: true }); } catch (e) { /* nada */ }
     setTimeout(lanzar, 700);
@@ -288,7 +386,8 @@ export function narrarSegmentos(segmentos, opciones = {}) {
   return {
     detener() {
       cancelado = true;
-      try { synth.cancel(); } catch (e) { /* nada */ }
+      try { if (synth) synth.cancel(); } catch (e) { /* nada */ }
+      try { if (audioActual) { audioActual.pause(); audioActual.src = ''; } } catch (e) { /* nada */ }
     },
     get activo() { return !cancelado; },
   };

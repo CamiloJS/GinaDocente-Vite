@@ -1,5 +1,5 @@
 // Pruebas de la narracion de publicaciones (limpieza, idiomas, voz femenina y orquestacion).
-import { limpiarParaNarrar, detectarIdioma, segmentosLocales, construirPromptNarracion, normalizarIdioma, parsearNarracion, prepararNarracion, elegirMejorVoz, narrarSegmentos } from "../src/utils/narracion.js";
+import { limpiarParaNarrar, detectarIdioma, analizarIdioma, partirPorIdioma, segmentosLocales, refinarSegmentos, construirPromptNarracion, normalizarIdioma, parsearNarracion, prepararNarracion, elegirMejorVoz, esVozBuena, urlVozNube, narrarSegmentos } from "../src/utils/narracion.js";
 
 let ok = 0, fallos = 0;
 const chequear = (nombre, cond, extra = "") => {
@@ -36,6 +36,17 @@ chequear("detecta los 3 idiomas en orden", idiomas === "es,en,fr", { idiomas, se
 chequear("cada fragmento mantiene su texto", segmentos[0].texto.includes("Hola a todos") && segmentos[1].texto.includes("Today we will practice"));
 chequear("no queda texto sin narrar", segmentos.map((s) => s.texto).join(" ").includes("merci de votre attention"));
 
+console.log("\n== Frases en otro idioma dentro de una publicacion (caso real) ==");
+const casiTodoEs = "Buenas tardes estimados estudiantes. Recuerden que mañana hay clase a las 6:10 am. Today we will practice the past simple. Tambien revisen el deber de consulta. Thank you very much for your attention.";
+const segCasos = segmentosLocales(casiTodoEs);
+const idCasos = segCasos.map((s) => s.idioma).join(",");
+chequear("lo que esta en ingles se marca en ingles aunque sea poco", idCasos === "es,en,es,en", { idCasos, segCasos });
+chequear("las frases inglesas quedan completas", segCasos.filter((s) => s.idioma === "en").map((s) => s.texto).join(" ").includes("Today we will practice"), segCasos);
+const conComodin = partirPorIdioma("Recuerden: read the text. Gracias por su atencion.");
+chequear("una frase corta en ingles tambien se separa", conComodin.map((s) => s.idioma).join(",") === "es,en,es", conComodin);
+chequear("sin marcas claras no inventa idioma", analizarIdioma("212 212 212").idioma === null);
+chequear("refinar respeta el idioma base", refinarSegmentos([{ idioma: "en", texto: "Hello students" }])[0].idioma === "en");
+
 console.log("\n== Prompt (oculto, para preparar la narracion) ==");
 const prompt = construirPromptNarracion("Hola https://x.com clase");
 chequear("pide idioma original", prompt.includes("IDIOMA ORIGINAL"));
@@ -60,6 +71,9 @@ let llamadas = 0;
 const iaBuena = async () => { llamadas++; return JSON.stringify([{ idioma: "es", texto: "Hola clase" }, { idioma: "en", texto: "Today we practice" }]); };
 let seg = await prepararNarracion("Hola clase. Today we practice.", iaBuena);
 chequear("usa la IA cuando responde bien", seg.length === 2 && seg[1].idioma === "en" && llamadas === 1, seg);
+const iaUnBloque = async () => JSON.stringify([{ idioma: "es", texto: "Buenas tardes. Today we will practice the past simple. Gracias por su atencion." }]);
+const segMix = await prepararNarracion("Buenas tardes. Today we will practice the past simple. Gracias por su atencion.", iaUnBloque);
+chequear("si la IA manda todo junto en espanol, igual separa el ingles", segMix.map((s) => s.idioma).join(",") === "es,en,es", segMix);
 let seg2 = await prepararNarracion("Hola clase. Today we practice.", iaBuena);
 chequear("usa cache (no repite la llamada)", llamadas === 1 && seg2.length === 2);
 const iaMala = async () => { throw new Error("sin internet"); };
@@ -89,6 +103,11 @@ chequear("prefiere femenina aunque la natural sea masculina", elegirMejorVoz("es
 chequear("evita voces roboticas (eSpeak)", !elegirMejorVoz("es", voces).name.toLowerCase().includes("espeak"));
 chequear("sin voces -> null", elegirMejorVoz("es", []) === null);
 chequear("idioma raro usa las que hay", elegirMejorVoz("xx", voces) !== null);
+chequear("reconoce voces de calidad (se usan las del equipo)", esVozBuena({ name: "Microsoft Dalia Online (Natural) - Spanish (Mexico)" }) === true && esVozBuena({ name: "Google español de Estados Unidos" }) === true);
+chequear("las voces roboticas del equipo NO se usan (van a la nube)", esVozBuena({ name: "Microsoft Sabina - Spanish (Mexico)" }) === false && esVozBuena(elegirMejorVoz("es", [{ name: "Microsoft Raul - Spanish (Mexico)", lang: "es-MX" }])) === false);
+const urlEn = urlVozNube("Today we practice", "en");
+chequear("voz neuronal en la nube para cada idioma", urlEn.includes("tl=en") && urlEn.includes("translate_tts") && urlVozNube("Hola clase", "es").includes("tl=es"));
+chequear("respaldo por nuestro servidor", urlVozNube("Hola clase", "es", true).startsWith("/api/voz?tl=es"));
 
 console.log("\n== Narrar por fragmentos (sin navegador no debe fallar) ==");
 let fin = false;

@@ -297,3 +297,15 @@ El usuario decidió que Antigravity trabaje 100% solo, sin depender de opencode.
 - Pruebas: scripts/test-narracion.mjs (42 casos) + verificacion en navegador
   (scripts/smoke/narracion.html) con speechSynthesis simulado: cadena es-MX -> en-US, detener() corta,
   0 errores de consola. 284 pruebas en total.
+
+### Mejoras de narracion (ronda 2, mismo dia)
+
+- El idioma se decide AHORA frase por frase (no por el bloque completo que devuelve la IA):
+  refinarSegmentos() vuelve a partir cualquier bloque, asi una publicacion 95% en espanol con frases
+  en ingles/frances las lee con su voz dedicada y continua en el idioma original.
+- Voz de calidad: si el equipo solo tiene voces roboticas (p. ej. Microsoft Raul/Sabina) o no tiene voz
+  del idioma, la narracion usa una VOZ NEURONAL EN LA NUBE por idioma (translate_tts), con respaldo en
+  /api/voz (nuestro servidor) y ultimo respaldo la voz del equipo. Verificado en el equipo real:
+  fragmentos [es,en,es] -> audios tl=es, tl=en, tl=es.
+- Pitch neutro (1.0) y ritmo 1.0 en voces neurales para que suenen con intencion y no roboticas.
+- Pruebas: 52 casos de narracion (312 en total).
