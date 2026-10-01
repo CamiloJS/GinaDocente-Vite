@@ -67,3 +67,11 @@ export function calculateScore(evalData, answers) {
 
 /** True si la evaluacion tiene preguntas que la docente debe calificar a mano. */
 export const tienePreguntasManuales = (evalData) => (evalData?.questions || []).some((q) => q?.type === 'speaking');
+
+/** True si la pregunta de seleccion multiple permite marcar VARIAS respuestas.
+ * Si no trae el campo (evaluaciones viejas), se deduce: varias solo si hay 2+ correctas. */
+export const permiteVariasRespuestas = (q) => {
+  if (q?.permiteMultiples === true) return true;
+  if (q?.permiteMultiples === false) return false;
+  return (q?.options || []).filter((o) => o?.isCorrect).length > 1;
+};

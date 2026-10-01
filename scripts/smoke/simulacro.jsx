@@ -15,6 +15,7 @@ const evaluacion = {
   targetGroupName: "Inglés IV (Global)",
   questions: [
     { type: "multiple", points: 1, text: "What is the past simple of 'go'?", options: [{ text: "goed", isCorrect: false }, { text: "went", isCorrect: true }, { text: "gone", isCorrect: false }] },
+    { type: "multiple", points: 1, permiteMultiples: true, text: "Selecciona TODAS las opciones correctas.", options: [{ text: "go", isCorrect: true }, { text: "buy", isCorrect: true }, { text: "play", isCorrect: false }] },
     { type: "multiple", points: 1, text: "Verdadero o Falso: 'Buy' es un verbo regular.", options: [{ text: "Verdadero", isCorrect: false }, { text: "Falso", isCorrect: true }] },
     { type: "listening", points: 1, text: "Escucha y elige la palabra que oyes.", audioUrl: "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3", options: [{ text: "cat", isCorrect: true }, { text: "cut", isCorrect: false }] },
     { type: "text", points: 1, text: "Write the past simple of 'buy'.", correctAnswer: "bought", acceptedAnswers: ["bought"] },

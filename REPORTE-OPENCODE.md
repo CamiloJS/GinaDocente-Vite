@@ -309,3 +309,17 @@ El usuario decidió que Antigravity trabaje 100% solo, sin depender de opencode.
   fragmentos [es,en,es] -> audios tl=es, tl=en, tl=es.
 - Pitch neutro (1.0) y ritmo 1.0 en voces neurales para que suenen con intencion y no roboticas.
 - Pruebas: 52 casos de narracion (312 en total).
+
+## Seleccion multiple unica/varias + bilingue EN+FR + fix del modal (01-oct-2026)
+
+- Nuevo campo por pregunta `permiteMultiples`: el editor tiene el control "Única respuesta / Varias respuestas".
+  En el examen y en el simulacro salen circulos (radio) para unica o casillas (checkbox) para varias,
+  con la instruccion correspondiente. Evaluaciones viejas: si tienen 2+ correctas se tratan como varias.
+- La IA marca `permiteMultiples` segun cuantas correctas deje (2+ -> varias).
+- Generador con IA: nueva opcion de idioma "Bilingüe (inglés + francés)" (reparte las preguntas mitad en
+  cada idioma, alternando). IDIOMAS.en_fr + linea de prompt + opcion en el modal.
+- ARREGLO del bug de la imagen: el modal de "Generar evaluación con IA" ahora se dibuja con portal en
+  <body> y z-index alto (antes quedaba por debajo del panel de chat, que es sticky con z-10).
+  Verificado en navegador: elementFromPoint sobre el panel devuelve el modal (no el chat), portal a body OK.
+- Verificado en navegador (simulacro): 7 radios (unica) + 4 checkboxes (varias), unica deja una marcada y
+  varias deja las dos. Pruebas: 262 en total (4 nuevas de scoring + 4 del generador).

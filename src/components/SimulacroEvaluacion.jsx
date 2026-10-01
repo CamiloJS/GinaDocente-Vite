@@ -6,6 +6,7 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { glassCard, glassInput } from '../utils/styles.js';
 import { desordenarPalabras } from '../utils/palabras.js';
+import { permiteVariasRespuestas } from '../utils/evalScoring.js';
 import { Clock, X, Eye, EyeOff, CheckCircle2, ShieldAlert, Mic, Volume2 } from './Icons.jsx';
 
 const dosDigitos = (n) => String(Math.max(0, Math.floor(Number(n) || 0))).padStart(2, '0');
@@ -140,6 +141,7 @@ export default function SimulacroEvaluacion({ evaluacion = {}, isDarkMode = fals
 
                 {q.type === 'multiple' || q.type === 'listening' ? (
                   <div className="space-y-2 pt-1 pl-8">
+                      <p className="text-[11px] text-gray-500 font-medium">{permiteVariasRespuestas(q) ? 'Puedes marcar una o varias opciones.' : 'Marca solo una opción.'}</p>
                     {(q.options || []).map((opt, oIndex) => {
                       const isSelected = Array.isArray(respuestas[i]) && respuestas[i].includes(oIndex);
                       const esCorrecta = mostrarCorrectas && opt.isCorrect;
@@ -153,11 +155,16 @@ export default function SimulacroEvaluacion({ evaluacion = {}, isDarkMode = fals
                           } ${esCorrecta ? 'ring-2 ring-emerald-500/70' : ''}`}
                         >
                           <input
-                            type="checkbox"
+                            type={permiteVariasRespuestas(q) ? 'checkbox' : 'radio'}
                             checked={isSelected}
+                            name={'simulacro-' + i}
                             onChange={(e) => {
-                              const actuales = Array.isArray(respuestas[i]) ? respuestas[i] : [];
-                              cambiar(i, e.target.checked ? [...actuales, oIndex] : actuales.filter((x) => x !== oIndex));
+                                if (permiteVariasRespuestas(q)) {
+                                    const actuales = Array.isArray(respuestas[i]) ? respuestas[i] : [];
+                                    cambiar(i, e.target.checked ? [...actuales, oIndex] : actuales.filter((x) => x !== oIndex));
+                                } else {
+                                    cambiar(i, [oIndex]);
+                                }
                             }}
                             className="w-4 h-4 accent-blue-600 rounded cursor-pointer"
                           />

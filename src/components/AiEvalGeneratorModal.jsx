@@ -2,6 +2,7 @@
 // Genera una evaluacion completa (preguntas + respuestas) con IA y la muestra
 // para que la docente la revise antes de usarla.
 import React, { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { X, Sparkles, Loader2, AlertTriangle, Undo2, CheckCircle2 } from './Icons.jsx'
 import {
   MAX_PREGUNTAS,
@@ -17,6 +18,7 @@ const OPCIONES_IDIOMA = [
   { valor: 'fr', etiqueta: 'Todo en franc\u00e9s' },
   { valor: 'bilingue', etiqueta: 'Biling\u00fce (ingl\u00e9s + espa\u00f1ol)' },
   { valor: 'bilingue_fr', etiqueta: 'Biling\u00fce (franc\u00e9s + espa\u00f1ol)' },
+  { valor: 'en_fr', etiqueta: 'Biling\u00fce (ingl\u00e9s + franc\u00e9s)' },
 ]
 
 const CLAVES_TIPOS = ['multiple', 'vf', 'text', 'orden', 'match']
@@ -104,8 +106,8 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
   const label = 'block text-[11px] font-bold mb-1 ' + (isDarkMode ? 'text-gray-300' : 'text-gray-600')
   const card = 'rounded-2xl border ' + (isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200')
 
-  return (
-    <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in">
+  return createPortal((
+    <div className="fixed inset-0 z-[999999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in">
       <div className={`${card} shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col overflow-hidden rounded-3xl`}>
         {/* Encabezado */}
         <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3 border-b border-gray-200 dark:border-gray-800">
@@ -340,7 +342,7 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
         </div>
       </div>
     </div>
-  )
+  ), document.body)
 }
 
 export default AiEvalGeneratorModal

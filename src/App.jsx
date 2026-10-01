@@ -50,7 +50,7 @@ import CommandPaletteModal from './components/CommandPaletteModal.jsx'
 import FeedbackIAEvaluacion from './components/FeedbackIAEvaluacion.jsx';
 import SimulacroEvaluacion from './components/SimulacroEvaluacion.jsx';
 import { extractTextFromPDF } from './utils/pdfExtractor.js'
-import { calculateScore, normalizarRespuesta } from './utils/evalScoring.js'
+import { calculateScore, normalizarRespuesta, permiteVariasRespuestas } from './utils/evalScoring.js'
 import { textoPlano } from './utils/textFormat.js';
 import { desordenarPalabras } from './utils/palabras.js'
 import { useClickOutside } from './utils/hooks.js'
@@ -7304,17 +7304,19 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                           }`}
                                                       >
                                                           <input 
-                                                              type="checkbox" 
+                                                              type={permiteVariasRespuestas(q) ? 'checkbox' : 'radio'}
                                                               checked={isSelected}
+                                                              name={'eval-pregunta-' + qIndex}
                                                               onChange={(e) => {
-                                                                  const currentAns = Array.isArray(studentAnswers[qIndex]) ? studentAnswers[qIndex] : [];
-                                                                  if (e.target.checked) {
-                                                                      setStudentAnswers({...studentAnswers, [qIndex]: [...currentAns, oIndex]});
+                                                                  if (permiteVariasRespuestas(q)) {
+                                                                      const currentAns = Array.isArray(studentAnswers[qIndex]) ? studentAnswers[qIndex] : [];
+                                                                      if (e.target.checked) setStudentAnswers({...studentAnswers, [qIndex]: [...currentAns, oIndex]});
+                                                                      else setStudentAnswers({...studentAnswers, [qIndex]: currentAns.filter(x => x !== oIndex)});
                                                                   } else {
-                                                                      setStudentAnswers({...studentAnswers, [qIndex]: currentAns.filter(idx => idx !== oIndex)});
+                                                                      setStudentAnswers({ ...studentAnswers, [qIndex]: [oIndex] });
                                                                   }
-                                                              }} 
-                                                              className="w-4 h-4 accent-blue-600 rounded cursor-pointer" 
+                                                              }}
+                                                              className="w-4 h-4 accent-blue-600 rounded cursor-pointer"
                                                           />
                                                           <span>{opt.text}</span>
                                                       </label>
@@ -8598,17 +8600,26 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
 
                                           {(q.type === 'multiple' || q.type === 'listening') ? (
                                               <div className="space-y-1.5 pl-4 sm:pl-7 border-l-2 border-blue-500/30">
-                                                  <p className="text-[11px] font-bold text-gray-500">Marca con el checkbox la(s) opción(es) correcta(s):</p>
+                                                  <div className="flex flex-wrap items-center gap-2">
+                                                      <span className="text-[11px] font-bold text-gray-500">{'Tipo de respuesta:'}</span>
+                                                      <button type="button" onClick={() => { const nq = [...evalFormData.questions]; const opciones = nq[qIndex].options || []; const primera = opciones.findIndex((o) => o.isCorrect); nq[qIndex] = { ...nq[qIndex], permiteMultiples: false, options: opciones.map((o, i) => ({ ...o, isCorrect: i === primera })) }; setEvalFormData({ ...evalFormData, questions: nq }); }} className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border transition-colors cursor-pointer ${!permiteVariasRespuestas(q) ? 'bg-blue-600 text-white border-blue-600' : (isDarkMode ? 'border-gray-700 text-gray-300 hover:bg-gray-800' : 'border-gray-300 text-gray-600 hover:bg-gray-100')}`}>{'Única respuesta'}</button>
+                                                      <button type="button" onClick={() => { const nq = [...evalFormData.questions]; nq[qIndex] = { ...nq[qIndex], permiteMultiples: true }; setEvalFormData({ ...evalFormData, questions: nq }); }} className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border transition-colors cursor-pointer ${permiteVariasRespuestas(q) ? 'bg-blue-600 text-white border-blue-600' : (isDarkMode ? 'border-gray-700 text-gray-300 hover:bg-gray-800' : 'border-gray-300 text-gray-600 hover:bg-gray-100')}`}>{'Varias respuestas'}</button>
+                                                  </div>
+                                                  <p className="text-[11px] font-bold text-gray-500">{permiteVariasRespuestas(q) ? 'Marca con el checkbox una o varias opciones correctas.' : 'Marca con el círculo la ÚNICA opción correcta.'}</p>
                                                   {q.options.map((opt, oIndex) => (
                                                       <div key={oIndex} className="flex gap-2 items-center">
                                                           <input 
-                                                              type="checkbox" 
-                                                              checked={opt.isCorrect} 
-                                                              onChange={(e) => {
-                                                                  const newQ = [...evalFormData.questions]; newQ[qIndex] = {...newQ[qIndex], options: newQ[qIndex].options.map((o, i) => i === oIndex ? {...o, isCorrect: e.target.checked} : {...o})}; setEvalFormData({...evalFormData, questions: newQ});
-                                                              }} 
-                                                              className="w-4 h-4 accent-green-600 rounded cursor-pointer" 
-                                                              title="Marcar como correcta" 
+                                                              type={permiteVariasRespuestas(q) ? 'checkbox' : 'radio'}
+                                                              checked={opt.isCorrect}
+                                                              name={'correcta-' + qIndex}
+                                                              onChange={() => {
+                                                                  const newQ = [...evalFormData.questions];
+                                                                  const varias = permiteVariasRespuestas(q);
+                                                                  newQ[qIndex] = { ...newQ[qIndex], options: newQ[qIndex].options.map((o, i) => (varias ? (i === oIndex ? { ...o, isCorrect: !o.isCorrect } : o) : { ...o, isCorrect: i === oIndex })) };
+                                                                  setEvalFormData({ ...evalFormData, questions: newQ });
+                                                              }}
+                                                              className="w-4 h-4 accent-green-600 rounded cursor-pointer"
+                                                              title="Marcar como correcta"
                                                           />
                                                           <input 
                                                               value={opt.text} 

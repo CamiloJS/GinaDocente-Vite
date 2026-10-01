@@ -1,5 +1,5 @@
 // Pruebas del motor de calificacion de evaluaciones (sin navegador).
-import { calculateScore, normalizarRespuesta, respuestasValidasDe, puntajeDe, tienePreguntasManuales } from "../src/utils/evalScoring.js";
+import { permiteVariasRespuestas, calculateScore, normalizarRespuesta, respuestasValidasDe, puntajeDe, tienePreguntasManuales } from "../src/utils/evalScoring.js";
 import { desordenarPalabras } from "../src/utils/palabras.js";
 
 let ok = 0, fallos = 0;
@@ -95,6 +95,15 @@ chequear("dictado exacto -> 5.0", calculateScore({ questions: [dictado] }, { 0: 
 chequear("dictado tolera mayusculas y espacios", calculateScore({ questions: [dictado] }, { 0: "  The Cat  Is Black " }) === 5.0);
 chequear("dictado incorrecto -> 0.0", calculateScore({ questions: [dictado] }, { 0: "the dog is black" }) === 0.0);
 chequear("listening sin audio no rompe", calculateScore({ questions: [{ type: "listening", text: "x", options: [{ text: "a", isCorrect: true }, { text: "b", isCorrect: false }] }] }, { 0: [0] }) === 5.0);
+
+
+console.log("\n== Seleccion multiple: unica vs varias ==");
+const conDos = { type: "multiple", options: [{ text: "a", isCorrect: true }, { text: "b", isCorrect: true }, { text: "c", isCorrect: false }] };
+const conUna = { type: "multiple", options: [{ text: "a", isCorrect: true }, { text: "b", isCorrect: false }] };
+chequear("varias: 2 correctas sin campo", permiteVariasRespuestas(conDos) === true);
+chequear("unica: 1 correcta sin campo", permiteVariasRespuestas(conUna) === false);
+chequear("el campo manda", permiteVariasRespuestas({ ...conUna, permiteMultiples: true }) === true && permiteVariasRespuestas({ ...conDos, permiteMultiples: false }) === false);
+chequear("sin opciones no hay varias", permiteVariasRespuestas({ type: "multiple" }) === false);
 
 console.log(`\nRESULTADO: ${ok} OK, ${fallos} fallos\n`);
 process.exit(fallos ? 1 : 0);

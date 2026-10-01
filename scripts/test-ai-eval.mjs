@@ -171,5 +171,18 @@ chequear("los enunciados quedan en texto plano", r.ok && !r.preguntas[0].text.in
 chequear("las opciones quedan en texto plano", r.ok && !r.preguntas[1].options[0].text.includes("**"), r.preguntas[1]?.options?.[0]?.text);
 chequear("no se pierde el contenido", r.preguntas[0].text.includes("Escribe") && r.preguntas[0].text.includes("go"), r.preguntas[0]?.text);
 
+console.log("\n== Seleccion multiple unica/varias en las preguntas de la IA ==");
+const rDos = parsearEvaluacion(JSON.stringify([{ type: "multiple", text: "Choose all that apply", options: [{ text: "go", isCorrect: true }, { text: "buy", isCorrect: true }, { text: "play", isCorrect: false }], correctAnswer: "", points: 1 }]), 1);
+const qDos = (rDos.questions || rDos.preguntas || [])[0] || {};
+chequear("varias correctas -> permiteMultiples", qDos.permiteMultiples === true, qDos);
+const rUna = parsearEvaluacion(JSON.stringify([{ type: "multiple", text: "Pick one", options: [{ text: "went", isCorrect: true }, { text: "gone", isCorrect: false }], correctAnswer: "", points: 1 }]), 1);
+const qUna = (rUna.questions || rUna.preguntas || [])[0] || {};
+chequear("una sola correcta -> respuesta unica", qUna.permiteMultiples === false, qUna);
+
+console.log("\n== Bilingue ingles + frances ==");
+chequear("existe la opcion bilingue en+fr", typeof IDIOMAS.en_fr === "string" && /franc/i.test(IDIOMAS.en_fr), IDIOMAS.en_fr);
+const pBilingue = construirPrompt({ tema: "greetings", total: 4, multiple: 4, text: 0, dificultad: "media", idioma: "en_fr" });
+chequear("el prompt reparte ingles y frances", pBilingue.includes("alternando idiomas") && pBilingue.includes("mitad en INGL"));
+
 console.log(`\nRESULTADO: ${ok} OK, ${fallos} fallos\n`);
 process.exit(fallos ? 1 : 0);

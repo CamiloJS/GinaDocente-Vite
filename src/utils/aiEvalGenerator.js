@@ -89,6 +89,7 @@ export const IDIOMAS = {
   fr: 'Todo en franc\u00e9s',
   bilingue: 'Biling\u00fce: enunciado y opciones en ingl\u00e9s, con la traducci\u00f3n al espa\u00f1ol entre par\u00e9ntesis',
   bilingue_fr: 'Biling\u00fce: enunciado y opciones en franc\u00e9s, con la traducci\u00f3n al espa\u00f1ol entre par\u00e9ntesis',
+  en_fr: 'Biling\u00fce: la mitad de las preguntas en ingl\u00e9s y la otra mitad en franc\u00e9s (sin traducir al espa\u00f1ol)',
 };
 
 /** Texto con las cantidades por tipo (se usa en el prompt y en la correccion). */
@@ -137,6 +138,7 @@ export function construirPrompt({ tema, total, multiple, text, dificultad = 'med
     titulo ? `Titulo de la evaluacion: "${titulo}"` : '',
     `Nivel de dificultad: ${DIFICULTADES[dificultad] || DIFICULTADES.media}`,
     `Idioma: ${IDIOMAS[idioma] || IDIOMAS.es}`,
+  idioma === 'en_fr' ? 'Reparte las preguntas: la mitad en INGL\u00c9S y la mitad en FRANC\u00c9S, alternando idiomas. Cada pregunta completa (enunciado y opciones) en un solo idioma.' : '',
     `Dirigido a: ${publico}.`,
     '',
     'Reglas obligatorias:',
@@ -208,7 +210,7 @@ function normalizarPregunta(q) {
     if (!esV && !esF) return { problema: `la pregunta de verdadero/falso "${texto.slice(0, 40)}..." no indica si es verdadero o falso` };
     const idx = opciones.findIndex((o) => (esV ? /verdadero|true|^v$/i : /falso|false|^f$/i).test(o.text));
     opciones[idx >= 0 ? idx : esV ? 0 : 1].isCorrect = true;
-    return { pregunta: { type: 'multiple', text: texto, options: opciones, correctAnswer: '', points: puntos } };
+    return { pregunta: { type: 'multiple', text: texto, options: opciones, permiteMultiples: opciones.filter((o) => o.isCorrect).length > 1, correctAnswer: '', points: puntos } };
   }
 
   let opciones = Array.isArray(q.options || q.opciones) ? (q.options || q.opciones) : [];
@@ -237,7 +239,7 @@ function normalizarPregunta(q) {
     if (!opciones.some((o) => o.isCorrect)) {
       return { problema: `la pregunta "${texto.slice(0, 40)}..." no tiene opci\u00f3n correcta marcada` };
     }
-    return { pregunta: { type: 'multiple', text: texto, options: opciones, correctAnswer: '', points: puntos } };
+    return { pregunta: { type: 'multiple', text: texto, options: opciones, permiteMultiples: opciones.filter((o) => o.isCorrect).length > 1, correctAnswer: '', points: puntos } };
   }
 
   // respuesta escrita
