@@ -1217,6 +1217,7 @@ Devuelve ÚNICAMENTE un array JSON plano sin \`\`\`json ni texto extra:
   // Grupos visibles y filtrado por membresía
   const myEnrolledGroups = (academicGroups || []).filter(g => {
     if (!g) return false;
+    if (String(g.id || '').startsWith('demo_')) return true;
     const membersList = Array.isArray(g.members)
       ? g.members
       : (g.members && typeof g.members === 'object' ? Object.keys(g.members) : []);
@@ -1235,6 +1236,7 @@ Devuelve ÚNICAMENTE un array JSON plano sin \`\`\`json ni texto extra:
   const myEnrolledNames = myEnrolledGroups.map(g => (g.name || '').toLowerCase().trim());
 
   const visibleReviews = role === 'teacher' ? (reviews || []) : (reviews || []).filter(r => {
+    if (String(r?.id || '').startsWith('demo-')) return true;
     const rGrpId = String(r.targetGroupId || '').trim();
     const rGrpName = String(r.targetGroupName || '').toLowerCase().trim();
     const isGeneric = (!rGrpId || rGrpId === 'all') && (!rGrpName || rGrpName === 'global' || rGrpName === 'general' || rGrpName === 'todos' || rGrpName === 'todos los estudiantes');

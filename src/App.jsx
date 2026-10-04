@@ -55,7 +55,7 @@ import { textoPlano } from './utils/textFormat.js';
 import { desordenarPalabras } from './utils/palabras.js'
 import { useClickOutside } from './utils/hooks.js'
 import { DemoModeBanner } from './components/DemoModeBanner.jsx'
-import { DEMO_TASKS, DEMO_EVALUATIONS, DEMO_SYLLABUS } from './utils/demoData.js'
+import { DEMO_TASKS, DEMO_EVALUATIONS, DEMO_SYLLABUS, DEMO_REVIEWS, DEMO_ACADEMIC_GROUPS } from './utils/demoData.js'
 
 const TasksTab = React.lazy(() => import('./components/TasksTab.jsx'))
 const ReviewsModule = React.lazy(() => import('./components/ReviewsModule.jsx'))
@@ -203,7 +203,12 @@ function App() {
     try {
       const hash = (typeof window !== 'undefined' && window.location.hash ? window.location.hash : '').toLowerCase();
       const search = (typeof window !== 'undefined' && window.location.search ? window.location.search : '').toLowerCase();
-      return hash.includes('demo') || hash.includes('invitado') || search.includes('demo=') || search.includes('mode=demo');
+      const fromUrl = hash.includes('demo') || hash.includes('invitado') || search.includes('demo=') || search.includes('mode=demo');
+      if (fromUrl) {
+        try { sessionStorage.setItem('englishTech_demoMode', '1'); } catch (e) {}
+        return true;
+      }
+      return typeof sessionStorage !== 'undefined' && sessionStorage.getItem('englishTech_demoMode') === '1';
     } catch (e) {
       return false;
     }
@@ -444,8 +449,8 @@ function App() {
   useEffect(() => { setChatWindow(300); cargandoMasRef.current = false; }, [activeChat?.id]);
   const [chatGroups, setChatGroups] = useState([]);
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
-    const [academicGroups, setAcademicGroups] = useState([]);
-    const [academicGroupsLoaded, setAcademicGroupsLoaded] = useState(false);
+    const [academicGroups, setAcademicGroups] = useState(() => initialIsDemo ? DEMO_ACADEMIC_GROUPS : []);
+    const [academicGroupsLoaded, setAcademicGroupsLoaded] = useState(() => initialIsDemo);
     const [managingCodesFor, setManagingCodesFor] = useState(null);
     const [codeExpiryDays, setCodeExpiryDays] = useState('2');
     const [joinCodeInput, setJoinCodeInput] = useState("");
@@ -560,12 +565,12 @@ function App() {
       return true;
     }
   });
-  const [tasks, setTasks] = useState([]);
-  const [pinnedTasks, setPinnedTasks] = useState([]);
-  const [tasksLoading, setTasksLoading] = useState(true);
+  const [tasks, setTasks] = useState(() => initialIsDemo ? DEMO_TASKS : []);
+  const [pinnedTasks, setPinnedTasks] = useState(() => initialIsDemo ? DEMO_TASKS.filter(t => t.isPinned) : []);
+  const [tasksLoading, setTasksLoading] = useState(() => !initialIsDemo);
   const [taskLimit, setTaskLimit] = useState(20);
   const loadMoreTasks = () => setTaskLimit(prev => prev + 20);
-  const [syllabus, setSyllabus] = useState([]);
+  const [syllabus, setSyllabus] = useState(() => initialIsDemo ? DEMO_SYLLABUS : []);
   const [showAddSyllabus, setShowAddSyllabus] = useState(false);
   const [showPdfSyllabusModal, setShowPdfSyllabusModal] = useState(false);
   const [isProcessingSyllabusPdf, setIsProcessingSyllabusPdf] = useState(false);
@@ -575,11 +580,11 @@ function App() {
   const [extractedSyllabusPreview, setExtractedSyllabusPreview] = useState(null);
   const [syllabusSearchTerm, setSyllabusSearchTerm] = useState("");
   const [syllabusSubjectFilter, setSyllabusSubjectFilter] = useState("all");
-  const [evaluations, setEvaluations] = useState([]);
+  const [evaluations, setEvaluations] = useState(() => initialIsDemo ? DEMO_EVALUATIONS : []);
   const [grades, setGrades] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
   const [alerts, setAlerts] = useState([]);
-  const [reviews, setReviews] = useState([]);
+  const [reviews, setReviews] = useState(() => initialIsDemo ? DEMO_REVIEWS : []);
   const [inboxTab, setInboxTab] = useState('suggestions');
   const [inboxFilter, setInboxFilter] = useState('all');
   const [inboxSearch, setInboxSearch] = useState('');
@@ -880,6 +885,7 @@ function App() {
 
   const isStudentInGroup = (group) => {
     if (!group) return false;
+    if (isDemoMode || String(group.id || '').startsWith('demo_')) return true;
     const membersList = Array.isArray(group.members)
       ? group.members
       : (group.members && typeof group.members === 'object' ? Object.keys(group.members) : []);
@@ -892,7 +898,7 @@ function App() {
     });
   };
 
-  const isStudentWithoutGroups = role === 'student' && hasEntered && academicGroupsLoaded && !hasDismissedFirstJoin && academicGroups.filter(isStudentInGroup).length === 0;
+  const isStudentWithoutGroups = role === 'student' && hasEntered && !isDemoMode && academicGroupsLoaded && !hasDismissedFirstJoin && academicGroups.filter(isStudentInGroup).length === 0;
 
   useEffect(() => {
     if (!myChatId) return;
@@ -2553,6 +2559,7 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
           };
 
           const handleExitDemo = () => {
+            try { sessionStorage.removeItem('englishTech_demoMode'); } catch (e) {}
             setIsDemoMode(false);
             setHasEntered(false);
             setRole('student');
@@ -2580,6 +2587,14 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
                 setRole('student');
                 setLoggedInUser('@invitado');
                 setLoggedInName('Invitado (Demo)');
+                setAcademicGroups(DEMO_ACADEMIC_GROUPS);
+                setAcademicGroupsLoaded(true);
+                setTasks(DEMO_TASKS);
+                setPinnedTasks(DEMO_TASKS.filter(t => t.isPinned));
+                setEvaluations(DEMO_EVALUATIONS);
+                setSyllabus(DEMO_SYLLABUS);
+                setReviews(DEMO_REVIEWS);
+                setTasksLoading(false);
               }
             };
             window.addEventListener('hashchange', handleHashDemo);
@@ -2663,6 +2678,11 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
             });
 
             const uAcadGlobal = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'academicGroups'), s => {
+                if (isInitialDemoLink()) {
+                    setAcademicGroups(DEMO_ACADEMIC_GROUPS);
+                    setAcademicGroupsLoaded(true);
+                    return;
+                }
                 setAcademicGroups(s.docs.map(d => ({ id: d.id, ...d.data() })));
                 setAcademicGroupsLoaded(true);
             }, (err) => {
@@ -2693,6 +2713,18 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
                   } catch (e) {
                     console.warn('Anonymous auth note:', e);
                   }
+                }
+
+                if (isInitialDemoLink()) {
+                    setIsDemoMode(true);
+                    setRole('student');
+                    setLoggedInUser('@invitado');
+                    setLoggedInName('Invitado (Demo)');
+                    setHasEntered(true);
+                    setLoginType(null);
+                    setAcademicGroups(DEMO_ACADEMIC_GROUPS);
+                    setAcademicGroupsLoaded(true);
+                    return;
                 }
                 
                 const rawSession = localStorage.getItem('englishTech_activeSession');
@@ -2868,7 +2900,7 @@ useEffect(() => {
 
 // Auto-sincronización de materias académicas con salas de chat grupales
 useEffect(() => {
-  if (!academicGroups || academicGroups.length === 0 || !myChatId) return;
+  if (isDemoMode || !academicGroups || academicGroups.length === 0 || !myChatId) return;
   academicGroups.forEach(g => {
       const chatGroupId = `acad_${g.id}`;
       const existing = chatGroups.find(cg => cg.id === chatGroupId || cg.id === `group_${g.id}`);
@@ -2888,15 +2920,18 @@ useEffect(() => {
           }, { merge: true }).catch(() => {});
       }
   });
-}, [academicGroups, chatGroups, myChatId]);
+}, [academicGroups, chatGroups, myChatId, isDemoMode]);
 
-// EFECTO PARA MODO DEMO: Carga de publicaciones, evaluaciones y syllabus ficticios
+// EFECTO PARA MODO DEMO: Carga de materia, publicaciones, evaluaciones, diapositivas y syllabus de prueba
 useEffect(() => {
     if (isDemoMode) {
+        setAcademicGroups(DEMO_ACADEMIC_GROUPS);
+        setAcademicGroupsLoaded(true);
         setTasks(DEMO_TASKS);
         setPinnedTasks(DEMO_TASKS.filter(t => t.isPinned));
         setEvaluations(DEMO_EVALUATIONS);
         setSyllabus(DEMO_SYLLABUS);
+        setReviews(DEMO_REVIEWS);
         setTasksLoading(false);
     }
 }, [isDemoMode]);
@@ -2940,11 +2975,11 @@ useEffect(() => {
 
 // 4. PESTAÑA: REPASOS (Diapositivas)
 useEffect(() => {
-    if (!hasEntered || !myChatId || activeTab !== 'reviews') return;
+    if (!hasEntered || !myChatId || isDemoMode || activeTab !== 'reviews') return;
     const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'reviews'), orderBy('createdAt', 'desc'), limit(15));
     const uReviews = onSnapshot(q, s => setReviews(s.docs.map(d => ({ id: d.id, ...d.data() }))), err => console.error(err));
     return () => uReviews();
-}, [hasEntered, myChatId, activeTab]);
+}, [hasEntered, myChatId, activeTab, isDemoMode]);
 
 // 5. PESTAÑA: SYLLABUS
 useEffect(() => {
@@ -4950,8 +4985,8 @@ Devuelve ÚNICAMENTE un array JSON plano (sin bloques markdown \`\`\`json ni tex
 
             // Filtro por materia y búsqueda - con restricción por membresía para estudiantes
             const filteredSyllabus = syllabus.filter(item => {
-              // Restricción crítica: estudiantes solo ven contenidos de sus grupos + 'all'
-              if (role !== 'teacher') {
+              // Restricción crítica: estudiantes solo ven contenidos de sus grupos + 'all' (salvo Modo Demo)
+              if (role !== 'teacher' && !isDemoMode && !String(item.id || '').startsWith('demo-')) {
                 const enrolledGroups = (academicGroups || []).filter(isStudentInGroup);
                 const enrolledIds = enrolledGroups.map(g => g.id);
                 const enrolledNames = enrolledGroups.map(g => (g.name || '').toLowerCase().trim());
@@ -4974,7 +5009,7 @@ Devuelve ÚNICAMENTE un array JSON plano (sin bloques markdown \`\`\`json ni tex
               // Filtro de búsqueda
               if (syllabusSearchTerm.trim()) {
                 const query = syllabusSearchTerm.trim().toLowerCase();
-                const actSearch = role === 'teacher' ? (item.activities || '') : '';
+                const actSearch = (role === 'teacher' || isDemoMode) ? (item.activities || '') : '';
                 const hay = `${item.week} ${item.unit || ''} ${item.topic || ''} ${item.description || ''} ${(item.keyConcepts || []).join(' ')} ${actSearch}`.toLowerCase();
                 return hay.includes(query);
               }
@@ -5735,10 +5770,10 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                           </div>
                         )}
 
-                        {/* Fila 5: Actividades y Entregas (Exclusivo para la docente) */}
-                        {role === 'teacher' && item.activities && (
+                        {/* Fila 5: Actividades y Entregas */}
+                        {(role === 'teacher' || isDemoMode) && item.activities && (
                           <div className="p-2.5 sm:p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-900 dark:text-amber-200 text-xs font-medium flex items-start gap-2">
-                            <span className="font-bold shrink-0 flex items-center gap-1"><Target size={13} className="text-amber-600 dark:text-amber-400 shrink-0" /> Actividades (Docente):</span>
+                            <span className="font-bold shrink-0 flex items-center gap-1"><Target size={13} className="text-amber-600 dark:text-amber-400 shrink-0" /> {isDemoMode ? 'Actividades de la semana:' : 'Actividades (Docente):'}</span>
                             <span className="leading-relaxed">{item.activities}</span>
                           </div>
                         )}
@@ -8847,6 +8882,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                   ? evaluations.filter(ev => evalTabFilter === 'archived' ? !!ev.isArchived : !ev.isArchived)
                   : evaluations.filter(ev => {
                       if (ev.isArchived) return false;
+                      if (isDemoMode || String(ev.id || '').startsWith('demo-')) return true;
                       const evGrpId = String(ev.targetGroupId || '').trim();
                       const evGrpName = String(ev.targetGroupName || '').toLowerCase().trim();
                       const isGeneric = (!evGrpId || evGrpId === 'all') && (!evGrpName || evGrpName === 'global' || evGrpName === 'todos' || evGrpName === 'general' || evGrpName === 'todos los estudiantes' || evGrpName === 'todos los estudiantes (global)');
@@ -9033,13 +9069,24 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                        ) : (
                                            isDone ? (
                                                studentGrade?.status === 'cancelled_tab_change' ? (
-                                                   <div className="w-full flex items-center justify-between">
-                                                       <span className="text-xs font-bold text-red-500 flex items-center gap-1">
-                                                           <ShieldAlert size={14} /> Anulada (0.0)
-                                                       </span>
-                                                       <span className="text-[10px] text-gray-500 font-medium italic">
-                                                           Cancelada por cambio de pestaña
-                                                       </span>
+                                                   <div className="w-full space-y-2">
+                                                       <div className="w-full flex items-center justify-between">
+                                                           <span className="text-xs font-bold text-red-500 flex items-center gap-1">
+                                                               <ShieldAlert size={14} /> Anulada (0.0)
+                                                           </span>
+                                                           <span className="text-[10px] text-gray-500 font-medium italic">
+                                                               Cancelada por cambio de pestaña
+                                                           </span>
+                                                       </div>
+                                                       {isDemoMode && (
+                                                           <button
+                                                               type="button"
+                                                               onClick={() => setGrades(prev => prev.filter(g => g.evaluationId !== ev.id))}
+                                                               className="w-full py-1.5 px-3 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-600 dark:text-amber-300 font-bold text-xs transition-colors cursor-pointer"
+                                                           >
+                                                               Volver a probar (Modo Demo)
+                                                           </button>
+                                                       )}
                                                    </div>
                                                 ) : (
                                                     <div className="w-full">
@@ -9060,8 +9107,18 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                             </div>
                                                         )}
 
+                                                        {isDemoMode && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setGrades(prev => prev.filter(g => g.evaluationId !== ev.id))}
+                                                                className="w-full mt-2.5 py-1.5 px-3 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-600 dark:text-amber-300 font-bold text-xs transition-colors cursor-pointer"
+                                                            >
+                                                                Volver a intentar prueba (Modo Demo)
+                                                            </button>
+                                                        )}
+
                                                         {/* Explicacion de las respuestas: automatica, siempre en espanol, solo tras el cierre */}
-                                                        {role === 'student' && isExpired && studentGrade && (
+                                                        {role === 'student' && (isExpired || isDemoMode) && studentGrade && (
                                                             <FeedbackIAEvaluacion
                                                                 evaluacion={ev}
                                                                 grade={studentGrade}
@@ -10482,6 +10539,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
               {isDemoMode && (
                 <DemoModeBanner
                   activeTab={activeTab}
+                  onChangeTab={changeTab}
                   onExitDemo={handleExitDemo}
                   isDarkMode={isDarkMode}
                   glassCard={glassCard}
@@ -12874,7 +12932,7 @@ Bot:`;
               )}
 
               {/* ONBOARDING PRIMERA VEZ */}
-              {showOnboarding && hasEntered && (
+              {showOnboarding && hasEntered && !isDemoMode && (
                 <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => { setShowOnboarding(false); try { localStorage.setItem('englishTech_onboardingDone', '1'); } catch(e) {} }}>
                   <div className={`max-w-sm w-full rounded-3xl p-6 text-center space-y-4 ${isDarkMode ? 'bg-gray-900 border border-gray-700' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
                     <div className="w-16 h-16 bg-gradient-to-br from-[#AD3333] to-[#8a2828] rounded-2xl flex items-center justify-center mx-auto">

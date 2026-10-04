@@ -1,6 +1,6 @@
 // src/components/DemoModeBanner.jsx
 // Barra superior informativa, explicador contextual por pestaña y modal de tour interactivo
-// para el Modo Demo / Invitado de English TECH.
+// para el Modo Demo / Invitado de English TECH (Materia: Inglés Tecnico economico).
 
 import React, { useState } from 'react';
 import { 
@@ -14,13 +14,21 @@ import {
   Lightbulb,
   GraduationCap
 } from './Icons.jsx';
-import { DEMO_GUIDE_TOUR, DEMO_TAB_INFO } from '../utils/demoData.js';
+import { DEMO_GUIDE_TOUR, DEMO_TAB_INFO, DEMO_SUBJECT_NAME } from '../utils/demoData.js';
 
-export function DemoModeBanner({ activeTab, onExitDemo, isDarkMode, glassCard }) {
+export function DemoModeBanner({ activeTab, onChangeTab, onExitDemo, isDarkMode, glassCard }) {
   const [showTourModal, setShowTourModal] = useState(false);
   const [selectedTourStep, setSelectedTourStep] = useState(0);
 
   const currentTabExplanation = DEMO_TAB_INFO[activeTab] || DEMO_TAB_INFO.tasks;
+
+  const quickTabs = [
+    { id: 'tasks', label: '📰 Publicaciones' },
+    { id: 'evaluations', label: '📝 Evaluaciones de Prueba' },
+    { id: 'reviews', label: '📊 Diapositivas Demo' },
+    { id: 'syllabus', label: '📚 Contenidos Programáticos' },
+    { id: 'groups', label: '👥 Materia' },
+  ];
 
   return (
     <>
@@ -32,16 +40,16 @@ export function DemoModeBanner({ activeTab, onExitDemo, isDarkMode, glassCard })
               <Sparkles size={16} className="text-amber-300 animate-pulse" />
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2 justify-center sm:justify-start">
+              <div className="flex flex-wrap items-center gap-2 justify-center sm:justify-start">
                 <span className="font-black tracking-wider uppercase bg-amber-400 text-purple-950 px-2 py-0.5 rounded-full text-[10px] shadow-xs">
                   Modo Demo / Invitado
                 </span>
-                <span className="font-semibold text-white/90 hidden md:inline">
-                  Contenido pedagógico simulado
+                <span className="font-bold bg-white/15 px-2 py-0.5 rounded-full text-[10px] text-white border border-white/20">
+                  Materia: {DEMO_SUBJECT_NAME}
                 </span>
               </div>
-              <p className="text-[11px] text-purple-100/90 truncate max-w-xl">
-                Explora libremente English TECH. Tus acciones no afectarán las notas ni los datos reales del curso.
+              <p className="text-[11px] text-purple-100/90 truncate max-w-xl mt-0.5">
+                Explora publicaciones, evaluaciones de prueba, diapositivas y contenidos programáticos sin afectar datos reales.
               </p>
             </div>
           </div>
@@ -68,30 +76,56 @@ export function DemoModeBanner({ activeTab, onExitDemo, isDarkMode, glassCard })
         </div>
       </aside>
 
-      {/* TARJETA EXPLICATIVA CONTEXTUAL DE LA PESTAÑA */}
-      <section aria-label="Guía contextual de la sección" className="max-w-[680px] mx-auto px-2 md:px-0 pt-2 mb-2">
-        <div className={`${glassCard} !p-3.5 border-purple-500/30 bg-gradient-to-r from-purple-500/10 via-indigo-500/5 to-transparent rounded-2xl flex items-start gap-3 shadow-xs`}>
-          <div className="w-8 h-8 rounded-xl bg-purple-600/15 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 border border-purple-500/20 mt-0.5">
-            <Compass size={17} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between gap-2">
-              <h4 className={`text-xs font-black uppercase tracking-wider ${isDarkMode ? 'text-purple-300' : 'text-purple-900'}`}>
-                {currentTabExplanation.title}
-              </h4>
-              <button
-                type="button"
-                onClick={() => setShowTourModal(true)}
-                className="text-[11px] font-bold text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-0.5 shrink-0"
-              >
-                <span>Ver tour</span>
-                <ChevronRight size={12} />
-              </button>
+      {/* TARJETA EXPLICATIVA CONTEXTUAL DE LA PESTAÑA + ACCESOS RÁPIDOS */}
+      <section aria-label="Guía contextual de la sección" className="max-w-[680px] mx-auto px-2 md:px-0 pt-2.5 mb-2">
+        <div className={`${glassCard} !p-3.5 border-purple-500/30 bg-gradient-to-r from-purple-500/10 via-indigo-500/5 to-transparent rounded-2xl space-y-2.5 shadow-xs`}>
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-xl bg-purple-600/15 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 border border-purple-500/20 mt-0.5">
+              <Compass size={17} />
             </div>
-            <p className={`text-xs mt-0.5 leading-relaxed ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-              {currentTabExplanation.summary}
-            </p>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <h4 className={`text-xs font-black uppercase tracking-wider ${isDarkMode ? 'text-purple-300' : 'text-purple-900'}`}>
+                  {currentTabExplanation.title}
+                </h4>
+                <button
+                  type="button"
+                  onClick={() => setShowTourModal(true)}
+                  className="text-[11px] font-bold text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-0.5 shrink-0 cursor-pointer"
+                >
+                  <span>Guía completa</span>
+                  <ChevronRight size={12} />
+                </button>
+              </div>
+              <p className={`text-xs mt-0.5 leading-relaxed ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                {currentTabExplanation.summary}
+              </p>
+            </div>
           </div>
+
+          {onChangeTab && (
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 pt-1 border-t border-purple-500/15 no-scrollbar">
+              {quickTabs.map((t) => {
+                const isActive = activeTab === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => onChangeTab(t.id)}
+                    className={`px-2.5 py-1 rounded-xl text-[11px] font-bold whitespace-nowrap transition-all cursor-pointer shrink-0 ${
+                      isActive
+                        ? 'bg-purple-600 text-white shadow-2xs'
+                        : isDarkMode
+                          ? 'bg-gray-800/80 text-gray-300 hover:bg-gray-700 border border-gray-700'
+                          : 'bg-white/90 text-purple-900 hover:bg-purple-50 border border-purple-200/80'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       </section>
 
@@ -107,7 +141,7 @@ export function DemoModeBanner({ activeTab, onExitDemo, isDarkMode, glassCard })
                 </div>
                 <div>
                   <h3 className={`text-base sm:text-lg font-black ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                    Guía de English TECH
+                    Guía de English TECH — {DEMO_SUBJECT_NAME}
                   </h3>
                   <p className="text-[11px] text-gray-500">
                     Descubre qué hace cada módulo y cómo funciona la plataforma
@@ -131,7 +165,7 @@ export function DemoModeBanner({ activeTab, onExitDemo, isDarkMode, glassCard })
                     key={idx}
                     type="button"
                     onClick={() => setSelectedTourStep(idx)}
-                    className={`p-2.5 rounded-xl border text-left transition-all ${
+                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                       selectedTourStep === idx
                         ? 'bg-purple-600 text-white border-purple-600 shadow-md ring-2 ring-purple-500/30'
                         : isDarkMode
@@ -174,7 +208,7 @@ export function DemoModeBanner({ activeTab, onExitDemo, isDarkMode, glassCard })
               }`}>
                 <Lightbulb size={16} className="text-amber-500 shrink-0 mt-0.5" />
                 <p className="text-[11px] leading-relaxed">
-                  <strong>Tip de navegación:</strong> Puedes responder los simulacros de evaluación, votar en las encuestas y escuchar las narraciones en voz alta con inteligencia artificial directamente desde este modo demo.
+                  <strong>Tip de navegación:</strong> Toda la demostración está configurada en torno a la materia <strong>"{DEMO_SUBJECT_NAME}"</strong>. Puedes resolver las evaluaciones de prueba, proyectar o descargar las diapositivas en PowerPoint (.pptx) y revisar las 6 semanas del contenido programático.
                 </p>
               </div>
             </div>
@@ -188,14 +222,14 @@ export function DemoModeBanner({ activeTab, onExitDemo, isDarkMode, glassCard })
                 <button
                   type="button"
                   onClick={() => setSelectedTourStep((prev) => (prev + 1) % DEMO_GUIDE_TOUR.length)}
-                  className="py-2 px-3.5 rounded-xl border border-gray-300 dark:border-gray-700 text-xs font-bold hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                  className="py-2 px-3.5 rounded-xl border border-gray-300 dark:border-gray-700 text-xs font-bold hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
                 >
                   Siguiente tema
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowTourModal(false)}
-                  className="py-2 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-md transition-transform active:scale-95 flex items-center gap-1.5"
+                  className="py-2 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-md transition-transform active:scale-95 flex items-center gap-1.5 cursor-pointer"
                 >
                   <CheckCircle2 size={14} />
                   <span>Entendido, explorar</span>

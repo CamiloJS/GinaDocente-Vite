@@ -130,7 +130,9 @@ const TasksTab = React.memo(({
 
     // 2. Comprobar si el estudiante pertenece a un grupo académico
     const isStudentInGroup = React.useCallback((group) => {
-        if (!group || !group.members) return false;
+        if (!group) return false;
+        if (String(group.id || '').startsWith('demo_')) return true;
+        if (!group.members) return false;
         const membersList = Array.isArray(group.members)
             ? group.members
             : (typeof group.members === 'object' ? Object.keys(group.members) : []);
@@ -151,6 +153,7 @@ const TasksTab = React.memo(({
     // 4. Verificador estricto de visibilidad de publicaciones y tareas
     const isTaskVisibleForUser = React.useCallback((t) => {
         if (!t) return false;
+        if (String(t.id || '').startsWith('demo-')) return true;
 
         // Si estamos viendo el feed específico de un grupo (fixedTargetGroup)
         if (fixedTargetGroup) {
