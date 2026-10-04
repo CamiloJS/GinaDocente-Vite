@@ -54,6 +54,8 @@ import { calculateScore, normalizarRespuesta, permiteVariasRespuestas } from './
 import { textoPlano } from './utils/textFormat.js';
 import { desordenarPalabras } from './utils/palabras.js'
 import { useClickOutside } from './utils/hooks.js'
+import { DemoModeBanner } from './components/DemoModeBanner.jsx'
+import { DEMO_TASKS, DEMO_EVALUATIONS, DEMO_SYLLABUS } from './utils/demoData.js'
 
 const TasksTab = React.lazy(() => import('./components/TasksTab.jsx'))
 const ReviewsModule = React.lazy(() => import('./components/ReviewsModule.jsx'))
@@ -196,6 +198,18 @@ function App() {
   };
   const initialHashInfo = getInitialHashInfo();
   
+  // Detección de Enlace exclusivo de Modo Demo / Invitado
+  const isInitialDemoLink = () => {
+    try {
+      const hash = (typeof window !== 'undefined' && window.location.hash ? window.location.hash : '').toLowerCase();
+      const search = (typeof window !== 'undefined' && window.location.search ? window.location.search : '').toLowerCase();
+      return hash.includes('demo') || hash.includes('invitado') || search.includes('demo=') || search.includes('mode=demo');
+    } catch (e) {
+      return false;
+    }
+  };
+  const initialIsDemo = isInitialDemoLink();
+
   // Recuperar sesión activa guardada si existe
   const getInitialActiveSession = () => {
     try {
@@ -240,7 +254,8 @@ function App() {
   };
 
   // --- TODOS LOS ESTADOS (useState) ---
-  const [hasEntered, setHasEntered] = useState(() => !!initialActiveSession); 
+  const [isDemoMode, setIsDemoMode] = useState(() => initialIsDemo);
+  const [hasEntered, setHasEntered] = useState(() => initialIsDemo || !!initialActiveSession); 
   const [loginType, setLoginType] = useState(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [viewingProfileId, setViewingProfileId] = useState(() => initialHashInfo.profileId);
@@ -275,8 +290,8 @@ function App() {
   const [editingIAId, setEditingIAId] = useState(null);
   const [editIAText, setEditIAText] = useState("");
 
-  const [loggedInUser, setLoggedInUser] = useState(() => initialActiveSession ? (initialActiveSession.role === 'teacher' ? 'GinaDocente' : `@${initialActiveSession.userKey}`) : ""); 
-  const [loggedInName, setLoggedInName] = useState(() => initialActiveSession ? (initialActiveSession.name || initialActiveSession.userKey) : ""); 
+  const [loggedInUser, setLoggedInUser] = useState(() => initialIsDemo ? '@invitado' : (initialActiveSession ? (initialActiveSession.role === 'teacher' ? 'GinaDocente' : `@${initialActiveSession.userKey}`) : "")); 
+  const [loggedInName, setLoggedInName] = useState(() => initialIsDemo ? 'Invitado (Demo)' : (initialActiveSession ? (initialActiveSession.name || initialActiveSession.userKey) : "")); 
   const [userMappings, setUserMappings] = useState({}); 
   const userMappingsRef = useRef(userMappings);
   const [userMappingsLoaded, setUserMappingsLoaded] = useState(false);
@@ -295,7 +310,7 @@ function App() {
   const [editUserLabelValue, setEditUserLabelValue] = useState("");
   
   const [user, setUser] = useState(null);
-  const [role, setRole] = useState(() => initialActiveSession?.role || 'student');
+  const [role, setRole] = useState(() => initialIsDemo ? 'student' : (initialActiveSession?.role || 'student'));
   const [activeTab, setActiveTab] = useState(() => initialHashInfo.tab);
   const [loginError, setLoginError] = useState("");
   
@@ -1369,6 +1384,26 @@ function App() {
     if (!targetEval || submittingEvalRef.current) return;
     submittingEvalRef.current = true;
     try {
+      if (isDemoMode) {
+        const demoCancelData = {
+          id: 'demo-cancel-' + Date.now(),
+          evaluationId: targetEval.id,
+          studentId: myChatId || 'invitado',
+          studentEmail: 'invitado@demo.local',
+          studentName: loggedInName || 'Invitado (Demo)',
+          score: 0.0,
+          status: 'cancelled_tab_change',
+          statusReason: 'Cancelada por cambio de pestaña o pantalla (Simulación Demo)',
+          answers: studentAnswersRef.current || {},
+          submittedAt: Date.now()
+        };
+        setGrades(prev => [{ ...demoCancelData }, ...prev.filter(g => g.id !== demoCancelData.id)]);
+        setActiveTakingEval(null);
+        setStudentAnswers({});
+        showMessage("Examen demo anulado: En modo anti-trampas real se registraría 0.0 por cambiar de pestaña.");
+        submittingEvalRef.current = false;
+        return;
+      }
       const cancelData = {
         evaluationId: targetEval.id,
         studentId: user?.uid || myChatId || 'student_user',
@@ -1515,6 +1550,29 @@ function App() {
     try {
       const currentAnswers = studentAnswersRef.current || studentAnswers || {};
       const score = calculateScore(activeTakingEval, currentAnswers);
+      if (isDemoMode) {
+        const demoGradeData = {
+          id: 'demo-grade-' + Date.now(),
+          evaluationId: activeTakingEval.id,
+          studentId: myChatId || 'invitado',
+          studentEmail: 'invitado@demo.local',
+          studentName: loggedInName || 'Invitado (Demo)',
+          score: parseFloat((Number(score) || 0).toFixed(1)),
+          answers: currentAnswers,
+          submittedAt: Date.now()
+        };
+        setGrades(prev => [{ ...demoGradeData }, ...prev.filter(g => g.id !== demoGradeData.id)]);
+        setActiveTakingEval(null);
+        setStudentAnswers({});
+        if (!autoSubmit) {
+          try {
+            confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
+          } catch(e) {}
+        }
+        showMessage(`¡Evaluación demo completada! Tu nota ficticia fue: ${demoGradeData.score} / 5.0 (Modo Demo: no se almacena en la base de datos).`);
+        submittingEvalRef.current = false;
+        return;
+      }
       const gradeData = {
         evaluationId: activeTakingEval.id,
         studentId: user?.uid || myChatId || 'student_user',
@@ -2494,7 +2552,45 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
             }
           };
 
+          const handleExitDemo = () => {
+            setIsDemoMode(false);
+            setHasEntered(false);
+            setRole('student');
+            setLoggedInUser("");
+            setLoggedInName("");
+            try {
+              if (window.location.hash && window.location.hash.toLowerCase().includes('demo')) {
+                window.location.hash = '';
+              }
+              if (window.location.search && window.location.search.toLowerCase().includes('demo')) {
+                const url = new URL(window.location.href);
+                url.searchParams.delete('demo');
+                url.searchParams.delete('mode');
+                window.history.replaceState({}, '', url.pathname + (window.location.hash || ''));
+              }
+            } catch (e) {}
+            changeTab('tasks');
+          };
+
+          useEffect(() => {
+            const handleHashDemo = () => {
+              if (isInitialDemoLink()) {
+                setIsDemoMode(true);
+                setHasEntered(true);
+                setRole('student');
+                setLoggedInUser('@invitado');
+                setLoggedInName('Invitado (Demo)');
+              }
+            };
+            window.addEventListener('hashchange', handleHashDemo);
+            return () => window.removeEventListener('hashchange', handleHashDemo);
+          }, []);
+
           const handleLogout = async () => {
+            if (isDemoMode) {
+              handleExitDemo();
+              return;
+            }
             // APAGAR EL FOQUITO VERDE ANTES DE SALIR
             if (myChatId) {
                 const finalPresenceId = role === 'teacher' ? 'teacher' : myChatId;
@@ -2794,9 +2890,20 @@ useEffect(() => {
   });
 }, [academicGroups, chatGroups, myChatId]);
 
+// EFECTO PARA MODO DEMO: Carga de publicaciones, evaluaciones y syllabus ficticios
+useEffect(() => {
+    if (isDemoMode) {
+        setTasks(DEMO_TASKS);
+        setPinnedTasks(DEMO_TASKS.filter(t => t.isPinned));
+        setEvaluations(DEMO_EVALUATIONS);
+        setSyllabus(DEMO_SYLLABUS);
+        setTasksLoading(false);
+    }
+}, [isDemoMode]);
+
 // 2. PESTAÑA: ASIGNACIONES (Muro de clase)
 useEffect(() => {
-    if (!hasEntered || !myChatId) return;
+    if (!hasEntered || !myChatId || isDemoMode) return;
     const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'tasks'), orderBy('createdAt', 'desc'), limit(taskLimit));
     const uTasks = onSnapshot(q, s => { 
         setTasks(s.docs.map(d => ({ id: d.id, ...d.data() }))); 
@@ -2807,11 +2914,11 @@ useEffect(() => {
     });
     const fallbackTimer = setTimeout(() => setTasksLoading(false), 3500);
     return () => { uTasks(); clearTimeout(fallbackTimer); };
-}, [hasEntered, myChatId, taskLimit]);
+}, [hasEntered, myChatId, taskLimit, isDemoMode]);
 
 // 2b. POSTS FIJADOS (independiente de la paginación)
 useEffect(() => {
-    if (!hasEntered || !myChatId || (activeTab !== 'tasks' && activeTab !== 'groups')) return;
+    if (!hasEntered || !myChatId || isDemoMode || (activeTab !== 'tasks' && activeTab !== 'groups')) return;
     const qPinned = query(collection(db, 'artifacts', appId, 'public', 'data', 'tasks'), where('isPinned', '==', true));
     const uPinned = onSnapshot(qPinned, s => {
         const pinnedList = s.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -2821,7 +2928,7 @@ useEffect(() => {
         console.error('Error cargando posts fijados:', err);
     });
     return () => uPinned();
-}, [hasEntered, myChatId, activeTab]);
+}, [hasEntered, myChatId, activeTab, isDemoMode]);
 
 // 3. PESTAÑA: PERFIL (Muro de Pinterest)
 useEffect(() => {
@@ -2841,18 +2948,18 @@ useEffect(() => {
 
 // 5. PESTAÑA: SYLLABUS
 useEffect(() => {
-    if (!hasEntered || !myChatId || activeTab !== 'syllabus') return;
+    if (!hasEntered || !myChatId || isDemoMode || activeTab !== 'syllabus') return;
     const uSyllabus = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'syllabus'), limit(100)), s => setSyllabus(s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.week - b.week)), err => console.error(err));
     return () => uSyllabus();
-}, [hasEntered, myChatId, activeTab]);
+}, [hasEntered, myChatId, activeTab, isDemoMode]);
 
 // 6. PESTAÑA: EVALUACIONES Y NOTAS
 useEffect(() => {
-    if (!hasEntered || !myChatId || activeTab !== 'evaluations') return;
+    if (!hasEntered || !myChatId || isDemoMode || activeTab !== 'evaluations') return;
     const uEvals = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'evaluations'), limit(100)), s => setEvaluations(s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => b.createdAt - a.createdAt)), err => console.error(err));
     const uGrades = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'grades'), limit(500)), s => setGrades(s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => b.createdAt - a.createdAt)), err => console.error(err));
     return () => { uEvals(); uGrades(); };
-}, [hasEntered, myChatId, activeTab]);
+}, [hasEntered, myChatId, activeTab, isDemoMode]);
 
 // 7. PESTAÑA: BUZÓN (Solo para la profesora)
 useEffect(() => {
@@ -2862,7 +2969,7 @@ useEffect(() => {
     return () => { uSug(); uAlerts(); };
 }, [hasEntered, myChatId, activeTab, role]);
             useEffect(() => {
-              if (myChatId) {
+              if (myChatId && !isDemoMode) {
                   const finalPresenceId = role === 'teacher' ? 'teacher' : myChatId;
                   const presenceRef = doc(db, 'artifacts', appId, 'public', 'data', 'presence', finalPresenceId);
                   
@@ -9674,6 +9781,69 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                     </div>
                 )}
 
+                {/* Tarjeta: Enlace exclusivo para Modo Demo / Invitado (Solo Docente) */}
+                {role === 'teacher' && (
+                    <div className={`${glassCard} !p-4 sm:!p-5 space-y-3 border-purple-500/30 bg-gradient-to-br from-purple-500/10 via-indigo-500/5 to-transparent`}>
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-2xl bg-purple-500/15 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-500/25 shrink-0 shadow-xs">
+                                    <Sparkles size={20} />
+                                </div>
+                                <div>
+                                    <h3 className={`text-sm font-bold flex items-center gap-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                                        <span>Enlace de Modo Demo / Invitado</span>
+                                        <span className="px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 text-[10px] font-black">
+                                            Exclusivo Docente
+                                        </span>
+                                    </h3>
+                                    <p className="text-[11px] text-gray-500 leading-relaxed">
+                                        Genera y comparte este enlace para que coordinadores, evaluadores o invitados exploren English TECH con publicaciones y evaluaciones ficticias sin acceso a notas reales.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="pt-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                            <div className="flex-1 relative">
+                                <input 
+                                    type="text" 
+                                    readOnly 
+                                    value={typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}#demo` : '#demo'} 
+                                    className={`${glassInput} !py-2 text-xs font-mono text-purple-700 dark:text-purple-300 select-all`} 
+                                    onClick={(e) => e.target.select()}
+                                />
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const demoUrl = `${window.location.origin}${window.location.pathname}#demo`;
+                                    try {
+                                        navigator.clipboard.writeText(demoUrl);
+                                        showMessage("¡Enlace de Modo Demo copiado al portapapeles! 📋 Solo quienes tengan este link podrán ingresar.");
+                                    } catch (e) {
+                                        showMessage("Enlace demo: " + demoUrl);
+                                    }
+                                }}
+                                className="py-2 px-4 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white shadow-sm transition-transform active:scale-95 flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
+                            >
+                                <Copy size={14} />
+                                <span>Copiar enlace</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    window.open(`${window.location.origin}${window.location.pathname}#demo`, '_blank');
+                                }}
+                                className="py-2 px-3 rounded-xl text-xs font-bold border border-purple-300 dark:border-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/40 text-purple-700 dark:text-purple-300 transition-colors flex items-center justify-center gap-1 shrink-0 cursor-pointer"
+                                title="Abrir y probar la experiencia de demo en una nueva pestaña"
+                            >
+                                <Compass size={14} />
+                                <span>Probar demo</span>
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 {/* Tarjeta: Sugerencias / Buzón (Para Estudiante y Docente) */}
                 <div className={`${glassCard} !p-4 sm:!p-5 space-y-3 border-amber-500/30 bg-gradient-to-br from-amber-500/5 to-orange-500/5`}>
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -10307,6 +10477,16 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
               <audio ref={notificationSound} src={CHAT_SOUNDS[chatSoundIndex]?.url || CHAT_SOUNDS[0].url} preload="auto" onLoadedMetadata={(e) => { e.currentTarget.volume = 0.5; }} />
 
               {/* Dialogo de Confirmación Global — manejado por el portal en la parte inferior */}
+
+              {/* BANNER Y GUIA EXPLICATIVA DE MODO DEMO / INVITADO */}
+              {isDemoMode && (
+                <DemoModeBanner
+                  activeTab={activeTab}
+                  onExitDemo={handleExitDemo}
+                  isDarkMode={isDarkMode}
+                  glassCard={glassCard}
+                />
+              )}
 
               {/* Navbar Principal Estilo Moderno */}
               <nav className={`sticky top-0 z-50 backdrop-blur-md border-b transition-colors duration-300 ${isDarkMode ? 'bg-gray-900/80 border-gray-800' : 'bg-white/80 border-gray-200'}`}>

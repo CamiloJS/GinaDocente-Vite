@@ -208,6 +208,10 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
 
 
     const handleVote = async (optionId) => {
+        if (task.id && String(task.id).startsWith('demo-')) {
+            showMessage("ℹ️ ¡Modo Demo! Esta encuesta es de muestra y no altera la base de datos.");
+            return;
+        }
         if (isLocked) {
             showMessage("ℹ️ La votación para esta encuesta ya ha finalizado.");
             return;
@@ -302,6 +306,10 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
     };
 
     const toggleReaction = async (type) => {
+        if (task.id && String(task.id).startsWith('demo-')) {
+            showMessage("✨ ¡Modo Demo! Reacción simulada.");
+            return;
+        }
         if (!currentUserId || currentUserId === 'undefined') return;
         try {
             if (!auth.currentUser) {
@@ -348,6 +356,10 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
     };
 
     const toggleForumRating = async (score) => {
+        if (task.id && String(task.id).startsWith('demo-')) {
+            showMessage("⭐ ¡Modo Demo! Puntuación simulada.");
+            return;
+        }
         if (!currentUserId || currentUserId === 'undefined') return;
         try {
             if (!auth.currentUser) {
@@ -858,6 +870,10 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
 
     const handleAddComment = async (e) => {
         e.preventDefault();
+        if (task.id && String(task.id).startsWith('demo-')) {
+            showMessage("💬 ¡Modo Demo! Para entregar evidencias o comentar en tareas reales, ingresa con tu cuenta institucional.");
+            return;
+        }
         const hasText = Boolean(commentText && commentText.trim());
         const hasTitle = Boolean(commentTitle && commentTitle.trim());
         const hasMedia = Boolean((commentImageUrls && commentImageUrls.length > 0) || (commentImageUrl && commentImageUrl.trim()) || commentFileUrl || audioCom);
