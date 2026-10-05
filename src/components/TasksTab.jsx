@@ -14,6 +14,7 @@ import AudioPlayer, { AudioRecordingVisualizer } from './AudioPlayer.jsx'
 import CustomVideoPlayer from './CustomVideoPlayer.jsx'
 import GeniallyEmbedPlayer, { extractGeniallyUrl } from './GeniallyEmbedPlayer.jsx'
 import { DEMO_TTL_MS, saveDemoSandboxItem } from '../utils/demoData.js'
+import { getItemTeacherId } from '../utils/helpers.js'
 
 const TasksTab = React.memo(({
 
@@ -156,6 +157,8 @@ const TasksTab = React.memo(({
         if (!t) return false;
         if (String(t.id || '').startsWith('demo-')) return true;
 
+        const taskTeacherId = getItemTeacherId(t);
+
         // Si estamos viendo el feed específico de un grupo (fixedTargetGroup)
         if (fixedTargetGroup) {
             const cleanFixed = String(fixedTargetGroup).trim().replace(/^acad_/i, '').toLowerCase();
@@ -169,6 +172,9 @@ const TasksTab = React.memo(({
 
             // Datos canónicos del grupo actual
             const targetGroupObj = (academicGroups || []).find(g => String(g?.id || '').trim().replace(/^acad_/i, '').toLowerCase() === cleanFixed);
+            if (targetGroupObj && getItemTeacherId(targetGroupObj) !== taskTeacherId) {
+                return false;
+            }
             const targetGroupName = (targetGroupObj?.name || '').toLowerCase().trim();
 
             const rawTaskGrpId = String(t.targetGroupId || t.groupId || t.academicGroupId || '').trim();
@@ -220,9 +226,10 @@ const TasksTab = React.memo(({
             taskGrpName !== 'todos los estudiantes (global)' && 
             taskGrpName !== 'general';
 
-        // Buscar si coincide con alguna materia existente en la plataforma
+        // Buscar si coincide con alguna materia existente en la plataforma (del mismo docente)
         const matchingGroupInSystem = (academicGroups || []).find(g => {
             if (!g) return false;
+            if (getItemTeacherId(g) !== taskTeacherId) return false;
             const gClean = String(g.id || '').trim().replace(/^acad_/i, '');
             const gName = (g.name || '').toLowerCase().trim();
             return (
@@ -239,8 +246,9 @@ const TasksTab = React.memo(({
                 return false;
             }
 
-            // Si tienen grupo, solo ven publicaciones de sus materias inscritas
+            // Si tienen grupo, solo ven publicaciones de sus materias inscritas (del mismo docente)
             return myEnrolledGroups.some(g => {
+                if (getItemTeacherId(g) !== taskTeacherId) return false;
                 const gClean = String(g.id || '').trim().replace(/^acad_/i, '');
                 const gName = (g.name || '').toLowerCase().trim();
                 return (
@@ -251,8 +259,11 @@ const TasksTab = React.memo(({
             });
         }
 
-        // Publicación auténticamente Global / Para todos los estudiantes
-        return true;
+        // Publicación auténticamente Global / Para todos los estudiantes de los docentes con los que está inscrito
+        if (myEnrolledGroups.length > 0) {
+            return myEnrolledGroups.some(g => getItemTeacherId(g) === taskTeacherId);
+        }
+        return taskTeacherId === 'teacher';
     }, [role, fixedTargetGroup, academicGroups, myEnrolledGroups]);
 
     // Deduplicación estricta por ID y huella de contenido para evitar duplicados en el feed
@@ -1064,6 +1075,9 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                             title: cleanTitle || (hasAttachments ? 'Publicación adjunta' : 'Sin título'), 
                                             description: cleanDesc, 
                                             authorName: loggedInName || 'Profesora', 
+                                            authorId: myChatId || 'teacher',
+                                            teacherId: myChatId || 'teacher',
+                                            ownerTeacherId: myChatId || 'teacher',
                                             targetGroupId: resolvedTargetGroupId,
                                             imageUrl: cleanMainImg,
                                             imageUrls: cleanImgList, 
@@ -1109,6 +1123,9 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                                 title: cleanTitle || (hasAttachments ? 'Publicación adjunta' : 'Sin título'),
                                                 description: cleanDesc,
                                                 authorName: loggedInName || 'Profesora',
+                                                authorId: myChatId || 'teacher',
+                                                teacherId: myChatId || 'teacher',
+                                                ownerTeacherId: myChatId || 'teacher',
                                                 targetGroupId: resolvedTargetGroupId,
                                                 imageUrl: cleanMainImg,
                                                 imageUrls: cleanImgList,
@@ -1223,7 +1240,7 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                 <EmptyState 
                     icon={BookOpen} 
                     title={role === 'student' && myEnrolledGroups.length === 0 ? "Sin materias asignadas" : "Todavía no hay publicaciones"} 
-                    message={role === 'student' && myEnrolledGroups.length === 0 ? "Aún no tienes ningún grupo asignado. Tu profesora te asignará a tu materia pronto." : "Cuando la profesora publique una tarea o aviso, aparecerá aquí."} 
+                    message={role === 'student' && myEnrolledGroups.length === 0 ? "Aún no tienes ningún grupo asignado. Tu docente te asignará a tu materia pronto." : "Cuando el docente publique una tarea o aviso, aparecerá aquí."} 
                     isDarkMode={isDarkMode} 
                 />
             ) : null}
@@ -1246,6 +1263,7 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                 currentUser={user} 
                                 showMessage={showMessage} 
                                 loggedInName={loggedInName} 
+                                myChatId={myChatId}
                                 isDarkMode={isDarkMode} 
                                 confirmAction={confirmAction} 
                                 handleOpenProfileByName={handleOpenProfileByName} 
@@ -1275,6 +1293,7 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                             currentUser={user} 
                             showMessage={showMessage} 
                             loggedInName={loggedInName} 
+                            myChatId={myChatId}
                             isDarkMode={isDarkMode} 
                             confirmAction={confirmAction} 
                             handleOpenProfileByName={handleOpenProfileByName} 

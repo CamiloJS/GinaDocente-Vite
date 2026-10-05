@@ -8,6 +8,7 @@ import {
 import goldenRatioTemplate from '../templates/goldenRatioOva.json';
 import { db, appId, collection, doc, setDoc, getDocs, deleteDoc, query, orderBy, limit } from '../firebase/config.js';
 import { DEMO_TTL_MS, isDemoItemExpired } from '../utils/demoData.js';
+import { getCanonicalTeacherId, getTeacherDisplayName, getTeacherUsername, getItemTeacherId } from '../utils/helpers.js';
 
 export default function OvaStudioTool({
   isDarkMode = false,
@@ -16,12 +17,17 @@ export default function OvaStudioTool({
   role = 'teacher',
   db: propDb = null,
   appId: propAppId = null,
-  isDemoMode = false
+  isDemoMode = false,
+  myChatId = 'teacher',
+  loggedInName = ''
 }) {
   const firestoreDb = propDb || db;
   const activeAppId = propAppId || appId;
+  const activeTeacherId = getCanonicalTeacherId(myChatId || loggedInName || user?.displayName);
   const ovaCollName = isDemoMode ? 'demo_ovas' : 'ovas';
-  const ovaStorageKey = isDemoMode ? 'englishTech_demo_ovas' : 'englishTech_ovas';
+  const ovaStorageKey = isDemoMode
+    ? `englishTech_demo_ovas_${activeTeacherId}`
+    : (activeTeacherId === 'camilodocente' ? 'englishTech_ovas_camilodocente' : 'englishTech_ovas');
 
   const [ovas, setOvas] = useState(() => {
     try {
@@ -29,7 +35,8 @@ export default function OvaStudioTool({
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const valid = isDemoMode ? parsed.filter(item => !isDemoItemExpired(item)) : parsed;
+          const valid = (isDemoMode ? parsed.filter(item => !isDemoItemExpired(item)) : parsed)
+            .filter(item => item.id === 'ova-golden-ratio-01' || getItemTeacherId(item) === activeTeacherId);
           if (valid.length > 0) return valid;
         }
       }
@@ -85,7 +92,7 @@ export default function OvaStudioTool({
             const data = d.data();
             if (isDemoMode && isDemoItemExpired(data, now)) {
               try { deleteDoc(d.ref); } catch (e) {}
-            } else {
+            } else if (d.id === 'ova-golden-ratio-01' || getItemTeacherId(data) === activeTeacherId) {
               list.push({ id: d.id, ...data });
             }
           });
@@ -114,7 +121,7 @@ export default function OvaStudioTool({
     };
     fetchOvas();
     return () => { isMounted = false; };
-  }, [firestoreDb, activeAppId, isDemoMode, ovaCollName, ovaStorageKey]);
+  }, [firestoreDb, activeAppId, isDemoMode, ovaCollName, ovaStorageKey, activeTeacherId]);
 
   // Sync fullscreen state with document fullscreen changes (e.g. user presses Esc)
   useEffect(() => {
@@ -183,11 +190,17 @@ export default function OvaStudioTool({
       } else if (type === 'OVA_SAVED' && project) {
         setSyncStatus('saving');
         const now = Date.now();
+        const isTemplate = project.id === 'ova-golden-ratio-01';
         const updatedProject = {
           ...project,
           updatedAt: now,
           editPin: project.editPin || activeOva?.editPin || '1234',
-          ...(isDemoMode && project.id !== 'ova-golden-ratio-01' ? {
+          ...(!isTemplate ? {
+            teacherId: project.teacherId || activeOva?.teacherId || activeTeacherId,
+            ownerTeacherId: project.ownerTeacherId || activeOva?.ownerTeacherId || activeTeacherId,
+            authorId: project.authorId || activeOva?.authorId || activeTeacherId
+          } : {}),
+          ...(isDemoMode && !isTemplate ? {
             isDemoCreated: true,
             expiresAt: project.expiresAt || (now + DEMO_TTL_MS)
           } : {})
@@ -218,7 +231,7 @@ export default function OvaStudioTool({
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [firestoreDb, activeAppId, isDemoMode, ovaCollName, ovaStorageKey]);
+  }, [firestoreDb, activeAppId, isDemoMode, ovaCollName, ovaStorageKey, activeTeacherId]);
 
   // Create new OVA
   const handleCreateNewOva = async () => {
@@ -226,6 +239,8 @@ export default function OvaStudioTool({
     const subject = newSubject.trim() || 'General';
     const now = Date.now();
     const newId = `ova-${now}`;
+    const teacherUsername = getTeacherUsername(activeTeacherId);
+    const teacherFullName = loggedInName || getTeacherDisplayName(activeTeacherId);
 
     const newOva = {
       id: newId,
@@ -233,7 +248,10 @@ export default function OvaStudioTool({
       title: title,
       subject: subject,
       description: 'Objeto Virtual de Aprendizaje creado con EnglishTech OVA Studio.',
-      author: user?.displayName || 'GinaDocente',
+      author: user?.displayName || teacherUsername,
+      authorId: activeTeacherId,
+      teacherId: activeTeacherId,
+      ownerTeacherId: activeTeacherId,
       createdAt: new Date().toISOString().split('T')[0],
       updatedAt: now,
       ...(isDemoMode ? { isDemoCreated: true, expiresAt: now + DEMO_TTL_MS } : {}),
@@ -248,7 +266,7 @@ export default function OvaStudioTool({
         subtitle: 'Explora este Objeto Virtual de Aprendizaje interactivo.',
         badgeText: 'OBJETO VIRTUAL DE APRENDIZAJE • ENGLISHTECH',
         institution: 'EnglishTech Academy',
-        authorName: user?.displayName || 'GinaDocente',
+        authorName: teacherFullName,
         backgroundImage: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?auto=format&fit=crop&w=1600&q=80',
         backgroundColor: '#0f172a',
         textColor: '#ffffff',
@@ -330,6 +348,10 @@ export default function OvaStudioTool({
       ...JSON.parse(JSON.stringify(currentOva)),
       id: newId,
       title: `${currentOva.title} (Copia)`,
+      author: user?.displayName || getTeacherUsername(activeTeacherId),
+      authorId: activeTeacherId,
+      teacherId: activeTeacherId,
+      ownerTeacherId: activeTeacherId,
       createdAt: new Date().toISOString().split('T')[0],
       updatedAt: now,
       ...(isDemoMode ? { isDemoCreated: true, expiresAt: now + DEMO_TTL_MS } : {})

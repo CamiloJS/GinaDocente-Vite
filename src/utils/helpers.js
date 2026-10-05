@@ -49,6 +49,56 @@ export const CHAT_PATTERNS = [
 ]
 
 export const TEACHER_NAME = 'Gina Marcela Quintana Delgado'
+export const SECOND_TEACHER_NAME = 'Camilo Jaimes'
+export const SECOND_TEACHER_ID = 'camilodocente'
+
+export const isCamiloTeacher = (val) => {
+  if (!val) return false
+  const clean = String(val).toLowerCase().replace(/^@/, '').trim()
+  return (
+    clean === 'camilodocente' ||
+    clean === 'teacher_camilo' ||
+    clean === 'camilo jaimes' ||
+    clean === 'camilodocente@unipamplona.edu.co' ||
+    clean.includes('camilo jaimes')
+  )
+}
+
+export const isTeacherId = (val) => {
+  if (!val) return false
+  const clean = String(val).toLowerCase().replace(/^@/, '').trim()
+  return (
+    clean === 'teacher' ||
+    clean === 'ginadocente' ||
+    clean === 'teacher_gina' ||
+    clean === 'demodocente' ||
+    isCamiloTeacher(clean)
+  )
+}
+
+export const getCanonicalTeacherId = (val) => (isCamiloTeacher(val) ? 'camilodocente' : 'teacher')
+
+export const getTeacherDisplayName = (val) => (isCamiloTeacher(val) ? SECOND_TEACHER_NAME : TEACHER_NAME)
+
+export const getTeacherUsername = (val) => (isCamiloTeacher(val) ? 'CamiloDocente' : 'GinaDocente')
+
+export const getItemTeacherId = (item) => {
+  if (!item || typeof item !== 'object') return 'teacher'
+  const candidates = [
+    item.teacherId,
+    item.ownerTeacherId,
+    item.createdBy,
+    item.authorId,
+    item.authorUsername,
+    item.authorName,
+    item.author,
+    item.teacherName,
+  ]
+  for (const c of candidates) {
+    if (c && isCamiloTeacher(c)) return 'camilodocente'
+  }
+  return 'teacher'
+}
 
 export const splitNameFirstAndLast = (fullName) => {
   if (!fullName) return { first: '', last: '' }
@@ -65,6 +115,7 @@ export const splitNameFirstAndLast = (fullName) => {
 export const FALLBACK_MAP = {
   ginadocente: { email: 'ginamarcelaquintana19@gmail.com', name: 'La profe', fullName: 'Gina Marcela Quintana Delgado', role: 'teacher', profilePicUrl: '/icono.png' },
   teacher: { email: 'ginamarcelaquintana19@gmail.com', name: 'La profe', fullName: 'Gina Marcela Quintana Delgado', role: 'teacher', profilePicUrl: '/icono.png' },
+  camilodocente: { email: 'camilodocente@unipamplona.edu.co', name: 'Camilo Jaimes', fullName: 'Camilo Jaimes', role: 'teacher', profilePicUrl: '' },
 }
 
 // --- Funciones de utilidad ---

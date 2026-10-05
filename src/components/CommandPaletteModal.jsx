@@ -4,6 +4,7 @@ import ReactDOM from 'react-dom';
 import {
   Search, FileText, BookOpen, CheckCheck, UsersIcon, UsersGroupIcon, X, ChevronRight, Clock
 } from './Icons.jsx';
+import { isTeacherId } from '../utils/helpers.js';
 
 const norm = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 
@@ -55,7 +56,10 @@ export const CommandPaletteModal = ({
     return () => window.removeEventListener('keydown', handleGlobalKey);
   }, [isOpen, onClose]);
 
-  const getMembersCount = (g) => Array.isArray(g?.members) ? g.members.length : (g?.members && typeof g.members === 'object' ? Object.keys(g.members).length : 0);
+  const getMembersCount = (g) => {
+    const list = Array.isArray(g?.members) ? g.members : (g?.members && typeof g.members === 'object' ? Object.keys(g.members) : []);
+    return list.filter(m => !isTeacherId(m)).length;
+  };
 
   const results = useMemo(() => {
     const q = norm(query);
@@ -82,7 +86,7 @@ export const CommandPaletteModal = ({
           type: 'evaluation',
           item: e
         })),
-        students: role === 'teacher' ? Object.entries(userMappings || {}).slice(0, 3).filter(([k]) => k !== 'teacher').map(([k, u]) => ({
+        students: role === 'teacher' ? Object.entries(userMappings || {}).filter(([k, u]) => !isTeacherId(k) && u?.role !== 'teacher').slice(0, 3).map(([k, u]) => ({
           id: k,
           title: u.fullName || u.name || k,
           subtitle: u.customLabel || u.email || 'Estudiante',
@@ -123,7 +127,7 @@ export const CommandPaletteModal = ({
     }));
 
     const filteredStudents = Object.entries(userMappings || {})
-      .filter(([uk, ud]) => uk !== 'teacher' && (norm(uk).includes(q) || norm(ud?.fullName).includes(q) || norm(ud?.email).includes(q)))
+      .filter(([uk, ud]) => !isTeacherId(uk) && ud?.role !== 'teacher' && (norm(uk).includes(q) || norm(ud?.fullName).includes(q) || norm(ud?.email).includes(q)))
       .slice(0, 5)
       .map(([k, u]) => ({
         id: k,

@@ -10,7 +10,9 @@ import {
 } from './firebase/config.js'
 import {
   CHAT_GRADIENTS, CHAT_PATTERNS, COMMENT_EMOJIS, FALLBACK_MAP, SLIDE_GRADIENTS,
-  TEACHER_NAME, compressImage, containsBadWords, checkBadWordsAsync, formatChatDate, formatTime,
+  TEACHER_NAME, SECOND_TEACHER_NAME, isCamiloTeacher, isTeacherId, getCanonicalTeacherId,
+  getTeacherDisplayName, getTeacherUsername, getItemTeacherId,
+  compressImage, containsBadWords, checkBadWordsAsync, formatChatDate, formatTime,
   uploadImageToStorage, uploadRawFileToStorage, speakText, splitNameFirstAndLast, format12HourTime, formatDateTime12H
 } from './utils/helpers.js'
 import {
@@ -329,8 +331,8 @@ function App() {
   const [editingIAId, setEditingIAId] = useState(null);
   const [editIAText, setEditIAText] = useState("");
 
-  const [loggedInUser, setLoggedInUser] = useState(() => initialIsDemo ? (initialDemoRole === 'teacher' ? 'DemoDocente' : '@invitado') : (initialActiveSession ? (initialActiveSession.role === 'teacher' ? 'GinaDocente' : `@${initialActiveSession.userKey}`) : "")); 
-  const [loggedInName, setLoggedInName] = useState(() => initialIsDemo ? (initialDemoRole === 'teacher' ? TEACHER_NAME : 'Invitado (Demo)') : (initialActiveSession ? (initialActiveSession.name || initialActiveSession.userKey) : "")); 
+  const [loggedInUser, setLoggedInUser] = useState(() => initialIsDemo ? (initialDemoRole === 'teacher' ? 'DemoDocente' : '@invitado') : (initialActiveSession ? (initialActiveSession.role === 'teacher' ? getTeacherUsername(initialActiveSession.userKey || initialActiveSession.name) : `@${initialActiveSession.userKey}`) : "")); 
+  const [loggedInName, setLoggedInName] = useState(() => initialIsDemo ? (initialDemoRole === 'teacher' ? TEACHER_NAME : 'Invitado (Demo)') : (initialActiveSession ? (initialActiveSession.role === 'teacher' ? getTeacherDisplayName(initialActiveSession.userKey || initialActiveSession.name) : (initialActiveSession.name || initialActiveSession.userKey)) : "")); 
   const [userMappings, setUserMappings] = useState({}); 
   const userMappingsRef = useRef(userMappings);
   const [userMappingsLoaded, setUserMappingsLoaded] = useState(false);
@@ -481,9 +483,9 @@ function App() {
   const [chatWindow, setChatWindow] = useState(300); // cuantos mensajes del chat se cargan
   const cargandoMasRef = useRef(false);
   useEffect(() => { setChatWindow(300); cargandoMasRef.current = false; }, [activeChat?.id]);
-  const [chatGroups, setChatGroups] = useState([]);
+  const [rawChatGroups, setChatGroups] = useState([]);
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
-    const [academicGroups, setAcademicGroups] = useState(() => initialIsDemo ? DEMO_ACADEMIC_GROUPS : []);
+    const [rawAcademicGroups, setAcademicGroups] = useState(() => initialIsDemo ? DEMO_ACADEMIC_GROUPS : []);
     const [academicGroupsLoaded, setAcademicGroupsLoaded] = useState(() => initialIsDemo);
     const [managingCodesFor, setManagingCodesFor] = useState(null);
     const [codeExpiryDays, setCodeExpiryDays] = useState('2');
@@ -599,12 +601,12 @@ function App() {
       return true;
     }
   });
-  const [tasks, setTasks] = useState(() => initialIsDemo ? DEMO_TASKS : []);
-  const [pinnedTasks, setPinnedTasks] = useState(() => initialIsDemo ? DEMO_TASKS.filter(t => t.isPinned) : []);
+  const [rawTasks, setTasks] = useState(() => initialIsDemo ? DEMO_TASKS : []);
+  const [rawPinnedTasks, setPinnedTasks] = useState(() => initialIsDemo ? DEMO_TASKS.filter(t => t.isPinned) : []);
   const [tasksLoading, setTasksLoading] = useState(() => !initialIsDemo);
   const [taskLimit, setTaskLimit] = useState(20);
   const loadMoreTasks = () => setTaskLimit(prev => prev + 20);
-  const [syllabus, setSyllabus] = useState(() => initialIsDemo ? DEMO_SYLLABUS : []);
+  const [rawSyllabus, setSyllabus] = useState(() => initialIsDemo ? DEMO_SYLLABUS : []);
   const [showAddSyllabus, setShowAddSyllabus] = useState(false);
   const [showPdfSyllabusModal, setShowPdfSyllabusModal] = useState(false);
   const [isProcessingSyllabusPdf, setIsProcessingSyllabusPdf] = useState(false);
@@ -614,11 +616,11 @@ function App() {
   const [extractedSyllabusPreview, setExtractedSyllabusPreview] = useState(null);
   const [syllabusSearchTerm, setSyllabusSearchTerm] = useState("");
   const [syllabusSubjectFilter, setSyllabusSubjectFilter] = useState("all");
-  const [evaluations, setEvaluations] = useState(() => initialIsDemo ? DEMO_EVALUATIONS : []);
-  const [grades, setGrades] = useState([]);
+  const [rawEvaluations, setEvaluations] = useState(() => initialIsDemo ? DEMO_EVALUATIONS : []);
+  const [rawGrades, setGrades] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
   const [alerts, setAlerts] = useState([]);
-  const [reviews, setReviews] = useState(() => initialIsDemo ? DEMO_REVIEWS : []);
+  const [rawReviews, setReviews] = useState(() => initialIsDemo ? DEMO_REVIEWS : []);
   const [inboxTab, setInboxTab] = useState('suggestions');
   const [inboxFilter, setInboxFilter] = useState('all');
   const [inboxSearch, setInboxSearch] = useState('');
@@ -741,8 +743,9 @@ function App() {
   }, [studentEditModal?.isOpen]);
 
   // --- VALORES DERIVADOS Y HELPERS DE USUARIO / CHAT ---
-  const myChatId = role === 'teacher' ? 'teacher' : (loggedInUser ? loggedInUser.replace('@', '') : '');
-  const myDisplayName = role === 'teacher' ? TEACHER_NAME : (loggedInName || myChatId);
+  const currentTeacherId = role === 'teacher' ? getCanonicalTeacherId(loggedInUser || loggedInName || user?.email) : 'teacher';
+  const myChatId = role === 'teacher' ? currentTeacherId : (loggedInUser ? loggedInUser.replace('@', '') : '');
+  const myDisplayName = role === 'teacher' ? getTeacherDisplayName(currentTeacherId) : (loggedInName || myChatId);
 
   const getMyStudentIdentifiers = () => {
     const ids = new Set();
@@ -818,6 +821,148 @@ function App() {
     return ids;
   };
 
+  const isStudentInGroup = (group) => {
+    if (!group) return false;
+    if (isDemoMode || String(group.id || '').startsWith('demo_')) return true;
+    const membersList = Array.isArray(group.members)
+      ? group.members
+      : (group.members && typeof group.members === 'object' ? Object.keys(group.members) : []);
+    if (membersList.length === 0) return false;
+    const myIds = getMyStudentIdentifiers();
+    return membersList.some(m => {
+      if (!m) return false;
+      const cleanM = String(m).toLowerCase().replace('@', '').trim();
+      return myIds.has(cleanM);
+    });
+  };
+
+  const studentEnrolledGroups = useMemo(
+    () => (rawAcademicGroups || []).filter(isStudentInGroup),
+    [rawAcademicGroups, myChatId, user, userMappings, loggedInUser, loggedInName, isDemoMode]
+  );
+
+  const studentTeacherIds = useMemo(
+    () => new Set(studentEnrolledGroups.map(g => getItemTeacherId(g))),
+    [studentEnrolledGroups]
+  );
+
+  const matchesStudentTeacher = useCallback((item) => {
+    if (isDemoMode || String(item?.id || '').startsWith('demo')) return true;
+    const itemTid = getItemTeacherId(item);
+    if (studentTeacherIds.size === 0) return itemTid === 'teacher';
+    return studentTeacherIds.has(itemTid);
+  }, [isDemoMode, studentTeacherIds]);
+
+  const academicGroups = useMemo(() => {
+    const list = rawAcademicGroups || [];
+    if (isDemoMode) return list;
+    if (role === 'teacher') {
+      return list.filter(g => String(g?.id || '').startsWith('demo') || getItemTeacherId(g) === currentTeacherId);
+    }
+    return list;
+  }, [rawAcademicGroups, isDemoMode, role, currentTeacherId]);
+
+  const chatGroups = useMemo(() => {
+    const list = rawChatGroups || [];
+    if (isDemoMode) return list;
+    if (role === 'teacher') {
+      return list.filter(g => {
+        if (String(g?.id || '').startsWith('demo')) return true;
+        if (g?.academicGroupId) {
+          const parentAcad = (rawAcademicGroups || []).find(ag => ag.id === g.academicGroupId);
+          if (parentAcad) return getItemTeacherId(parentAcad) === currentTeacherId;
+        }
+        return getItemTeacherId(g) === currentTeacherId;
+      });
+    }
+    return list;
+  }, [rawChatGroups, rawAcademicGroups, isDemoMode, role, currentTeacherId]);
+
+  const tasks = useMemo(() => {
+    const list = rawTasks || [];
+    if (isDemoMode) return list;
+    if (role === 'teacher') {
+      return list.filter(t => String(t?.id || '').startsWith('demo') || getItemTeacherId(t) === currentTeacherId);
+    }
+    return list.filter(t => {
+      if (String(t?.id || '').startsWith('demo')) return true;
+      const rawGrp = String(t.targetGroupId || t.groupId || t.academicGroupId || t.targetGroup || '').trim().toLowerCase();
+      const isGlobal = !rawGrp || rawGrp === 'all' || rawGrp === 'global' || rawGrp === 'todos';
+      return isGlobal ? matchesStudentTeacher(t) : true;
+    });
+  }, [rawTasks, isDemoMode, role, currentTeacherId, matchesStudentTeacher]);
+
+  const pinnedTasks = useMemo(() => {
+    const list = rawPinnedTasks || [];
+    if (isDemoMode) return list;
+    if (role === 'teacher') {
+      return list.filter(t => String(t?.id || '').startsWith('demo') || getItemTeacherId(t) === currentTeacherId);
+    }
+    return list.filter(t => {
+      if (String(t?.id || '').startsWith('demo')) return true;
+      const rawGrp = String(t.targetGroupId || t.groupId || t.academicGroupId || t.targetGroup || '').trim().toLowerCase();
+      const isGlobal = !rawGrp || rawGrp === 'all' || rawGrp === 'global' || rawGrp === 'todos';
+      return isGlobal ? matchesStudentTeacher(t) : true;
+    });
+  }, [rawPinnedTasks, isDemoMode, role, currentTeacherId, matchesStudentTeacher]);
+
+  const syllabus = useMemo(() => {
+    const list = rawSyllabus || [];
+    if (isDemoMode) return list;
+    if (role === 'teacher') {
+      return list.filter(s => String(s?.id || '').startsWith('demo') || getItemTeacherId(s) === currentTeacherId);
+    }
+    return list.filter(s => {
+      if (String(s?.id || '').startsWith('demo')) return true;
+      const gId = String(s.targetGroupId || '').trim().toLowerCase();
+      const isGlobal = !gId || gId === 'all';
+      return isGlobal ? matchesStudentTeacher(s) : true;
+    });
+  }, [rawSyllabus, isDemoMode, role, currentTeacherId, matchesStudentTeacher]);
+
+  const evaluations = useMemo(() => {
+    const list = rawEvaluations || [];
+    if (isDemoMode) return list;
+    if (role === 'teacher') {
+      return list.filter(ev => String(ev?.id || '').startsWith('demo') || getItemTeacherId(ev) === currentTeacherId);
+    }
+    return list.filter(ev => {
+      if (String(ev?.id || '').startsWith('demo')) return true;
+      const gId = String(ev.targetGroupId || '').trim().toLowerCase();
+      const isGlobal = !gId || gId === 'all';
+      return isGlobal ? matchesStudentTeacher(ev) : true;
+    });
+  }, [rawEvaluations, isDemoMode, role, currentTeacherId, matchesStudentTeacher]);
+
+  const grades = useMemo(() => {
+    const list = rawGrades || [];
+    if (isDemoMode) return list;
+    if (role === 'teacher') {
+      const evalMap = new Map((rawEvaluations || []).map(ev => [ev.id, ev]));
+      return list.filter(g => {
+        if (String(g?.id || '').startsWith('demo')) return true;
+        const parentEval = g?.evaluationId ? evalMap.get(g.evaluationId) : null;
+        if (parentEval) return getItemTeacherId(parentEval) === currentTeacherId;
+        return getItemTeacherId(g) === currentTeacherId;
+      });
+    }
+    return list;
+  }, [rawGrades, rawEvaluations, isDemoMode, role, currentTeacherId]);
+
+  const reviews = useMemo(() => {
+    const list = rawReviews || [];
+    if (isDemoMode) return list;
+    if (role === 'teacher') {
+      return list.filter(r => String(r?.id || '').startsWith('demo') || getItemTeacherId(r) === currentTeacherId);
+    }
+    return list.filter(r => {
+      if (String(r?.id || '').startsWith('demo')) return true;
+      const gId = String(r.targetGroupId || '').trim().toLowerCase();
+      const isGlobal = !gId || gId === 'all';
+      return isGlobal ? matchesStudentTeacher(r) : true;
+    });
+  }, [rawReviews, isDemoMode, role, currentTeacherId, matchesStudentTeacher]);
+
   const removeStudentFromGroupHelper = async (groupId, studentKey) => {
     if (!groupId || !studentKey) return;
     const idsToRemove = getAllIdentifiersForStudentKey(studentKey);
@@ -826,6 +971,7 @@ function App() {
 
     const currentAcadGroup = academicGroups.find(g => g.id === acadId);
     const currentChatGroup = chatGroups.find(g => g.id === chatGroupId || g.id === groupId);
+    const ownerTeacherId = getItemTeacherId(currentAcadGroup || currentChatGroup || { teacherId: myChatId });
 
     const acadMembers = Array.isArray(currentAcadGroup?.members)
       ? currentAcadGroup.members
@@ -843,7 +989,7 @@ function App() {
     const updatedChatMembers = chatMembers.filter(m => {
       if (!m) return false;
       const cleanM = String(m).toLowerCase().replace('@', '').trim();
-      return !idsToRemove.has(cleanM) || cleanM === 'teacher';
+      return !idsToRemove.has(cleanM) || cleanM === ownerTeacherId;
     });
 
     // 1. Actualizar estado local inmediatamente para que desaparezca al instante en la UI
@@ -859,7 +1005,7 @@ function App() {
         members: updatedAcadMembers
       });
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', chatGroupId), {
-        members: Array.from(new Set(['teacher', ...updatedChatMembers]))
+        members: Array.from(new Set([ownerTeacherId, ...updatedChatMembers]))
       }, { merge: true });
     } catch (err) {
       console.error("Error al persistir la remoción del estudiante en Firestore:", err);
@@ -890,10 +1036,11 @@ function App() {
 
     const updatedAcadMembers = Array.from(new Set([...currentMembers, studentKey]));
     const currentChatGroup = chatGroups.find(g => g.id === chatGroupId || g.id === groupId);
+    const ownerTeacherId = getItemTeacherId(currentAcadGroup || currentChatGroup || { teacherId: myChatId });
     const currentChatMembers = Array.isArray(currentChatGroup?.members)
       ? currentChatGroup.members
       : (currentChatGroup?.members && typeof currentChatGroup.members === 'object' ? Object.keys(currentChatGroup.members) : []);
-    const updatedChatMembers = Array.from(new Set([myChatId, 'teacher', ...currentChatMembers, studentKey]));
+    const updatedChatMembers = Array.from(new Set([ownerTeacherId, ...currentChatMembers, studentKey]));
 
     // 1. Actualizar estados locales inmediatamente
     setAcademicGroups(prev => prev.map(g => g.id === acadId ? { ...g, members: updatedAcadMembers } : g));
@@ -915,21 +1062,6 @@ function App() {
       console.error("Error al agregar estudiante al grupo:", err);
       showMessage("Error al agregar estudiante al grupo.");
     }
-  };
-
-  const isStudentInGroup = (group) => {
-    if (!group) return false;
-    if (isDemoMode || String(group.id || '').startsWith('demo_')) return true;
-    const membersList = Array.isArray(group.members)
-      ? group.members
-      : (group.members && typeof group.members === 'object' ? Object.keys(group.members) : []);
-    if (membersList.length === 0) return false;
-    const myIds = getMyStudentIdentifiers();
-    return membersList.some(m => {
-      if (!m) return false;
-      const cleanM = String(m).toLowerCase().replace('@', '').trim();
-      return myIds.has(cleanM);
-    });
   };
 
   const isStudentWithoutGroups = role === 'student' && hasEntered && !isDemoMode && academicGroupsLoaded && !hasDismissedFirstJoin && academicGroups.filter(isStudentInGroup).length === 0;
@@ -1080,12 +1212,13 @@ function App() {
   const allChatUsers = (() => {
     const rawList = [
       { id: 'teacher', name: TEACHER_NAME, role: 'teacher', profilePicUrl: userMappings['teacher']?.profilePicUrl || '' },
+      { id: 'camilodocente', name: SECOND_TEACHER_NAME, role: 'teacher', profilePicUrl: userMappings['camilodocente']?.profilePicUrl || '' },
       ...Object.entries(userMappings || {})
         .filter(([id, data]) => {
           if (!data?.email) return false;
           const cleanId = id.toLowerCase().replace('@', '').trim();
-          if (cleanId === 'teacher' || cleanId === 'ginadocente') return false;
-          if (data.role === 'teacher' || (data.fullName && data.fullName.toLowerCase().includes('gina marcela'))) return false;
+          if (isTeacherId(cleanId)) return false;
+          if (data.role === 'teacher' || (data.fullName && (data.fullName.toLowerCase().includes('gina marcela') || isCamiloTeacher(data.fullName)))) return false;
           return true;
         })
         .map(([id, data]) => ({ 
@@ -1100,8 +1233,8 @@ function App() {
       ...Object.entries(FALLBACK_MAP)
         .filter(([id, data]) => {
           const cleanId = id.toLowerCase().replace('@', '').trim();
-          if (cleanId === 'teacher' || cleanId === 'ginadocente') return false;
-          if (data.role === 'teacher' || (data.name && data.name.toLowerCase().includes('gina marcela'))) return false;
+          if (isTeacherId(cleanId)) return false;
+          if (data.role === 'teacher' || (data.name && (data.name.toLowerCase().includes('gina marcela') || isCamiloTeacher(data.name)))) return false;
           return !userMappings[id];
         })
         .map(([id, data]) => ({ 
@@ -1127,15 +1260,15 @@ function App() {
     });
 
     if (role === 'teacher') {
-      return rawUsers;
+      return rawUsers.filter(u => u.role !== 'teacher' && !isTeacherId(u.id));
     }
 
     // Estudiante: Obtener materias/grupos en los que está inscrito
     const myEnrolledGroups = academicGroups.filter(isStudentInGroup);
 
-    // Si no está en ningún grupo, únicamente ve a la docente
+    // Si no está en ningún grupo, únicamente ve a la docente principal
     if (myEnrolledGroups.length === 0) {
-      return rawUsers.filter(u => u.role === 'teacher' || u.id === 'teacher');
+      return rawUsers.filter(u => u.id === 'teacher');
     }
 
     // Recolectar identificadores de los compañeros de sus grupos
@@ -1148,7 +1281,9 @@ function App() {
     });
 
     return rawUsers.filter(u => {
-      if (u.role === 'teacher' || u.id === 'teacher') return true;
+      if (u.role === 'teacher' || isTeacherId(u.id)) {
+        return studentTeacherIds.size === 0 ? u.id === 'teacher' : studentTeacherIds.has(u.id);
+      }
       const cleanUId = u.id.toLowerCase().replace('@', '').trim();
       const cleanPeerUid = (u.uid || '').trim();
       const cleanPeerEmail = (u.email || '').toLowerCase().trim();
@@ -1265,7 +1400,9 @@ function App() {
     const cleanKey = (rawKey || cleanName).replace('@', '').toLowerCase();
 
     let targetId = null;
-    if (cleanName === TEACHER_NAME.toLowerCase() || cleanName === 'profesora' || cleanName === 'la profe' || cleanName === 'docente' || cleanName.includes('gina') || cleanKey === 'teacher') {
+    if (isCamiloTeacher(cleanName) || isCamiloTeacher(cleanKey)) {
+      targetId = 'camilodocente';
+    } else if (cleanName === TEACHER_NAME.toLowerCase() || cleanName === 'profesora' || cleanName === 'la profe' || cleanName === 'docente' || cleanName.includes('gina') || cleanKey === 'teacher') {
       targetId = 'teacher';
     } else if (rawKey && Object.keys(userMappings || {}).some(k => k.toLowerCase() === rawKey.toLowerCase())) {
       targetId = Object.keys(userMappings || {}).find(k => k.toLowerCase() === rawKey.toLowerCase());
@@ -1365,7 +1502,7 @@ function App() {
   };
 
   const updatePresenceStatus = async (newStatus) => {
-    const finalPresenceId = role === 'teacher' ? 'teacher' : myChatId;
+    const finalPresenceId = myChatId;
     if (finalPresenceId) {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'presence', finalPresenceId), {
         isOnline: true,
@@ -1446,6 +1583,7 @@ function App() {
       }
       const cancelData = {
         evaluationId: targetEval.id,
+        teacherId: getItemTeacherId(targetEval),
         studentId: user?.uid || myChatId || 'student_user',
         studentEmail: user?.email || '',
         studentName: loggedInName || 'Estudiante',
@@ -1627,6 +1765,7 @@ function App() {
       }
       const gradeData = {
         evaluationId: activeTakingEval.id,
+        teacherId: getItemTeacherId(activeTakingEval),
         studentId: user?.uid || myChatId || 'student_user',
         studentEmail: user?.email || '',
         studentName: loggedInName || 'Estudiante',
@@ -1820,7 +1959,7 @@ function App() {
     const handleOffline = () => {
       showMessage("Estás sin conexión. Algunas funciones pueden estar limitadas.");
       if (myChatId) {
-        const finalPresenceId = role === 'teacher' ? 'teacher' : myChatId;
+        const finalPresenceId = myChatId;
         setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'presence', finalPresenceId), {
           isOnline: false,
           status: 'offline',
@@ -1831,7 +1970,7 @@ function App() {
     const handleOnline = () => {
       showMessage("Conexión restaurada.");
       if (myChatId) {
-        const finalPresenceId = role === 'teacher' ? 'teacher' : myChatId;
+        const finalPresenceId = myChatId;
         setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'presence', finalPresenceId), {
           isOnline: true,
           status: 'online',
@@ -1915,7 +2054,7 @@ function App() {
   // Sincronización en tiempo real e instantánea de la URL del perfil activo
   useEffect(() => {
     if (activeTab === 'profile') {
-      const targetHash = viewingProfileId ? `profile/${viewingProfileId}` : (role === 'teacher' ? 'profile/teacher' : (myChatId ? `profile/${myChatId}` : 'profile'));
+      const targetHash = viewingProfileId ? `profile/${viewingProfileId}` : (myChatId ? `profile/${myChatId}` : 'profile');
       const currentHash = window.location.hash.replace('#', '');
       if (currentHash !== targetHash) {
         try {
@@ -2182,7 +2321,7 @@ function App() {
             } else if (FALLBACK_MAP[cleanUser]) {
                 targetEmail = FALLBACK_MAP[cleanUser].email;
                 expectedRole = FALLBACK_MAP[cleanUser].role;
-                targetName = FALLBACK_MAP[cleanUser].name;
+                targetName = FALLBACK_MAP[cleanUser].fullName || FALLBACK_MAP[cleanUser].name;
             } else {
                 setLoginError("Ese usuario no está registrado en el directorio.");
                 return;
@@ -2197,12 +2336,23 @@ function App() {
                 try {
                     await signInWithEmailAndPassword(auth, targetEmail, password);
                 } catch (authErr) {
-                    // Si falla la autenticación de Firebase (ej: cuenta vinculada a Google) pero es la docente con su contraseña
-                    const isTeacherUser = cleanUser === 'ginadocente' || cleanUser === 'teacher' || targetEmail.toLowerCase() === 'ginamarcelaquintana19@gmail.com';
-                    const isMasterPassword = password === 'DANTE12345' || password === 'dante12345';
-                    if (isTeacherUser && isMasterPassword) {
+                    // Si falla la autenticación de Firebase (ej: cuenta vinculada a Google o primer ingreso docente)
+                    const isGinaUser = cleanUser === 'ginadocente' || cleanUser === 'teacher' || targetEmail.toLowerCase() === 'ginamarcelaquintana19@gmail.com';
+                    const isGinaMasterPassword = password === 'DANTE12345' || password === 'dante12345';
+                    const isCamiloUser = isCamiloTeacher(cleanUser) || isCamiloTeacher(targetEmail);
+                    const isCamiloMasterPassword = password === 'Camilo.2410!!';
+
+                    if (isGinaUser && isGinaMasterPassword) {
                         if (!auth.currentUser) {
                             await signInAnonymously(auth);
+                        }
+                    } else if (isCamiloUser && isCamiloMasterPassword) {
+                        try {
+                            await createUserWithEmailAndPassword(auth, targetEmail, password);
+                        } catch (createErr) {
+                            if (!auth.currentUser) {
+                                await signInAnonymously(auth);
+                            }
                         }
                     } else {
                         throw authErr;
@@ -2210,21 +2360,31 @@ function App() {
                 }
 
                 if (auth.currentUser) await auth.currentUser.getIdToken(true).catch(() => {});
+
+                if (isCamiloTeacher(cleanUser)) {
+                    setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userMappings', 'camilodocente'), {
+                        fullName: SECOND_TEACHER_NAME,
+                        email: targetEmail,
+                        role: 'teacher'
+                    }, { merge: true }).catch(() => {});
+                }
                 
-                const userPhoto = userMappings?.[cleanUser]?.profilePicUrl || auth.currentUser?.photoURL || (expectedRole === 'teacher' ? userMappings?.['teacher']?.profilePicUrl : null) || '';
-                const newAcc = { username: cleanUser, name: targetName, role: expectedRole, email: targetEmail, profilePicUrl: userPhoto };
+                const teacherCanonicalKey = expectedRole === 'teacher' ? getCanonicalTeacherId(cleanUser) : cleanUser;
+                const userPhoto = userMappings?.[cleanUser]?.profilePicUrl || (expectedRole === 'teacher' ? userMappings?.[teacherCanonicalKey]?.profilePicUrl : null) || auth.currentUser?.photoURL || '';
+                const finalDisplayName = expectedRole === 'teacher' ? getTeacherDisplayName(cleanUser) : targetName;
+                const newAcc = { username: cleanUser, name: finalDisplayName, role: expectedRole, email: targetEmail, profilePicUrl: userPhoto };
                 const accs = safeGetSavedAccounts();
                 const filtered = accs.filter(a => a.username !== cleanUser); 
                 const updatedAccs = [newAcc, ...filtered];
                 localStorage.setItem('englishTech_savedAccounts', JSON.stringify(updatedAccs));
                 setSavedAccounts(updatedAccs);
 
-                const sessionObj = { email: targetEmail, uid: auth.currentUser?.uid || cleanUser, userKey: cleanUser, name: targetName, role: expectedRole, isGoogle: false };
+                const sessionObj = { email: targetEmail, uid: auth.currentUser?.uid || cleanUser, userKey: cleanUser, name: finalDisplayName, role: expectedRole, isGoogle: false };
                 localStorage.setItem('englishTech_activeSession', JSON.stringify(sessionObj));
 
                 setRole(expectedRole);
-                setLoggedInUser(expectedRole === 'teacher' ? 'GinaDocente' : `@${cleanUser}`);
-                setLoggedInName(expectedRole === 'teacher' ? TEACHER_NAME : targetName);
+                setLoggedInUser(expectedRole === 'teacher' ? getTeacherUsername(cleanUser) : `@${cleanUser}`);
+                setLoggedInName(finalDisplayName);
                 setHasEntered(true);
                 setLoginType(null);
 
@@ -2243,8 +2403,8 @@ function App() {
               
               const cleanUser = acc.username ? acc.username.replace('@', '') : '';
               const targetRole = acc.role || 'student';
-              const targetName = targetRole === 'teacher' ? TEACHER_NAME : (acc.name || cleanUser);
-              const targetUser = targetRole === 'teacher' ? 'GinaDocente' : `@${cleanUser}`;
+              const targetName = targetRole === 'teacher' ? getTeacherDisplayName(cleanUser || acc.name) : (acc.name || cleanUser);
+              const targetUser = targetRole === 'teacher' ? getTeacherUsername(cleanUser || acc.name) : `@${cleanUser}`;
               
               const sessionObj = {
                   email: acc.email || '',
@@ -2289,24 +2449,25 @@ function App() {
                 const userKey = existingEntry[0];
                 const targetFullName = existingEntry[1].fullName || fullName;
                 const targetRole = existingEntry[1].role || 'student';
+                const finalDisplayName = targetRole === 'teacher' ? getTeacherDisplayName(userKey || targetFullName) : targetFullName;
                 
                 await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userMappings', userKey), {
                   lastLogin: Date.now()
                 }).catch(() => {});
 
-                const newAcc = { username: userKey, name: targetFullName, role: targetRole, email: email, isGoogle: true };
+                const newAcc = { username: userKey, name: finalDisplayName, role: targetRole, email: email, isGoogle: true };
                 const accs = safeGetSavedAccounts();
                 const filtered = accs.filter(a => a.username !== userKey); 
                 const updatedAccs = [newAcc, ...filtered];
                 localStorage.setItem('englishTech_savedAccounts', JSON.stringify(updatedAccs));
                 setSavedAccounts(updatedAccs);
 
-                const sessionObj = { email: email, uid: gUser.uid, userKey: userKey, name: targetFullName, role: targetRole, isGoogle: true };
+                const sessionObj = { email: email, uid: gUser.uid, userKey: userKey, name: finalDisplayName, role: targetRole, isGoogle: true };
                 localStorage.setItem('englishTech_activeSession', JSON.stringify(sessionObj));
 
                 setRole(targetRole);
-                setLoggedInUser(targetRole === 'teacher' ? 'GinaDocente' : `@${userKey}`);
-                setLoggedInName(targetRole === 'teacher' ? TEACHER_NAME : targetFullName);
+                setLoggedInUser(targetRole === 'teacher' ? getTeacherUsername(userKey || targetFullName) : `@${userKey}`);
+                setLoggedInName(finalDisplayName);
                 setHasEntered(true);
                 setLoginType(null);
                 if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
@@ -2384,6 +2545,11 @@ function App() {
             setGoogleOnboarding(prev => ({ ...prev, isSaving: true }));
 
             try {
+              if (isTeacherId(rawUser) || rawUser === 'admin') {
+                showMessage(`El usuario @${rawUser} está reservado para docentes. Elige otro.`);
+                setGoogleOnboarding(prev => ({ ...prev, isSaving: false }));
+                return;
+              }
               // Validar si el username ya está tomado por OTRO usuario distinto
               const userDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'userMappings', rawUser);
               const existingSnap = await getDoc(userDocRef);
@@ -2461,12 +2627,17 @@ function App() {
             setLoginError("");
 
             try {
-              // 1. Validar nombre de usuario único
+              // 1. Validar nombre de usuario único y reservar cuentas docentes
+              if (isTeacherId(username) || username === 'admin') {
+                setLoginError(`El usuario @${username} está reservado para docentes.`);
+                setIsRegisteringStudent(false);
+                return;
+              }
               const userDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'userMappings', username);
               const userSnap = await getDoc(userDocRef);
-              if (userSnap.exists() || username === 'teacher' || username === 'admin') {
+              if (userSnap.exists()) {
                 const uData = userSnap.data();
-                if (uData.email?.toLowerCase() !== email) {
+                if (uData?.email?.toLowerCase() !== email) {
                   setLoginError(`El usuario @${username} ya está en uso por otro estudiante.`);
                   setIsRegisteringStudent(false);
                   return;
@@ -2739,7 +2910,7 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
             }
             // APAGAR EL FOQUITO VERDE ANTES DE SALIR
             if (myChatId) {
-                const finalPresenceId = role === 'teacher' ? 'teacher' : myChatId;
+                const finalPresenceId = myChatId;
                 await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'presence', finalPresenceId), { isOnline: false, status: 'offline', lastSeen: Date.now() }, { merge: true }).catch(()=>{});
             }
             
@@ -2869,8 +3040,8 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
                     if (activeSession && (activeSession.userKey || activeSession.name)) {
                         const cleanKey = (activeSession.userKey || '').replace('@', '');
                         const finalRole = activeSession.role || 'student';
-                        const finalName = finalRole === 'teacher' ? TEACHER_NAME : (activeSession.name || cleanKey);
-                        const finalUser = finalRole === 'teacher' ? 'GinaDocente' : `@${cleanKey}`;
+                        const finalName = finalRole === 'teacher' ? getTeacherDisplayName(cleanKey || activeSession.name) : (activeSession.name || cleanKey);
+                        const finalUser = finalRole === 'teacher' ? getTeacherUsername(cleanKey || activeSession.name) : `@${cleanKey}`;
                         
                         setRole(finalRole);
                         setLoggedInUser(finalUser);
@@ -2898,11 +3069,11 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
                         const dbData = currentMappings[foundKey] || {};
                         const fallbackData = FALLBACK_MAP[foundKey] || {};
                         const finalRole = dbData.role || fallbackData.role || 'student';
-                        const finalName = dbData.fullName || fallbackData.name || foundKey;
+                        const finalName = finalRole === 'teacher' ? getTeacherDisplayName(foundKey) : (dbData.fullName || fallbackData.name || foundKey);
                         
                         setRole(finalRole);
-                        setLoggedInUser(finalRole === 'teacher' ? 'GinaDocente' : `@${foundKey}`);
-                        setLoggedInName(finalRole === 'teacher' ? TEACHER_NAME : finalName);
+                        setLoggedInUser(finalRole === 'teacher' ? getTeacherUsername(foundKey) : `@${foundKey}`);
+                        setLoggedInName(finalName);
                         setHasEntered(true);
                         setLoginType(null);
                         localStorage.setItem('englishTech_activeSession', JSON.stringify({ email: u.email, uid: u.uid, userKey: foundKey, name: finalName, role: finalRole }));
@@ -2916,7 +3087,9 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
 useEffect(() => {
     if (!myChatId) return;
     const base = ['artifacts', appId, 'public', 'data'];
-    const uidKey = user?.uid || myChatId;
+    const uidKey = isCamiloTeacher(myChatId) ? 'camilodocente' : (user?.uid || myChatId);
+    const botDocId = isCamiloTeacher(myChatId) ? 'teacherBot_camilodocente' : 'teacherBot';
+    const teacherBotUserKey = isCamiloTeacher(myChatId) ? 'camilodocente' : (user?.uid || myChatId || 'teacher');
     
     const uBotSettings = onSnapshot(doc(db, ...base, 'settings', 'bot'), d => setBotInfoList(d.data()?.infoList || []));
     const uChat = onSnapshot(doc(db, 'artifacts', appId, 'users', uidKey, 'chatbot', 'history'), d => setChatHistory(d.data()?.messages || []));
@@ -3012,10 +3185,12 @@ useEffect(() => {
     });
 
     // Listener para el conocimiento del bot de la profe
-    const uTeacherBot = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'teacherBot'), d => setTeacherBotInfoList(d.data()?.infoList || []));
-    const uTeacherBotHist = onSnapshot(doc(db, 'artifacts', appId, 'users', user?.uid || 'teacher', 'teacherBot', 'history'), d => {
+    const uTeacherBot = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'settings', botDocId), d => setTeacherBotInfoList(d.data()?.infoList || []));
+    const uTeacherBotHist = onSnapshot(doc(db, 'artifacts', appId, 'users', teacherBotUserKey, 'teacherBot', 'history'), d => {
         if (d.exists()) {
             setTeacherBotHistory(d.data()?.messages || []);
+        } else {
+            setTeacherBotHistory([]);
         }
     });
 
@@ -3036,8 +3211,9 @@ useEffect(() => {
   academicGroups.forEach(g => {
       const chatGroupId = `acad_${g.id}`;
       const existing = chatGroups.find(cg => cg.id === chatGroupId || cg.id === `group_${g.id}`);
+      const ownerTeacherId = getItemTeacherId(g);
       const rawGroupMembers = Array.isArray(g.members) ? g.members : (g.members && typeof g.members === 'object' ? Object.keys(g.members) : []);
-      const groupMembers = Array.from(new Set([myChatId, 'teacher', ...rawGroupMembers]));
+      const groupMembers = Array.from(new Set([ownerTeacherId, ...rawGroupMembers]));
       if (!existing) {
           setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', chatGroupId), {
               id: chatGroupId,
@@ -3046,7 +3222,8 @@ useEffect(() => {
               members: groupMembers,
               emoji: g.emoji || 'BookOpen',
               avatarUrl: g.avatarUrl || g.coverUrl || '',
-              createdBy: 'teacher',
+              createdBy: ownerTeacherId,
+              teacherId: ownerTeacherId,
               isAcademicGroupChat: true,
               createdAt: g.createdAt || Date.now()
           }, { merge: true }).catch(() => {});
@@ -3219,7 +3396,7 @@ useEffect(() => {
 }, [hasEntered, myChatId, activeTab, role, isDemoMode]);
             useEffect(() => {
               if (myChatId && !isDemoMode) {
-                  const finalPresenceId = role === 'teacher' ? 'teacher' : myChatId;
+                  const finalPresenceId = myChatId;
                   const presenceRef = doc(db, 'artifacts', appId, 'public', 'data', 'presence', finalPresenceId);
                   
                   let awayTimer;
@@ -3391,7 +3568,7 @@ useEffect(() => {
                       }
                       if (call.type !== 'group') {
                           const calleeId = call.callee || ''
-                          const isMeCallee = calleeId === myChatId || (role === 'teacher' && (calleeId === 'teacher' || calleeId === 'teacher_gina'))
+                          const isMeCallee = calleeId === myChatId || (myChatId === 'teacher' && calleeId === 'teacher_gina') || (myChatId === 'camilodocente' && calleeId === 'teacher_camilo')
                           if (isMeCallee) {
                               setIncomingCall({
                                   callId: d.id,
@@ -3403,8 +3580,8 @@ useEffect(() => {
                               break
                           }
                       } else {
-                          const isMe = parts.some(p => p.id === myChatId || (role === 'teacher' && (p.id === 'teacher' || p.id === 'teacher_gina')))
-                          const isInitiator = call.initiator === myChatId || (role === 'teacher' && (call.initiator === 'teacher' || call.initiator === 'teacher_gina'))
+                          const isMe = parts.some(p => p.id === myChatId || (myChatId === 'teacher' && p.id === 'teacher_gina') || (myChatId === 'camilodocente' && p.id === 'teacher_camilo'))
+                          const isInitiator = call.initiator === myChatId || (myChatId === 'teacher' && call.initiator === 'teacher_gina') || (myChatId === 'camilodocente' && call.initiator === 'teacher_camilo')
                           if (isMe && !isInitiator) {
                               setIncomingCall({
                                   callId: d.id,
@@ -3550,7 +3727,7 @@ useEffect(() => {
               const markAsRead = async () => {
                   markingReadRef.current = true;
                   try {
-                      const isMyMsg = (m) => m.authorId === myChatId || (role === 'teacher' && (m.authorId === 'teacher' || m.authorId === 'teacher_gina'));
+                      const isMyMsg = (m) => m.authorId === myChatId || (myChatId === 'teacher' && m.authorId === 'teacher_gina') || (myChatId === 'camilodocente' && m.authorId === 'teacher_camilo');
                       const unreadMessages = chatMessages.filter(m => !isMyMsg(m) && m.status !== 'read');
                       await Promise.all(unreadMessages.map(msg => {
                           const msgRef = doc(db, 'artifacts', appId, 'public', 'data', 'chats', activeChat.id, 'messages', msg.id);
@@ -3577,7 +3754,7 @@ useEffect(() => {
 // NUEVO: Efecto para compartir en qué chat estamos actualmente
 useEffect(() => {
     if (!myChatId) return;
-    const finalPresenceId = role === 'teacher' ? 'teacher' : myChatId;
+    const finalPresenceId = myChatId;
     const presenceRef = doc(db, 'artifacts', appId, 'public', 'data', 'presence', finalPresenceId);
 
     const updateChatPresence = () => {
@@ -3600,6 +3777,7 @@ useEffect(() => {
     };
 }, [activeChat, isChatAppOpen, myChatId, role, db, appId]);
             
+
 
 
           
@@ -3639,6 +3817,12 @@ useEffect(() => {
     }
     if (raw.toLowerCase().startsWith('teacher_')) {
       return raw.slice(8);
+    }
+    if (raw.toLowerCase().endsWith('_camilodocente')) {
+      return raw.slice(0, -14);
+    }
+    if (raw.toLowerCase().startsWith('camilodocente_')) {
+      return raw.slice(14);
     }
 
     const parts = raw.split('_');
@@ -3817,7 +4001,7 @@ useEffect(() => {
                           grade: roundedGrade,
                           gradeFeedback: (gradingItemModal.feedback || '').trim(),
                           gradedAt: Date.now(),
-                          gradedBy: TEACHER_NAME
+                          gradedBy: myDisplayName
                       });
                       showMessage("Calificación guardada para el mensaje.");
                   } else if (gradingItemModal.type === 'post') {
@@ -3826,7 +4010,7 @@ useEffect(() => {
                           grade: roundedGrade,
                           gradeFeedback: (gradingItemModal.feedback || '').trim(),
                           gradedAt: Date.now(),
-                          gradedBy: TEACHER_NAME
+                          gradedBy: myDisplayName
                       });
                       showMessage("Calificación guardada para la publicación.");
                   }
@@ -3871,7 +4055,7 @@ useEffect(() => {
               const newPrefs = { ...chatPreferences };
               newPrefs[chatId] = { ...(newPrefs[chatId] || { gradient: '', pattern: 'none' }), [key]: value };
               setChatPreferences(newPrefs);
-              const prefsUid = user?.uid || myChatId;
+              const prefsUid = isCamiloTeacher(myChatId) ? 'camilodocente' : (user?.uid || myChatId);
               if (prefsUid) {
                   await setDoc(doc(db, 'artifacts', appId, 'users', prefsUid, 'preferences', 'chat'), { prefs: newPrefs }, { merge: true }).catch(err => console.error('Error saving chat prefs:', err));
               }
@@ -4003,7 +4187,7 @@ useEffect(() => {
           await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', grp.id), { members: updatedMembers });
           if (grp.academicGroupId || grp.id.startsWith('acad_')) {
               const acadId = grp.academicGroupId || grp.id.replace('acad_', '');
-              await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', acadId), { members: updatedMembers.filter(m => m !== 'teacher') }).catch(() => {});
+              await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', acadId), { members: updatedMembers.filter(m => !isTeacherId(m)) }).catch(() => {});
           }
           setShowAddMembersModal(false);
           setSelectedNewMembers([]);
@@ -4024,7 +4208,7 @@ useEffect(() => {
           await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', grp.id), { members: updatedMembers });
           if (grp.academicGroupId || grp.id.startsWith('acad_')) {
               const acadId = grp.academicGroupId || grp.id.replace('acad_', '');
-              await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', acadId), { members: updatedMembers.filter(m => m !== 'teacher') }).catch(() => {});
+              await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', acadId), { members: updatedMembers.filter(m => !isTeacherId(m)) }).catch(() => {});
           }
           setActiveChat(null);
           setShowGroupInfo(false);
@@ -4071,9 +4255,9 @@ useEffect(() => {
               return;
           }
 
-          const authorName = role === 'teacher' ? TEACHER_NAME : loggedInName;
+          const authorName = role === 'teacher' ? myDisplayName : loggedInName;
           const msgPreviewText = textToSend || (imgToSend ? 'Imagen' : (fileToSend ? 'Documento' : (audioToSend ? 'Nota de voz' : '')));
-          const previewName = role === 'teacher' ? 'Profesora' : (loggedInName || 'Estudiante').split(' ')[0];
+          const previewName = role === 'teacher' ? (isCamiloTeacher(myChatId) ? 'Prof. Camilo' : 'Profesora') : (loggedInName || 'Estudiante').split(' ')[0];
 
           await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'chats', activeChat.id, 'messages'), {
               text: textToSend,
@@ -4143,6 +4327,7 @@ useEffect(() => {
                       name: newGroupName.trim(),
                       members: [myChatId, ...newGroupMembers],
                       createdBy: myChatId,
+                      ...(role === 'teacher' ? { teacherId: myChatId } : {}),
                       createdAt: Date.now()
                   });
                   setIsCreatingGroup(false);
@@ -4384,6 +4569,8 @@ useEffect(() => {
                       targetGroupName: evalFormData.targetGroupName || 'Todos los estudiantes (Global)',
                       createdAt: now,
                       createdBy: myChatId,
+                      teacherId: myChatId,
+                      authorName: myDisplayName,
                       ...(isDemoMode ? { isDemoCreated: true, expiresAt: now + DEMO_TTL_MS } : {})
                   };
 
@@ -4551,7 +4738,7 @@ useEffect(() => {
             ]);
 
             await withTimeout(addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'userPosts'), {
-                authorId: user?.uid || myChatId || 'user', 
+                authorId: role === 'teacher' ? myChatId : (user?.uid || myChatId || 'user'), 
                 authorUsername: myChatId || '', 
                 authorName: loggedInName || 'Usuario',
                 title: (profilePostTitle || '').trim(), 
@@ -4618,14 +4805,28 @@ useEffect(() => {
 
     const renderProfile = () => {
         const rawTargetId = viewingProfileId ? String(viewingProfileId).trim() : '';
-        const isViewingTeacherExplicit = rawTargetId.toLowerCase() === 'teacher' || rawTargetId.toLowerCase() === 'ginadocente';
-        const isViewingSelfStudent = Boolean(myChatId && rawTargetId.toLowerCase() === myChatId.toLowerCase());
-        const isMyProfile = !rawTargetId || (role === 'teacher' ? isViewingTeacherExplicit : isViewingSelfStudent);
+        const cleanRawTarget = rawTargetId.toLowerCase().replace(/^@/, '');
+        const isViewingMyTeacherProfile = role === 'teacher' && (
+            !cleanRawTarget ||
+            cleanRawTarget === myChatId ||
+            (myChatId === 'teacher' && (cleanRawTarget === 'teacher' || cleanRawTarget === 'ginadocente')) ||
+            (myChatId === 'camilodocente' && isCamiloTeacher(cleanRawTarget))
+        );
+        const isViewingSelfStudent = Boolean(myChatId && cleanRawTarget === myChatId.toLowerCase());
+        const isMyProfile = !cleanRawTarget || (role === 'teacher' ? isViewingMyTeacherProfile : isViewingSelfStudent);
 
-        let targetUserKey = rawTargetId || (role === 'teacher' ? 'teacher' : myChatId);
+        let targetUserKey = rawTargetId || myChatId || (role === 'teacher' ? 'teacher' : '');
         let userData = null;
 
-        if (targetUserKey === 'teacher' || targetUserKey.toLowerCase() === 'ginadocente' || (role === 'teacher' && isMyProfile)) {
+        if (isCamiloTeacher(targetUserKey) || (role === 'teacher' && isMyProfile && myChatId === 'camilodocente')) {
+            userData = {
+                fullName: SECOND_TEACHER_NAME,
+                role: 'teacher',
+                customLabel: 'Docente',
+                profilePicUrl: userMappings['camilodocente']?.profilePicUrl || ''
+            };
+            targetUserKey = 'camilodocente';
+        } else if (targetUserKey === 'teacher' || targetUserKey.toLowerCase() === 'ginadocente' || (role === 'teacher' && isMyProfile)) {
             userData = {
                 fullName: TEACHER_NAME,
                 role: 'teacher',
@@ -4645,7 +4846,7 @@ useEffect(() => {
                 if (FALLBACK_MAP[cleanFbKey]) {
                     targetUserKey = cleanFbKey;
                     const fb = FALLBACK_MAP[cleanFbKey];
-                    userData = { fullName: fb.name, role: fb.role, customLabel: fb.customLabel, profilePicUrl: fb.profilePicUrl, email: fb.email };
+                    userData = { fullName: fb.fullName || fb.name, role: fb.role, customLabel: fb.customLabel, profilePicUrl: fb.profilePicUrl, email: fb.email };
                 } else {
                     // 3. Buscar por UID en userMappings
                     const matchUid = Object.entries(userMappings || {}).find(([, u]) => u?.uid === targetUserKey);
@@ -4698,16 +4899,22 @@ useEffect(() => {
         }
 
         const profileName = userData?.fullName || (isMyProfile ? loggedInName : targetUserKey);
-        const profileRole = (userData?.role === 'teacher' || targetUserKey === 'teacher' || targetUserKey.toLowerCase() === 'ginadocente') ? 'Docente' : (userData?.customLabel || 'Estudiante');
+        const profileRole = (userData?.role === 'teacher' || isTeacherId(targetUserKey)) ? 'Docente' : (userData?.customLabel || 'Estudiante');
         const targetProfilePic = userData?.profilePicUrl || (isMyProfile ? (userMappings[myChatId]?.profilePicUrl || '') : '');
         const targetFilterId = targetUserKey;
         const targetUserId = targetUserKey;
 
         // Estado de presencia en tiempo real (conectado, ausente, ocupado, desconectado)
-        const pData = userPresence[targetUserId] || (targetUserId === 'teacher' ? userPresence['teacher'] : userPresence[targetFilterId]) || {};
+        const pData = userPresence[targetUserId] || userPresence[targetFilterId] || {};
         const presenceStatus = (!pData.isOnline || pData.status === 'offline') ? 'offline' : (pData.status || 'offline');
 
-        const myPosts = userPosts.filter(p => p.authorUsername === targetFilterId || (isMyProfile && ((p.authorId && p.authorId === user?.uid) || p.authorUsername === myChatId)));
+        const isTeacherProfile = isTeacherId(targetFilterId);
+        const myPosts = userPosts.filter(p => {
+            if (isTeacherProfile) {
+                return getCanonicalTeacherId(p.authorUsername || p.authorId || p.authorName) === getCanonicalTeacherId(targetFilterId);
+            }
+            return p.authorUsername === targetFilterId || (isMyProfile && ((p.authorId && p.authorId === user?.uid) || p.authorUsername === myChatId));
+        });
         
         return (
             <div className="space-y-5 pb-20 md:pb-6 max-w-3xl mx-auto">
@@ -5116,6 +5323,7 @@ useEffect(() => {
               appId={appId}
               academicGroups={academicGroups}
               myChatId={myChatId}
+              loggedInName={loggedInName}
               user={user}
               showMessage={showMessage}
               confirmAction={confirmAction}
@@ -5249,6 +5457,8 @@ Devuelve ÚNICAMENTE un array JSON plano (sin bloques markdown \`\`\`json ni tex
                     activities: item.activities || '',
                     targetGroupId: syllabusPdfTargetGroup || 'all',
                     targetGroupName: targetGroupName,
+                    teacherId: myChatId,
+                    createdBy: myChatId,
                     createdAt: Date.now()
                   });
                 }
@@ -5272,13 +5482,13 @@ Devuelve ÚNICAMENTE un array JSON plano (sin bloques markdown \`\`\`json ni tex
               if (role !== 'teacher' && !isDemoMode && !String(item.id || '').startsWith('demo-')) {
                 const enrolledGroups = (academicGroups || []).filter(isStudentInGroup);
                 const enrolledIds = enrolledGroups.map(g => g.id);
-                const enrolledNames = enrolledGroups.map(g => (g.name || '').toLowerCase().trim());
                 const itemGroupId = String(item.targetGroupId || '').trim();
                 const itemGroupName = String(item.targetGroupName || '').toLowerCase().trim();
+                const itemTeacherId = getItemTeacherId(item);
                 const isGeneric = (!itemGroupId || itemGroupId === 'all') && (!itemGroupName || itemGroupName === 'global' || itemGroupName === 'general' || itemGroupName === 'todos' || itemGroupName === 'todos los estudiantes');
                 if (!isGeneric) {
                   if (enrolledIds.length === 0) return false;
-                  const matchesMyGroup = enrolledIds.includes(itemGroupId) || enrolledIds.map(id => `acad_${id}`).includes(itemGroupId) || (itemGroupName && enrolledNames.includes(itemGroupName));
+                  const matchesMyGroup = enrolledGroups.some(g => g.id === itemGroupId || `acad_${g.id}` === itemGroupId || (itemGroupName && (g.name || '').toLowerCase().trim() === itemGroupName && getItemTeacherId(g) === itemTeacherId));
                   if (!matchesMyGroup) return false;
                 }
               }
@@ -5431,6 +5641,8 @@ Devuelve ÚNICAMENTE un array JSON plano (sin bloques markdown \`\`\`json ni tex
                           activities: actVal,
                           targetGroupId: targetGrp,
                           targetGroupName: grpObj ? grpObj.name : 'General',
+                          teacherId: myChatId,
+                          createdBy: myChatId,
                           createdAt: Date.now()
                         });
                         e.target.reset();
@@ -6142,7 +6354,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                 })
             );
             
-            let matched = findMatch(academicGroups);
+            let matched = findMatch(rawAcademicGroups);
 
             // Fallback si la memoria aún está hidratando (solo fuera de Modo Demo)
             if (!matched && !isDemoMode) {
@@ -6157,7 +6369,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
             }
 
             if (!matched) { 
-                setJoinCodeError(`Código "${code}" no encontrado o ha expirado. Verifica con tu profesora.`); 
+                setJoinCodeError(`Código "${code}" no encontrado o ha expirado. Verifica con tu docente.`); 
                 setIsJoiningGroup(false); 
                 return false; 
             }
@@ -6209,7 +6421,8 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
 
             // Sincronizar chat grupal
             const chatGroupId = `acad_${matched.id}`;
-            const updatedChatMembers = Array.from(new Set([...updatedMembers, 'teacher']));
+            const ownerTeacherId = getItemTeacherId(matched);
+            const updatedChatMembers = Array.from(new Set([...updatedMembers, ownerTeacherId]));
             await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', chatGroupId), { 
                 id: chatGroupId,
                 academicGroupId: matched.id,
@@ -6217,6 +6430,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                 name: matched.name, 
                 avatarUrl: matched.avatarUrl || '', 
                 emoji: matched.emoji || 'BookOpen',
+                teacherId: ownerTeacherId,
                 isAcademicGroupChat: true
             }, { merge: true }).catch(() => {});
 
@@ -6229,7 +6443,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
             setChatGroups(prev => {
                 const exists = prev.some(g => g.id === chatGroupId);
                 if (exists) return prev.map(g => g.id === chatGroupId ? { ...g, members: updatedChatMembers } : g);
-                return [...prev, { id: chatGroupId, academicGroupId: matched.id, name: matched.name, members: updatedChatMembers, isAcademicGroupChat: true }];
+                return [...prev, { id: chatGroupId, academicGroupId: matched.id, name: matched.name, members: updatedChatMembers, teacherId: ownerTeacherId, isAcademicGroupChat: true }];
             });
 
             // Navegar y celebrar
@@ -6277,6 +6491,9 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                     coverPattern: 'doodle-1',
                     coverUrl: '',
                     inviteCodes: [{ code: 'DEMO' + String(now).slice(-2), expiresAt: now + DEMO_TTL_MS }],
+                    teacherId: myChatId,
+                    teacherName: myDisplayName,
+                    createdBy: myChatId,
                     createdAt: now,
                     expiresAt: now + DEMO_TTL_MS,
                     isDemoCreated: true
@@ -6312,11 +6529,14 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                 coverPattern: 'doodle-1',
                 coverUrl: '',
                 inviteCodes: [],
+                teacherId: myChatId,
+                teacherName: myDisplayName,
+                createdBy: myChatId,
                 createdAt: Date.now()
             });
 
             // Creación automática inmediata de la sala de chat grupal para la materia
-            const groupChatMembers = Array.from(new Set([myChatId, 'teacher', ...selectedAcadMembers]));
+            const groupChatMembers = Array.from(new Set([myChatId, ...selectedAcadMembers]));
             await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', `acad_${newGroupDoc.id}`), {
                 id: `acad_${newGroupDoc.id}`,
                 academicGroupId: newGroupDoc.id,
@@ -6325,6 +6545,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                 emoji: newAcadGroupEmoji || 'BookOpen',
                 avatarUrl: newAcadGroupAvatarUrl.trim() || '',
                 createdBy: myChatId,
+                teacherId: myChatId,
                 isAcademicGroupChat: true,
                 createdAt: Date.now()
             }, { merge: true });
@@ -6378,7 +6599,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
         }
     };
 
-    const studentEntries = Object.entries(userMappings || {}).filter(([uk, ud]) => uk !== 'teacher' && ud?.role !== 'teacher');
+    const studentEntries = Object.entries(userMappings || {}).filter(([uk, ud]) => !isTeacherId(uk) && ud?.role !== 'teacher');
     const filteredStudents = evalSearchQuery.trim()
         ? studentEntries.filter(([uk, ud]) => {
             const norm = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -6395,7 +6616,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
         const enrolledStudentsMap = new Map();
         const rawCurrentGroupMembers = Array.isArray(currentGroup?.members) ? currentGroup.members : (currentGroup?.members && typeof currentGroup.members === 'object' ? Object.keys(currentGroup.members) : []);
         rawCurrentGroupMembers.forEach(m => {
-            if (!m || m === 'teacher') return;
+            if (!m || isTeacherId(m)) return;
             const cleanM = String(m).toLowerCase().replace('@', '').trim();
             let foundKey = Object.keys(userMappings || {}).find(uk => {
                 const ud = userMappings[uk];
@@ -6468,12 +6689,14 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                     members: updatedMembers
                 });
                 // Sincronizar chat grupal
-                const updatedChatMembers = Array.from(new Set([myChatId, 'teacher', ...updatedMembers]));
+                const ownerTeacherId = getItemTeacherId(currentGroup || { teacherId: myChatId });
+                const updatedChatMembers = Array.from(new Set([ownerTeacherId, ...updatedMembers]));
                 await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', `acad_${currentGroup.id}`), {
                     members: updatedChatMembers,
                     name: currentGroup.name,
                     avatarUrl: currentGroup.avatarUrl || currentGroup.coverUrl || '',
-                    emoji: currentGroup.emoji || 'BookOpen'
+                    emoji: currentGroup.emoji || 'BookOpen',
+                    teacherId: ownerTeacherId
                 }, { merge: true }).catch(() => {});
                 showMessage("Estudiante inscrito en la materia y añadido al chat grupal.");
             } catch (err) {
@@ -9382,8 +9605,8 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
               }
 
               // Filtro de evaluaciones visibles para estudiantes y archivadas para la docente
-              const myEnrolledSubjectIds = (academicGroups || []).filter(isStudentInGroup).map(g => g.id);
-              const myEnrolledSubjectNames = (academicGroups || []).filter(isStudentInGroup).map(g => (g.name || '').toLowerCase().trim());
+              const myEnrolledSubjects = (academicGroups || []).filter(isStudentInGroup);
+              const myEnrolledSubjectIds = myEnrolledSubjects.map(g => g.id);
               const visibleEvaluations = role === 'teacher' 
                   ? evaluations.filter(ev => evalTabFilter === 'archived' ? !!ev.isArchived : !ev.isArchived)
                   : evaluations.filter(ev => {
@@ -9391,10 +9614,11 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                       if (isDemoMode || String(ev.id || '').startsWith('demo-')) return true;
                       const evGrpId = String(ev.targetGroupId || '').trim();
                       const evGrpName = String(ev.targetGroupName || '').toLowerCase().trim();
+                      const evTeacherId = getItemTeacherId(ev);
                       const isGeneric = (!evGrpId || evGrpId === 'all') && (!evGrpName || evGrpName === 'global' || evGrpName === 'todos' || evGrpName === 'general' || evGrpName === 'todos los estudiantes' || evGrpName === 'todos los estudiantes (global)');
                       if (isGeneric) return true;
                       if (myEnrolledSubjectIds.length === 0) return false;
-                      return myEnrolledSubjectIds.includes(evGrpId) || myEnrolledSubjectIds.map(id => `acad_${id}`).includes(evGrpId) || (evGrpName && myEnrolledSubjectNames.includes(evGrpName));
+                      return myEnrolledSubjects.some(g => g.id === evGrpId || `acad_${g.id}` === evGrpId || (evGrpName && (g.name || '').toLowerCase().trim() === evGrpName && getItemTeacherId(g) === evTeacherId));
                   });
 
               const activeCount = evaluations.filter(e => !e.isArchived).length;
@@ -10322,7 +10546,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                             type="button"
                             onClick={() => updatePresenceStatus('online')} 
                             className={`py-2 px-2 rounded-xl flex items-center justify-center gap-1.5 border transition-all text-center ${
-                                (!userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status || userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'online') 
+                                (!userPresence[myChatId]?.status || userPresence[myChatId]?.status === 'online') 
                                     ? 'bg-green-500/15 border-green-500 text-green-600 dark:text-green-400 ring-2 ring-green-500/20 shadow-xs font-bold text-xs' 
                                     : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 text-xs'
                             }`}
@@ -10335,7 +10559,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                             type="button"
                             onClick={() => updatePresenceStatus('away')} 
                             className={`py-2 px-2 rounded-xl flex items-center justify-center gap-1.5 border transition-all text-center ${
-                                userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'away' 
+                                userPresence[myChatId]?.status === 'away' 
                                     ? 'bg-orange-500/15 border-orange-500 text-orange-600 dark:text-orange-400 ring-2 ring-orange-500/20 shadow-xs font-bold text-xs' 
                                     : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 text-xs'
                             }`}
@@ -10348,7 +10572,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                             type="button"
                             onClick={() => updatePresenceStatus('busy')} 
                             className={`py-2 px-2 rounded-xl flex items-center justify-center gap-1.5 border transition-all text-center ${
-                                userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'busy' 
+                                userPresence[myChatId]?.status === 'busy' 
                                     ? 'bg-red-500/15 border-red-500 text-red-600 dark:text-red-400 ring-2 ring-red-500/20 shadow-xs font-bold text-xs' 
                                     : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 text-xs'
                             }`}
@@ -10656,8 +10880,10 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                   <p className="text-sm text-gray-600 text-center mb-2">Haz clic en tu cuenta o accede manualmente.</p>
                                   <div className="flex flex-wrap justify-center gap-4 max-h-64 overflow-y-auto p-2">
                                       {savedAccounts.map(acc => {
-                                           const userPhoto = acc.profilePicUrl || acc.photoURL || userMappings?.[acc.username]?.profilePicUrl || (acc.role === 'teacher' ? userMappings?.['teacher']?.profilePicUrl : null);
-                                           const initial = (acc.role === 'teacher' ? 'G' : (acc.name || 'U').charAt(0)).toUpperCase();
+                                           const isCamiloAcc = acc.role === 'teacher' && isCamiloTeacher(acc.username || acc.name);
+                                           const teacherKey = isCamiloAcc ? 'camilodocente' : 'teacher';
+                                           const userPhoto = acc.profilePicUrl || acc.photoURL || userMappings?.[acc.username]?.profilePicUrl || (acc.role === 'teacher' ? userMappings?.[teacherKey]?.profilePicUrl : null);
+                                           const initial = (acc.role === 'teacher' ? (isCamiloAcc ? 'C' : 'G') : (acc.name || 'U').charAt(0)).toUpperCase();
                                            return (
                                                <div key={acc.username} className="relative group">
                                                    <button 
@@ -10676,7 +10902,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                            )}
                                                        </div>
                                                        <span className="text-xs font-bold text-gray-800 dark:text-gray-200 text-center leading-tight line-clamp-2">
-                                                           {acc.role === 'teacher' ? 'Gina' : acc.name}
+                                                           {acc.role === 'teacher' ? (isCamiloAcc ? 'Camilo' : 'Gina') : acc.name}
                                                        </span>
                                                    </button>
                                                    <button 
@@ -11290,9 +11516,9 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                       {userMappings[myChatId]?.profilePicUrl ? <img src={userMappings[myChatId].profilePicUrl} className="w-full h-full object-cover" /> : <UserIcon size={22} />}
                                   </div>
                                   <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 ${isDarkMode ? 'border-gray-800' : 'border-white'} ${
-                                      (!userPresence[role === 'teacher' ? 'teacher' : myChatId]?.isOnline || userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'offline') ? 'bg-gray-400' :
-                                      userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'away' ? 'bg-orange-400' :
-                                      userPresence[role === 'teacher' ? 'teacher' : myChatId]?.status === 'busy' ? 'bg-red-500' : 'bg-green-500'
+                                      (!userPresence[myChatId]?.isOnline || userPresence[myChatId]?.status === 'offline') ? 'bg-gray-400' :
+                                      userPresence[myChatId]?.status === 'away' ? 'bg-orange-400' :
+                                      userPresence[myChatId]?.status === 'busy' ? 'bg-red-500' : 'bg-green-500'
                                   }`} />
                               </div>
                               
@@ -11442,6 +11668,8 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                               user={user}
                               role={role}
                               isDemoMode={isDemoMode}
+                              myChatId={myChatId}
+                              loggedInName={loggedInName}
                           />
                       )}
                   </main>
@@ -11757,7 +11985,8 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                   <button 
                                       type="button"
                                       onClick={async () => {
-                                          await deleteDoc(doc(db, 'artifacts', appId, 'users', user?.uid || 'teacher', 'teacherBot', 'history')).catch(()=>{});
+                                          const botUserKey = isCamiloTeacher(myChatId) ? 'camilodocente' : (user?.uid || myChatId || 'teacher');
+                                          await deleteDoc(doc(db, 'artifacts', appId, 'users', botUserKey, 'teacherBot', 'history')).catch(()=>{});
                                           setTeacherBotHistory([]);
                                           showMessage("Sesión del asistente reiniciada.");
                                       }} 
@@ -11781,7 +12010,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                               <div className={`text-xs sm:text-sm p-3.5 rounded-2xl rounded-tl-none shadow-xs font-medium whitespace-pre-wrap leading-relaxed border ${
                                   isDarkMode ? 'bg-gray-800/80 text-blue-200 border-gray-700/80' : 'bg-blue-50/90 text-blue-950 border-blue-100'
                               }`}>
-                                  ¡Hola, Profesora Gina! Soy su Asistente de English TECH. Estoy aquí para orientarle en la gestión de contenidos, evaluaciones, asignaciones y uso de las herramientas de la plataforma. ¿En qué le puedo colaborar hoy?
+                                  {`¡Hola, ${isCamiloTeacher(myChatId) ? 'Profesor Camilo' : 'Profesora Gina'}! Soy su Asistente de English TECH. Estoy aquí para orientarle en la gestión de contenidos, evaluaciones, asignaciones y uso de las herramientas de la plataforma. ¿En qué le puedo colaborar hoy?`}
                               </div>
                               {teacherBotHistory.map((m, i) => {
                                   const isMe = m.role === 'user';
@@ -11851,6 +12080,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                               const groupList = academicGroups.map(g => `${g.name} (ID:${g.id}, ${(Array.isArray(g.members) ? g.members.length : (g.members && typeof g.members === 'object' ? Object.keys(g.members).length : 0))} miembros)`);
                               const weekList = syllabus.slice(-8).map(s => `S${s.week}: ${s.topic || 'Sin tema'}`);
 
+                              const teacherPromptName = isCamiloTeacher(myChatId) ? 'Camilo' : 'Gina';
                               const prompt = `Asistente de English TECH. Fecha: ${now}. Responde SOLO con JSON cuando el usuario pida una accion, o texto normal si es pregunta. Breve. Sin asteriscos. En espanol.
 
 ACCIONES (responde JSON: {"action":"NOMBRE","params":{...},"response":"respuesta al usuario"}):
@@ -11868,8 +12098,8 @@ REPORTE: performance_report (params: {scope:all|group|student})
 
 ${teacherBotInfoList.length > 0 ? 'Notas docente: ' + teacherBotInfoList.map(i => i.text).join('; ') + '\n' : ''}
 Datos: ${studs.length} estudiantes (${studs.slice(0,15).join(', ')}), ${tasks.length} tareas (${taskList.join(' | ')}), ${evaluations.length} evaluaciones (${evList.join(' | ')}), ${academicGroups.length} grupos (${groupList.join(' | ')}), ${syllabus.length} sem syllabus (${weekList.join(', ')}), Notas: ${avgGrade}/5.0 (${gradeDetails.join(' | ')})
-Historial: ${newHistory.slice(-6).map(m => `${m.role === 'user' ? 'Gina' : 'Bot'}: ${m.text}`).join('\n')}
-Gina: ${userMsg}
+Historial: ${newHistory.slice(-6).map(m => `${m.role === 'user' ? teacherPromptName : 'Bot'}: ${m.text}`).join('\n')}
+${teacherPromptName}: ${userMsg}
 Bot:`;
 
                               try {
@@ -12011,7 +12241,7 @@ Bot:`;
                                               case 'create_group':
                                                   if (parsed.params?.name) {
                                                       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'chatGroups'), {
-                                                          name: parsed.params.name, members: [myChatId, 'teacher'], createdBy: myChatId, createdAt: Date.now()
+                                                          name: parsed.params.name, members: [myChatId], createdBy: myChatId, teacherId: myChatId, createdAt: Date.now()
                                                       });
                                                       cleanReply = `Grupo "${parsed.params.name}" creado.`;
                                                   }
@@ -12043,7 +12273,8 @@ Bot:`;
 
                                   const finalHistory = [...newHistory, { role: 'bot', text: cleanReply, time: botTime }];
                                   setTeacherBotHistory(finalHistory);
-                                  setDoc(doc(db, 'artifacts', appId, 'users', user?.uid || 'teacher', 'teacherBot', 'history'), { messages: finalHistory }).catch(e => console.warn("Historial local guardado:", e));
+                                  const botUserKey = isCamiloTeacher(myChatId) ? 'camilodocente' : (user?.uid || myChatId || 'teacher');
+                                  setDoc(doc(db, 'artifacts', appId, 'users', botUserKey, 'teacherBot', 'history'), { messages: finalHistory }).catch(e => console.warn("Historial local guardado:", e));
                               } catch (err) {
                                    console.error("Teacher bot error:", err);
                                    let errorText = "Ocurrió un error al procesar su solicitud. Por favor, intente de nuevo.";
@@ -12055,7 +12286,8 @@ Bot:`;
                                    }
                                    const finalHistory = [...newHistory, { role: 'bot', text: errorText }];
                                    setTeacherBotHistory(finalHistory);
-                                   setDoc(doc(db, 'artifacts', appId, 'users', user?.uid || 'teacher', 'teacherBot', 'history'), { messages: finalHistory }).catch(()=>{});
+                                   const botUserKey = isCamiloTeacher(myChatId) ? 'camilodocente' : (user?.uid || myChatId || 'teacher');
+                                   setDoc(doc(db, 'artifacts', appId, 'users', botUserKey, 'teacherBot', 'history'), { messages: finalHistory }).catch(()=>{});
                               } finally {
                                   setIsTeacherBotLoading(false);
                               }
@@ -12406,7 +12638,7 @@ Bot:`;
                                                            const typingInGroup = typingStatus[activeChat.id] || {};
                                                            const typers = Object.entries(typingInGroup)
                                                                .filter(([uid, val]) => uid !== myChatId && (val === true || (typeof val === 'object' && val.isTyping)))
-                                                               .map(([uid, val]) => (typeof val === 'object' && val.name) ? val.name.split(' ')[0] : (userMappings[uid]?.fullName?.split(' ')[0] || (uid === 'teacher' ? 'Gina' : uid)));
+                                                               .map(([uid, val]) => (typeof val === 'object' && val.name) ? val.name.split(' ')[0] : (userMappings[uid]?.fullName?.split(' ')[0] || (isCamiloTeacher(uid) ? 'Camilo' : (isTeacherId(uid) ? 'Gina' : uid))));
                                                            if (typers.length > 0) {
                                                                return <span className="text-emerald-500 font-bold animate-pulse">{typers.join(', ')} {typers.length === 1 ? 'está escribiendo...' : 'están escribiendo...'}</span>;
                                                            }
@@ -12439,7 +12671,7 @@ Bot:`;
                                                       const members = rawGroupMembers.filter(m => m !== myChatId)
                                                       const participants = members.map(id => ({
                                                           id,
-                                                          name: id === 'teacher' ? TEACHER_NAME : (userMappings[id]?.fullName || id)
+                                                          name: isTeacherId(id) ? getTeacherDisplayName(id) : (userMappings[id]?.fullName || id)
                                                       }))
                                                       if (participants.length === 0) { showMessage("No hay otros miembros para llamar."); return }
                                                       setActiveCall({
@@ -12524,13 +12756,16 @@ Bot:`;
                                       </div>
                                   </div>
 
-                                  {/* VISTA DE INFORMACIÓN DEL GRUPO (ESTILO WHATSAPP / TELEGRAM) */}
+                                   {/* VISTA DE INFORMACIÓN DEL GRUPO (ESTILO WHATSAPP / TELEGRAM) */}
                                    {showGroupInfo && activeChat.type === 'group' ? (() => {
                                        const grp = chatGroups.find(g => g.id === activeChat.id || `group_${g.id}` === activeChat.id || `acad_${g.academicGroupId}` === activeChat.id || `acad_${g.id}` === activeChat.id) || activeChat;
                                        const currentMembers = Array.isArray(grp?.members) ? grp.members : (grp?.members && typeof grp.members === 'object' ? Object.keys(grp.members) : []);
                                        const membersList = currentMembers;
                                        const filteredMembers = membersList.filter(uk => {
-                                           if (uk === 'teacher') return 'docente gina marcela quintana'.includes(groupInfoSearch.toLowerCase());
+                                           if (isTeacherId(uk)) {
+                                               const tName = getTeacherDisplayName(uk).toLowerCase();
+                                               return (`docente ${tName}`).includes(groupInfoSearch.toLowerCase());
+                                           }
                                            const uData = userMappings[uk] || {};
                                            if (role === 'teacher') {
                                                return (uData.fullName || uk || '').toLowerCase().includes(groupInfoSearch.toLowerCase()) || (uData.email || '').toLowerCase().includes(groupInfoSearch.toLowerCase());
@@ -12713,8 +12948,12 @@ Bot:`;
                                                        isDarkMode ? 'divide-gray-750' : 'divide-gray-100'
                                                    }`}>
                                                        {/* Docente / Administrador con Foto Real */}
-                                                       {filteredMembers.includes('teacher') && (() => {
-                                                           const teacherPhoto = userMappings['teacher']?.profilePicUrl || (role === 'teacher' ? auth.currentUser?.photoURL : null);
+                                                       {(() => {
+                                                           const groupOwnerId = getItemTeacherId(grp);
+                                                           const groupOwnerName = getTeacherDisplayName(groupOwnerId);
+                                                           const showTeacherCard = filteredMembers.some(m => isTeacherId(m)) || (!groupInfoSearch.trim());
+                                                           if (!showTeacherCard) return null;
+                                                           const teacherPhoto = userMappings[groupOwnerId]?.profilePicUrl || (role === 'teacher' && myChatId === groupOwnerId ? auth.currentUser?.photoURL : null);
                                                            return (
                                                                <div className={`p-2.5 flex items-center justify-between transition-colors ${
                                                                    isDarkMode ? 'hover:bg-gray-800/60' : 'hover:bg-gray-50'
@@ -12722,34 +12961,34 @@ Bot:`;
                                                                    <div className="flex items-center gap-2.5 min-w-0">
                                                                        <div className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-br from-[#AD3333] to-[#8a2828] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs border border-white dark:border-gray-700">
                                                                            {teacherPhoto ? (
-                                                                               <img src={teacherPhoto} alt={TEACHER_NAME} className="w-full h-full object-cover" />
+                                                                               <img src={teacherPhoto} alt={groupOwnerName} className="w-full h-full object-cover" />
                                                                            ) : (
                                                                                <TeacherIcon size={14} />
                                                                            )}
                                                                        </div>
-                                                                   <div className="min-w-0">
-                                                                       <div className="flex items-center gap-1.5">
-                                                                           <p className="font-extrabold text-xs truncate">Gina Marcela Quintana</p>
-                                                                           <span className="px-1.5 py-0.5 rounded-md bg-red-500/10 text-red-600 dark:text-red-400 font-bold text-[9px]">Admin</span>
+                                                                       <div className="min-w-0">
+                                                                           <div className="flex items-center gap-1.5">
+                                                                               <p className="font-extrabold text-xs truncate">{groupOwnerName}</p>
+                                                                               <span className="px-1.5 py-0.5 rounded-md bg-red-500/10 text-red-600 dark:text-red-400 font-bold text-[9px]">Admin</span>
+                                                                           </div>
                                                                        </div>
-                                                                                                                                          </div>
+                                                                   </div>
+                                                                   {myChatId !== groupOwnerId && (
+                                                                       <button 
+                                                                           type="button" 
+                                                                           onClick={() => { setShowGroupInfo(false); handleOpenChat({ id: `dm_${[myChatId, groupOwnerId].sort().join('_')}`, name: groupOwnerName, type: 'dm', role: 'teacher', otherUserId: groupOwnerId, targetUserId: groupOwnerId }); }}
+                                                                           className="p-1.5 rounded-lg text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30"
+                                                                           title="Mensaje privado"
+                                                                       >
+                                                                           <MessageCircle size={15} />
+                                                                       </button>
+                                                                   )}
                                                                </div>
-                                                               {myChatId !== 'teacher' && (
-                                                                   <button 
-                                                                       type="button" 
-                                                                       onClick={() => { setShowGroupInfo(false); handleOpenChat({ id: `dm_${[myChatId, 'teacher'].sort().join('_')}`, name: TEACHER_NAME, type: 'dm', role: 'teacher', otherUserId: 'teacher', targetUserId: 'teacher' }); }}
-                                                                       className="p-1.5 rounded-lg text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30"
-                                                                       title="Mensaje privado"
-                                                                   >
-                                                                       <MessageCircle size={15} />
-                                                                   </button>
-                                                               )}
-                                                                </div>
-                                                            );
-                                                        })()}
+                                                           );
+                                                       })()}
 
                                                        {/* Estudiantes */}
-                                                       {filteredMembers.filter(m => m !== 'teacher').map(uk => {
+                                                       {filteredMembers.filter(m => !isTeacherId(m)).map(uk => {
                                                            const uData = userMappings[uk] || {};
                                                            const isOnline = userPresence[uk]?.status === 'online';
                                                            const isMe = uk === myChatId;
@@ -12871,7 +13110,7 @@ Bot:`;
                                               const showDateSeparator = !prevMsg || new Date(prevMsg.createdAt || Date.now()).toDateString() !== new Date(m.createdAt || Date.now()).toDateString();
                                   
                                               const isMe = m.authorId === myChatId;
-                                              const isTeacher = m.author === TEACHER_NAME;
+                                              const isTeacher = m.author === TEACHER_NAME || m.author === SECOND_TEACHER_NAME || isTeacherId(m.authorId);
                                               const isEditingThis = editingAppMessageId === m.id;
                                               
                                               const bubbleRadius = isMe
@@ -13219,7 +13458,7 @@ Bot:`;
                                                    const typingInGroup = typingStatus[activeChat.id] || {};
                                                    const typers = Object.entries(typingInGroup)
                                                        .filter(([uid, val]) => uid !== myChatId && (val === true || (typeof val === 'object' && val.isTyping)))
-                                                       .map(([uid, val]) => (typeof val === 'object' && val.name) ? val.name.split(' ')[0] : (userMappings[uid]?.fullName?.split(' ')[0] || (uid === 'teacher' ? 'Gina' : uid)));
+                                                       .map(([uid, val]) => (typeof val === 'object' && val.name) ? val.name.split(' ')[0] : (userMappings[uid]?.fullName?.split(' ')[0] || (isTeacherId(uid) ? getTeacherDisplayName(uid).split(' ')[0] : uid)));
                                                    if (typers.length === 0) return null;
                                                    return (
                                                        <div className="flex items-center gap-2 py-1.5 px-3 rounded-2xl bg-white/90 dark:bg-gray-800/90 backdrop-blur-md text-gray-700 dark:text-gray-200 border border-gray-200/80 dark:border-gray-700 w-fit text-xs font-semibold shadow-xs animate-in fade-in slide-in-from-bottom-1">
@@ -13612,18 +13851,22 @@ Bot:`;
                     tasks={role === 'teacher' ? tasks : tasks.filter(t => {
                         const tGrpId = String(t.targetGroupId || t.targetGroup || t.groupId || t.academicGroupId || '').replace(/^acad_/i, '').toLowerCase().trim();
                         const tGrpName = String(t.targetGroupName || '').toLowerCase().trim();
+                        const taskTeacherId = getItemTeacherId(t);
                         const isGeneric = (!tGrpId || tGrpId === 'all' || tGrpId === 'global') && (!tGrpName || tGrpName === 'global' || tGrpName === 'todos' || tGrpName === 'general' || tGrpName === 'todos los estudiantes (global)');
                         if (isGeneric) return true;
                         const enrolled = academicGroups.filter(isStudentInGroup);
                         if (enrolled.length === 0) return false;
-                        return enrolled.some(g => String(g.id || '').replace(/^acad_/i, '').toLowerCase() === tGrpId || (g.name && g.name.toLowerCase().trim() === tGrpName));
+                        return enrolled.some(g => String(g.id || '').replace(/^acad_/i, '').toLowerCase() === tGrpId || (g.name && g.name.toLowerCase().trim() === tGrpName && getItemTeacherId(g) === taskTeacherId));
                     })}
                     academicGroups={role === 'teacher' ? academicGroups : academicGroups.filter(isStudentInGroup)}
                     evaluations={role === 'teacher' ? evaluations : evaluations.filter(ev => {
                         const enrolled = academicGroups.filter(isStudentInGroup);
-                        if (!ev.targetGroupId || ev.targetGroupId === 'all') return true;
+                        const evGrpId = String(ev.targetGroupId || '').trim();
+                        const evGrpName = String(ev.targetGroupName || '').toLowerCase().trim();
+                        const evTeacherId = getItemTeacherId(ev);
+                        if ((!evGrpId || evGrpId === 'all') && (!evGrpName || evGrpName === 'global' || evGrpName === 'todos' || evGrpName === 'general')) return true;
                         if (enrolled.length === 0) return false;
-                        return enrolled.some(g => g.id === ev.targetGroupId || `acad_${g.id}` === ev.targetGroupId);
+                        return enrolled.some(g => g.id === evGrpId || `acad_${g.id}` === evGrpId || (evGrpName && (g.name || '').toLowerCase().trim() === evGrpName && getItemTeacherId(g) === evTeacherId));
                     })}
                     userMappings={userMappings}
                     reviews={reviews}
@@ -13681,7 +13924,7 @@ Bot:`;
                           <div className="px-5 py-3.5 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between bg-white dark:bg-gray-900">
                               <div className="flex items-center gap-3 min-w-0">
                                   {(() => {
-                                      const userPhoto = userMappings[myChatId]?.profilePicUrl || (role === 'teacher' ? userMappings['teacher']?.profilePicUrl : null) || auth.currentUser?.photoURL;
+                                      const userPhoto = userMappings[myChatId]?.profilePicUrl || (role === 'teacher' && !isCamiloTeacher(myChatId) ? userMappings['teacher']?.profilePicUrl : null) || (role === 'teacher' && isCamiloTeacher(myChatId) ? null : auth.currentUser?.photoURL);
                                       return (
                                           <div className={`w-10 h-10 rounded-full overflow-hidden flex items-center justify-center text-white font-bold text-sm shadow-xs border-2 border-white dark:border-gray-700 shrink-0 ${
                                               role === 'teacher' ? 'bg-gradient-to-br from-[#AD3333] to-[#8a2828]' : 'bg-gradient-to-br from-blue-500 to-indigo-600'
@@ -13873,13 +14116,8 @@ Bot:`;
                                           type="button"
                                           onClick={() => {
                                               setIsMobileMenuOpen(false);
-                                              if (role === 'teacher') {
-                                                  setViewingProfileId('teacher');
-                                                  changeTab('profile', 'teacher');
-                                              } else {
-                                                  setViewingProfileId(myChatId);
-                                                  changeTab('profile', myChatId);
-                                              }
+                                              setViewingProfileId(myChatId);
+                                              changeTab('profile', myChatId);
                                           }}
                                           className="w-full flex items-center justify-between p-3.5 hover:bg-gray-100 dark:hover:bg-gray-750 transition-colors text-left"
                                       >
@@ -13978,7 +14216,7 @@ Bot:`;
                                   const grp = chatGroups.find(g => g.id === activeChat.id || `group_${g.id}` === activeChat.id || `acad_${g.academicGroupId}` === activeChat.id || `acad_${g.id}` === activeChat.id) || activeChat;
                                   const currentMembers = Array.isArray(grp?.members) ? grp.members : (grp?.members && typeof grp.members === 'object' ? Object.keys(grp.members) : []);
                                   const availableStudents = Object.entries(userMappings || {})
-                                      .filter(([uk]) => !currentMembers.includes(uk))
+                                      .filter(([uk, data]) => !currentMembers.includes(uk) && !isTeacherId(uk) && data?.role !== 'teacher')
                                       .filter(([uk, data]) => {
                                           const term = addMemberSearch.toLowerCase();
                                           return uk.toLowerCase().includes(term) || (data.fullName || '').toLowerCase().includes(term) || (data.email || '').toLowerCase().includes(term);
@@ -14079,8 +14317,9 @@ Bot:`;
                                                   const rawModalMembers = groupMembersModal.group?.members;
                                                   const modalMembersList = Array.isArray(rawModalMembers) ? rawModalMembers : (rawModalMembers && typeof rawModalMembers === 'object' ? Object.keys(rawModalMembers) : []);
                                                   modalMembersList.forEach(m => {
-                                                      if (!m || m === 'teacher') return;
+                                                      if (!m || isTeacherId(m)) return;
                                                       const cleanM = String(m).toLowerCase().replace('@', '').trim();
+                                                      if (isTeacherId(cleanM)) return;
                                                       let foundKey = Object.keys(userMappings || {}).find(uk => {
                                                           const ud = userMappings[uk];
                                                           return uk.toLowerCase() === cleanM || (ud?.uid && ud.uid.toLowerCase() === cleanM) || (ud?.email && (ud.email.toLowerCase() === cleanM || ud.email.split('@')[0].toLowerCase() === cleanM));
@@ -14155,39 +14394,46 @@ Bot:`;
                                   {/* Lista de Miembros */}
                                   <div className="flex-1 overflow-y-auto p-3 space-y-2 divide-y divide-gray-100 dark:divide-gray-800/60">
                                       {/* Docente / Creador */}
-                                      <div className="flex items-center justify-between gap-3 p-2 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                                          <div className="flex items-center gap-3 min-w-0">
-                                              <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-[#AD3333] to-[#8a2828] text-white flex items-center justify-center font-bold text-xs shrink-0 border-2 border-white dark:border-gray-700 shadow-2xs">
-                                                  {userMappings['teacher']?.profilePicUrl ? (
-                                                      <img src={userMappings['teacher'].profilePicUrl} alt={TEACHER_NAME} className="w-full h-full object-cover" />
-                                                  ) : (
-                                                      'G'
+                                      {(() => {
+                                          const groupOwnerId = getItemTeacherId(groupMembersModal.group);
+                                          const groupOwnerName = getTeacherDisplayName(groupOwnerId);
+                                          const groupOwnerInitial = isCamiloTeacher(groupOwnerId) ? 'C' : 'G';
+                                          return (
+                                              <div className="flex items-center justify-between gap-3 p-2 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                                                  <div className="flex items-center gap-3 min-w-0">
+                                                      <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-[#AD3333] to-[#8a2828] text-white flex items-center justify-center font-bold text-xs shrink-0 border-2 border-white dark:border-gray-700 shadow-2xs">
+                                                          {userMappings[groupOwnerId]?.profilePicUrl ? (
+                                                              <img src={userMappings[groupOwnerId].profilePicUrl} alt={groupOwnerName} className="w-full h-full object-cover" />
+                                                          ) : (
+                                                              groupOwnerInitial
+                                                          )}
+                                                      </div>
+                                                      <div className="min-w-0">
+                                                          <div className="flex items-center gap-1.5">
+                                                              <p className="font-bold text-xs truncate">{groupOwnerName}</p>
+                                                              <span className="px-1.5 py-0.5 rounded-md bg-red-500/10 text-red-600 dark:text-red-400 font-extrabold text-[9px] uppercase">
+                                                                  Docente
+                                                              </span>
+                                                          </div>
+                                                      </div>
+                                                  </div>
+                                                  {role === 'student' && (
+                                                      <button
+                                                          type="button"
+                                                          onClick={() => {
+                                                              setGroupMembersModal({ isOpen: false, group: null, search: "" });
+                                                              handleOpenChat({ id: `dm_${[myChatId, groupOwnerId].sort().join('_')}`, name: groupOwnerName, type: 'dm', role: 'teacher', otherUserId: groupOwnerId, targetUserId: groupOwnerId });
+                                                              setIsChatMinimized(false);
+                                                          }}
+                                                          className="p-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-xs font-bold transition-colors shrink-0"
+                                                          title="Enviar mensaje directo"
+                                                      >
+                                                          <MessageCircle size={15} />
+                                                      </button>
                                                   )}
                                               </div>
-                                              <div className="min-w-0">
-                                                  <div className="flex items-center gap-1.5">
-                                                      <p className="font-bold text-xs truncate">{TEACHER_NAME}</p>
-                                                      <span className="px-1.5 py-0.5 rounded-md bg-red-500/10 text-red-600 dark:text-red-400 font-extrabold text-[9px] uppercase">
-                                                          Docente
-                                                      </span>
-                                                  </div>
-                                                                                                </div>
-                                          </div>
-                                          {role === 'student' && (
-                                              <button
-                                                  type="button"
-                                                  onClick={() => {
-                                                      setGroupMembersModal({ isOpen: false, group: null, search: "" });
-                                                      handleOpenChat({ id: `dm_${[myChatId, 'teacher'].sort().join('_')}`, name: TEACHER_NAME, type: 'dm', role: 'teacher', otherUserId: 'teacher', targetUserId: 'teacher' });
-                                                      setIsChatMinimized(false);
-                                                  }}
-                                                  className="p-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-xs font-bold transition-colors shrink-0"
-                                                  title="Enviar mensaje directo"
-                                              >
-                                                  <MessageCircle size={15} />
-                                              </button>
-                                          )}
-                                      </div>
+                                          );
+                                      })()}
 
                                       {/* Lista de Estudiantes Inscritos */}
                                       {(() => {
@@ -14195,9 +14441,9 @@ Bot:`;
                                           const rawModalMembers2 = groupMembersModal.group?.members;
                                           const modalMembersList2 = Array.isArray(rawModalMembers2) ? rawModalMembers2 : (rawModalMembers2 && typeof rawModalMembers2 === 'object' ? Object.keys(rawModalMembers2) : []);
                                           modalMembersList2.forEach(m => {
-                                              if (!m) return;
+                                              if (!m || isTeacherId(m)) return;
                                               const cleanM = String(m).toLowerCase().replace('@', '').trim();
-                                              if (cleanM === 'teacher' || cleanM === 'ginadocente' || cleanM === 'ginamarcela') return;
+                                              if (isTeacherId(cleanM)) return;
                                               
                                               let foundKey = Object.keys(userMappings || {}).find(uk => {
                                                   const ud = userMappings[uk];
@@ -14211,7 +14457,7 @@ Bot:`;
                                               }
                                               const finalKey = foundKey || cleanM;
                                               const uData = userMappings[finalKey] || FALLBACK_MAP[finalKey] || { fullName: finalKey, email: '' };
-                                              if (uData.role === 'teacher' || (uData.fullName && uData.fullName.toLowerCase().includes('gina marcela'))) return;
+                                              if (uData.role === 'teacher' || (uData.fullName && (uData.fullName.toLowerCase().includes('gina marcela') || isCamiloTeacher(uData.fullName)))) return;
                                               if (!uniqueGroupMembersMap.has(finalKey)) {
                                                   uniqueGroupMembersMap.set(finalKey, uData);
                                               }
@@ -14384,9 +14630,10 @@ Bot:`;
                                           const seenKeys = new Set();
 
                                           const checkAndAdd = (k, data) => {
-                                              if (!k || k === 'teacher' || data?.role === 'teacher') return;
-                                              if (data?.fullName && data.fullName.toLowerCase().includes('gina marcela')) return;
+                                              if (!k || isTeacherId(k) || data?.role === 'teacher') return;
+                                              if (data?.fullName && (data.fullName.toLowerCase().includes('gina marcela') || isCamiloTeacher(data.fullName))) return;
                                               const cleanK = String(k).toLowerCase().replace('@', '').trim();
+                                              if (isTeacherId(cleanK)) return;
                                               const cleanUid = (data?.uid || '').toLowerCase().trim();
                                               const cleanEmail = (data?.email || '').toLowerCase().trim();
                                               const cleanPrefix = cleanEmail ? cleanEmail.split('@')[0] : '';
@@ -14582,11 +14829,12 @@ Bot:`;
                           <div className={`${glassCard} max-w-md w-full flex flex-col gap-4 relative bg-white`}>
                               <button onClick={() => setShowIAKnowledgeModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-red-500"><X size={20}/></button>
                               <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Sparkles className="text-purple-600"/> Cerebro del Asistente</h3>
-                              <p className="text-xs text-gray-500">Edwin, aquí puede escribir cómo funciona la página para que el Asistente se lo explique a la Profe Gina.</p>
+                              <p className="text-xs text-gray-500">Edwin, aquí puede escribir cómo funciona la página para que el Asistente se lo explique a {isCamiloTeacher(myChatId) ? 'el Profe Camilo' : 'la Profe Gina'}.</p>
                               
                               <div className="max-h-60 overflow-y-auto space-y-2 pr-2">
                                   {teacherBotInfoList.map(item => {
                                       const isEditing = editingIAId === item.id;
+                                      const botDocId = isCamiloTeacher(myChatId) ? 'teacherBot_camilodocente' : 'teacherBot';
                                       return (
                                       <div key={item.id} className="bg-gray-50 p-3 rounded-xl text-xs flex justify-between items-start gap-3 border border-gray-200 shadow-sm">
                                           {isEditing ? (
@@ -14597,7 +14845,7 @@ Bot:`;
                                                       <button onClick={() => {
                                                           if(!editIAText.trim()) return;
                                                           const newList = teacherBotInfoList.map(i => i.id === item.id ? { ...i, text: editIAText.trim() } : i);
-                                                          setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'teacherBot'), { infoList: newList }).then(() => { setTeacherBotInfoList(newList); setEditingIAId(null); }).catch(err => { console.error(err); showMessage("Error al guardar."); });
+                                                          setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', botDocId), { infoList: newList }).then(() => { setTeacherBotInfoList(newList); setEditingIAId(null); }).catch(err => { console.error(err); showMessage("Error al guardar."); });
                                                       }} className="text-white bg-green-600 hover:bg-green-700 transition-colors p-1.5 rounded-lg" title="Guardar"><CheckLine size={16}/></button>
                                                   </div>
                                               </div>
@@ -14609,7 +14857,7 @@ Bot:`;
                                                       <button onClick={() => {
                                                           confirmAction("¿Seguro que desea borrar este conocimiento?", () => {
                                                               const newList = teacherBotInfoList.filter(i => i.id !== item.id);
-                                                              setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'teacherBot'), { infoList: newList }).then(() => setTeacherBotInfoList(newList)).catch(err => { console.error(err); showMessage("Error al eliminar."); });
+                                                              setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', botDocId), { infoList: newList }).then(() => setTeacherBotInfoList(newList)).catch(err => { console.error(err); showMessage("Error al eliminar."); });
                                                           });
                                                       }} className="text-red-500 hover:text-red-700 transition-colors bg-red-100 p-1.5 rounded-lg" title="Eliminar"><Trash2 size={14}/></button>
                                                   </div>
@@ -14624,8 +14872,9 @@ Bot:`;
                                   <textarea value={newIAKnowledge} onChange={e => setNewIAKnowledge(e.target.value)} placeholder="Añadir nuevo conocimiento a la IA..." className={`${glassInput} h-14 text-xs resize-none`} />
                                   <button onClick={() => {
                                       if(!newIAKnowledge.trim()) return;
+                                      const botDocId = isCamiloTeacher(myChatId) ? 'teacherBot_camilodocente' : 'teacherBot';
                                       const newList = [...teacherBotInfoList, { id: Date.now().toString(), text: newIAKnowledge.trim() }];
-                                      setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'teacherBot'), { infoList: newList }).then(() => { setTeacherBotInfoList(newList); setNewIAKnowledge(""); }).catch(err => { console.error(err); showMessage("Error al guardar."); });
+                                      setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', botDocId), { infoList: newList }).then(() => { setTeacherBotInfoList(newList); setNewIAKnowledge(""); }).catch(err => { console.error(err); showMessage("Error al guardar."); });
                                   }} className={`${redButton} h-auto px-4 !bg-purple-600 hover:!bg-purple-700`}><Plus size={18}/></button>
                               </div>
                           </div>

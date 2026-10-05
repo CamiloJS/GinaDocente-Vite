@@ -5,7 +5,7 @@ import {
   CheckCheck, CheckCircle2, CheckLine, Clock, Edit3, EyeOff, FileDocIcon, FileText, ImageIcon, Loader2, Lock, MessageSquareText, Mic, PaperclipIcon, Plus, ReplyIcon, Send, SmileIcon, Square, Star, Pin, Trash2, Upload, X, XLine, Volume2, VolumeX, Languages, UserIcon, BookOpen, NavNotebook, Play, Pause, Download, MessageCircle, BarChart2, Vote
 } from './Icons.jsx'
 import {
-  compressImage, containsBadWords, checkBadWordsAsync, uploadImageToStorage, uploadRawFileToStorage, TEACHER_NAME, COMMENT_EMOJIS, REACTION_EMOJIS, splitNameFirstAndLast, FALLBACK_MAP, format12HourTime, formatDateTime12H
+  compressImage, containsBadWords, checkBadWordsAsync, uploadImageToStorage, uploadRawFileToStorage, TEACHER_NAME, SECOND_TEACHER_NAME, SECOND_TEACHER_ID, isCamiloTeacher, isTeacherId, getCanonicalTeacherId, getTeacherDisplayName, getItemTeacherId, COMMENT_EMOJIS, REACTION_EMOJIS, splitNameFirstAndLast, FALLBACK_MAP, format12HourTime, formatDateTime12H
 } from '../utils/helpers.js'
 import { glassCard, glassInput } from '../utils/styles.js'
 import { useClickOutside } from '../utils/hooks.js'
@@ -23,7 +23,7 @@ import { runTransaction } from 'firebase/firestore'
 import AudioPlayer, { AudioRecordingVisualizer } from './AudioPlayer.jsx'
 import { getDemoRemainingDays, saveDemoSandboxItem, removeDemoSandboxItem } from '../utils/demoData.js'
 
-const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, appId, academicGroups, glassInput: propGlassInput, callGemini, currentUser, showMessage, loggedInName, isDarkMode, confirmAction, handleOpenProfileByName, userMappings }) => {
+const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, appId, academicGroups, glassInput: propGlassInput, callGemini, currentUser, showMessage, loggedInName, myChatId, isDarkMode, confirmAction, handleOpenProfileByName, userMappings }) => {
     const cardRef = React.useRef(null);
     const editTaskDescRef = React.useRef(null);
     const [isEditingTask, setIsEditingTask] = useState(false);
@@ -62,8 +62,9 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
     useEffect(() => () => { try { narracionRef.current?.detener?.(); } catch (e) { /* nada */ } }, []);
 
 
+    const activeTeacherId = role === 'teacher' ? getCanonicalTeacherId(myChatId || loggedInName) : null;
     const currentUserId = role === 'teacher' 
-        ? 'teacher_gina' 
+        ? (activeTeacherId === SECOND_TEACHER_ID ? 'teacher_camilo' : 'teacher_gina') 
         : (currentUser?.uid ? `uid_${currentUser.uid}` : (loggedInName ? `name_${loggedInName.toLowerCase().replace(/[^a-z0-9]/g, '_')}` : 'student_user'));
     const [commentText, setCommentText] = useState("");
     const [commentImageUrl, setCommentImageUrl] = useState("");
@@ -176,7 +177,7 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
         const studentComments = (task.comments || []).filter(c => {
             if (c.isDeleted) return false;
             const authorLower = (c.author || '').trim().toLowerCase();
-            const isTeacherAuthor = c.authorRole === 'teacher' || c.role === 'teacher' || c.authorId === 'teacher' || c.authorUsername === 'teacher' || authorLower === 'teacher' || (c.author && c.author.trim() === TEACHER_NAME) || authorLower === 'profesora' || authorLower === 'la profe' || authorLower === 'docente gina' || authorLower === 'profesora gina';
+            const isTeacherAuthor = c.authorRole === 'teacher' || c.role === 'teacher' || isTeacherId(c.authorId) || isTeacherId(c.authorUsername) || isTeacherId(authorLower) || (c.author && (c.author.trim() === TEACHER_NAME || c.author.trim() === SECOND_TEACHER_NAME)) || authorLower === 'profesora' || authorLower === 'profesor' || authorLower === 'la profe' || authorLower === 'el profe' || authorLower === 'docente gina' || authorLower === 'profesora gina' || authorLower === 'docente camilo' || authorLower === 'profesor camilo';
             return !isTeacherAuthor;
         });
 
@@ -364,7 +365,9 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
             delete newReactions['type'];
 
             const userKeysToCheck = role === 'teacher' 
-                ? ['teacher', 'teacher_gina', 'GinaDocente', currentUserId, currentUser?.uid].filter(Boolean)
+                ? (activeTeacherId === SECOND_TEACHER_ID 
+                    ? ['camilodocente', 'teacher_camilo', 'CamiloDocente', currentUserId, currentUser?.uid].filter(Boolean)
+                    : ['teacher', 'teacher_gina', 'GinaDocente', currentUserId, currentUser?.uid].filter(Boolean))
                 : [currentUserId, currentUser?.uid, loggedInName ? `name_${loggedInName.toLowerCase().replace(/[^a-z0-9]/g, '_')}` : null].filter(Boolean);
 
             let existingKey = null;
@@ -384,7 +387,7 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                 delete newReactions[currentUserId];
             } else {
                 if (existingKey) delete newReactions[existingKey];
-                newReactions[currentUserId] = { type: type, name: loggedInName || (role === 'teacher' ? TEACHER_NAME : 'Estudiante'), timestamp: Date.now() };
+                newReactions[currentUserId] = { type: type, name: loggedInName || (role === 'teacher' ? getTeacherDisplayName(activeTeacherId) : 'Estudiante'), timestamp: Date.now() };
             }
 
             await updateTaskDoc({ reactions: newReactions });
@@ -410,7 +413,9 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
             delete newRatings['type'];
 
             const userKeysToCheck = role === 'teacher' 
-                ? ['teacher', 'teacher_gina', 'GinaDocente', currentUserId, currentUser?.uid].filter(Boolean)
+                ? (activeTeacherId === SECOND_TEACHER_ID 
+                    ? ['camilodocente', 'teacher_camilo', 'CamiloDocente', currentUserId, currentUser?.uid].filter(Boolean)
+                    : ['teacher', 'teacher_gina', 'GinaDocente', currentUserId, currentUser?.uid].filter(Boolean))
                 : [currentUserId, currentUser?.uid, loggedInName ? `name_${loggedInName.toLowerCase().replace(/[^a-z0-9]/g, '_')}` : null].filter(Boolean);
 
             let existingKey = null;
@@ -433,7 +438,7 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                 if (existingKey) delete newRatings[existingKey];
                 newRatings[currentUserId] = { 
                     score: score, 
-                    name: loggedInName || (role === 'teacher' ? TEACHER_NAME : 'Estudiante'), 
+                    name: loggedInName || (role === 'teacher' ? getTeacherDisplayName(activeTeacherId) : 'Estudiante'), 
                     timestamp: Date.now() 
                 };
                 showMessage(`⭐ ¡Puntaje asignado: ${score} estrella${score > 1 ? 's' : ''}!`);
@@ -512,7 +517,7 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                     const currentRatings = { ...(c.ratings || {}) };
                     currentRatings[currentUserId] = {
                         stars: stars,
-                        name: loggedInName || (role === 'teacher' ? TEACHER_NAME : 'Estudiante'),
+                        name: loggedInName || (role === 'teacher' ? getTeacherDisplayName(activeTeacherId) : 'Estudiante'),
                         role: role,
                         timestamp: Date.now()
                     };
@@ -535,14 +540,40 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
 
         // 1. Recopilar todos los estudiantes del curso o que hayan entregado
         const allStudentsMap = {};
+        const cleanTaskGrp = String(task.targetGroupId || task.targetGroup || '').replace(/^acad_/i, '').trim().toLowerCase();
+        const isGlobalTask = !cleanTaskGrp || cleanTaskGrp === 'all' || cleanTaskGrp === 'global';
+
+        const matchingGroups = isGlobalTask
+            ? (academicGroups || [])
+            : (academicGroups || []).filter(g => {
+                const gId = String(g?.id || '').replace(/^acad_/i, '').trim().toLowerCase();
+                const gName = String(g?.name || '').trim().toLowerCase();
+                return gId === cleanTaskGrp || gName === cleanTaskGrp;
+            });
+
+        const groupMemberKeys = new Set();
+        matchingGroups.forEach(g => {
+            const mList = Array.isArray(g?.members) ? g.members : (g?.members && typeof g.members === 'object' ? Object.keys(g.members) : []);
+            mList.forEach(m => {
+                if (m && !isTeacherId(m)) {
+                    groupMemberKeys.add(String(m).toLowerCase().replace('@', '').trim());
+                }
+            });
+        });
 
         // Estudiantes registrados en el directorio
         Object.entries(userMappings || {}).forEach(([username, data]) => {
-            if (data?.role !== 'teacher' && username !== 'teacher' && data?.fullName) {
-                const cleanTaskGrp = String(task.targetGroupId || task.targetGroup || '').replace(/^acad_/i, '').trim().toLowerCase();
+            if (data?.role !== 'teacher' && !isTeacherId(username) && data?.fullName) {
+                const cleanU = String(username).toLowerCase().replace('@', '').trim();
+                const cleanUid = String(data.uid || '').toLowerCase().trim();
+                const cleanEmail = String(data.email || '').toLowerCase().trim();
+                const cleanPrefix = cleanEmail ? cleanEmail.split('@')[0] : '';
+                const inTeacherGroup = groupMemberKeys.has(cleanU) || (cleanUid && groupMemberKeys.has(cleanUid)) || (cleanEmail && groupMemberKeys.has(cleanEmail)) || (cleanPrefix && groupMemberKeys.has(cleanPrefix));
                 const cleanStudentGrp1 = String(data.academicGroupId || '').replace(/^acad_/i, '').trim().toLowerCase();
                 const cleanStudentGrp2 = String(data.group || '').replace(/^acad_/i, '').trim().toLowerCase();
-                if (!cleanTaskGrp || cleanTaskGrp === 'all' || cleanTaskGrp === 'global' || (cleanStudentGrp1 && cleanStudentGrp1 === cleanTaskGrp) || (cleanStudentGrp2 && cleanStudentGrp2 === cleanTaskGrp)) {
+                const matchesDirectGroup = !isGlobalTask && ((cleanStudentGrp1 && cleanStudentGrp1 === cleanTaskGrp) || (cleanStudentGrp2 && cleanStudentGrp2 === cleanTaskGrp));
+
+                if (inTeacherGroup || matchesDirectGroup) {
                     allStudentsMap[data.fullName.trim()] = {
                         name: data.fullName.trim(),
                         username: username,
@@ -554,7 +585,7 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
 
         // Incluir a cualquier estudiante que haya hecho entrega en los comentarios
         (task.comments || []).forEach(c => {
-            if (c.author && c.author !== TEACHER_NAME && c.author !== 'Profesora' && c.author !== 'La profe' && !c.isDeleted) {
+            if (c.author && c.author !== TEACHER_NAME && c.author !== SECOND_TEACHER_NAME && !isTeacherId(c.authorId) && c.author !== 'Profesora' && c.author !== 'Profesor' && c.author !== 'La profe' && !c.isDeleted) {
                 if (!allStudentsMap[c.author.trim()]) {
                     allStudentsMap[c.author.trim()] = {
                         name: c.author.trim(),
@@ -758,6 +789,9 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
         if (task.authorId && userMappings?.[task.authorId]?.profilePicUrl) return userMappings[task.authorId].profilePicUrl;
         
         const authorNameLower = (task.authorName || '').trim().toLowerCase();
+        if (isCamiloTeacher(task.authorId) || isCamiloTeacher(authorNameLower)) {
+            return userMappings?.[SECOND_TEACHER_ID]?.profilePicUrl || FALLBACK_MAP?.[SECOND_TEACHER_ID]?.profilePicUrl || '';
+        }
         const teacherNameLower = TEACHER_NAME.toLowerCase();
         
         if (!task.authorName || authorNameLower === teacherNameLower || authorNameLower.includes('gina') || authorNameLower.includes('profesora') || task.authorId === 'teacher' || (!task.authorId && role === 'teacher')) {
@@ -921,9 +955,10 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
 
             const newComment = { 
                 id: Date.now().toString() + Math.random().toString(36).substr(2, 5), 
-                author: role === 'teacher' ? TEACHER_NAME : loggedInName, 
-                authorUsername: role === 'teacher' ? 'teacher' : (currentUser?.email ? currentUser.email.split('@')[0] : (currentUserId || '')),
-                authorId: role === 'teacher' ? 'teacher' : (currentUserId || currentUser?.uid || ''),
+                author: role === 'teacher' ? (loggedInName || getTeacherDisplayName(activeTeacherId)) : loggedInName, 
+                authorUsername: role === 'teacher' ? (activeTeacherId || 'teacher') : (currentUser?.email ? currentUser.email.split('@')[0] : (currentUserId || '')),
+                authorId: role === 'teacher' ? (activeTeacherId || 'teacher') : (currentUserId || currentUser?.uid || ''),
+                authorRole: role,
                 createdAt: Date.now(),
                 title: isForum ? (commentTitle || '').trim().toUpperCase() : '',
                 text: (commentText || '').trim(), 
@@ -959,7 +994,9 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
     const renderForumStarRating = () => {
         const ratingsMap = task.ratings || task.forumRatings || {};
         const myValidKeys = role === 'teacher' 
-            ? ['teacher', 'teacher_gina', 'GinaDocente', currentUserId, currentUser?.uid].filter(Boolean)
+            ? (activeTeacherId === SECOND_TEACHER_ID 
+                ? ['camilodocente', 'teacher_camilo', 'CamiloDocente', currentUserId, currentUser?.uid].filter(Boolean)
+                : ['teacher', 'teacher_gina', 'GinaDocente', currentUserId, currentUser?.uid].filter(Boolean))
             : [currentUserId, currentUser?.uid, loggedInName ? `name_${loggedInName.toLowerCase().replace(/[^a-z0-9]/g, '_')}` : null].filter(Boolean);
 
         let myCurrentScore = null;
@@ -1067,7 +1104,9 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
 
         // Llaves válidas para identificar inequívocamente al usuario actual
         const myValidKeys = role === 'teacher' 
-            ? ['teacher', 'teacher_gina', 'GinaDocente', currentUserId, currentUser?.uid].filter(Boolean)
+            ? (activeTeacherId === SECOND_TEACHER_ID 
+                ? ['camilodocente', 'teacher_camilo', 'CamiloDocente', currentUserId, currentUser?.uid].filter(Boolean)
+                : ['teacher', 'teacher_gina', 'GinaDocente', currentUserId, currentUser?.uid].filter(Boolean))
             : [currentUserId, currentUser?.uid, loggedInName ? `name_${loggedInName.toLowerCase().replace(/[^a-z0-9]/g, '_')}` : null].filter(Boolean);
 
         let mySelectedReactionType = null;
@@ -1163,7 +1202,7 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                                 onClick={() => handleOpenProfileByName(task.authorName, task.authorUsername || task.authorId)} 
                                 className="font-bold text-sm hover:underline truncate text-left text-gray-900 dark:text-gray-100 leading-tight"
                             >
-                                {task.authorName || TEACHER_NAME}
+                                {task.authorName || getTeacherDisplayName(getItemTeacherId(task))}
                             </button>
 
                             {task.isPinned && (
@@ -1547,10 +1586,13 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                                                 {showVoters && (
                                                     <div className="flex flex-wrap gap-1 mt-1.5 p-2 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/60 dark:border-indigo-800/40 animate-in fade-in duration-150">
                                                         {(opt.voterIds || []).map(uid => {
-                                                            const isTeacher = uid === 'teacher' || uid === 'teacher_gina' || (typeof uid === 'string' && uid.startsWith('teacher'));
-                                                            const studentName = isTeacher 
-                                                                ? (TEACHER_NAME || 'Prof. Gina Quintana')
-                                                                : (userMappings?.[uid]?.fullName || userMappings?.[uid]?.name || String(uid || '').replace(/^uid_|^name_/, ''));
+                                                            const isCamiloVoter = isCamiloTeacher(uid) || uid === 'teacher_camilo';
+                                                            const isGinaVoter = !isCamiloVoter && (uid === 'teacher' || uid === 'teacher_gina' || isTeacherId(uid) || (typeof uid === 'string' && uid.startsWith('teacher')));
+                                                            const studentName = isCamiloVoter
+                                                                ? (SECOND_TEACHER_NAME || 'Camilo Jaimes')
+                                                                : isGinaVoter 
+                                                                    ? (TEACHER_NAME || 'Prof. Gina Quintana')
+                                                                    : (userMappings?.[uid]?.fullName || userMappings?.[uid]?.name || String(uid || '').replace(/^uid_|^name_/, ''));
                                                             return (
                                                                 <span key={uid} className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-white dark:bg-gray-800 text-indigo-800 dark:text-indigo-200 border border-indigo-200/60 dark:border-indigo-700/60 shadow-2xs">
                                                                     <UserIcon size={10} /> {studentName}
@@ -1892,7 +1934,7 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                                 const loggedInNameLower = (loggedInName || '').trim().toLowerCase();
                                 const authorIdLower = (c.authorId || c.authorUsername || '').trim().toLowerCase();
                                 const currentUserIdLower = (currentUserId || currentUser?.uid || '').trim().toLowerCase();
-                                const isTeacherAuthor = c.authorRole === 'teacher' || c.role === 'teacher' || authorIdLower === 'teacher' || authorIdLower === 'teacher_gina' || (c.author && c.author.trim() === TEACHER_NAME) || authorNameLower === 'profesora' || authorNameLower === 'la profe' || authorNameLower === 'docente gina' || authorNameLower === 'profesora gina';
+                                const isTeacherAuthor = c.authorRole === 'teacher' || c.role === 'teacher' || isTeacherId(authorIdLower) || authorIdLower === 'teacher_gina' || authorIdLower === 'teacher_camilo' || (c.author && (c.author.trim() === TEACHER_NAME || c.author.trim() === SECOND_TEACHER_NAME)) || authorNameLower === 'profesora' || authorNameLower === 'profesor' || authorNameLower === 'la profe' || authorNameLower === 'docente gina' || authorNameLower === 'profesora gina' || authorNameLower === 'docente camilo' || authorNameLower === 'profesor camilo';
 
                                 const isOwner = (
                                     (loggedInNameLower && authorNameLower === loggedInNameLower) ||
@@ -2025,7 +2067,7 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                                     }`}>
                                         <div className="flex justify-between items-start">
                                             <div className="flex items-center gap-1.5 flex-wrap">
-                                                <button onClick={() => handleOpenProfileByName(c.author, c.authorUsername || c.authorId)} className={`font-bold text-xs hover:underline text-left ${c.author === TEACHER_NAME || c.author === 'Profesora' ? 'text-[#AD3333]' : (isDarkMode ? 'text-gray-100' : 'text-gray-800')}`}>
+                                                <button onClick={() => handleOpenProfileByName(c.author, c.authorUsername || c.authorId)} className={`font-bold text-xs hover:underline text-left ${isTeacherAuthor ? 'text-[#AD3333]' : (isDarkMode ? 'text-gray-100' : 'text-gray-800')}`}>
                                                     {c.author}
                                                 </button>
                                                 {isTask && isStudentAuthor && (() => {
@@ -2378,7 +2420,7 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                             };
 
                             const displayedRoots = (filterOnlyUngraded && role === 'teacher' && isTask)
-                                ? roots.filter(r => !r.isDeleted && (r.authorRole !== 'teacher' && r.authorId !== 'teacher') && (r.grade === undefined || r.grade === null || r.grade === ''))
+                                ? roots.filter(r => !r.isDeleted && (r.authorRole !== 'teacher' && !isTeacherId(r.authorId)) && (r.grade === undefined || r.grade === null || r.grade === ''))
                                 : roots;
 
                             if (displayedRoots.length === 0) {

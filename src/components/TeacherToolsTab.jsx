@@ -1,7 +1,7 @@
 // src/components/TeacherToolsTab.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import confetti from 'canvas-confetti';
-import { speakText } from '../utils/helpers.js';
+import { speakText, isTeacherId } from '../utils/helpers.js';
 import {
   Timer, Dices, Coins, Shuffle, Play, Pause, RotateCcw, Plus, Minus,
   UsersGroupIcon, Users, CheckCheck, Copy, Volume2, VolumeX, Sparkles,
@@ -287,7 +287,9 @@ export default function TeacherToolsTab({
   appId = null,
   user = null,
   role = 'teacher',
-  isDemoMode = false
+  isDemoMode = false,
+  myChatId = 'teacher',
+  loggedInName = ''
 }) {
   const [activeSubTab, setActiveSubTab] = useState('timer'); // 'timer' | 'picker' | 'groups' | 'coin' | 'ova'
   const tabsScrollRef = useRef(null);
@@ -508,7 +510,7 @@ export default function TeacherToolsTab({
   const getGroupStudentCount = (group) => {
     if (!group?.members) return 0;
     const list = Array.isArray(group.members) ? group.members : (typeof group.members === 'object' ? Object.keys(group.members) : []);
-    return list.filter(m => m !== 'teacher').length;
+    return list.filter(m => !isTeacherId(m)).length;
   };
 
   const getActiveStudentList = () => {
@@ -524,7 +526,7 @@ export default function TeacherToolsTab({
     const members = Array.isArray(currentGrp.members) ? currentGrp.members : (currentGrp.members && typeof currentGrp.members === 'object' ? Object.keys(currentGrp.members) : []);
     const seen = new Set();
     const result = [];
-    members.filter(m => m !== 'teacher').forEach(m => {
+    members.filter(m => !isTeacherId(m)).forEach(m => {
       const u = userMappings[m] || {};
       const resolvedName = (u.fullName || u.name || m).trim().toLowerCase();
       const resolvedKey = (u.uid || u.email || m).trim().toLowerCase().replace('@', '');
@@ -629,7 +631,7 @@ export default function TeacherToolsTab({
   const handleGenerateTeams = () => {
     const currentGrp = academicGroups.find(g => g.id === selectedTeamGroupId);
     const rawMembers = Array.isArray(currentGrp?.members) ? currentGrp.members : (currentGrp?.members && typeof currentGrp.members === 'object' ? Object.keys(currentGrp.members) : []);
-    const members = rawMembers.filter(m => m !== 'teacher');
+    const members = rawMembers.filter(m => !isTeacherId(m));
     
     if (members.length === 0) {
       showMessage('Este grupo no tiene estudiantes inscritos.');
@@ -1724,6 +1726,8 @@ export default function TeacherToolsTab({
             db={db}
             appId={appId}
             isDemoMode={isDemoMode}
+            myChatId={myChatId}
+            loggedInName={loggedInName}
           />
         </div>
       )}

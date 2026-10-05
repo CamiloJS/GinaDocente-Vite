@@ -9,7 +9,7 @@ import {
   ArrowUp, ArrowDown, CheckCheck, Globe, CheckCircle2, ChevronDown,
   Lightbulb, Pin, Clock
 } from './Icons.jsx'
-import { TEACHER_NAME } from '../utils/helpers.js'
+import { TEACHER_NAME, getTeacherDisplayName, getItemTeacherId } from '../utils/helpers.js'
 import EmptyState from './EmptyState.jsx'
 import { doc, addDoc, collection, deleteDoc, updateDoc } from '../firebase/config.js'
 import { DEMO_TTL_MS, getDemoRemainingDays, saveDemoSandboxItem, removeDemoSandboxItem } from '../utils/demoData.js'
@@ -25,7 +25,7 @@ export const exportReviewToPresentation = async (review) => {
   const { default: pptxgen } = await import('pptxgenjs');
   const pptx = new pptxgen();
   pptx.layout = 'LAYOUT_16x9';
-  pptx.author = TEACHER_NAME;
+  pptx.author = review.author || TEACHER_NAME;
   pptx.subject = displayTitle;
   pptx.title = displayTitle;
 
@@ -1154,12 +1154,16 @@ Devuelve ÚNICAMENTE un array JSON plano sin \`\`\`json ni texto extra:
       const targetGroup = (academicGroups || []).find(g => g?.id === reviewTargetGroup);
       const targetGroupName = targetGroup ? targetGroup.name : 'General';
       const now = Date.now();
+      const authorTeacherId = myChatId || 'teacher';
       const newDoc = {
         topic: generatedTitle,
         language: language,
         slides: parsed,
         slideCount: parsed.length,
-        author: TEACHER_NAME,
+        author: getTeacherDisplayName(authorTeacherId),
+        authorId: authorTeacherId,
+        teacherId: authorTeacherId,
+        ownerTeacherId: authorTeacherId,
         targetGroupId: reviewTargetGroup || 'all',
         targetGroupName: targetGroupName,
         createdAt: now,
@@ -1281,16 +1285,19 @@ Devuelve ÚNICAMENTE un array JSON plano sin \`\`\`json ni texto extra:
     });
   });
   const myEnrolledIds = myEnrolledGroups.map(g => g.id);
-  const myEnrolledNames = myEnrolledGroups.map(g => (g.name || '').toLowerCase().trim());
+  const myEnrolledTeacherIds = new Set(myEnrolledGroups.map(g => getItemTeacherId(g)));
 
   const visibleReviews = role === 'teacher' ? (reviews || []) : (reviews || []).filter(r => {
     if (String(r?.id || '').startsWith('demo-')) return true;
     const rGrpId = String(r.targetGroupId || '').trim();
     const rGrpName = String(r.targetGroupName || '').toLowerCase().trim();
+    const reviewTeacherId = getItemTeacherId(r);
     const isGeneric = (!rGrpId || rGrpId === 'all') && (!rGrpName || rGrpName === 'global' || rGrpName === 'general' || rGrpName === 'todos' || rGrpName === 'todos los estudiantes');
-    if (isGeneric) return true;
+    if (isGeneric) {
+      return myEnrolledTeacherIds.size === 0 ? reviewTeacherId === 'teacher' : myEnrolledTeacherIds.has(reviewTeacherId);
+    }
     if (myEnrolledIds.length === 0) return false;
-    return myEnrolledIds.includes(rGrpId) || (rGrpName && myEnrolledNames.includes(rGrpName));
+    return myEnrolledGroups.some(g => g.id === rGrpId || `acad_${g.id}` === rGrpId || (rGrpName && (g.name || '').toLowerCase().trim() === rGrpName && getItemTeacherId(g) === reviewTeacherId));
   });
   const selectableGroups = role === 'teacher' ? (academicGroups || []) : myEnrolledGroups;
 
