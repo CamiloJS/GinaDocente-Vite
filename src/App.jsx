@@ -55,6 +55,15 @@ import { extractTextFromPDF } from './utils/pdfExtractor.js'
 import { calculateScore, normalizarRespuesta, permiteVariasRespuestas } from './utils/evalScoring.js'
 import { textoPlano } from './utils/textFormat.js';
 import { desordenarPalabras } from './utils/palabras.js'
+import {
+  getUserPresenceData,
+  getPresenceStatus,
+  isLastMessageFromStudent,
+  getChatIndicatorState,
+  getLastConnectionTime,
+  formatLastConnection,
+  sortChatContacts,
+} from './utils/chatPresence.js'
 import { useClickOutside } from './utils/hooks.js'
 import { DemoModeBanner } from './components/DemoModeBanner.jsx'
 import {
@@ -1295,20 +1304,13 @@ function App() {
   })();
 
   const sortUsersByPresence = (users) => {
-    return [...users].sort((a, b) => {
-      const getRank = (u) => {
-        const pData = userPresence[u.id] || (u.uid ? userPresence[u.uid] : null) || (u.email ? userPresence[u.email.split('@')[0]] : null);
-        const st = pData?.status;
-        if (st === 'online') return 0;
-        if (st === 'away' || st === 'busy') return 1;
-        return 2;
-      };
-      const rankA = getRank(a);
-      const rankB = getRank(b);
-      if (rankA !== rankB) return rankA - rankB;
-      if (a.role === 'teacher' && b.role !== 'teacher') return -1;
-      if (b.role === 'teacher' && a.role !== 'teacher') return 1;
-      return (a.name || '').localeCompare(b.name || '');
+    return sortChatContacts(users, {
+      userPresence,
+      unreadChats,
+      lastMessages,
+      myChatId,
+      role,
+      userMappings,
     });
   };
 
@@ -3160,8 +3162,22 @@ useEffect(() => {
 
     const uLastMsgs = onSnapshot(collection(db, ...base, 'lastMessages'), s => {
         const msgs = {};
-        s.docs.forEach(d => msgs[d.id] = d.data());
-        setLastMessages(msgs);
+        s.docs.forEach(d => { msgs[d.id] = d.data(); });
+        setLastMessages(prev => {
+            const merged = {};
+            for (const [k, v] of Object.entries(msgs)) {
+                const existing = prev?.[k];
+                const lastStudentAt = Math.max(Number(v?.lastStudentAt) || 0, Number(existing?.lastStudentAt) || 0);
+                merged[k] = {
+                    ...(existing || {}),
+                    ...v,
+                    authorId: v?.authorId || existing?.authorId || '',
+                    authorRole: v?.authorRole || existing?.authorRole || '',
+                    ...(lastStudentAt > 0 ? { lastStudentAt } : {}),
+                };
+            }
+            return merged;
+        });
     }, (err) => { console.error('[lista de chats] fallo la escucha:', err); });
 
     const uChatPrefs = onSnapshot(doc(db, 'artifacts', appId, 'users', uidKey, 'preferences', 'chat'), d => {
@@ -3170,7 +3186,24 @@ useEffect(() => {
     });
 
     const uPresence = onSnapshot(collection(db, ...base, 'presence'), s => {
-        const p = {}; s.docs.forEach(d => p[d.id] = d.data()); setUserPresence(p); userPresenceRef.current = p;
+        const now = Date.now();
+        const p = {};
+        const staleToPersist = [];
+        s.docs.forEach(d => {
+            const data = d.data() || {};
+            if (data.status !== 'offline' && data.lastPing && (now - data.lastPing > 180000)) {
+                const seenAt = data.lastPing || data.lastSeen || now;
+                p[d.id] = { ...data, status: 'offline', isOnline: false, lastSeen: seenAt };
+                staleToPersist.push({ id: d.id, seenAt });
+            } else {
+                p[d.id] = data;
+            }
+        });
+        setUserPresence(p);
+        userPresenceRef.current = p;
+        staleToPersist.forEach(({ id, seenAt }) => {
+            setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'presence', id), { isOnline: false, status: 'offline', lastSeen: seenAt }, { merge: true }).catch(() => {});
+        });
     });
 
     // 👇 Cazafantasmas: revisa los latidos cada 30 seg y PERSISTE el offline en Firestore
@@ -3183,11 +3216,15 @@ useEffect(() => {
         );
         if (staleKeys.length === 0) return;
         const newP = { ...prev };
-        staleKeys.forEach(k => { newP[k] = { ...newP[k], status: 'offline', isOnline: false }; });
+        staleKeys.forEach(k => {
+            const seenAt = prev[k].lastPing || prev[k].lastSeen || now;
+            newP[k] = { ...newP[k], status: 'offline', isOnline: false, lastSeen: seenAt };
+        });
         setUserPresence(newP);
         userPresenceRef.current = newP;
         staleKeys.forEach(k => {
-            setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'presence', k), { isOnline: false, status: 'offline', lastSeen: Date.now() }, { merge: true }).catch(() => {});
+            const seenAt = prev[k].lastPing || prev[k].lastSeen || now;
+            setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'presence', k), { isOnline: false, status: 'offline', lastSeen: seenAt }, { merge: true }).catch(() => {});
         });
     }, 30000);
 
@@ -3715,6 +3752,54 @@ useEffect(() => {
 
                   setChatMessages(msgs);
 
+                  if (msgs.length > 0 && activeChat?.id) {
+                      const latest = msgs[msgs.length - 1];
+                      let latestStudentTs = 0;
+                      for (let i = msgs.length - 1; i >= 0; i--) {
+                          const m = msgs[i];
+                          const isFromStud = m?.authorId
+                              ? (!isTeacherId(m.authorId) && m.authorId !== myChatId)
+                              : isLastMessageFromStudent(getDmTargetUserId(activeChat, myChatId), m, myChatId, userMappings);
+                          if (isFromStud && Number(m?.createdAt) > 0) {
+                              latestStudentTs = Number(m.createdAt);
+                              break;
+                          }
+                      }
+                      if (latest?.authorId) {
+                          const inferredRole = isTeacherId(latest.authorId) ? 'teacher' : 'student';
+                          setLastMessages(prev => {
+                              const curr = prev[activeChat.id];
+                              const nextStudentAt = Math.max(Number(curr?.lastStudentAt) || 0, latestStudentTs);
+                              const nextCreatedAt = latest.createdAt || curr?.createdAt || Date.now();
+                              if (
+                                  curr &&
+                                  curr.authorId === latest.authorId &&
+                                  curr.authorRole === inferredRole &&
+                                  (Number(curr.lastStudentAt) || 0) >= nextStudentAt &&
+                                  curr.createdAt === nextCreatedAt
+                              ) {
+                                  return prev;
+                              }
+                              const nextEntry = {
+                                  ...(curr || {}),
+                                  text: curr?.text || (latest.isDeleted ? 'Mensaje eliminado' : (latest.text || (latest.imageUrl ? 'Imagen' : (latest.fileUrl ? 'Documento' : (latest.audioUrl ? 'Nota de voz' : ''))))),
+                                  author: curr?.author || (latest.author || 'Usuario').split(' ')[0],
+                                  authorId: latest.authorId,
+                                  authorRole: inferredRole,
+                                  createdAt: nextCreatedAt,
+                                  ...(nextStudentAt > 0 ? { lastStudentAt: nextStudentAt } : {}),
+                              };
+                              if (!isDemoMode && (!curr?.authorId || !curr?.authorRole || (nextStudentAt > 0 && !curr?.lastStudentAt))) {
+                                  setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'lastMessages', activeChat.id), nextEntry, { merge: true }).catch(() => {});
+                              }
+                              return {
+                                  ...prev,
+                                  [activeChat.id]: nextEntry,
+                              };
+                          });
+                      }
+                  }
+
                   // Auto-scroll hacia abajo inmediato (estilo WhatsApp / Messenger)
                   const scrollMode = isInitialLoad ? 'auto' : 'smooth';
                   setTimeout(() => scrollToChatBottom(scrollMode), 20);
@@ -3727,9 +3812,22 @@ useEffect(() => {
               return () => unsubscribe();
           }, [activeChat?.id, myChatId, chatWindow]);
 
+          // Si el chat está abierto y expandido, limpiar la marca de "nuevo no abierto" (pasa de puntico azul a puntico rojo si falta responder)
+          useEffect(() => {
+              if (!activeChat?.id || isChatMinimized || !myChatId) return;
+              if (unreadChats[activeChat.id]) {
+                  setUnreadChats(prev => ({ ...prev, [activeChat.id]: false }));
+                  const alertRef = doc(db, 'artifacts', appId, 'public', 'data', 'chatAlerts', myChatId);
+                  updateDoc(alertRef, { [`chats.${activeChat.id}`]: false }).then(() => {
+                      const stillUnread = Object.entries(unreadChats).some(([id, isUn]) => isUn && id !== activeChat.id);
+                      if (!stillUnread) updateDoc(alertRef, { hasUnread: false }).catch(() => {});
+                  }).catch(() => {});
+              }
+          }, [activeChat?.id, isChatMinimized, unreadChats, myChatId, appId]);
+
           // Efecto para marcar los mensajes como leídos cuando entras al chat
           useEffect(() => {
-              if (!activeChat || !myChatId || chatMessages.length === 0) return;
+              if (!activeChat || isChatMinimized || !myChatId || chatMessages.length === 0) return;
               if (markingReadRef.current) return;
 
               const unreadMessages = chatMessages.filter(m => m.authorId !== myChatId && m.status !== 'read');
@@ -3750,7 +3848,7 @@ useEffect(() => {
               };
 
               markAsRead();
-          }, [chatMessages, activeChat?.id, myChatId, db, appId]);
+          }, [chatMessages, activeChat?.id, isChatMinimized, myChatId, db, appId]);
 
           // Efecto para asegurar auto-scroll siempre que cambien los mensajes o se abra/maximice el chat
           useEffect(() => {
@@ -3771,7 +3869,7 @@ useEffect(() => {
     const updateChatPresence = () => {
         // Detectamos si la ventana está visible
         const isVisible = document.visibilityState === 'visible';
-        const currentView = (isChatAppOpen && activeChat && isVisible) ? activeChat.id : null;
+        const currentView = (activeChat && !isChatMinimized && isVisible) ? activeChat.id : null;
         window.currentChatViewId = currentView;
         setDoc(presenceRef, { currentChatId: currentView }, { merge: true }).catch(() => {});
     };
@@ -3786,7 +3884,7 @@ useEffect(() => {
         document.removeEventListener('visibilitychange', updateChatPresence);
         setDoc(presenceRef, { currentChatId: null }, { merge: true }).catch(() => {});
     };
-}, [activeChat, isChatAppOpen, myChatId, role, db, appId]);
+}, [activeChat, isChatMinimized, isChatAppOpen, myChatId, role, db, appId]);
             
 
 
@@ -3846,10 +3944,12 @@ useEffect(() => {
                   return;
               }
               setActiveChat(chat);
+              setIsChatMinimized(false);
               setShowChatSettings(false);
               setShowGroupInfo(false);
               setReplyingTo(null); // <--- PEGA ESTA LÍNEA AQUÍ
               if (unreadChats[chat.id]) {
+                  setUnreadChats(prev => ({ ...prev, [chat.id]: false }));
                   const alertRef = doc(db, 'artifacts', appId, 'public', 'data', 'chatAlerts', myChatId);
                   updateDoc(alertRef, { [`chats.${chat.id}`]: false }).then(() => {
                       const stillUnread = Object.entries(unreadChats).some(([id, isUnread]) => isUnread && id !== chat.id);
@@ -3879,15 +3979,25 @@ useEffect(() => {
                       await deleteDoc(msgRef);
                       const msgsSnapshot = await getDocs(query(collection(db, 'artifacts', appId, 'public', 'data', 'chats', activeChat.id, 'messages'), orderBy('createdAt', 'desc'), limit(1)));
                       if (msgsSnapshot.empty) {
+                          setLastMessages(prev => { const next = { ...prev }; delete next[activeChat.id]; return next; });
                           await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'lastMessages', activeChat.id)).catch(()=>{});
                       } else {
                           const remaining = msgsSnapshot.docs.map(d => d.data()).sort((a, b) => b.createdAt - a.createdAt);
                           const last = remaining[0];
-                          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'lastMessages', activeChat.id), {
+                          const prevLast = lastMessages?.[activeChat.id];
+                          const lastStudentAt = !isTeacherId(last?.authorId)
+                              ? (Number(last?.createdAt) || Number(prevLast?.lastStudentAt) || 0)
+                              : (Number(prevLast?.lastStudentAt) || 0);
+                          const nextLastPayload = {
                               text: last?.isDeleted ? 'Mensaje eliminado' : (last?.text || (last?.imageUrl ? 'Imagen' : '')),
                               author: (last?.author || 'Usuario').split(' ')[0],
-                              createdAt: last?.createdAt || Date.now()
-                          });
+                              authorId: last?.authorId || '',
+                              authorRole: isTeacherId(last?.authorId) ? 'teacher' : 'student',
+                              createdAt: last?.createdAt || Date.now(),
+                              ...(lastStudentAt > 0 ? { lastStudentAt } : {})
+                          };
+                          setLastMessages(prev => ({ ...prev, [activeChat.id]: nextLastPayload }));
+                          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'lastMessages', activeChat.id), nextLastPayload);
                       }
                       return;
                   }
@@ -3930,11 +4040,18 @@ useEffect(() => {
                           text: "Este mensaje fue eliminado"
                       });
 
-                      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'lastMessages', activeChat.id), {
-                          text: 'Este mensaje fue eliminado',
-                          author: (msgObj.author || 'Usuario').split(' ')[0],
-                          createdAt: Date.now()
-                      }, { merge: true });
+                      const isLatestInChat = chatMessages.length > 0 && chatMessages[chatMessages.length - 1]?.id === msgId;
+                      if (isLatestInChat) {
+                          const msgTime = msgObj.createdAt || Date.now();
+                          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'lastMessages', activeChat.id), {
+                              text: 'Este mensaje fue eliminado',
+                              author: (msgObj.author || 'Usuario').split(' ')[0],
+                              authorId: msgObj.authorId || myChatId,
+                              authorRole: role,
+                              createdAt: msgTime,
+                              ...(role !== 'teacher' ? { lastStudentAt: msgTime } : {})
+                          }, { merge: true });
+                      }
                   }
               } catch (err) {
                   console.error("Error al eliminar mensaje:", err);
@@ -4103,6 +4220,7 @@ useEffect(() => {
               const deletePromises = msgsSnapshot.docs.map(d => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chats', activeChat.id, 'messages', d.id)));
               await Promise.all(deletePromises);
 
+              setLastMessages(prev => { const next = { ...prev }; delete next[activeChat.id]; return next; });
               await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'lastMessages', activeChat.id));
               setActiveChat(null);
               showMessage("Historial de chat eliminado.");
@@ -4270,6 +4388,7 @@ useEffect(() => {
           const msgPreviewText = textToSend || (imgToSend ? 'Imagen' : (fileToSend ? 'Documento' : (audioToSend ? 'Nota de voz' : '')));
           const previewName = role === 'teacher' ? (isCamiloTeacher(myChatId) ? 'Prof. Camilo' : 'Profesora') : (loggedInName || 'Estudiante').split(' ')[0];
 
+          const nowTs = Date.now();
           await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'chats', activeChat.id, 'messages'), {
               text: textToSend,
               imageUrl: imgToSend,
@@ -4281,19 +4400,32 @@ useEffect(() => {
               uid: user?.uid || myChatId || '',
               status: 'sent',
               replyTo: replyToSend,
-              createdAt: Date.now()
+              createdAt: nowTs
           });
 
           // Scroll hacia abajo instantáneo al enviar
           setTimeout(() => scrollToChatBottom('smooth'), 30);
           setTimeout(() => scrollToChatBottom('smooth'), 150);
 
-          // ACTUALIZAR ÚLTIMO MENSAJE
-          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'lastMessages', activeChat.id), {
+          // ACTUALIZAR ÚLTIMO MENSAJE (preservando lastStudentAt cuando un docente responde)
+          const prevLast = lastMessages?.[activeChat.id];
+          const prevStudTs = Math.max(
+              Number(prevLast?.lastStudentAt) || 0,
+              prevLast && isLastMessageFromStudent(getDmTargetUserId(activeChat, myChatId), prevLast, myChatId, userMappings)
+                  ? (Number(prevLast?.createdAt) || 0)
+                  : 0
+          );
+          const nextStudentAt = role !== 'teacher' ? nowTs : prevStudTs;
+          const lastMsgPayload = {
               text: msgPreviewText,
               author: previewName,
-              createdAt: Date.now()
-          });
+              authorId: myChatId,
+              authorRole: role,
+              createdAt: nowTs,
+              ...(nextStudentAt > 0 ? { lastStudentAt: nextStudentAt } : {})
+          };
+          setLastMessages(prev => ({ ...prev, [activeChat.id]: lastMsgPayload }));
+          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'lastMessages', activeChat.id), lastMsgPayload, { merge: true });
 
           let targetIds = [];
           if (activeChat.type === 'group') {
@@ -12091,15 +12223,16 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                               <div className="space-y-0.5">
                                                   {filteredUsers.map(u => {
                                                       const chatId = `dm_${[myChatId, u.id].sort().join('_')}`;
-                                                      const isUnread = unreadChats[chatId];
-                                                      const presenceData = userPresence[u.id] || (u.uid ? userPresence[u.uid] : null) || (u.email ? userPresence[u.email.split('@')[0]] : null);
-                                                      const presenceStatus = presenceData?.status;
+                                                      const indicatorState = getChatIndicatorState({ user: u, chatId, unreadChats, lastMessages, myChatId, role, userMappings });
+                                                      const isUnread = indicatorState === 'unread';
+                                                      const isUnanswered = indicatorState === 'unanswered';
+                                                      const presenceData = getUserPresenceData(u, userPresence, userMappings);
+                                                      const presenceStatus = getPresenceStatus(presenceData);
                                                       const isOnline = presenceStatus === 'online';
                                                       const isAway = presenceStatus === 'away';
                                                       const isBusy = presenceStatus === 'busy';
                                                       const isConnected = isOnline || isAway || isBusy;
                                                       const isDisconnected = !isConnected;
-                                                      const isOffline = isDisconnected;
                                                       
                                                       const statusDotColor = isOnline ? 'bg-green-500' : isAway ? 'bg-orange-400' : isBusy ? 'bg-red-500' : 'bg-gray-400';
                                                       const photo = u.profilePicUrl || userMappings[u.id]?.profilePicUrl;
@@ -12146,7 +12279,11 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                                           : 'text-gray-500'
                                                                   }`}>{u.role === 'teacher' ? 'Docente' : (u.customLabel || 'Estudiante')}</p>
                                                               </div>
-                                                              {isUnread && <span className="w-2 h-2 bg-blue-500 rounded-full"></span>}
+                                                              {isUnread ? (
+                                                                  <span className="w-2 h-2 bg-blue-500 rounded-full shrink-0" title="Mensaje nuevo"></span>
+                                                              ) : isUnanswered ? (
+                                                                  <span className="w-2 h-2 bg-red-500 rounded-full shrink-0" title="Mensaje sin responder"></span>
+                                                              ) : null}
                                                           </button>
                                                       );
                                                   })}
@@ -12721,8 +12858,11 @@ Bot:`;
                               <div className="space-y-1.5">
                                   {filteredUsers.map(u => {
                                       const chatId = `dm_${[myChatId, u.id].sort().join('_')}`;
-                                      const presenceData = userPresence[u.id] || (u.uid ? userPresence[u.uid] : null) || (u.email ? userPresence[u.email.split('@')[0]] : null);
-                                      const presenceStatus = presenceData?.status;
+                                      const indicatorState = getChatIndicatorState({ user: u, chatId, unreadChats, lastMessages, myChatId, role, userMappings });
+                                      const isUnread = indicatorState === 'unread';
+                                      const isUnanswered = indicatorState === 'unanswered';
+                                      const presenceData = getUserPresenceData(u, userPresence, userMappings);
+                                      const presenceStatus = getPresenceStatus(presenceData);
                                       const isOnline = presenceStatus === 'online';
                                       const isAway = presenceStatus === 'away';
                                       const isBusy = presenceStatus === 'busy';
@@ -12773,6 +12913,11 @@ Bot:`;
                                                           : 'text-gray-400'
                                                   }`}>{u.role === 'teacher' ? 'Docente' : (u.customLabel || 'Estudiante')}</p>
                                               </div>
+                                              {isUnread ? (
+                                                  <span className="w-2.5 h-2.5 bg-blue-500 rounded-full shrink-0" title="Mensaje nuevo"></span>
+                                              ) : isUnanswered ? (
+                                                  <span className="w-2.5 h-2.5 bg-red-500 rounded-full shrink-0" title="Mensaje sin responder"></span>
+                                              ) : null}
                                           </button>
                                       );
                                   })}
@@ -12823,7 +12968,8 @@ Bot:`;
                                            else if (anyBusy) dotColor = 'bg-red-500';
                                       } else {
                                           const tId = getDmTargetUserId(activeChat, myChatId);
-                                          const st = userPresence[tId]?.status;
+                                          const pData = getUserPresenceData(tId, userPresence, userMappings);
+                                          const st = getPresenceStatus(pData);
                                           if (st === 'online') dotColor = 'bg-green-500';
                                           else if (st === 'away') dotColor = 'bg-orange-400';
                                           else if (st === 'busy') dotColor = 'bg-red-500';
@@ -12896,7 +13042,8 @@ Bot:`;
                                               <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 ${isDarkMode ? 'border-gray-800' : 'border-white'} ${
                                                   (() => {
                                                       const tId = getDmTargetUserId(activeChat, myChatId);
-                                                      const st = userPresence[tId]?.status;
+                                                      const pData = getUserPresenceData(tId, userPresence, userMappings);
+                                                      const st = getPresenceStatus(pData);
                                                       return st === 'online' ? 'bg-green-500' : st === 'away' ? 'bg-orange-400' : st === 'busy' ? 'bg-red-500' : 'bg-gray-400';
                                                   })()
                                               }`}></div>
@@ -12936,12 +13083,29 @@ Bot:`;
                                                         const targetId = getDmTargetUserId(activeChat, myChatId);
                                                         const isTyping = typingStatus[activeChat.id]?.[targetId];
                                                         if (isTyping === true || (typeof isTyping === 'object' && isTyping?.isTyping === true)) return <span className="text-blue-500 font-bold animate-pulse">Escribiendo...</span>;
-                                                        const pData = userPresence[targetId] || {};
-                                                        if (pData.status === 'online') {
+                                                        const pData = getUserPresenceData(targetId, userPresence, userMappings);
+                                                        const st = getPresenceStatus(pData);
+                                                        if (st === 'online') {
                                                             return pData.currentChatId === activeChat.id ? <span className="text-green-600 font-bold">En este chat</span> : <span className="text-green-500 font-bold">En línea</span>;
                                                         }
-                                                        if (pData.status === 'away') return 'Ausente';
-                                                        if (pData.status === 'busy') return 'Ocupado';
+                                                        if (st === 'away') return 'Ausente';
+                                                        if (st === 'busy') return 'Ocupado';
+                                                        if (role === 'teacher' && !isTeacherId(targetId)) {
+                                                            let lastConn = getLastConnectionTime(targetId, userPresence, userMappings, lastMessages[activeChat.id], lastMessages);
+                                                            if (Array.isArray(chatMessages) && chatMessages.length > 0) {
+                                                                for (let i = chatMessages.length - 1; i >= 0; i--) {
+                                                                    const m = chatMessages[i];
+                                                                    if (m && isLastMessageFromStudent(targetId, m, myChatId, userMappings) && Number(m.createdAt) > 0) {
+                                                                        lastConn = Math.max(lastConn, Number(m.createdAt));
+                                                                        break;
+                                                                    }
+                                                                }
+                                                            }
+                                                            if (lastConn > 0) {
+                                                                const formattedLastSeen = formatLastConnection(lastConn);
+                                                                return <span title={formattedLastSeen}>{formattedLastSeen}</span>;
+                                                            }
+                                                        }
                                                         return 'Desconectado';
                                                    })()}
                                                </p>
