@@ -143,11 +143,13 @@ export const DEMO_EVALUATIONS = [
     dueDate: '2026-12-31',
     dueTime: '23:59',
     strictAntiCheat: false,
+    immediateFeedback: true,
     createdAt: Date.now() - 1000 * 60 * 60 * 12,
     questions: [
       {
         text: 'Choose the correct economic term: "When the general price level of goods and services rises continuously and purchasing power falls, the economy is experiencing ______."',
         type: 'multiple',
+        imageUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="520" height="220" viewBox="0 0 520 220"><rect width="520" height="220" rx="16" fill="%23f8fafc"/><text x="24" y="34" font-family="Arial,sans-serif" font-size="14" font-weight="bold" fill="%231e293b">Price Level vs. Purchasing Power Index</text><line x1="48" y1="180" x2="480" y2="180" stroke="%23cbd5e1" stroke-width="2"/><line x1="48" y1="50" x2="48" y2="180" stroke="%23cbd5e1" stroke-width="2"/><polyline fill="none" stroke="%23dc2626" stroke-width="4" points="65,160 165,132 265,102 365,76 460,56"/><polyline fill="none" stroke="%232563eb" stroke-width="3" stroke-dasharray="6,4" points="65,68 165,94 265,122 365,146 460,166"/><text x="345" y="52" font-family="Arial,sans-serif" font-size="12" font-weight="bold" fill="%23dc2626">General Price Level (+)</text><text x="335" y="174" font-family="Arial,sans-serif" font-size="12" font-weight="bold" fill="%232563eb">Purchasing Power (-)</text></svg>',
         options: [
           { text: 'inflation', isCorrect: true },
           { text: 'deflation', isCorrect: false },
@@ -201,6 +203,7 @@ export const DEMO_EVALUATIONS = [
     dueDate: '2026-12-31',
     dueTime: '23:59',
     strictAntiCheat: false,
+    immediateFeedback: true,
     createdAt: Date.now() - 1000 * 60 * 60 * 30,
     questions: [
       {

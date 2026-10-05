@@ -79,6 +79,11 @@ export default function SimulacroEvaluacion({ evaluacion = {}, isDarkMode = fals
                     <ShieldAlert size={11} /> Anti-trampas
                   </span>
                 )}
+                {evaluacion.immediateFeedback && (
+                  <span className="text-[10px] uppercase font-black px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center gap-1">
+                    <CheckCircle2 size={11} /> Retroalimentación inmediata
+                  </span>
+                )}
               </h2>
               <p className="text-xs text-gray-500 font-medium mt-0.5 break-words">{evaluacion.description || 'Sin indicaciones'}</p>
             </div>
@@ -93,6 +98,14 @@ export default function SimulacroEvaluacion({ evaluacion = {}, isDarkMode = fals
             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${isDarkMode ? 'border-gray-700 text-gray-300' : 'border-gray-200 text-gray-600'}`}>Respondidas: {respondidas}/{preguntas.length}</span>
           </div>
           <p className="text-[10px] text-gray-400 font-medium mt-2">El cronómetro se activa cuando la evaluación se publica.</p>
+        </div>
+
+        {/* Temporizador pequeño flotante en esquina inferior (sin título, sin tapar preguntas ni respuestas) */}
+        <div className="fixed bottom-4 right-4 z-[1000] pointer-events-none">
+          <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border border-red-500/35 text-[#AD3333] dark:text-red-400 px-2.5 py-1 rounded-full font-black font-mono text-xs flex items-center gap-1.5 shadow-md">
+            <Clock size={12} />
+            <span>{dosDigitos(tiempoLimite)}:00</span>
+          </div>
         </div>
 
         {/* Aviso anti-trampas (tal como lo verá el estudiante) */}
@@ -129,6 +142,14 @@ export default function SimulacroEvaluacion({ evaluacion = {}, isDarkMode = fals
                     </span>
                   )}
                 </div>
+
+                {q.imageUrl && (
+                  <div className="pl-8 pt-2">
+                    <div className="rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-gray-900/50 max-w-md">
+                      <img src={q.imageUrl} alt={`Imagen de la pregunta ${i + 1}`} className="w-full max-h-64 object-contain" />
+                    </div>
+                  </div>
+                )}
 
                 {(q.type === 'listening' || q.type === 'dictation') && q.audioUrl && (
                   <div className="pl-8 pt-1">

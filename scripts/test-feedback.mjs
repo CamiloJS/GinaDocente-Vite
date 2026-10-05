@@ -1,5 +1,15 @@
-// Pruebas de la retroalimentacion con IA: automatica, SIEMPRE en espanol y para TODOS los tipos.
-import { evaluacionVencida, describirPregunta, construirPromptFeedback, parsearFeedback, generarFeedbackIA, pendientesDeFeedback, limpiarMencionIA } from "../src/utils/aiFeedback.js";
+import {
+  evaluacionVencida,
+  tieneRetroalimentacionInmediata,
+  puedeMostrarFeedback,
+  describirPregunta,
+  armarMinijuegoPregunta,
+  construirPromptFeedback,
+  parsearFeedback,
+  generarFeedbackIA,
+  pendientesDeFeedback,
+  limpiarMencionIA,
+} from "../src/utils/aiFeedback.js";
 
 let ok = 0, fallos = 0;
 const chequear = (nombre, cond, extra = "") => {
@@ -9,7 +19,7 @@ const chequear = (nombre, cond, extra = "") => {
 
 const AHORA = new Date("2026-09-30T12:00:00").getTime();
 
-console.log("\n== Regla del deadline (solo despues de vencer) ==");
+console.log("\n== Regla del deadline y retroalimentacion inmediata ==");
 chequear("sin fecha -> no vencida", evaluacionVencida({ title: 'x' }, AHORA) === false);
 chequear("fecha futura -> no vencida", evaluacionVencida({ dueDate: '2026-10-05', dueTime: '23:59' }, AHORA) === false);
 chequear("fecha pasada -> vencida", evaluacionVencida({ dueDate: '2026-09-20', dueTime: '23:59' }, AHORA) === true);
@@ -17,6 +27,10 @@ chequear("mismo dia antes de la hora -> no vencida", evaluacionVencida({ dueDate
 chequear("mismo dia despues de la hora -> vencida", evaluacionVencida({ dueDate: '2026-09-30', dueTime: '06:00' }, AHORA) === true);
 chequear("sin hora usa 23:59", evaluacionVencida({ dueDate: '2026-09-30' }, AHORA) === false);
 chequear("fecha invalida -> no vencida", evaluacionVencida({ dueDate: 'no-es-fecha' }, AHORA) === false);
+chequear("tieneRetroalimentacionInmediata detecta immediateFeedback=true", tieneRetroalimentacionInmediata({ immediateFeedback: true }) === true);
+chequear("tieneRetroalimentacionInmediata falso por defecto", tieneRetroalimentacionInmediata({ title: 'x' }) === false);
+chequear("puedeMostrarFeedback permite vigente si tiene immediateFeedback", puedeMostrarFeedback({ dueDate: '2026-12-01', dueTime: '23:59', immediateFeedback: true }, AHORA) === true);
+chequear("puedeMostrarFeedback bloquea vigente sin immediateFeedback", puedeMostrarFeedback({ dueDate: '2026-12-01', dueTime: '23:59', immediateFeedback: false }, AHORA) === false);
 
 console.log("\n== Descripcion de TODOS los tipos ==");
 const multiple = { type: 'multiple', text: 'Elige', options: [{ text: 'uno', isCorrect: false }, { text: 'dos', isCorrect: true }, { text: 'tres', isCorrect: false }] };
@@ -41,6 +55,58 @@ chequear("dictado correcto", d.acierto === true);
 d = describirPregunta({ type: 'speaking', text: 'Habla sobre tu rutina' }, 'https://audio/voz.webm');
 chequear("speaking con audio: se marca como audio y sin acierto automatico", d.esAudio === true && d.acierto === null && d.delEstudiante.includes('audio'), d);
 chequear("speaking sin audio", describirPregunta({ type: 'speaking', text: 'Habla' }, '').delEstudiante === '(no grabo nada)');
+
+console.log("\n== Minijuego cazatrampas y analisis de opciones por pregunta ==");
+const mjMultiple = armarMinijuegoPregunta(multiple, [0]);
+chequear("multiple genera analisis de todas las opciones", mjMultiple.analisisOpciones.length === 3);
+chequear("multiple identifica cual opcion era correcta y cuales no iban", mjMultiple.analisisOpciones[1].esCorrecta === true && mjMultiple.analisisOpciones[0].esCorrecta === false && mjMultiple.analisisOpciones[0].fueElegida === true);
+chequear("multiple genera 3 opciones de minijuego con 1 verdadera y 2 trampas", mjMultiple.opcionesJuego.length === 3 && mjMultiple.opcionesJuego.filter((o) => o.esCorrecta).length === 1 && mjMultiple.opcionesJuego.filter((o) => !o.esCorrecta).length === 2);
+
+const mjOrder = armarMinijuegoPregunta({ type: 'order', text: 'Ordena', words: ['she', 'went', 'home'] }, ['home', 'went', 'she']);
+chequear("order genera analisis de orden correcto vs orden del estudiante", mjOrder.analisisOpciones.length === 2 && mjOrder.opcionesJuego.length === 3);
+
+const mjMatch = armarMinijuegoPregunta({ type: 'match', text: 'Une', pairs: [{ left: 'dog', right: 'perro' }, { left: 'cat', right: 'gato' }] }, { 0: 'perro', 1: 'perro' });
+chequear("match genera analisis por pareja y minijuego de 3 opciones", mjMatch.analisisOpciones.length === 2 && mjMatch.opcionesJuego.length === 3);
+
+const mjText = armarMinijuegoPregunta({ type: 'text', text: 'Pasado de buy', correctAnswer: 'bought' }, 'buyed');
+chequear("text genera analisis de respuesta correcta vs error del estudiante", mjText.analisisOpciones.length === 2 && mjText.opcionesJuego.length === 3);
+
+const matchLargo = {
+  type: 'match',
+  text: 'Relaciona cada concepto de Ingles Tecnico economico con su definicion exacta en ingles:',
+  pairs: [
+    { left: 'Supply and Demand', right: 'Relationship between availability and desire for goods' },
+    { left: 'Trade Surplus', right: 'Economic state when exports exceed imports' },
+    { left: 'Bull Market', right: 'Financial market where asset prices are rising' },
+    { left: 'Central Bank', right: 'Institution that manages currency and interest rates' }
+  ]
+};
+const mjMatchLargo = armarMinijuegoPregunta(matchLargo, { 0: 'Economic state when exports exceed imports', 1: 'Economic state when exports exceed imports', 2: 'Financial market where asset prices are rising', 3: 'Institution that manages currency and interest rates' });
+chequear("match con 4 parejas largas enfoca el reto en una pareja especifica sin truncar a mitad de palabra", mjMatchLargo.preguntaTrampa.includes('Supply and Demand') && mjMatchLargo.opcionesJuego.some((o) => o.esCorrecta && o.texto.includes('Relationship between availability and desire for goods') && o.texto.includes('Supply and Demand')));
+
+const vfPregunta = {
+  type: 'multiple',
+  text: 'Indica si la afirmacion es verdadera o falsa: "GDP measures total monetary value of final goods."',
+  options: [
+    { text: 'Verdadero', isCorrect: true },
+    { text: 'Falso', isCorrect: false }
+  ]
+};
+const mjVF = armarMinijuegoPregunta(vfPregunta, [1]);
+chequear("verdadero/falso no genera trampa absurda sobre sinonimos", !mjVF.opcionesJuego.some((o) => o.texto.includes('sinónimos')));
+
+const mjConRazonIA = armarMinijuegoPregunta(multiple, [0], 'Explicacion general', {
+  porQueOpciones: ['Razon especifica 1', 'Razon especifica 2', 'Razon especifica 3'],
+  retoPregunta: 'Reto personalizado',
+  opcionesJuego: [
+    { texto: 'Opcion A', esCorrecta: false, explicacion: 'Exp A' },
+    { texto: 'Opcion B', esCorrecta: true, explicacion: 'Exp B' },
+    { texto: 'Opcion C', esCorrecta: false, explicacion: 'Exp C' }
+  ]
+});
+const mjRehidratado = armarMinijuegoPregunta(multiple, [0], 'Explicacion general', mjConRazonIA);
+chequear("rehidratar minijuego conserva porQueOpciones de la IA en analisisOpciones", mjRehidratado.analisisOpciones[0].razon === 'Razon especifica 1' && mjRehidratado.analisisOpciones[1].razon === 'Razon especifica 2');
+chequear("rehidratar minijuego no vuelve a barajar opcionesJuego (orden estable)", JSON.stringify(mjRehidratado.opcionesJuego.map((o) => o.texto)) === JSON.stringify(mjConRazonIA.opcionesJuego.map((o) => o.texto)));
 
 console.log("\n== Prompt (SIEMPRE en espanol) ==");
 const prompt = construirPromptFeedback({ titulo: 'Examen 1', items: [describirPregunta(multiple, [0]), describirPregunta({ type: 'text', text: 'x', correctAnswer: 'y' }, 'y')] });
@@ -81,6 +147,7 @@ chequear("el parseo limpia las menciones de IA", r.ok && !/como ia/i.test(r.feed
 console.log("\n== Generacion completa (con IA simulada) ==");
 const evVencida = { title: 'Examen', dueDate: '2026-09-01', dueTime: '23:59' };
 const evVigente = { title: 'Examen', dueDate: '2026-12-01', dueTime: '23:59' };
+const evVigenteInmediata = { title: 'Examen Inmediato', dueDate: '2026-12-01', dueTime: '23:59', immediateFeedback: true };
 const preguntas = [multiple, { type: 'speaking', text: 'Graba tu voz' }, { type: 'text', text: 'Pasado de go', correctAnswer: 'went' }];
 const respuestas = { 0: [0], 1: 'https://audio/x.webm', 2: 'went' };
 let llamadas = 0;
@@ -88,10 +155,13 @@ let promptUsado = '';
 const iaFalsa = async (p) => { llamadas++; promptUsado = p; return JSON.stringify([{ i: 1, explicacion: 'Revisa la opcion dos.' }, { i: 2, explicacion: 'Tu audio debe incluir ejemplos.' }, { i: 3, explicacion: 'Muy bien.' }]); };
 
 let g = await generarFeedbackIA({ evaluacion: evVigente, preguntas, respuestas, llamarIA: iaFalsa, ahora: AHORA });
-chequear("NO genera si la evaluacion sigue vigente", g.ok === false && g.vencida === false && llamadas === 0, JSON.stringify(g));
+chequear("NO genera si la evaluacion sigue vigente y no tiene retroalimentacion inmediata", g.ok === false && g.vencida === false && llamadas === 0, JSON.stringify(g));
+
+g = await generarFeedbackIA({ evaluacion: evVigenteInmediata, preguntas, respuestas, llamarIA: iaFalsa, ahora: AHORA });
+chequear("SI genera en evaluacion vigente cuando tiene immediateFeedback=true", g.ok === true && llamadas === 1, JSON.stringify(g));
 
 g = await generarFeedbackIA({ evaluacion: evVencida, preguntas, respuestas, llamarIA: iaFalsa, ahora: AHORA });
-chequear("genera cuando ya vencio", g.ok === true && g.vencida === true && llamadas === 1);
+chequear("genera cuando ya vencio", g.ok === true && g.vencida === true && llamadas === 2);
 chequear("cubre TODOS los tipos, 1 a 1", g.feedback.length === 3 && g.feedback.every(Boolean), JSON.stringify(g.feedback));
 chequear("incluye la de speaking", g.feedback[1] === 'Tu audio debe incluir ejemplos.');
 chequear("el prompt siempre pide espanol", promptUsado.includes('SIEMPRE en ESPANOL') && promptUsado.includes('RESPUESTA GRABADA'));
@@ -117,3 +187,4 @@ chequear("sin argumentos -> vacio", pendientesDeFeedback().length === 0);
 
 console.log(`\nRESULTADO: ${ok} OK, ${fallos} fallos\n`);
 process.exit(fallos ? 1 : 0);
+

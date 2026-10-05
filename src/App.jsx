@@ -450,6 +450,7 @@ function App() {
     dueTime: "23:59",
     timeLimit: 30,
     strictAntiCheat: false,
+    immediateFeedback: false,
     targetGroupId: "all",
     targetGroupName: "Todos los estudiantes (Global)",
     questions: []
@@ -457,6 +458,8 @@ function App() {
   const [showAiEvalModal, setShowAiEvalModal] = useState(false);
   const [showSimulacroEval, setShowSimulacroEval] = useState(false);
   const [activeTakingEval, setActiveTakingEval] = useState(null);
+  const [activeImmediateFeedback, setActiveImmediateFeedback] = useState(null);
+  const [uploadingQuestionImageIdx, setUploadingQuestionImageIdx] = useState(null);
   const [studentAnswers, setStudentAnswers] = useState({});
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [viewingResultsFor, setViewingResultsFor] = useState(null);
@@ -1726,12 +1729,13 @@ function App() {
     if (submittingEvalRef.current) return;
     submittingEvalRef.current = true;
     try {
+      const evalSnapshot = activeTakingEval;
       const currentAnswers = studentAnswersRef.current || studentAnswers || {};
-      const score = calculateScore(activeTakingEval, currentAnswers);
+      const score = calculateScore(evalSnapshot, currentAnswers);
       if (isDemoMode) {
         const now = Date.now();
         const demoGradePayload = {
-          evaluationId: activeTakingEval.id,
+          evaluationId: evalSnapshot.id,
           studentId: myChatId || 'invitado',
           studentEmail: 'invitado@demo.local',
           studentName: loggedInName || 'Invitado (Demo)',
@@ -1754,6 +1758,9 @@ function App() {
         setGrades(prev => [{ ...demoGradeData }, ...prev.filter(g => g.id !== demoGradeData.id)]);
         setActiveTakingEval(null);
         setStudentAnswers({});
+        if (evalSnapshot.immediateFeedback) {
+          setActiveImmediateFeedback({ evaluacion: evalSnapshot, grade: demoGradeData });
+        }
         if (!autoSubmit) {
           try {
             confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
@@ -1764,8 +1771,8 @@ function App() {
         return;
       }
       const gradeData = {
-        evaluationId: activeTakingEval.id,
-        teacherId: getItemTeacherId(activeTakingEval),
+        evaluationId: evalSnapshot.id,
+        teacherId: getItemTeacherId(evalSnapshot),
         studentId: user?.uid || myChatId || 'student_user',
         studentEmail: user?.email || '',
         studentName: loggedInName || 'Estudiante',
@@ -1774,9 +1781,13 @@ function App() {
         submittedAt: Date.now()
       };
       const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'grades'), gradeData);
-      setGrades(prev => [{ id: docRef.id, ...gradeData }, ...prev.filter(g => g.id !== docRef.id)]);
+      const savedGrade = { id: docRef.id, ...gradeData };
+      setGrades(prev => [savedGrade, ...prev.filter(g => g.id !== docRef.id)]);
       setActiveTakingEval(null);
       setStudentAnswers({});
+      if (evalSnapshot.immediateFeedback) {
+        setActiveImmediateFeedback({ evaluacion: evalSnapshot, grade: savedGrade });
+      }
       if (!autoSubmit) {
         try {
           confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
@@ -4564,6 +4575,7 @@ useEffect(() => {
                       description: (evalFormData.description || '').trim(),
                       timeLimit: parsedTimeLimit,
                       strictAntiCheat: !!evalFormData.strictAntiCheat,
+                      immediateFeedback: !!evalFormData.immediateFeedback,
                       isArchived: false,
                       targetGroupId: evalFormData.targetGroupId || 'all',
                       targetGroupName: evalFormData.targetGroupName || 'Todos los estudiantes (Global)',
@@ -4594,6 +4606,7 @@ useEffect(() => {
                           dueTime: "23:59",
                           timeLimit: 30,
                           strictAntiCheat: false,
+                          immediateFeedback: false,
                           targetGroupId: "all",
                           targetGroupName: "Todos los estudiantes (Global)",
                           questions: [{ type: 'multiple', text: '', options: [{text: '', isCorrect: false}, {text: '', isCorrect: false}], correctAnswer: '' }]
@@ -4613,6 +4626,7 @@ useEffect(() => {
                       dueTime: "23:59",
                       timeLimit: 30,
                       strictAntiCheat: false,
+                      immediateFeedback: false,
                       targetGroupId: "all",
                       targetGroupName: "Todos los estudiantes (Global)",
                       questions: [{ type: 'multiple', text: '', options: [{text: '', isCorrect: false}, {text: '', isCorrect: false}], correctAnswer: '' }]
@@ -4621,6 +4635,39 @@ useEffect(() => {
               } catch (err) {
                   console.error(err);
                   showMessage("Error al crear la evaluación. Intenta de nuevo.");
+              }
+          };
+
+          const handleQuestionImageUpload = async (file, qIndex) => {
+              if (!file) return;
+              if (!file.type || !file.type.startsWith('image/')) {
+                  showMessage("Selecciona un archivo de imagen válido (JPG, PNG, GIF o WebP).");
+                  return;
+              }
+              setUploadingQuestionImageIdx(qIndex);
+              try {
+                  const base64 = await compressImage(file, 1600, 1600, 0.82);
+                  let finalUrl = base64;
+                  if (!isDemoMode) {
+                      try {
+                          const uploadedUrl = await uploadImageToStorage(base64, 'eval_question_images');
+                          if (uploadedUrl) finalUrl = uploadedUrl;
+                      } catch (storageErr) {
+                          console.warn('Usando imagen optimizada directa como respaldo:', storageErr);
+                      }
+                  }
+                  setEvalFormData((prev) => {
+                      const nuevas = [...(prev.questions || [])];
+                      if (!nuevas[qIndex]) return prev;
+                      nuevas[qIndex] = { ...nuevas[qIndex], imageUrl: finalUrl };
+                      return { ...prev, questions: nuevas };
+                  });
+                  showMessage("Imagen agregada a la pregunta.");
+              } catch (err) {
+                  console.error(err);
+                  showMessage("No se pudo cargar la imagen. Intenta con otra.");
+              } finally {
+                  setUploadingQuestionImageIdx(null);
               }
           };
 
@@ -8109,22 +8156,35 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
               // Vista de Rendición de Evaluación (Estudiante respondiendo)
               if (activeTakingEval) {
                   return (
-                      <div className="max-w-3xl mx-auto space-y-4 pb-20 md:pb-8 animate-in fade-in">
-                          {/* Sticky Header con Temporizador y Progreso */}
-                          <div className={`${glassCard} !p-4 sticky top-[76px] z-40 border border-red-500/20 shadow-md backdrop-blur-md flex items-center justify-between gap-4 rounded-2xl`}>
-                              <div className="min-w-0">
-                                  <h2 className="text-base sm:text-lg font-black text-gray-900 dark:text-gray-100 truncate flex items-center gap-2">
+                      <div className="max-w-3xl mx-auto space-y-4 pb-24 md:pb-12 animate-in fade-in relative">
+                          {/* Encabezado fijo arriba (NO sticky para que el título nunca baje ni tape las preguntas) */}
+                          <div className={`${glassCard} !p-4 border border-red-500/20 shadow-sm flex items-start justify-between gap-3 rounded-2xl`}>
+                              <div className="min-w-0 flex-1">
+                                  <h2 className="text-base sm:text-lg font-black text-gray-900 dark:text-gray-100 break-words flex items-center gap-2 flex-wrap">
                                       <span>{activeTakingEval.title}</span>
                                       {activeTakingEval.strictAntiCheat && (
                                           <span className="text-[10px] uppercase font-black px-2 py-0.5 rounded-full bg-red-500 text-white flex items-center gap-1 shrink-0">
                                               <ShieldAlert size={11} /> Anti-trampas
                                           </span>
                                       )}
+                                      {activeTakingEval.immediateFeedback && (
+                                          <span className="text-[10px] uppercase font-black px-2 py-0.5 rounded-full bg-blue-600 text-white flex items-center gap-1 shrink-0">
+                                              <Lightbulb size={11} /> Retroalimentación inmediata
+                                          </span>
+                                      )}
                                   </h2>
-                                  <p className="text-xs text-gray-500 font-medium truncate">{activeTakingEval.description}</p>
+                                  <p className="text-xs text-gray-500 font-medium mt-0.5 break-words">{activeTakingEval.description}</p>
                               </div>
-                              <div className="bg-red-500/10 border border-red-500/30 text-[#AD3333] dark:text-red-400 px-3.5 py-1.5 rounded-xl font-bold font-mono text-sm sm:text-base flex items-center gap-2 shrink-0 animate-pulse">
-                                  <Clock size={16}/> {formatTime(timeRemaining)}
+                              <div className="bg-red-500/10 border border-red-500/30 text-[#AD3333] dark:text-red-400 px-2.5 py-1 rounded-xl font-bold font-mono text-xs flex items-center gap-1.5 shrink-0">
+                                  <Clock size={13}/> {formatTime(timeRemaining)}
+                              </div>
+                          </div>
+
+                          {/* Temporizador pequeño flotante en esquina inferior (sin título, sin tapar preguntas ni clics) */}
+                          <div className={`fixed bottom-[74px] ${activeChat ? 'md:bottom-16' : 'md:bottom-5'} right-3 md:right-5 z-[130] pointer-events-none`}>
+                              <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border border-red-500/35 text-[#AD3333] dark:text-red-400 px-2.5 py-1 rounded-full font-black font-mono text-xs flex items-center gap-1.5 shadow-md">
+                                  <Clock size={12} className="animate-pulse" />
+                                  <span>{formatTime(timeRemaining)}</span>
                               </div>
                           </div>
 
@@ -8149,10 +8209,23 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                           <span className="w-6 h-6 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
                                               {qIndex + 1}
                                           </span>
-                                          <h3 className="text-sm sm:text-base font-bold text-gray-900 dark:text-gray-100 leading-snug">
+                                          <h3 className="text-sm sm:text-base font-bold text-gray-900 dark:text-gray-100 leading-snug break-words flex-1">
                                               {q.text}
                                           </h3>
                                       </div>
+
+                                      {q.imageUrl && (
+                                          <div className="pl-8 pt-1">
+                                              <div className="rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-gray-900/60 max-w-md">
+                                                  <img
+                                                      src={q.imageUrl}
+                                                      alt={`Imagen de la pregunta ${qIndex + 1}`}
+                                                      onClick={() => setFullScreenImage(q.imageUrl)}
+                                                      className="w-full max-h-64 object-contain cursor-pointer hover:opacity-95 transition-opacity"
+                                                  />
+                                              </div>
+                                          </div>
+                                      )}
                                       
                                       {(q.type === 'listening' || q.type === 'dictation') && q.audioUrl && (
                                           <div className="pl-8">
@@ -8287,6 +8360,57 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                   className="py-2.5 px-6 rounded-xl bg-green-600 hover:bg-green-700 text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-md transition-transform active:scale-95 cursor-pointer"
                               >
                                   <Send size={15}/> Enviar evaluación
+                              </button>
+                          </div>
+                      </div>
+                  );
+              }
+
+              // Vista de Retroalimentación Inmediata (se abre apenas el estudiante termina la evaluación o al tocar el botón)
+              if (activeImmediateFeedback) {
+                  const fbEval = activeImmediateFeedback.evaluacion || {};
+                  const fbGrade = grades.find((g) => g.id === activeImmediateFeedback.grade?.id) || activeImmediateFeedback.grade || {};
+                  const notaNum = Number(fbGrade.score) || 0;
+                  return (
+                      <div className="max-w-3xl mx-auto space-y-4 pb-20 md:pb-8 animate-in fade-in">
+                          <div className={`${glassCard} !p-4 sm:!p-5 rounded-3xl border border-blue-500/25 shadow-sm space-y-3`}>
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <button
+                                      type="button"
+                                      onClick={() => setActiveImmediateFeedback(null)}
+                                      className="inline-flex items-center gap-1.5 text-xs font-bold text-gray-600 dark:text-gray-300 hover:text-[#AD3333] transition-colors cursor-pointer"
+                                  >
+                                      <ArrowLeftIcon size={15} /> Volver a Evaluaciones
+                                  </button>
+                                  <span className={`text-sm font-black px-3 py-1 rounded-xl ${notaNum >= 3.0 ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/15 text-rose-600 dark:text-rose-300 border border-rose-500/30'}`}>
+                                      Tu calificación: {notaNum.toFixed(1)} / 5.0
+                                  </span>
+                              </div>
+                              <div>
+                                  <h2 className="text-lg sm:text-xl font-black text-gray-900 dark:text-gray-100 break-words">
+                                      {fbEval.title || 'Resultados de tu evaluación'}
+                                  </h2>
+                                  <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mt-0.5">
+                                      Revisa en qué te quedó bien o mal, por qué las otras opciones no iban, por qué la correcta es la correcta y pon a prueba tu dominio en el minijuego de cada pregunta.
+                                  </p>
+                              </div>
+                          </div>
+
+                          <FeedbackIAEvaluacion
+                              evaluacion={{ ...fbEval, immediateFeedback: true }}
+                              grade={fbGrade}
+                              expandidoInicial={true}
+                              onZoomImage={(url) => setFullScreenImage(url)}
+                              onGenerado={(fb, mj) => setGrades((prev) => prev.map((g) => (g.id === fbGrade.id ? { ...g, feedbackIA: fb, ...(mj ? { minijuegosIA: mj } : {}) } : g)))}
+                          />
+
+                          <div className="flex justify-end pt-2">
+                              <button
+                                  type="button"
+                                  onClick={() => setActiveImmediateFeedback(null)}
+                                  className="py-2.5 px-6 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm transition-colors cursor-pointer shadow-sm"
+                              >
+                                  Listo, volver a Evaluaciones
                               </button>
                           </div>
                       </div>
@@ -8967,6 +9091,19 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                           )}
                                                       </p>
 
+                                                      {q.imageUrl && (
+                                                          <div className="pl-8 mb-3">
+                                                              <div className="rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-gray-900/60 max-w-sm">
+                                                                  <img
+                                                                      src={q.imageUrl}
+                                                                      alt={`Imagen de la pregunta ${qIdx + 1}`}
+                                                                      onClick={() => setFullScreenImage(q.imageUrl)}
+                                                                      className="w-full max-h-52 object-contain cursor-zoom-in"
+                                                                  />
+                                                              </div>
+                                                          </div>
+                                                      )}
+
                                                       {/* Respuestas detalladas */}
                                                       {(q.type === 'multiple' || q.type === 'listening') ? (
                                                           <div className="space-y-1.5 pl-8">
@@ -9200,6 +9337,19 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                           {q.text || q.question || 'Sin enunciado'}
                                                       </p>
 
+                                                      {q.imageUrl && (
+                                                          <div className="pl-8 pt-1">
+                                                              <div className="rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-gray-900/60 max-w-sm">
+                                                                  <img
+                                                                      src={q.imageUrl}
+                                                                      alt={`Imagen de la pregunta ${qIdx + 1}`}
+                                                                      onClick={() => setFullScreenImage(q.imageUrl)}
+                                                                      className="w-full max-h-52 object-contain cursor-zoom-in"
+                                                                  />
+                                                              </div>
+                                                          </div>
+                                                      )}
+
                                                       {q.type === 'multiple' ? (
                                                           <div className="space-y-1.5 pl-8">
                                                               {(q.options || []).map((opt, oIdx) => (
@@ -9322,8 +9472,8 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                           <input type="number" min="1" max="180" value={evalFormData.timeLimit} onChange={e => setEvalFormData({...evalFormData, timeLimit: parseInt(e.target.value) || 30})} className={`${glassInput} !py-2 text-xs`} required />
                                       </div>
                                   </div>
-                                   {/* Toggle Modo Anti-Trampas Minimalista */}
-                                    <div className="pt-2 border-t border-gray-200/70 dark:border-gray-800">
+                                   {/* Toggles de Modo Anti-Trampas y Retroalimentación inmediata */}
+                                    <div className="pt-2 border-t border-gray-200/70 dark:border-gray-800 space-y-2.5">
                                         <div 
                                             onClick={() => setEvalFormData(prev => ({ ...prev, strictAntiCheat: !prev.strictAntiCheat }))}
                                             className={`flex items-center justify-between p-3 rounded-2xl border transition-all cursor-pointer select-none ${
@@ -9348,6 +9498,33 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                 checked={!!evalFormData.strictAntiCheat} 
                                                 onChange={(e) => { e.stopPropagation(); setEvalFormData({ ...evalFormData, strictAntiCheat: e.target.checked }); }} 
                                                 className="w-4 h-4 accent-red-600 rounded cursor-pointer shrink-0" 
+                                            />
+                                        </div>
+
+                                        <div 
+                                            onClick={() => setEvalFormData(prev => ({ ...prev, immediateFeedback: !prev.immediateFeedback }))}
+                                            className={`flex items-center justify-between p-3 rounded-2xl border transition-all cursor-pointer select-none ${
+                                                evalFormData.immediateFeedback
+                                                    ? 'border-blue-500/50 bg-blue-50/60 dark:bg-blue-950/30 text-blue-900 dark:text-blue-200 shadow-2xs'
+                                                    : 'border-gray-200 dark:border-gray-700 bg-gray-50/70 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200'
+                                            }`}
+                                        >
+                                            <div className="flex items-start gap-2.5 pr-2">
+                                                <Lightbulb size={18} className="text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                                                <div>
+                                                    <p className="text-xs font-bold leading-tight">
+                                                        Retroalimentación inmediata
+                                                    </p>
+                                                    <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 leading-snug">
+                                                        Opcional: apenas termine la evaluación, el estudiante verá en qué le quedó mal, por qué las otras opciones no iban, por qué la correcta es la correcta y un minijuego en cada pregunta.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <input 
+                                                type="checkbox" 
+                                                checked={!!evalFormData.immediateFeedback} 
+                                                onChange={(e) => { e.stopPropagation(); setEvalFormData({ ...evalFormData, immediateFeedback: e.target.checked }); }} 
+                                                className="w-4 h-4 accent-blue-600 rounded cursor-pointer shrink-0" 
                                             />
                                         </div>
                                     </div>
@@ -9456,6 +9633,80 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                               className={`${glassInput} !py-2 text-xs font-semibold resize-none`} 
                                               required 
                                           />
+
+                                          {/* Imagen opcional por pregunta */}
+                                          <div className="flex flex-wrap items-center gap-2">
+                                              <label className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-bold transition-all cursor-pointer ${
+                                                  isDarkMode
+                                                      ? 'border-gray-700 bg-gray-800/70 text-gray-200 hover:bg-gray-800'
+                                                      : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
+                                              }`}>
+                                                  {uploadingQuestionImageIdx === qIndex ? (
+                                                      <>
+                                                          <Loader2 size={13} className="animate-spin text-blue-500" />
+                                                          <span>Subiendo imagen...</span>
+                                                      </>
+                                                  ) : (
+                                                      <>
+                                                          <ImageIcon size={13} className="text-blue-500" />
+                                                          <span>{q.imageUrl ? 'Cambiar imagen' : 'Agregar imagen (opcional)'}</span>
+                                                      </>
+                                                  )}
+                                                  <input
+                                                      type="file"
+                                                      accept="image/*"
+                                                      className="hidden"
+                                                      disabled={uploadingQuestionImageIdx === qIndex}
+                                                      onChange={(e) => {
+                                                          const file = e.target.files?.[0];
+                                                          if (file) handleQuestionImageUpload(file, qIndex);
+                                                          e.target.value = '';
+                                                      }}
+                                                  />
+                                              </label>
+                                              <input
+                                                  type="url"
+                                                  value={q.imageUrl && !String(q.imageUrl).startsWith('data:') ? q.imageUrl : ''}
+                                                  onChange={(e) => {
+                                                      const val = e.target.value.trim();
+                                                      const newQ = [...evalFormData.questions];
+                                                      const copia = { ...newQ[qIndex] };
+                                                      if (val) copia.imageUrl = val;
+                                                      else delete copia.imageUrl;
+                                                      newQ[qIndex] = copia;
+                                                      setEvalFormData({ ...evalFormData, questions: newQ });
+                                                  }}
+                                                  placeholder="O pega URL de imagen (https://...)"
+                                                  className={`${glassInput} !py-1.5 !px-2.5 flex-1 min-w-[180px] text-[11px]`}
+                                              />
+                                              {q.imageUrl && (
+                                                  <button
+                                                      type="button"
+                                                      onClick={() => {
+                                                          const newQ = [...evalFormData.questions];
+                                                          const copia = { ...newQ[qIndex] };
+                                                          delete copia.imageUrl;
+                                                          newQ[qIndex] = copia;
+                                                          setEvalFormData({ ...evalFormData, questions: newQ });
+                                                      }}
+                                                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-bold text-red-600 dark:text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/25 transition-colors cursor-pointer"
+                                                  >
+                                                      <Trash2 size={12} /> Quitar imagen
+                                                  </button>
+                                              )}
+                                          </div>
+
+                                          {q.imageUrl && (
+                                              <div className="rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-gray-900/60 max-w-sm">
+                                                  <img
+                                                      src={q.imageUrl}
+                                                      alt={`Vista previa pregunta ${qIndex + 1}`}
+                                                      onClick={() => setFullScreenImage(q.imageUrl)}
+                                                      className="w-full max-h-52 object-contain cursor-pointer hover:opacity-95 transition-opacity"
+                                                  />
+                                              </div>
+                                          )}
+
                                           {(q.type === 'listening' || q.type === 'dictation') && (
                                               <div className="pl-4 sm:pl-7 pt-1 space-y-1">
                                                   <p className="text-[11px] font-bold text-gray-500">Audio de la pregunta <span className="text-red-500">*</span></p>
@@ -9529,6 +9780,26 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                       className={`${glassInput} !py-1.5 text-xs border-blue-500/40 bg-blue-500/10`}
                                                   />
                                                   <p className="text-[10px] text-gray-500">{(q.words || []).length} palabras</p>
+                                              </div>
+                                          ) : q.type === 'match' ? (
+                                              <div className="space-y-2 pl-4 sm:pl-7 border-l-2 border-blue-500/30">
+                                                  <p className="text-[11px] font-bold text-gray-500">{'Escribe las parejas (izquierda y su respuesta correcta). Mínimo 3:'}</p>
+                                                  {(q.pairs || []).map((par, pIndex) => (
+                                                      <div key={pIndex} className="flex gap-2 items-center">
+                                                          <span className="text-[10px] font-bold text-gray-400 w-4 shrink-0">{pIndex + 1}</span>
+                                                          <input value={par.left} onChange={(e) => { const newQ = [...evalFormData.questions]; const pares = [...(newQ[qIndex].pairs || [])]; pares[pIndex] = { ...pares[pIndex], left: e.target.value }; newQ[qIndex] = { ...newQ[qIndex], pairs: pares }; setEvalFormData({ ...evalFormData, questions: newQ }); }} placeholder="Ej: Supply and Demand" className={`${glassInput} !py-1.5 flex-1 text-xs`} />
+                                                          <span className="text-gray-400 text-xs">{'→'}</span>
+                                                          <input value={par.right} onChange={(e) => { const newQ = [...evalFormData.questions]; const pares = [...(newQ[qIndex].pairs || [])]; pares[pIndex] = { ...pares[pIndex], right: e.target.value }; newQ[qIndex] = { ...newQ[qIndex], pairs: pares }; setEvalFormData({ ...evalFormData, questions: newQ }); }} placeholder="Ej: Oferta y demanda" className={`${glassInput} !py-1.5 flex-1 text-xs border-green-500/40 bg-green-500/10`} />
+                                                          {(q.pairs || []).length > 3 && (
+                                                              <button type="button" onClick={() => { const newQ = [...evalFormData.questions]; const pares = [...(newQ[qIndex].pairs || [])]; pares.splice(pIndex, 1); newQ[qIndex] = { ...newQ[qIndex], pairs: pares }; setEvalFormData({ ...evalFormData, questions: newQ }); }} className="text-gray-400 hover:text-red-500 p-1 cursor-pointer" title="Eliminar pareja"><X size={14} /></button>
+                                                          )}
+                                                      </div>
+                                                  ))}
+                                                  {(q.pairs || []).length < 6 && (
+                                                      <button type="button" onClick={() => { const newQ = [...evalFormData.questions]; newQ[qIndex] = { ...newQ[qIndex], pairs: [...(newQ[qIndex].pairs || []), { left: '', right: '' }] }; setEvalFormData({ ...evalFormData, questions: newQ }); }} className="text-[11px] font-bold text-blue-600 hover:underline pt-1 flex items-center gap-1 cursor-pointer">
+                                                          <Plus size={12} /> Agregar pareja
+                                                      </button>
+                                                  )}
                                               </div>
                                           ) : q.type === 'speaking' ? (
                                               <div className="pl-4 sm:pl-7 border-l-2 border-blue-500/30">
@@ -9646,6 +9917,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                       dueTime: "23:59",
                                       timeLimit: 30,
                                       strictAntiCheat: false,
+                                      immediateFeedback: false,
                                       targetGroupId: "all",
                                       targetGroupName: "Todos los estudiantes (Global)",
                                       questions: [{ type: 'multiple', text: '', options: [{text: '', isCorrect: false}, {text: '', isCorrect: false}], correctAnswer: '' }]
@@ -9723,6 +9995,11 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                    {ev.strictAntiCheat && (
                                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 px-2 py-0.5 rounded-md border border-red-200/60 dark:border-red-800/60">
                                                            <ShieldAlert size={10} /> Anti-trampas
+                                                       </span>
+                                                   )}
+                                                   {ev.immediateFeedback && (
+                                                       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-md border border-blue-200/60 dark:border-blue-800/60">
+                                                           <Lightbulb size={10} /> Retroalimentación inmediata
                                                        </span>
                                                    )}
                                                    {ev.isArchived && (
@@ -9857,18 +10134,28 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                             <button
                                                                 type="button"
                                                                 onClick={() => setGrades(prev => prev.filter(g => g.evaluationId !== ev.id))}
-                                                                className="w-full mt-2.5 py-1.5 px-3 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-600 dark:text-amber-300 font-bold text-xs transition-colors cursor-pointer"
+                                                                className="w-full mt-2 py-1.5 px-3 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-600 dark:text-amber-300 font-bold text-xs transition-colors cursor-pointer"
                                                             >
                                                                 Volver a intentar prueba (Modo Demo)
                                                             </button>
                                                         )}
 
-                                                        {/* Explicacion de las respuestas: automatica, siempre en espanol, solo tras el cierre */}
-                                                        {role === 'student' && (isExpired || isDemoMode) && studentGrade && (
+                                                        {/* Retroalimentación en la tarjeta cuando tiene retroalimentación inmediata o ya cerró */}
+                                                        {role === 'student' && (ev.immediateFeedback || isExpired) && studentGrade && (
                                                             <FeedbackIAEvaluacion
                                                                 evaluacion={ev}
                                                                 grade={studentGrade}
-                                                                onGenerado={(fb) => setGrades((prev) => prev.map((g) => (g.id === studentGrade.id ? { ...g, feedbackIA: fb } : g)))}
+                                                                onAbrirCompleto={() => setActiveImmediateFeedback({ evaluacion: ev, grade: studentGrade })}
+                                                                onZoomImage={(url) => setFullScreenImage(url)}
+                                                                onGenerado={(fb, mj) =>
+                                                                    setGrades((prev) =>
+                                                                        prev.map((g) =>
+                                                                            g.id === studentGrade.id
+                                                                                ? { ...g, feedbackIA: fb, ...(mj ? { minijuegosIA: mj } : {}) }
+                                                                                : g
+                                                                        )
+                                                                    )
+                                                                }
                                                             />
                                                         )}
                                                     </div>
@@ -14821,7 +15108,7 @@ Bot:`;
                      </div>
                 , document.body)}
 
-              <ScrollToTop isDarkMode={isDarkMode} />
+              {!activeTakingEval && <ScrollToTop isDarkMode={isDarkMode} />}
 
               {/* 👇 AQUÍ VA EL CEREBRO DEL BOT PARA EDWIN 👇 */}
                   {showIAKnowledgeModal && ReactDOM.createPortal(

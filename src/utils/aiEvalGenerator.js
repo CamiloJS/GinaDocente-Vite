@@ -177,6 +177,8 @@ function normalizarPregunta(q) {
   if (!texto) return { problema: 'una pregunta vino sin enunciado' };
   const tipo = String(q.type || q.tipo || '').toLowerCase();
   const puntos = Number(q.points) > 0 ? Number(q.points) : 1;
+  const imageUrl = typeof q.imageUrl === 'string' && q.imageUrl.trim() ? q.imageUrl.trim() : '';
+  const extraImg = imageUrl ? { imageUrl } : {};
 
   // --- Ordenar la oracion ---
   if (tipo === 'order' || tipo === 'ordenar' || Array.isArray(q.words)) {
@@ -184,7 +186,7 @@ function normalizarPregunta(q) {
       .map((w) => limpiar(w, 60))
       .filter(Boolean);
     if (palabras.length < 2) return { problema: `la pregunta de ordenar "${texto.slice(0, 40)}..." no trae palabras suficientes` };
-    return { pregunta: { type: 'order', text: texto, options: [], words: palabras.slice(0, 30), correctAnswer: '', points: puntos } };
+    return { pregunta: { type: 'order', text: texto, options: [], words: palabras.slice(0, 30), correctAnswer: '', points: puntos, ...extraImg } };
   }
 
   // --- Relacionar columnas ---
@@ -196,7 +198,7 @@ function normalizarPregunta(q) {
     if (pairs.length < 3 || derechos.size !== pairs.length) {
       return { problema: `la pregunta de relacionar "${texto.slice(0, 40)}..." necesita al menos 3 parejas con respuestas distintas` };
     }
-    return { pregunta: { type: 'match', text: texto, options: [], pairs: pairs.slice(0, 6), correctAnswer: '', points: puntos } };
+    return { pregunta: { type: 'match', text: texto, options: [], pairs: pairs.slice(0, 6), correctAnswer: '', points: puntos, ...extraImg } };
   }
 
   // --- Verdadero / Falso (se guarda como multiple con las dos opciones tipicas) ---
@@ -210,7 +212,7 @@ function normalizarPregunta(q) {
     if (!esV && !esF) return { problema: `la pregunta de verdadero/falso "${texto.slice(0, 40)}..." no indica si es verdadero o falso` };
     const idx = opciones.findIndex((o) => (esV ? /verdadero|true|^v$/i : /falso|false|^f$/i).test(o.text));
     opciones[idx >= 0 ? idx : esV ? 0 : 1].isCorrect = true;
-    return { pregunta: { type: 'multiple', text: texto, options: opciones, permiteMultiples: opciones.filter((o) => o.isCorrect).length > 1, correctAnswer: '', points: puntos } };
+    return { pregunta: { type: 'multiple', text: texto, options: opciones, permiteMultiples: opciones.filter((o) => o.isCorrect).length > 1, correctAnswer: '', points: puntos, ...extraImg } };
   }
 
   let opciones = Array.isArray(q.options || q.opciones) ? (q.options || q.opciones) : [];
@@ -239,12 +241,12 @@ function normalizarPregunta(q) {
     if (!opciones.some((o) => o.isCorrect)) {
       return { problema: `la pregunta "${texto.slice(0, 40)}..." no tiene opci\u00f3n correcta marcada` };
     }
-    return { pregunta: { type: 'multiple', text: texto, options: opciones, permiteMultiples: opciones.filter((o) => o.isCorrect).length > 1, correctAnswer: '', points: puntos } };
+    return { pregunta: { type: 'multiple', text: texto, options: opciones, permiteMultiples: opciones.filter((o) => o.isCorrect).length > 1, correctAnswer: '', points: puntos, ...extraImg } };
   }
 
   // respuesta escrita
   if (!respuesta) return { problema: `la pregunta "${texto.slice(0, 40)}..." no trae respuesta esperada` };
-  return { pregunta: { type: 'text', text: texto, options: [], correctAnswer: respuesta, acceptedAnswers: alternativas, points: puntos } };
+  return { pregunta: { type: 'text', text: texto, options: [], correctAnswer: respuesta, acceptedAnswers: alternativas, points: puntos, ...extraImg } };
 }
 
 /** Clasifica una pregunta ya normalizada en su tipo (para validar cantidades). */
