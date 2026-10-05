@@ -7,6 +7,7 @@ import {
 } from './Icons.jsx';
 import goldenRatioTemplate from '../templates/goldenRatioOva.json';
 import { db, appId, collection, doc, setDoc, getDocs, deleteDoc, query, orderBy, limit } from '../firebase/config.js';
+import { DEMO_TTL_MS, isDemoItemExpired } from '../utils/demoData.js';
 
 export default function OvaStudioTool({
   isDarkMode = false,
@@ -14,17 +15,23 @@ export default function OvaStudioTool({
   user = null,
   role = 'teacher',
   db: propDb = null,
-  appId: propAppId = null
+  appId: propAppId = null,
+  isDemoMode = false
 }) {
   const firestoreDb = propDb || db;
   const activeAppId = propAppId || appId;
+  const ovaCollName = isDemoMode ? 'demo_ovas' : 'ovas';
+  const ovaStorageKey = isDemoMode ? 'englishTech_demo_ovas' : 'englishTech_ovas';
 
   const [ovas, setOvas] = useState(() => {
     try {
-      const cached = localStorage.getItem('englishTech_ovas');
+      const cached = localStorage.getItem(ovaStorageKey);
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const valid = isDemoMode ? parsed.filter(item => !isDemoItemExpired(item)) : parsed;
+          if (valid.length > 0) return valid;
+        }
       }
     } catch (e) {}
     // Seed with goldenRatioTemplate
@@ -61,7 +68,7 @@ export default function OvaStudioTool({
     const fetchOvas = async () => {
       try {
         if (!firestoreDb || !activeAppId) return;
-        const ovasColl = collection(firestoreDb, 'artifacts', activeAppId, 'public', 'data', 'ovas');
+        const ovasColl = collection(firestoreDb, 'artifacts', activeAppId, 'public', 'data', ovaCollName);
         let snap;
         try {
           const q = query(ovasColl, orderBy('updatedAt', 'desc'), limit(50));
@@ -72,11 +79,24 @@ export default function OvaStudioTool({
         }
 
         if (!snap.empty && isMounted) {
-          const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          const now = Date.now();
+          const list = [];
+          snap.docs.forEach(d => {
+            const data = d.data();
+            if (isDemoMode && isDemoItemExpired(data, now)) {
+              try { deleteDoc(d.ref); } catch (e) {}
+            } else {
+              list.push({ id: d.id, ...data });
+            }
+          });
+          if (list.length === 0) {
+            const seed = { ...goldenRatioTemplate, id: 'ova-golden-ratio-01', editPin: '1234', updatedAt: Date.now() };
+            list.push(seed);
+          }
           list.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
           setOvas(list);
           try {
-            localStorage.setItem('englishTech_ovas', JSON.stringify(list));
+            localStorage.setItem(ovaStorageKey, JSON.stringify(list));
           } catch (e) {}
           const activeItem = list.find(o => o.id === selectedOvaId) || list[0];
           if (activeItem) {
@@ -86,7 +106,7 @@ export default function OvaStudioTool({
         } else if (snap.empty && isMounted) {
           // Save default seed to Firestore
           const seed = { ...goldenRatioTemplate, id: 'ova-golden-ratio-01', editPin: '1234', updatedAt: Date.now() };
-          await setDoc(doc(firestoreDb, 'artifacts', activeAppId, 'public', 'data', 'ovas', seed.id), seed);
+          await setDoc(doc(firestoreDb, 'artifacts', activeAppId, 'public', 'data', ovaCollName, seed.id), seed);
         }
       } catch (err) {
         console.warn('Could not fetch OVAs from cloud, using local cache:', err);
@@ -94,7 +114,7 @@ export default function OvaStudioTool({
     };
     fetchOvas();
     return () => { isMounted = false; };
-  }, [firestoreDb, activeAppId]);
+  }, [firestoreDb, activeAppId, isDemoMode, ovaCollName, ovaStorageKey]);
 
   // Sync fullscreen state with document fullscreen changes (e.g. user presses Esc)
   useEffect(() => {
@@ -162,24 +182,29 @@ export default function OvaStudioTool({
         handleCopyPublicLink(targetId);
       } else if (type === 'OVA_SAVED' && project) {
         setSyncStatus('saving');
+        const now = Date.now();
         const updatedProject = {
           ...project,
-          updatedAt: Date.now(),
-          editPin: project.editPin || activeOva?.editPin || '1234'
+          updatedAt: now,
+          editPin: project.editPin || activeOva?.editPin || '1234',
+          ...(isDemoMode && project.id !== 'ova-golden-ratio-01' ? {
+            isDemoCreated: true,
+            expiresAt: project.expiresAt || (now + DEMO_TTL_MS)
+          } : {})
         };
 
         setOvas(prev => {
           const idx = prev.findIndex(o => o.id === updatedProject.id);
           const next = idx >= 0 ? prev.map((o, i) => i === idx ? updatedProject : o) : [updatedProject, ...prev];
           try {
-            localStorage.setItem('englishTech_ovas', JSON.stringify(next));
+            localStorage.setItem(ovaStorageKey, JSON.stringify(next));
           } catch (err) {}
           return next;
         });
 
         // Persist to Firestore
         if (firestoreDb && activeAppId && updatedProject.id) {
-          setDoc(doc(firestoreDb, 'artifacts', activeAppId, 'public', 'data', 'ovas', updatedProject.id), updatedProject, { merge: true })
+          setDoc(doc(firestoreDb, 'artifacts', activeAppId, 'public', 'data', ovaCollName, updatedProject.id), updatedProject, { merge: true })
             .then(() => setSyncStatus('synced'))
             .catch(err => {
               console.warn('Firestore save error:', err);
@@ -193,13 +218,14 @@ export default function OvaStudioTool({
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [firestoreDb, activeAppId]);
+  }, [firestoreDb, activeAppId, isDemoMode, ovaCollName, ovaStorageKey]);
 
   // Create new OVA
   const handleCreateNewOva = async () => {
     const title = newTitle.trim() || 'Nuevo Objeto de Aprendizaje';
     const subject = newSubject.trim() || 'General';
-    const newId = `ova-${Date.now()}`;
+    const now = Date.now();
+    const newId = `ova-${now}`;
 
     const newOva = {
       id: newId,
@@ -209,7 +235,8 @@ export default function OvaStudioTool({
       description: 'Objeto Virtual de Aprendizaje creado con EnglishTech OVA Studio.',
       author: user?.displayName || 'GinaDocente',
       createdAt: new Date().toISOString().split('T')[0],
-      updatedAt: Date.now(),
+      updatedAt: now,
+      ...(isDemoMode ? { isDemoCreated: true, expiresAt: now + DEMO_TTL_MS } : {}),
       editPin: '1234',
       theme: {
         primaryColor: '#AD3333',
@@ -232,17 +259,17 @@ export default function OvaStudioTool({
       },
       pages: [
         {
-          id: `page-${Date.now()}-1`,
+          id: `page-${now}-1`,
           title: 'Inicio',
           type: 'cover',
           icon: 'Home',
           subSlides: [
             {
-              id: `slide-${Date.now()}-1`,
+              id: `slide-${now}-1`,
               title: 'Portada Interactiva',
               blocks: [
                 {
-                  id: `blk-${Date.now()}-1`,
+                  id: `blk-${now}-1`,
                   type: 'callout',
                   title: '¡Bienvenido al OVA!',
                   content: 'En este espacio pedagógico interactivo podrás explorar los contenidos, actividades evaluativas y recursos multimedia preparados para la clase.',
@@ -253,17 +280,17 @@ export default function OvaStudioTool({
           ]
         },
         {
-          id: `page-${Date.now()}-2`,
+          id: `page-${now}-2`,
           title: 'Actividades',
           type: 'activity',
           icon: 'FileText',
           subSlides: [
             {
-              id: `slide-${Date.now()}-2`,
+              id: `slide-${now}-2`,
               title: 'Hoja de Actividades y Recursos',
               blocks: [
                 {
-                  id: `blk-${Date.now()}-2`,
+                  id: `blk-${now}-2`,
                   type: 'text',
                   content: '<h2 class="font-playfair text-2xl font-bold mb-2">Taller Práctico</h2><p>Escribe aquí las instrucciones de la actividad para los estudiantes...</p>'
                 }
@@ -278,12 +305,12 @@ export default function OvaStudioTool({
     setOvas(nextList);
     setSelectedOvaId(newId);
     try {
-      localStorage.setItem('englishTech_ovas', JSON.stringify(nextList));
+      localStorage.setItem(ovaStorageKey, JSON.stringify(nextList));
     } catch (e) {}
 
     if (firestoreDb && activeAppId) {
       try {
-        await setDoc(doc(firestoreDb, 'artifacts', activeAppId, 'public', 'data', 'ovas', newId), newOva);
+        await setDoc(doc(firestoreDb, 'artifacts', activeAppId, 'public', 'data', ovaCollName, newId), newOva);
       } catch (e) {}
     }
 
@@ -291,19 +318,21 @@ export default function OvaStudioTool({
     setShowNewModal(false);
     setNewTitle('');
     setNewSubject('');
-    showMessage('Nuevo OVA creado con éxito. ¡Listo para diseñar!');
+    showMessage(isDemoMode ? 'Nuevo OVA creado en Modo Demo (se borra automáticamente en 2 semanas).' : 'Nuevo OVA creado con éxito. ¡Listo para diseñar!');
   };
 
   // Duplicate current OVA
   const handleDuplicateOva = async () => {
     if (!currentOva) return;
-    const newId = `ova-${Date.now()}`;
+    const now = Date.now();
+    const newId = `ova-${now}`;
     const clone = {
       ...JSON.parse(JSON.stringify(currentOva)),
       id: newId,
       title: `${currentOva.title} (Copia)`,
       createdAt: new Date().toISOString().split('T')[0],
-      updatedAt: Date.now()
+      updatedAt: now,
+      ...(isDemoMode ? { isDemoCreated: true, expiresAt: now + DEMO_TTL_MS } : {})
     };
     if (clone.cover) clone.cover.title = clone.title;
 
@@ -311,12 +340,12 @@ export default function OvaStudioTool({
     setOvas(nextList);
     setSelectedOvaId(newId);
     try {
-      localStorage.setItem('englishTech_ovas', JSON.stringify(nextList));
+      localStorage.setItem(ovaStorageKey, JSON.stringify(nextList));
     } catch (e) {}
 
     if (firestoreDb && activeAppId) {
       try {
-        await setDoc(doc(firestoreDb, 'artifacts', activeAppId, 'public', 'data', 'ovas', newId), clone);
+        await setDoc(doc(firestoreDb, 'artifacts', activeAppId, 'public', 'data', ovaCollName, newId), clone);
       } catch (e) {}
     }
 
@@ -338,12 +367,12 @@ export default function OvaStudioTool({
     setOvas(nextList);
     setSelectedOvaId(nextList[0].id);
     try {
-      localStorage.setItem('englishTech_ovas', JSON.stringify(nextList));
+      localStorage.setItem(ovaStorageKey, JSON.stringify(nextList));
     } catch (e) {}
 
     if (firestoreDb && activeAppId) {
       try {
-        await deleteDoc(doc(firestoreDb, 'artifacts', activeAppId, 'public', 'data', 'ovas', idToDelete));
+        await deleteDoc(doc(firestoreDb, 'artifacts', activeAppId, 'public', 'data', ovaCollName, idToDelete));
       } catch (e) {}
     }
 
@@ -387,14 +416,14 @@ export default function OvaStudioTool({
     setOvas(prev => {
       const next = prev.map(o => o.id === updated.id ? updated : o);
       try {
-        localStorage.setItem('englishTech_ovas', JSON.stringify(next));
+        localStorage.setItem(ovaStorageKey, JSON.stringify(next));
       } catch (e) {}
       return next;
     });
 
     if (firestoreDb && activeAppId) {
       try {
-        await setDoc(doc(firestoreDb, 'artifacts', activeAppId, 'public', 'data', 'ovas', updated.id), updated, { merge: true });
+        await setDoc(doc(firestoreDb, 'artifacts', activeAppId, 'public', 'data', ovaCollName, updated.id), updated, { merge: true });
       } catch (e) {}
     }
 

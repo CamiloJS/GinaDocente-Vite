@@ -12,49 +12,106 @@ import {
   Compass, 
   CheckCircle2, 
   Lightbulb,
-  GraduationCap
+  GraduationCap,
+  Shield,
+  Clock
 } from './Icons.jsx';
-import { DEMO_GUIDE_TOUR, DEMO_TAB_INFO, DEMO_SUBJECT_NAME } from '../utils/demoData.js';
+import { DEMO_GUIDE_TOUR, DEMO_TAB_INFO, DEMO_TEACHER_TAB_INFO, DEMO_SUBJECT_NAME } from '../utils/demoData.js';
 
-export function DemoModeBanner({ activeTab, onChangeTab, onExitDemo, isDarkMode, glassCard }) {
+export function DemoModeBanner({ activeTab, onChangeTab, onExitDemo, role = 'student', onSwitchDemoRole, isDarkMode, glassCard }) {
   const [showTourModal, setShowTourModal] = useState(false);
   const [selectedTourStep, setSelectedTourStep] = useState(0);
 
-  const currentTabExplanation = DEMO_TAB_INFO[activeTab] || DEMO_TAB_INFO.tasks;
+  const isTeacherDemo = role === 'teacher';
+  const currentTabExplanation = isTeacherDemo
+    ? (DEMO_TEACHER_TAB_INFO[activeTab] || DEMO_TEACHER_TAB_INFO.tasks)
+    : (DEMO_TAB_INFO[activeTab] || DEMO_TAB_INFO.tasks);
 
   const quickTabs = [
-    { id: 'tasks', label: '📰 Publicaciones' },
-    { id: 'evaluations', label: '📝 Evaluaciones de Prueba' },
-    { id: 'reviews', label: '📊 Diapositivas Demo' },
+    { id: 'tasks', label: isTeacherDemo ? '📰 Crear / Ver Muro' : '📰 Publicaciones' },
+    { id: 'evaluations', label: isTeacherDemo ? '📝 Crear Evaluaciones' : '📝 Evaluaciones de Prueba' },
+    { id: 'reviews', label: isTeacherDemo ? '📊 Crear Diapositivas' : '📊 Diapositivas Demo' },
     { id: 'syllabus', label: '📚 Contenidos Programáticos' },
     { id: 'groups', label: '👥 Materia' },
+    ...(isTeacherDemo ? [{ id: 'tools', label: '🛠️ Herramientas OVA' }] : [])
   ];
 
   return (
     <>
       {/* BANNER SUPERIOR DE AVISO */}
-      <aside aria-label="Aviso de Modo Demo" className="w-full bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-800 text-white shadow-md z-40 border-b border-purple-500/40 transition-all">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs">
+      <aside
+        aria-label="Aviso de Modo Demo"
+        className={`w-full ${
+          isTeacherDemo
+            ? 'bg-gradient-to-r from-indigo-800 via-purple-800 to-fuchsia-900 border-fuchsia-400/40'
+            : 'bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-800 border-purple-500/40'
+        } text-white shadow-md z-40 border-b transition-all`}
+      >
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex flex-col lg:flex-row items-center justify-between gap-2.5 text-xs">
           <div className="flex items-center gap-2.5 text-center sm:text-left min-w-0">
-            <div className="w-7 h-7 rounded-lg bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0 border border-white/30 shadow-xs">
-              <Sparkles size={16} className="text-amber-300 animate-pulse" />
+            <div className="w-8 h-8 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0 border border-white/30 shadow-xs">
+              {isTeacherDemo ? (
+                <Shield size={17} className="text-amber-300" />
+              ) : (
+                <Sparkles size={16} className="text-amber-300 animate-pulse" />
+              )}
             </div>
             <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2 justify-center sm:justify-start">
+              <div className="flex flex-wrap items-center gap-1.5 justify-center sm:justify-start">
                 <span className="font-black tracking-wider uppercase bg-amber-400 text-purple-950 px-2 py-0.5 rounded-full text-[10px] shadow-xs">
-                  Modo Demo / Invitado
+                  {isTeacherDemo ? '👩‍🏫 Modo Demo Docente' : '🎓 Modo Demo Estudiante'}
                 </span>
                 <span className="font-bold bg-white/15 px-2 py-0.5 rounded-full text-[10px] text-white border border-white/20">
                   Materia: {DEMO_SUBJECT_NAME}
                 </span>
+                {isTeacherDemo && (
+                  <span className="font-bold bg-emerald-400/20 text-emerald-200 border border-emerald-300/40 px-2 py-0.5 rounded-full text-[10px] flex items-center gap-1">
+                    <Clock size={11} />
+                    <span>Creaciones aisladas • Se borran en 2 semanas</span>
+                  </span>
+                )}
               </div>
-              <p className="text-[11px] text-purple-100/90 truncate max-w-xl mt-0.5">
-                Explora publicaciones, evaluaciones de prueba, diapositivas y contenidos programáticos sin afectar datos reales.
+              <p className="text-[11px] text-purple-100/95 truncate max-w-2xl mt-0.5">
+                {isTeacherDemo
+                  ? 'Puedes crear tareas, evaluaciones, diapositivas y temas de forma 100% aislada (duran máx. 2 semanas y se eliminan automáticamente).'
+                  : 'Explora publicaciones, evaluaciones de prueba, diapositivas y contenidos programáticos sin afectar datos reales.'}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center justify-center gap-2 shrink-0">
+            {/* Selector de Rol en Modo Demo (Estudiante vs Docente) */}
+            {onSwitchDemoRole && (
+              <div
+                role="group"
+                aria-label="Cambiar vista del Modo Demo"
+                className="inline-flex items-center p-0.5 rounded-xl bg-black/30 border border-white/20 shadow-inner"
+              >
+                <button
+                  type="button"
+                  onClick={() => onSwitchDemoRole('student')}
+                  className={`py-1 px-2.5 rounded-lg text-[11px] font-extrabold transition-all cursor-pointer flex items-center gap-1 ${
+                    !isTeacherDemo
+                      ? 'bg-white text-purple-900 shadow-xs'
+                      : 'text-purple-100 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  <span>🎓 Estudiante</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSwitchDemoRole('teacher')}
+                  className={`py-1 px-2.5 rounded-lg text-[11px] font-extrabold transition-all cursor-pointer flex items-center gap-1 ${
+                    isTeacherDemo
+                      ? 'bg-amber-400 text-purple-950 shadow-xs'
+                      : 'text-purple-100 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  <span>👩‍🏫 Docente</span>
+                </button>
+              </div>
+            )}
+
             <button
               type="button"
               onClick={() => setShowTourModal(true)}
@@ -84,18 +141,29 @@ export function DemoModeBanner({ activeTab, onChangeTab, onExitDemo, isDarkMode,
               <Compass size={17} />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <h4 className={`text-xs font-black uppercase tracking-wider ${isDarkMode ? 'text-purple-300' : 'text-purple-900'}`}>
                   {currentTabExplanation.title}
                 </h4>
-                <button
-                  type="button"
-                  onClick={() => setShowTourModal(true)}
-                  className="text-[11px] font-bold text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-0.5 shrink-0 cursor-pointer"
-                >
-                  <span>Guía completa</span>
-                  <ChevronRight size={12} />
-                </button>
+                <div className="flex items-center gap-2">
+                  {onSwitchDemoRole && (
+                    <button
+                      type="button"
+                      onClick={() => onSwitchDemoRole(isTeacherDemo ? 'student' : 'teacher')}
+                      className="text-[11px] font-extrabold px-2 py-0.5 rounded-lg bg-purple-600/15 text-purple-700 dark:text-purple-300 hover:bg-purple-600/25 transition-colors cursor-pointer"
+                    >
+                      {isTeacherDemo ? 'Cambiar a Vista Estudiante 🎓' : 'Probar como Docente 👩‍🏫'}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowTourModal(true)}
+                    className="text-[11px] font-bold text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-0.5 shrink-0 cursor-pointer"
+                  >
+                    <span>Guía</span>
+                    <ChevronRight size={12} />
+                  </button>
+                </div>
               </div>
               <p className={`text-xs mt-0.5 leading-relaxed ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
                 {currentTabExplanation.summary}

@@ -13,6 +13,7 @@ import { auth, signInAnonymously, db as defaultDb, appId as defaultAppId, collec
 import AudioPlayer, { AudioRecordingVisualizer } from './AudioPlayer.jsx'
 import CustomVideoPlayer from './CustomVideoPlayer.jsx'
 import GeniallyEmbedPlayer, { extractGeniallyUrl } from './GeniallyEmbedPlayer.jsx'
+import { DEMO_TTL_MS, saveDemoSandboxItem } from '../utils/demoData.js'
 
 const TasksTab = React.memo(({
 
@@ -23,7 +24,7 @@ const TasksTab = React.memo(({
     prevTaskTitle, setPrevTaskTitle, prevTaskDesc, setPrevTaskDesc, hasAiModified,
     setHasAiModified, callGemini, showMessage, handleAiTranslate, taskDate, setTaskDate,
     taskTime, setTaskTime, allowLate, setAllowLate, db, appId, loggedInName, getToday,
-    tasks, user, isDarkMode, confirmAction, setFullScreenImage, handleOpenProfileByName,
+    tasks, setTasks, isDemoMode = false, user, isDarkMode, confirmAction, setFullScreenImage, handleOpenProfileByName,
     academicGroups, myChatId, userMappings, tasksLoading, taskLimit, loadMoreTasks, pinnedTasks,
     filterType, setFilterType, selectedGroupFilter, setSelectedGroupFilter, onTogglePin,
     taskSortOrder, setTaskSortOrder, wallSearchTerm: propWallSearchTerm, setWallSearchTerm: propSetWallSearchTerm,
@@ -1083,6 +1084,10 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                         if (audioPub && typeof audioPub === 'string' && audioPub.trim()) payload.audioUrl = audioPub.trim();
                                         if (targetGroupName) payload.targetGroupName = targetGroupName;
                                         if (role) payload.authorRole = role;
+                                        if (isDemoMode) {
+                                            payload.isDemoCreated = true;
+                                            payload.expiresAt = Date.now() + DEMO_TTL_MS;
+                                        }
 
                                         // Asegurar que no existan valores undefined en el documento
                                         Object.keys(payload).forEach(k => {
@@ -1091,8 +1096,12 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                             }
                                         });
 
+                                        const targetCollectionName = isDemoMode ? 'demo_tasks' : 'tasks';
+                                        let createdDocId = null;
+
                                         try {
-                                            await withTimeout(addDoc(collection(effectiveDb, 'artifacts', effectiveAppId, 'public', 'data', 'tasks'), payload));
+                                            const docRef = await withTimeout(addDoc(collection(effectiveDb, 'artifacts', effectiveAppId, 'public', 'data', targetCollectionName), payload));
+                                            createdDocId = docRef?.id || null;
                                         } catch (primaryErr) {
                                             console.warn("Retrying task creation with basic schema:", primaryErr);
                                             const basicPayload = {
@@ -1111,11 +1120,28 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                                 hideDate: Boolean(hidePublicationDate),
                                                 createdAt: Date.now(),
                                                 comments: [],
-                                                reactions: {}
+                                                reactions: {},
+                                                ...(isDemoMode ? { isDemoCreated: true, expiresAt: Date.now() + DEMO_TTL_MS } : {})
                                             };
                                             if (postGeniallyUrl && postGeniallyUrl.trim()) basicPayload.geniallyUrl = extractGeniallyUrl(postGeniallyUrl.trim());
                                             if (validPoll) basicPayload.poll = validPoll;
-                                            await withTimeout(addDoc(collection(effectiveDb, 'artifacts', effectiveAppId, 'public', 'data', 'tasks'), basicPayload), 10000);
+                                            try {
+                                                const retryRef = await withTimeout(addDoc(collection(effectiveDb, 'artifacts', effectiveAppId, 'public', 'data', targetCollectionName), basicPayload), 10000);
+                                                createdDocId = retryRef?.id || null;
+                                            } catch (retryErr) {
+                                                if (!isDemoMode) throw retryErr;
+                                                createdDocId = `demo-task-${Date.now()}`;
+                                            }
+                                        }
+
+                                        if (isDemoMode) {
+                                            const demoCreatedTask = saveDemoSandboxItem('tasks', {
+                                                id: createdDocId || `demo-task-${Date.now()}`,
+                                                ...payload
+                                            });
+                                            if (typeof setTasks === 'function') {
+                                                setTasks(prev => [demoCreatedTask, ...(prev || []).filter(t => String(t.id) !== String(demoCreatedTask.id))]);
+                                            }
                                         }
 
                                         if (typeof setTaskTitle === 'function') setTaskTitle("");
@@ -1142,7 +1168,11 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                         setHasDueDate(true);
                                         setIsFormExpanded(false);
                                         setPostTargetGroup(fixedTargetGroup || "all");
-                                        showMessage(currentPostType === 'poll' ? "Encuesta publicada con éxito." : currentPostType === 'forum' ? "Foro de debate publicado con éxito." : currentPostType === 'task' ? "Tarea publicada con éxito." : "Publicación compartida con éxito.");
+                                        if (isDemoMode) {
+                                            showMessage("⏳ Publicación creada en Modo Demo (aislada • dura máx. 2 semanas).");
+                                        } else {
+                                            showMessage(currentPostType === 'poll' ? "Encuesta publicada con éxito." : currentPostType === 'forum' ? "Foro de debate publicado con éxito." : currentPostType === 'task' ? "Tarea publicada con éxito." : "Publicación compartida con éxito.");
+                                        }
                                     } catch (err) {
                                         console.error("Error al publicar:", err);
                                         showMessage(`Error al publicar: ${err?.message || 'Intenta nuevamente.'}`);
@@ -1205,6 +1235,8 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                             <TaskCard 
                                 task={{...task, type: task.type || 'task', isPinned: true}} 
                                 role={role} 
+                                isDemoMode={isDemoMode}
+                                setTasks={setTasks}
                                 db={db} 
                                 appId={appId} 
                                 academicGroups={academicGroups}
@@ -1232,6 +1264,8 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                         <TaskCard 
                             task={{...task, type: task.type || 'task'}} 
                             role={role} 
+                            isDemoMode={isDemoMode}
+                            setTasks={setTasks}
                             db={db} 
                             appId={appId} 
                             academicGroups={academicGroups}

@@ -55,7 +55,19 @@ import { textoPlano } from './utils/textFormat.js';
 import { desordenarPalabras } from './utils/palabras.js'
 import { useClickOutside } from './utils/hooks.js'
 import { DemoModeBanner } from './components/DemoModeBanner.jsx'
-import { DEMO_TASKS, DEMO_EVALUATIONS, DEMO_SYLLABUS, DEMO_REVIEWS, DEMO_ACADEMIC_GROUPS } from './utils/demoData.js'
+import {
+  DEMO_TASKS,
+  DEMO_EVALUATIONS,
+  DEMO_SYLLABUS,
+  DEMO_REVIEWS,
+  DEMO_ACADEMIC_GROUPS,
+  DEMO_TTL_MS,
+  isDemoItemExpired,
+  getDemoRemainingDays,
+  saveDemoSandboxItem,
+  removeDemoSandboxItem,
+  mergeDemoItemsWithBase
+} from './utils/demoData.js'
 
 const TasksTab = React.lazy(() => import('./components/TasksTab.jsx'))
 const ReviewsModule = React.lazy(() => import('./components/ReviewsModule.jsx'))
@@ -198,7 +210,7 @@ function App() {
   };
   const initialHashInfo = getInitialHashInfo();
   
-  // Detección de Enlace exclusivo de Modo Demo / Invitado
+  // Detección de Enlace exclusivo de Modo Demo / Invitado (Estudiante o Docente)
   const isInitialDemoLink = () => {
     try {
       const hash = (typeof window !== 'undefined' && window.location.hash ? window.location.hash : '').toLowerCase();
@@ -206,6 +218,9 @@ function App() {
       const fromUrl = hash.includes('demo') || hash.includes('invitado') || search.includes('demo=') || search.includes('mode=demo');
       if (fromUrl) {
         try { sessionStorage.setItem('englishTech_demoMode', '1'); } catch (e) {}
+        if (hash.includes('docente') || hash.includes('teacher') || search.includes('demo=teacher') || search.includes('demo=docente')) {
+          try { sessionStorage.setItem('englishTech_demoRole', 'teacher'); } catch (e) {}
+        }
         return true;
       }
       return typeof sessionStorage !== 'undefined' && sessionStorage.getItem('englishTech_demoMode') === '1';
@@ -213,7 +228,26 @@ function App() {
       return false;
     }
   };
+  const getInitialDemoRole = () => {
+    try {
+      const hash = (typeof window !== 'undefined' && window.location.hash ? window.location.hash : '').toLowerCase();
+      const search = (typeof window !== 'undefined' && window.location.search ? window.location.search : '').toLowerCase();
+      if (hash.includes('docente') || hash.includes('teacher') || search.includes('demo=teacher') || search.includes('demo=docente')) {
+        try { sessionStorage.setItem('englishTech_demoRole', 'teacher'); } catch (e) {}
+        return 'teacher';
+      }
+      if (hash.includes('estudiante') || hash.includes('student') || search.includes('demo=student') || search.includes('demo=estudiante')) {
+        try { sessionStorage.setItem('englishTech_demoRole', 'student'); } catch (e) {}
+        return 'student';
+      }
+      const saved = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('englishTech_demoRole') : null;
+      return saved === 'teacher' ? 'teacher' : 'student';
+    } catch (e) {
+      return 'student';
+    }
+  };
   const initialIsDemo = isInitialDemoLink();
+  const initialDemoRole = initialIsDemo ? getInitialDemoRole() : 'student';
 
   // Recuperar sesión activa guardada si existe
   const getInitialActiveSession = () => {
@@ -295,8 +329,8 @@ function App() {
   const [editingIAId, setEditingIAId] = useState(null);
   const [editIAText, setEditIAText] = useState("");
 
-  const [loggedInUser, setLoggedInUser] = useState(() => initialIsDemo ? '@invitado' : (initialActiveSession ? (initialActiveSession.role === 'teacher' ? 'GinaDocente' : `@${initialActiveSession.userKey}`) : "")); 
-  const [loggedInName, setLoggedInName] = useState(() => initialIsDemo ? 'Invitado (Demo)' : (initialActiveSession ? (initialActiveSession.name || initialActiveSession.userKey) : "")); 
+  const [loggedInUser, setLoggedInUser] = useState(() => initialIsDemo ? (initialDemoRole === 'teacher' ? 'DemoDocente' : '@invitado') : (initialActiveSession ? (initialActiveSession.role === 'teacher' ? 'GinaDocente' : `@${initialActiveSession.userKey}`) : "")); 
+  const [loggedInName, setLoggedInName] = useState(() => initialIsDemo ? (initialDemoRole === 'teacher' ? TEACHER_NAME : 'Invitado (Demo)') : (initialActiveSession ? (initialActiveSession.name || initialActiveSession.userKey) : "")); 
   const [userMappings, setUserMappings] = useState({}); 
   const userMappingsRef = useRef(userMappings);
   const [userMappingsLoaded, setUserMappingsLoaded] = useState(false);
@@ -315,7 +349,7 @@ function App() {
   const [editUserLabelValue, setEditUserLabelValue] = useState("");
   
   const [user, setUser] = useState(null);
-  const [role, setRole] = useState(() => initialIsDemo ? 'student' : (initialActiveSession?.role || 'student'));
+  const [role, setRole] = useState(() => initialIsDemo ? initialDemoRole : (initialActiveSession?.role || 'student'));
   const [activeTab, setActiveTab] = useState(() => initialHashInfo.tab);
   const [loginError, setLoginError] = useState("");
   
@@ -1557,16 +1591,28 @@ function App() {
       const currentAnswers = studentAnswersRef.current || studentAnswers || {};
       const score = calculateScore(activeTakingEval, currentAnswers);
       if (isDemoMode) {
-        const demoGradeData = {
-          id: 'demo-grade-' + Date.now(),
+        const now = Date.now();
+        const demoGradePayload = {
           evaluationId: activeTakingEval.id,
           studentId: myChatId || 'invitado',
           studentEmail: 'invitado@demo.local',
           studentName: loggedInName || 'Invitado (Demo)',
           score: parseFloat((Number(score) || 0).toFixed(1)),
           answers: currentAnswers,
-          submittedAt: Date.now()
+          submittedAt: now,
+          createdAt: now,
+          expiresAt: now + DEMO_TTL_MS,
+          isDemoCreated: true
         };
+        let createdId = 'demo-grade-' + now;
+        try {
+          const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'demo_grades'), demoGradePayload);
+          if (docRef?.id) createdId = docRef.id;
+        } catch (e) {
+          // Local sandbox fallback
+        }
+        const demoGradeData = { id: createdId, ...demoGradePayload };
+        saveDemoSandboxItem('grades', demoGradeData);
         setGrades(prev => [{ ...demoGradeData }, ...prev.filter(g => g.id !== demoGradeData.id)]);
         setActiveTakingEval(null);
         setStudentAnswers({});
@@ -1575,7 +1621,7 @@ function App() {
             confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
           } catch(e) {}
         }
-        showMessage(`¡Evaluación demo completada! Tu nota ficticia fue: ${demoGradeData.score} / 5.0 (Modo Demo: no se almacena en la base de datos).`);
+        showMessage(`¡Evaluación demo completada! Tu nota fue: ${demoGradeData.score} / 5.0 (Aislada en Modo Demo • puedes revisarla cambiando a vista Docente).`);
         submittingEvalRef.current = false;
         return;
       }
@@ -1609,6 +1655,15 @@ function App() {
 
   const handleEnableRetry = async (gradeId, studentName) => {
     confirmAction(`¿Deseas autorizar un nuevo intento a ${studentName}? Se eliminará la entrega previa y el estudiante podrá volver a presentar la evaluación.`, async () => {
+      if (isDemoMode || String(gradeId).startsWith('demo')) {
+        removeDemoSandboxItem('grades', gradeId);
+        setGrades(prev => prev.filter(g => g.id !== gradeId));
+        try {
+          await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'demo_grades', gradeId));
+        } catch (e) {}
+        showMessage(`Reintento autorizado para ${studentName} (Modo Demo).`);
+        return;
+      }
       try {
         await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'grades', gradeId));
         setGrades(prev => prev.filter(g => g.id !== gradeId));
@@ -1621,6 +1676,21 @@ function App() {
   };
 
   const toggleArchiveEvaluation = async (evalId, currentIsArchived) => {
+    if (isDemoMode || String(evalId).startsWith('demo')) {
+      setEvaluations(prev => {
+        const next = prev.map(e => e.id === evalId ? { ...e, isArchived: !currentIsArchived } : e);
+        const updated = next.find(e => e.id === evalId);
+        if (updated && updated.isDemoCreated) saveDemoSandboxItem('evaluations', updated);
+        return next;
+      });
+      try {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'demo_evaluations', evalId), {
+          isArchived: !currentIsArchived
+        });
+      } catch (e) {}
+      showMessage(!currentIsArchived ? "Evaluación archivada en Modo Demo." : "Evaluación desarchivada en Modo Demo.");
+      return;
+    }
     try {
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'evaluations', evalId), {
         isArchived: !currentIsArchived
@@ -1636,6 +1706,20 @@ function App() {
   const saveEditedGrade = async (gradeId) => {
     const newScore = parseFloat(String(editingGrade.score).replace(',', '.'));
     if (isNaN(newScore) || newScore < 0 || newScore > 5) return showMessage("Nota inválida (debe ser entre 0.0 y 5.0)");
+    if (isDemoMode || String(gradeId).startsWith('demo')) {
+      setGrades(prev => {
+        const next = prev.map(g => g.id === gradeId ? { ...g, score: newScore } : g);
+        const updated = next.find(g => g.id === gradeId);
+        if (updated) saveDemoSandboxItem('grades', updated);
+        return next;
+      });
+      try {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'demo_grades', gradeId), { score: newScore });
+      } catch (e) {}
+      setEditingGrade({ id: null, score: '' });
+      showMessage("Nota actualizada (Modo Demo).");
+      return;
+    }
     try {
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'grades', gradeId), { score: newScore });
       setGrades(prev => prev.map(g => g.id === gradeId ? { ...g, score: newScore } : g));
@@ -1652,6 +1736,26 @@ function App() {
     setIsSavingFeedback(true);
     try {
       const feedbackClean = (reviewFeedbackText || '').trim();
+      if (isDemoMode || String(selectedStudentGradeForReview.id).startsWith('demo')) {
+        try {
+          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'demo_grades', selectedStudentGradeForReview.id), {
+            teacherFeedback: feedbackClean
+          });
+        } catch (e) {}
+        setSelectedStudentGradeForReview(prev => prev ? ({
+          ...prev,
+          teacherFeedback: feedbackClean
+        }) : null);
+        setGrades(prev => {
+          const next = prev.map(g => g.id === selectedStudentGradeForReview.id ? { ...g, teacherFeedback: feedbackClean } : g);
+          const updated = next.find(g => g.id === selectedStudentGradeForReview.id);
+          if (updated) saveDemoSandboxItem('grades', updated);
+          return next;
+        });
+        showMessage("Retroalimentación guardada (Modo Demo).");
+        setIsSavingFeedback(false);
+        return;
+      }
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'grades', selectedStudentGradeForReview.id), {
         teacherFeedback: feedbackClean
       });
@@ -2559,7 +2663,10 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
           };
 
           const handleExitDemo = () => {
-            try { sessionStorage.removeItem('englishTech_demoMode'); } catch (e) {}
+            try {
+              sessionStorage.removeItem('englishTech_demoMode');
+              sessionStorage.removeItem('englishTech_demoRole');
+            } catch (e) {}
             setIsDemoMode(false);
             setHasEntered(false);
             setRole('student');
@@ -2579,21 +2686,45 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
             changeTab('tasks');
           };
 
+          const handleSwitchDemoRole = (targetRole) => {
+            const nextRole = targetRole === 'teacher' ? 'teacher' : 'student';
+            try {
+              sessionStorage.setItem('englishTech_demoMode', '1');
+              sessionStorage.setItem('englishTech_demoRole', nextRole);
+            } catch (e) {}
+            setIsDemoMode(true);
+            setHasEntered(true);
+            setRole(nextRole);
+            setLoggedInUser(nextRole === 'teacher' ? 'DemoDocente' : '@invitado');
+            setLoggedInName(nextRole === 'teacher' ? TEACHER_NAME : 'Invitado (Demo)');
+            if (nextRole === 'student' && (activeTab === 'directory' || activeTab === 'tools' || activeTab === 'inbox')) {
+              changeTab('tasks');
+            }
+            showMessage(
+              nextRole === 'teacher'
+                ? '👩‍🏫 Vista Docente (Modo Demo) activada: puedes crear tareas, evaluaciones, diapositivas y contenidos aislados (se borran automáticamente en 2 semanas).'
+                : '🎓 Vista Estudiante (Modo Demo) activada: explora las publicaciones, diapositivas y presenta las evaluaciones.'
+            );
+          };
+
           useEffect(() => {
             const handleHashDemo = () => {
               if (isInitialDemoLink()) {
+                const demoRole = getInitialDemoRole();
                 setIsDemoMode(true);
                 setHasEntered(true);
-                setRole('student');
-                setLoggedInUser('@invitado');
-                setLoggedInName('Invitado (Demo)');
-                setAcademicGroups(DEMO_ACADEMIC_GROUPS);
+                setRole(demoRole);
+                setLoggedInUser(demoRole === 'teacher' ? 'DemoDocente' : '@invitado');
+                setLoggedInName(demoRole === 'teacher' ? TEACHER_NAME : 'Invitado (Demo)');
+                setAcademicGroups(mergeDemoItemsWithBase(DEMO_ACADEMIC_GROUPS, [], 'academicGroups'));
                 setAcademicGroupsLoaded(true);
-                setTasks(DEMO_TASKS);
-                setPinnedTasks(DEMO_TASKS.filter(t => t.isPinned));
-                setEvaluations(DEMO_EVALUATIONS);
-                setSyllabus(DEMO_SYLLABUS);
-                setReviews(DEMO_REVIEWS);
+                const mergedTasks = mergeDemoItemsWithBase(DEMO_TASKS, [], 'tasks');
+                setTasks(mergedTasks);
+                setPinnedTasks(mergedTasks.filter(t => t.isPinned));
+                setEvaluations(mergeDemoItemsWithBase(DEMO_EVALUATIONS, [], 'evaluations'));
+                setSyllabus(mergeDemoItemsWithBase(DEMO_SYLLABUS, [], 'syllabus').slice().sort((a, b) => (Number(a.week) || 0) - (Number(b.week) || 0)));
+                setReviews(mergeDemoItemsWithBase(DEMO_REVIEWS, [], 'reviews'));
+                setGrades(mergeDemoItemsWithBase([], [], 'grades'));
                 setTasksLoading(false);
               }
             };
@@ -2679,7 +2810,7 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
 
             const uAcadGlobal = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'academicGroups'), s => {
                 if (isInitialDemoLink()) {
-                    setAcademicGroups(DEMO_ACADEMIC_GROUPS);
+                    setAcademicGroups(mergeDemoItemsWithBase(DEMO_ACADEMIC_GROUPS, [], 'academicGroups'));
                     setAcademicGroupsLoaded(true);
                     return;
                 }
@@ -2716,13 +2847,14 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
                 }
 
                 if (isInitialDemoLink()) {
+                    const demoRole = getInitialDemoRole();
                     setIsDemoMode(true);
-                    setRole('student');
-                    setLoggedInUser('@invitado');
-                    setLoggedInName('Invitado (Demo)');
+                    setRole(demoRole);
+                    setLoggedInUser(demoRole === 'teacher' ? 'DemoDocente' : '@invitado');
+                    setLoggedInName(demoRole === 'teacher' ? TEACHER_NAME : 'Invitado (Demo)');
                     setHasEntered(true);
                     setLoginType(null);
-                    setAcademicGroups(DEMO_ACADEMIC_GROUPS);
+                    setAcademicGroups(mergeDemoItemsWithBase(DEMO_ACADEMIC_GROUPS, [], 'academicGroups'));
                     setAcademicGroupsLoaded(true);
                     return;
                 }
@@ -2922,18 +3054,100 @@ useEffect(() => {
   });
 }, [academicGroups, chatGroups, myChatId, isDemoMode]);
 
-// EFECTO PARA MODO DEMO: Carga de materia, publicaciones, evaluaciones, diapositivas y syllabus de prueba
+// EFECTO PARA MODO DEMO: Carga base + escucha colecciones aisladas 'demo_*' con limpieza automática a las 2 semanas (14 días)
 useEffect(() => {
-    if (isDemoMode) {
-        setAcademicGroups(DEMO_ACADEMIC_GROUPS);
-        setAcademicGroupsLoaded(true);
-        setTasks(DEMO_TASKS);
-        setPinnedTasks(DEMO_TASKS.filter(t => t.isPinned));
-        setEvaluations(DEMO_EVALUATIONS);
-        setSyllabus(DEMO_SYLLABUS);
-        setReviews(DEMO_REVIEWS);
-        setTasksLoading(false);
-    }
+    if (!isDemoMode) return;
+
+    // 1. Hidratación instantánea con base + sandbox local (filtrando vencidos > 14 días)
+    setAcademicGroups(mergeDemoItemsWithBase(DEMO_ACADEMIC_GROUPS, [], 'academicGroups'));
+    setAcademicGroupsLoaded(true);
+    const initialTasks = mergeDemoItemsWithBase(DEMO_TASKS, [], 'tasks');
+    setTasks(initialTasks);
+    setPinnedTasks(initialTasks.filter(t => t.isPinned));
+    setEvaluations(mergeDemoItemsWithBase(DEMO_EVALUATIONS, [], 'evaluations'));
+    setSyllabus(mergeDemoItemsWithBase(DEMO_SYLLABUS, [], 'syllabus').slice().sort((a, b) => (Number(a.week) || 0) - (Number(b.week) || 0)));
+    setReviews(mergeDemoItemsWithBase(DEMO_REVIEWS, [], 'reviews'));
+    setGrades(mergeDemoItemsWithBase([], [], 'grades'));
+    setSuggestions([
+      {
+        id: 'demo-sug-1',
+        studentName: 'Mariana Gómez (Demo)',
+        category: 'Metodología',
+        text: '[Metodología] Teacher, los casos de estudio sobre inflación y tasas de interés del Banco de la República nos ayudaron muchísimo a practicar vocabulario financiero real.',
+        read: false,
+        createdAt: Date.now() - 3600000 * 5
+      },
+      {
+        id: 'demo-sug-2',
+        studentName: 'Andrés Felipe Ríos (Demo)',
+        category: 'Material de apoyo',
+        text: '[Material de apoyo] Las diapositivas bilingües de Supply & Demand con glosario técnico están súper claras para repasar antes del quiz.',
+        read: true,
+        createdAt: Date.now() - 3600000 * 28
+      }
+    ]);
+    setAlerts([]);
+    setTasksLoading(false);
+
+    // 2. Suscripción a colecciones aisladas 'demo_*' en Firestore con purga automática de elementos > 2 semanas
+    const base = ['artifacts', appId, 'public', 'data'];
+    const collectValidAndPurgeExpired = (snap) => {
+      const now = Date.now();
+      const valid = [];
+      snap.docs.forEach(d => {
+        const data = { id: d.id, ...d.data(), isDemoCreated: true };
+        if (isDemoItemExpired(data, now)) {
+          deleteDoc(d.ref).catch(() => {});
+        } else {
+          valid.push(data);
+        }
+      });
+      return valid;
+    };
+
+    const uDemoTasks = onSnapshot(collection(db, ...base, 'demo_tasks'), snap => {
+      const valid = collectValidAndPurgeExpired(snap);
+      const merged = mergeDemoItemsWithBase(DEMO_TASKS, valid, 'tasks');
+      setTasks(merged);
+      setPinnedTasks(merged.filter(t => t.isPinned));
+    }, () => {});
+
+    const uDemoEvals = onSnapshot(collection(db, ...base, 'demo_evaluations'), snap => {
+      const valid = collectValidAndPurgeExpired(snap);
+      setEvaluations(mergeDemoItemsWithBase(DEMO_EVALUATIONS, valid, 'evaluations'));
+    }, () => {});
+
+    const uDemoSyllabus = onSnapshot(collection(db, ...base, 'demo_syllabus'), snap => {
+      const valid = collectValidAndPurgeExpired(snap);
+      const merged = mergeDemoItemsWithBase(DEMO_SYLLABUS, valid, 'syllabus')
+        .slice()
+        .sort((a, b) => (Number(a.week) || 0) - (Number(b.week) || 0));
+      setSyllabus(merged);
+    }, () => {});
+
+    const uDemoReviews = onSnapshot(collection(db, ...base, 'demo_reviews'), snap => {
+      const valid = collectValidAndPurgeExpired(snap);
+      setReviews(mergeDemoItemsWithBase(DEMO_REVIEWS, valid, 'reviews'));
+    }, () => {});
+
+    const uDemoGroups = onSnapshot(collection(db, ...base, 'demo_academicGroups'), snap => {
+      const valid = collectValidAndPurgeExpired(snap);
+      setAcademicGroups(mergeDemoItemsWithBase(DEMO_ACADEMIC_GROUPS, valid, 'academicGroups'));
+    }, () => {});
+
+    const uDemoGrades = onSnapshot(collection(db, ...base, 'demo_grades'), snap => {
+      const valid = collectValidAndPurgeExpired(snap);
+      setGrades(mergeDemoItemsWithBase([], valid, 'grades'));
+    }, () => {});
+
+    return () => {
+      uDemoTasks();
+      uDemoEvals();
+      uDemoSyllabus();
+      uDemoReviews();
+      uDemoGroups();
+      uDemoGrades();
+    };
 }, [isDemoMode]);
 
 // 2. PESTAÑA: ASIGNACIONES (Muro de clase)
@@ -2967,11 +3181,11 @@ useEffect(() => {
 
 // 3. PESTAÑA: PERFIL (Muro de Pinterest)
 useEffect(() => {
-    if (!hasEntered || !myChatId || activeTab !== 'profile') return;
+    if (!hasEntered || !myChatId || isDemoMode || activeTab !== 'profile') return;
     const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'userPosts'), orderBy('createdAt', 'desc'), limit(20));
     const uUserPosts = onSnapshot(q, s => setUserPosts(s.docs.map(d => ({ id: d.id, ...d.data() }))), err => console.error(err));
     return () => uUserPosts();
-}, [hasEntered, myChatId, activeTab]);
+}, [hasEntered, myChatId, activeTab, isDemoMode]);
 
 // 4. PESTAÑA: REPASOS (Diapositivas)
 useEffect(() => {
@@ -2998,11 +3212,11 @@ useEffect(() => {
 
 // 7. PESTAÑA: BUZÓN (Solo para la profesora)
 useEffect(() => {
-    if (!hasEntered || !myChatId || activeTab !== 'inbox' || role !== 'teacher') return;
+    if (!hasEntered || !myChatId || isDemoMode || activeTab !== 'inbox' || role !== 'teacher') return;
     const uSug = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'suggestions'), s => setSuggestions(s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => b.createdAt - a.createdAt)), err => console.error(err));
     const uAlerts = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'alerts'), s => setAlerts(s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => b.createdAt - a.createdAt)), err => console.error(err));
     return () => { uSug(); uAlerts(); };
-}, [hasEntered, myChatId, activeTab, role]);
+}, [hasEntered, myChatId, activeTab, role, isDemoMode]);
             useEffect(() => {
               if (myChatId && !isDemoMode) {
                   const finalPresenceId = role === 'teacher' ? 'teacher' : myChatId;
@@ -4158,6 +4372,7 @@ useEffect(() => {
               if (firstError) return showMessage(firstError);
 
               try {
+                  const now = Date.now();
                   const newEval = {
                       ...evalFormData,
                       title: evalFormData.title.trim(),
@@ -4167,9 +4382,39 @@ useEffect(() => {
                       isArchived: false,
                       targetGroupId: evalFormData.targetGroupId || 'all',
                       targetGroupName: evalFormData.targetGroupName || 'Todos los estudiantes (Global)',
-                      createdAt: Date.now(),
-                      createdBy: myChatId
+                      createdAt: now,
+                      createdBy: myChatId,
+                      ...(isDemoMode ? { isDemoCreated: true, expiresAt: now + DEMO_TTL_MS } : {})
                   };
+
+                  if (isDemoMode) {
+                      let createdId = `demo_eval_${now}`;
+                      try {
+                          const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'demo_evaluations'), newEval);
+                          if (docRef?.id) createdId = docRef.id;
+                      } catch (e) {
+                          // Local sandbox fallback
+                      }
+                      const createdEval = { id: createdId, ...newEval };
+                      saveDemoSandboxItem('evaluations', createdEval);
+                      setEvaluations(prev => [createdEval, ...prev.filter(ev => ev.id !== createdId)]);
+                      setIsCreatingEval(false);
+                      setEvalTabFilter('active');
+                      setEvalFormData({
+                          title: "",
+                          description: "",
+                          dueDate: getToday(),
+                          dueTime: "23:59",
+                          timeLimit: 30,
+                          strictAntiCheat: false,
+                          targetGroupId: "all",
+                          targetGroupName: "Todos los estudiantes (Global)",
+                          questions: [{ type: 'multiple', text: '', options: [{text: '', isCorrect: false}, {text: '', isCorrect: false}], correctAnswer: '' }]
+                      });
+                      showMessage("⏳ Evaluación creada en Modo Demo (aislada • se borrará automáticamente en 2 semanas).");
+                      return;
+                  }
+
                   const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'evaluations'), newEval);
                   setEvaluations(prev => [{ id: docRef.id, ...newEval }, ...prev]);
                   setIsCreatingEval(false);
@@ -4865,6 +5110,8 @@ useEffect(() => {
               glassInput={glassInput}
               redButton={redButton}
               reviews={reviews}
+              setReviews={setReviews}
+              isDemoMode={isDemoMode}
               db={db}
               appId={appId}
               academicGroups={academicGroups}
@@ -4955,6 +5202,42 @@ Devuelve ÚNICAMENTE un array JSON plano (sin bloques markdown \`\`\`json ni tex
               try {
                 const targetGroup = academicGroups.find(g => g.id === syllabusPdfTargetGroup);
                 const targetGroupName = targetGroup ? targetGroup.name : 'General';
+
+                if (isDemoMode) {
+                  const createdItems = [];
+                  for (let idx = 0; idx < extractedSyllabusPreview.length; idx++) {
+                    const item = extractedSyllabusPreview[idx];
+                    const now = Date.now() + idx;
+                    const payload = {
+                      week: Number(item.week) || (idx + 1),
+                      unit: item.unit || '',
+                      topic: item.topic || 'Tema de clase',
+                      description: item.description || '',
+                      keyConcepts: Array.isArray(item.keyConcepts) ? item.keyConcepts : [],
+                      activities: item.activities || '',
+                      targetGroupId: syllabusPdfTargetGroup || 'demo-group-ing-econ-1',
+                      targetGroupName: syllabusPdfTargetGroup && syllabusPdfTargetGroup !== 'all' ? targetGroupName : 'Inglés Técnico Económico',
+                      createdAt: now,
+                      expiresAt: now + DEMO_TTL_MS,
+                      isDemoCreated: true
+                    };
+                    let createdId = `demo_syl_${now}_${idx}`;
+                    try {
+                      const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'demo_syllabus'), payload);
+                      if (docRef?.id) createdId = docRef.id;
+                    } catch (e) {}
+                    const finalItem = { id: createdId, ...payload };
+                    saveDemoSandboxItem('syllabus', finalItem);
+                    createdItems.push(finalItem);
+                  }
+                  setSyllabus(prev => [...createdItems, ...prev].sort((a, b) => (Number(a.week) || 0) - (Number(b.week) || 0)));
+                  confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
+                  showMessage(`⏳ ${extractedSyllabusPreview.length} semanas añadidas en Modo Demo (aisladas • se borran en 2 semanas).`);
+                  setShowPdfSyllabusModal(false);
+                  setExtractedSyllabusPreview(null);
+                  setSyllabusPdfFile(null);
+                  return;
+                }
 
                 for (const item of extractedSyllabusPreview) {
                   await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'syllabus'), {
@@ -5110,6 +5393,34 @@ Devuelve ÚNICAMENTE un array JSON plano (sin bloques markdown \`\`\`json ni tex
                       if (!weekVal || !topicVal) return;
 
                       const grpObj = academicGroups.find(g => g.id === targetGrp);
+
+                      if (isDemoMode) {
+                        const now = Date.now();
+                        const payload = {
+                          week: weekVal,
+                          unit: unitVal,
+                          topic: topicVal,
+                          description: descVal,
+                          activities: actVal,
+                          targetGroupId: targetGrp === 'all' ? 'demo-group-ing-econ-1' : targetGrp,
+                          targetGroupName: grpObj ? grpObj.name : 'Inglés Técnico Económico',
+                          createdAt: now,
+                          expiresAt: now + DEMO_TTL_MS,
+                          isDemoCreated: true
+                        };
+                        let createdId = `demo_syl_${now}`;
+                        try {
+                          const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'demo_syllabus'), payload);
+                          if (docRef?.id) createdId = docRef.id;
+                        } catch (err) {}
+                        const createdItem = { id: createdId, ...payload };
+                        saveDemoSandboxItem('syllabus', createdItem);
+                        setSyllabus(prev => [createdItem, ...prev.filter(s => s.id !== createdId)].sort((a, b) => (Number(a.week) || 0) - (Number(b.week) || 0)));
+                        e.target.reset();
+                        setShowAddSyllabus(false);
+                        showMessage("⏳ Contenido programático añadido en Modo Demo (aislado • se borrará en 2 semanas).");
+                        return;
+                      }
 
                       try {
                         await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'syllabus'), {
@@ -5715,6 +6026,14 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                 {item.targetGroupName}
                               </span>
                             )}
+                            {item.isDemoCreated && (
+                              <span
+                                className="px-2.5 py-1 rounded-xl bg-amber-500/15 text-amber-700 dark:text-amber-300 text-[10px] font-bold border border-amber-500/30"
+                                title="Contenido temporal creado en Modo Demo (se elimina automáticamente a las 2 semanas)"
+                              >
+                                ⏳ Temporal Demo ({getDemoRemainingDays(item) ?? 14}d)
+                              </span>
+                            )}
                           </div>
 
                           <div className="flex items-center gap-2 shrink-0">
@@ -5733,7 +6052,25 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                             {role === 'teacher' && (
                               <button
                                 type="button"
-                                onClick={() => confirmAction("¿Eliminar este tema del cronograma?", async () => { try { setSyllabus(prev => prev.filter(s => s.id !== item.id)); await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'syllabus', item.id)); showMessage("Tema eliminado del cronograma."); } catch(err) { console.error(err); showMessage("Error al eliminar el tema."); } })}
+                                onClick={() => confirmAction("¿Eliminar este tema del cronograma?", async () => {
+                                  if (isDemoMode || item.isDemoCreated || String(item.id).startsWith('demo')) {
+                                    removeDemoSandboxItem('syllabus', item.id);
+                                    setSyllabus(prev => prev.filter(s => s.id !== item.id));
+                                    if (item.isDemoCreated) {
+                                      try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'demo_syllabus', item.id)); } catch (e) {}
+                                    }
+                                    showMessage("Tema eliminado en Modo Demo.");
+                                    return;
+                                  }
+                                  try {
+                                    setSyllabus(prev => prev.filter(s => s.id !== item.id));
+                                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'syllabus', item.id));
+                                    showMessage("Tema eliminado del cronograma.");
+                                  } catch(err) {
+                                    console.error(err);
+                                    showMessage("Error al eliminar el tema.");
+                                  }
+                                })}
                                 className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
                                 title="Eliminar tema"
                               >
@@ -5807,8 +6144,8 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
             
             let matched = findMatch(academicGroups);
 
-            // Fallback si la memoria aún está hidratando
-            if (!matched) {
+            // Fallback si la memoria aún está hidratando (solo fuera de Modo Demo)
+            if (!matched && !isDemoMode) {
                 try {
                     const snap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'academicGroups'));
                     const freshGroups = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -5847,6 +6184,24 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
             const studentId = (myChatId || (user?.email ? user.email.split('@')[0] : '') || user?.uid || 'student').toLowerCase().replace('@', '').trim();
             const updatedMembers = Array.from(new Set([...currentMembers.map(m => String(m).trim()), studentId].filter(Boolean)));
             
+            if (isDemoMode) {
+                setAcademicGroups(prev => {
+                    const next = prev.map(g => g.id === matched.id ? { ...g, members: updatedMembers } : g);
+                    const updated = next.find(g => g.id === matched.id);
+                    if (updated && updated.isDemoCreated) saveDemoSandboxItem('academicGroups', updated);
+                    return next;
+                });
+                setSelectedGroupForFeed({ ...matched, members: updatedMembers });
+                changeTab('groups');
+                setJoinedGroupSuccess({ ...matched, members: updatedMembers });
+                showMessage(`¡Te has unido a "${matched.name}" (Modo Demo)!`);
+                setJoinCodeInput("");
+                setJoinCodeError("");
+                setIsJoiningGroup(false);
+                if (onSuccess) onSuccess();
+                return true;
+            }
+
             // Actualizar Firestore
             await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', matched.id), { 
                 members: updatedMembers 
@@ -5911,6 +6266,43 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
         if(!newAcadGroupName.trim()) return showMessage("Escribe un nombre para la materia.");
         
         setIsSavingMateria(true);
+        if (isDemoMode) {
+            try {
+                const now = Date.now();
+                const demoGroupPayload = {
+                    name: newAcadGroupName.trim(),
+                    members: Array.from(new Set(['invitado', '@invitado', ...selectedAcadMembers])),
+                    emoji: newAcadGroupEmoji || 'BookOpen',
+                    avatarUrl: newAcadGroupAvatarUrl.trim() || '',
+                    coverPattern: 'doodle-1',
+                    coverUrl: '',
+                    inviteCodes: [{ code: 'DEMO' + String(now).slice(-2), expiresAt: now + DEMO_TTL_MS }],
+                    createdAt: now,
+                    expiresAt: now + DEMO_TTL_MS,
+                    isDemoCreated: true
+                };
+                let createdId = `demo_group_${now}`;
+                try {
+                    const newGroupDoc = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'demo_academicGroups'), demoGroupPayload);
+                    if (newGroupDoc?.id) createdId = newGroupDoc.id;
+                } catch (err) {}
+                const createdGroup = { id: createdId, ...demoGroupPayload };
+                saveDemoSandboxItem('academicGroups', createdGroup);
+                setAcademicGroups(prev => [createdGroup, ...prev.filter(g => g.id !== createdId)]);
+                setNewAcadGroupName(""); 
+                setSelectedAcadMembers([]); 
+                setNewAcadGroupAvatarUrl("");
+                setNewAcadGroupEmoji('BookOpen');
+                setIsCreatingAcadGroup(false);
+                setShowMateriasList(true);
+                showMessage("⏳ Materia creada en Modo Demo (aislada • se borrará automáticamente en 2 semanas).");
+            } catch (error) {
+                console.error(error);
+                showMessage("Error al crear materia demo.");
+            }
+            setIsSavingMateria(false);
+            return;
+        }
         try {
             const newGroupDoc = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'academicGroups'), {
                 name: newAcadGroupName.trim(),
@@ -5953,6 +6345,23 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
     const handleSaveStudentEdit = async (e) => {
         e.preventDefault();
         if (!studentEditModal.userKey) return;
+        if (isDemoMode) {
+            setUserMappings(prev => ({
+                ...prev,
+                [studentEditModal.userKey]: {
+                    ...(prev[studentEditModal.userKey] || {}),
+                    fullName: studentEditModal.fullName.trim(),
+                    customLabel: studentEditModal.customLabel.trim(),
+                    profilePicUrl: studentEditModal.profilePicUrl.trim(),
+                    email: studentEditModal.email.trim(),
+                    role: 'student',
+                    updatedAt: Date.now()
+                }
+            }));
+            showMessage("Perfil de estudiante actualizado en Modo Demo (solo en tu sesión).");
+            setStudentEditModal({ isOpen: false, userKey: '', fullName: '', customLabel: '', email: '', profilePicUrl: '' });
+            return;
+        }
         try {
             await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userMappings', studentEditModal.userKey), {
                 fullName: studentEditModal.fullName.trim(),
@@ -6022,6 +6431,14 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
         const handleRemoveStudentFromSubject = async (studentKey) => {
             const studentName = userMappings[studentKey]?.fullName || FALLBACK_MAP[studentKey]?.name || studentKey;
             confirmAction(`¿Quitar a ${studentName} de la materia "${currentGroup.name}"?`, async () => {
+                if (isDemoMode) {
+                    const rawMembers = Array.isArray(currentGroup.members) ? currentGroup.members : (currentGroup.members && typeof currentGroup.members === 'object' ? Object.keys(currentGroup.members) : []);
+                    const updatedMembers = rawMembers.filter(m => String(m).toLowerCase().replace('@', '') !== String(studentKey).toLowerCase().replace('@', ''));
+                    setAcademicGroups(prev => prev.map(g => g.id === currentGroup.id ? { ...g, members: updatedMembers } : g));
+                    setSelectedSubjectDetail(prev => prev ? { ...prev, members: updatedMembers } : null);
+                    showMessage("Estudiante removido de la materia (Modo Demo).");
+                    return;
+                }
                 try {
                     await removeStudentFromGroupHelper(currentGroup.id, studentKey);
                     showMessage("Estudiante removido de la materia y del chat grupal.");
@@ -6037,6 +6454,16 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                 const updatedMembers = Array.from(new Set([...rawMembers, studentKey]));
                 setAcademicGroups(prev => prev.map(g => g.id === currentGroup.id ? { ...g, members: updatedMembers } : g));
                 setSelectedSubjectDetail(prev => prev ? { ...prev, members: updatedMembers } : null);
+                if (isDemoMode) {
+                    if (currentGroup.isDemoCreated) {
+                        saveDemoSandboxItem('academicGroups', { ...currentGroup, members: updatedMembers });
+                        try {
+                            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'demo_academicGroups', currentGroup.id), { members: updatedMembers });
+                        } catch (e) {}
+                    }
+                    showMessage("Estudiante inscrito en la materia (Modo Demo).");
+                    return;
+                }
                 await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', currentGroup.id), {
                     members: updatedMembers
                 });
@@ -6512,6 +6939,14 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                                 {codes.length} {codes.length === 1 ? 'código' : 'códigos'}
                                                             </span>
                                                         )}
+                                                        {g.isDemoCreated && (
+                                                            <span
+                                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30"
+                                                                title="Materia temporal creada en Modo Demo (se elimina automáticamente a las 2 semanas)"
+                                                            >
+                                                                ⏳ Temporal Demo ({getDemoRemainingDays(g) ?? 14}d)
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
@@ -6519,6 +6954,18 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                             <button
                                                 type="button"
                                                 onClick={() => confirmAction(`¿Eliminar la materia "${g.name}"? Esta acción borrará permanentemente la materia, todos sus foros, tareas, publicaciones y archivos asociados.`, async () => {
+                                                    if (isDemoMode || g.isDemoCreated || String(g.id).startsWith('demo')) {
+                                                        removeDemoSandboxItem('academicGroups', g.id);
+                                                        setAcademicGroups(prev => prev.filter(item => item.id !== g.id));
+                                                        setTasks(prev => prev.filter(t => t.targetGroupId !== g.id && t.targetGroupId !== `acad_${g.id}`));
+                                                        if (selectedGroupForFeed?.id === g.id) setSelectedGroupForFeed(null);
+                                                        if (selectedSubjectDetail?.id === g.id) setSelectedSubjectDetail(null);
+                                                        if (g.isDemoCreated) {
+                                                            try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'demo_academicGroups', g.id)); } catch (e) {}
+                                                        }
+                                                        showMessage(`Materia "${g.name}" eliminada en Modo Demo.`);
+                                                        return;
+                                                    }
                                                     try {
                                                         // 1. Borrar todas las tareas, publicaciones y foros asociados a esta materia
                                                         const tasksSnap = await getDocs(query(collection(db, 'artifacts', appId, 'public', 'data', 'tasks'), where('targetGroupId', '==', g.id)));
@@ -6609,6 +7056,14 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                         const expiresAt = codeExpiryDays === '0' ? null : Date.now() + (parseInt(codeExpiryDays, 10) || 7) * 24 * 60 * 60 * 1000;
                                                         const updated = [...(g.inviteCodes || []), { code, expiresAt }];
                                                         setAcademicGroups(prev => prev.map(item => item.id === g.id ? { ...item, inviteCodes: updated } : item));
+                                                        if (isDemoMode || g.isDemoCreated || String(g.id).startsWith('demo')) {
+                                                            if (g.isDemoCreated) {
+                                                                saveDemoSandboxItem('academicGroups', { ...g, inviteCodes: updated });
+                                                                try { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'demo_academicGroups', g.id), { inviteCodes: updated }); } catch (e) {}
+                                                            }
+                                                            showMessage(`Código ${code} generado en Modo Demo.`);
+                                                            return;
+                                                        }
                                                         try { 
                                                             await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', g.id), { inviteCodes: updated }); 
                                                             showMessage(`Código ${code} generado (${codeExpiryDays==='0' ? 'sin expiración' : codeExpiryDays + ' días'})`); 
@@ -6637,6 +7092,14 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                                         <button type="button" onClick={async () => { 
                                                                             const updated = (g.inviteCodes || []).filter((_, i) => i !== idx); 
                                                                             setAcademicGroups(prev => prev.map(item => item.id === g.id ? { ...item, inviteCodes: updated } : item));
+                                                                            if (isDemoMode || g.isDemoCreated || String(g.id).startsWith('demo')) {
+                                                                                if (g.isDemoCreated) {
+                                                                                    saveDemoSandboxItem('academicGroups', { ...g, inviteCodes: updated });
+                                                                                    try { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'demo_academicGroups', g.id), { inviteCodes: updated }); } catch (e) {}
+                                                                                }
+                                                                                showMessage('Código eliminado en Modo Demo');
+                                                                                return;
+                                                                            }
                                                                             try { 
                                                                                 await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', g.id), { inviteCodes: updated }); 
                                                                                 showMessage('Código eliminado'); 
@@ -6671,6 +7134,16 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                         const email = e.target.email.value.trim();
                         const pass = e.target.password.value;
                         if (!u || !fn || !email || !pass) return;
+                        if (isDemoMode) {
+                            setUserMappings(prev => ({
+                                ...prev,
+                                [u]: { fullName: fn, email: email, role: 'student', createdAt: Date.now(), isDemoCreated: true }
+                            }));
+                            e.target.reset();
+                            setShowRegisterStudentForm(false);
+                            showMessage("Estudiante de prueba añadido en Modo Demo (solo en tu sesión).");
+                            return;
+                        }
                         try {
                             await createUserWithEmailAndPassword(secondaryAuth, email, pass);
                             await signOut(secondaryAuth);
@@ -6830,6 +7303,15 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                         <button 
                                             type="button"
                                             onClick={() => confirmAction(`¿Eliminar a "${data.fullName}" (@${userKey}) del sistema? Su enlace de perfil será eliminado permanentemente.`, async () => {
+                                                if (isDemoMode) {
+                                                    setUserMappings(prev => {
+                                                        const next = { ...prev };
+                                                        delete next[userKey];
+                                                        return next;
+                                                    });
+                                                    showMessage("Estudiante removido de la vista (Modo Demo).");
+                                                    return;
+                                                }
                                                 try {
                                                 await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userMappings', userKey));
                                                 for (const g of academicGroups) {
@@ -7313,6 +7795,30 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                     finalCoverUrl = await uploadImageToStorage(groupCoverModal.customFile, 'group_covers');
                                                 }
 
+                                                if (isDemoMode || groupCoverModal.group?.isDemoCreated || String(groupCoverModal.group?.id).startsWith('demo')) {
+                                                    const updates = {
+                                                        emoji: groupCoverModal.emoji || 'BookOpen',
+                                                        coverPattern: groupCoverModal.coverPattern || 'doodle-1',
+                                                        coverUrl: finalCoverUrl || ''
+                                                    };
+                                                    setAcademicGroups(prev => {
+                                                        const next = prev.map(g => g.id === groupCoverModal.group.id ? { ...g, ...updates } : g);
+                                                        const updated = next.find(g => g.id === groupCoverModal.group.id);
+                                                        if (updated && updated.isDemoCreated) saveDemoSandboxItem('academicGroups', updated);
+                                                        return next;
+                                                    });
+                                                    if (groupCoverModal.group?.isDemoCreated) {
+                                                        try { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'demo_academicGroups', groupCoverModal.group.id), updates); } catch (e) {}
+                                                    }
+                                                    setSelectedGroupForFeed(prev => ({
+                                                        ...prev,
+                                                        ...updates
+                                                    }));
+                                                    setGroupCoverModal({ isOpen: false, group: null, emoji: 'BookOpen', coverPattern: 'doodle-1', coverUrl: '', customFile: null, isSaving: false });
+                                                    showMessage("Personalización del grupo guardada (Modo Demo).");
+                                                    return;
+                                                }
+
                                                 await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', groupCoverModal.group.id), {
                                                     emoji: groupCoverModal.emoji || 'BookOpen',
                                                     coverPattern: groupCoverModal.coverPattern || 'doodle-1',
@@ -7364,7 +7870,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                             prevTaskDesc={prevTaskDesc} setPrevTaskDesc={setPrevTaskDesc} hasAiModified={hasAiModified} setHasAiModified={setHasAiModified}
                             callGemini={callGemini} showMessage={showMessage} handleAiTranslate={handleAiTranslate} taskDate={taskDate}
                             setTaskDate={setTaskDate} taskTime={taskTime} setTaskTime={setTaskTime} allowLate={allowLate} setAllowLate={setAllowLate}
-                            db={db} appId={appId} loggedInName={loggedInName} getToday={getToday} tasks={tasks} user={user} isDarkMode={isDarkMode}
+                            db={db} appId={appId} loggedInName={loggedInName} getToday={getToday} tasks={tasks} setTasks={setTasks} isDemoMode={isDemoMode} user={user} isDarkMode={isDarkMode}
                             confirmAction={confirmAction} setFullScreenImage={setFullScreenImage} tasksLoading={tasksLoading} taskLimit={taskLimit} loadMoreTasks={loadMoreTasks} pinnedTasks={pinnedTasks}
                             wallSearchTerm={wallSearchTerm} setWallSearchTerm={setWallSearchTerm}
                             fixedTargetGroup={selectedGroupForFeed.id}
@@ -8985,6 +9491,11 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                    <span className="inline-block text-[10px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-md border border-blue-200/60 dark:border-blue-800/60">
                                                        {ev.targetGroupName || 'Global'}
                                                    </span>
+                                                   {ev.isDemoCreated && (
+                                                       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/50 px-2 py-0.5 rounded-md border border-amber-300/70 dark:border-amber-700/60" title="Evaluación creada en Modo Demo: se elimina automáticamente a las 2 semanas">
+                                                           ⏳ Temporal Demo ({getDemoRemainingDays(ev)}d)
+                                                       </span>
+                                                   )}
                                                    {ev.strictAntiCheat && (
                                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 px-2 py-0.5 rounded-md border border-red-200/60 dark:border-red-800/60">
                                                            <ShieldAlert size={10} /> Anti-trampas
@@ -9038,6 +9549,17 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                     <button 
                                                         type="button"
                                                         onClick={() => confirmAction("¿Borrar evaluación? También se borrarán las notas de los estudiantes.", async () => {
+                                                            if (isDemoMode) {
+                                                                setEvaluations(prev => prev.filter(e => e.id !== ev.id));
+                                                                setGrades(prev => prev.filter(g => g.evaluationId !== ev.id));
+                                                                removeDemoSandboxItem('evaluations', ev.id);
+                                                                if (viewingResultsFor?.id === ev.id) setViewingResultsFor(null);
+                                                                try {
+                                                                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'demo_evaluations', ev.id));
+                                                                } catch (e) {}
+                                                                showMessage("Evaluación eliminada del Modo Demo.");
+                                                                return;
+                                                            }
                                                             try {
                                                                 const gradeSnap = await getDocs(query(collection(db, 'artifacts', appId, 'public', 'data', 'grades'), where('evaluationId', '==', ev.id)));
                                                                 await Promise.all(gradeSnap.docs.map(d => deleteDoc(d.ref)));
@@ -9187,6 +9709,10 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
               });
 
               const toggleSuggestionRead = async (s) => {
+                  if (isDemoMode) {
+                      setSuggestions(prev => prev.map(item => item.id === s.id ? { ...item, read: !s.read } : item));
+                      return;
+                  }
                   try {
                       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'suggestions', s.id), {
                           read: !s.read
@@ -9197,6 +9723,11 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
               };
 
               const markAllSuggestionsAsRead = async () => {
+                  if (isDemoMode) {
+                      setSuggestions(prev => prev.map(s => ({ ...s, read: true })));
+                      showMessage("Todas las sugerencias han sido marcadas como revisadas (Modo Demo).");
+                      return;
+                  }
                   try {
                       const unreadList = suggestions.filter(s => !s.read);
                       await Promise.all(unreadList.map(s => updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'suggestions', s.id), { read: true })));
@@ -9452,7 +9983,14 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
 
                                                        <button
                                                            type="button"
-                                                           onClick={() => confirmAction('¿Eliminar esta sugerencia permanentemente?', () => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'suggestions', s.id)))}
+                                                           onClick={() => confirmAction('¿Eliminar esta sugerencia permanentemente?', () => {
+                                                               if (isDemoMode) {
+                                                                   setSuggestions(prev => prev.filter(item => item.id !== s.id));
+                                                                   showMessage("Sugerencia eliminada (Modo Demo).");
+                                                                   return;
+                                                               }
+                                                               return deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'suggestions', s.id));
+                                                           })}
                                                            className="p-2 rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
                                                            title="Eliminar sugerencia"
                                                        >
@@ -9542,7 +10080,14 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
 
                                                   <button
                                                       type="button"
-                                                      onClick={() => confirmAction('¿Borrar esta alerta?', () => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'alerts', a.id)))}
+                                                      onClick={() => confirmAction('¿Borrar esta alerta?', () => {
+                                                          if (isDemoMode) {
+                                                              setAlerts(prev => prev.filter(item => item.id !== a.id));
+                                                              showMessage("Alerta eliminada (Modo Demo).");
+                                                              return;
+                                                          }
+                                                          return deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'alerts', a.id));
+                                                      })}
                                                       className="p-2 rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-100 dark:hover:bg-red-950/60 transition-colors"
                                                       title="Eliminar alerta"
                                                   >
@@ -9838,65 +10383,116 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                     </div>
                 )}
 
-                {/* Tarjeta: Enlace exclusivo para Modo Demo / Invitado (Solo Docente) */}
-                {role === 'teacher' && (
-                    <div className={`${glassCard} !p-4 sm:!p-5 space-y-3 border-purple-500/30 bg-gradient-to-br from-purple-500/10 via-indigo-500/5 to-transparent`}>
+                {/* Tarjeta: Enlaces exclusivos para Modo Demo / Invitado (Estudiante y Docente) */}
+                {(role === 'teacher' || isDemoMode) && (
+                    <div className={`${glassCard} !p-4 sm:!p-5 space-y-3.5 border-purple-500/30 bg-gradient-to-br from-purple-500/10 via-indigo-500/5 to-transparent`}>
                         <div className="flex items-start justify-between gap-3">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-2xl bg-purple-500/15 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-500/25 shrink-0 shadow-xs">
                                     <Sparkles size={20} />
                                 </div>
                                 <div>
-                                    <h3 className={`text-sm font-bold flex items-center gap-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                                        <span>Enlace de Modo Demo / Invitado</span>
+                                    <h3 className={`text-sm font-bold flex flex-wrap items-center gap-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                                        <span>Enlaces de Modo Demo (Estudiante y Docente)</span>
                                         <span className="px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 text-[10px] font-black">
-                                            Exclusivo Docente
+                                            Entorno Aislado • Temporal 2 Semanas
                                         </span>
                                     </h3>
-                                    <p className="text-[11px] text-gray-500 leading-relaxed">
-                                        Genera y comparte este enlace para que coordinadores, evaluadores o invitados exploren English TECH con publicaciones y evaluaciones ficticias sin acceso a notas reales.
+                                    <p className="text-[11px] text-gray-500 leading-relaxed mt-0.5">
+                                        Comparte el Modo Demo como <strong>Estudiante</strong> o como <strong>Docente</strong>. Todo lo que se cree en el Modo Demo queda 100% aislado de tus datos reales y se borra automáticamente a las <strong>2 semanas (14 días)</strong>.
                                     </p>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="pt-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                            <div className="flex-1 relative">
-                                <input 
-                                    type="text" 
-                                    readOnly 
-                                    value={typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}#demo` : '#demo'} 
-                                    className={`${glassInput} !py-2 text-xs font-mono text-purple-700 dark:text-purple-300 select-all`} 
-                                    onClick={(e) => e.target.select()}
-                                />
+                        {/* Enlace 1: Modo Demo Estudiante */}
+                        <div className="space-y-1.5 pt-1">
+                            <label className="text-[11px] font-extrabold text-purple-700 dark:text-purple-300 flex items-center gap-1.5">
+                                <span>🎓 Enlace Modo Demo como Estudiante:</span>
+                            </label>
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                                <div className="flex-1 relative">
+                                    <input 
+                                        type="text" 
+                                        readOnly 
+                                        value={typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}#demo` : '#demo'} 
+                                        className={`${glassInput} !py-2 text-xs font-mono text-purple-700 dark:text-purple-300 select-all`} 
+                                        onClick={(e) => e.target.select()}
+                                    />
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const demoUrl = `${window.location.origin}${window.location.pathname}#demo`;
+                                        try {
+                                            navigator.clipboard.writeText(demoUrl);
+                                            showMessage("¡Enlace de Modo Demo (Estudiante) copiado al portapapeles! 📋");
+                                        } catch (e) {
+                                            showMessage("Enlace demo estudiante: " + demoUrl);
+                                        }
+                                    }}
+                                    className="py-2 px-3.5 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white shadow-sm transition-transform active:scale-95 flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
+                                >
+                                    <Copy size={14} />
+                                    <span>Copiar</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        window.open(`${window.location.origin}${window.location.pathname}#demo`, '_blank');
+                                    }}
+                                    className="py-2 px-3 rounded-xl text-xs font-bold border border-purple-300 dark:border-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/40 text-purple-700 dark:text-purple-300 transition-colors flex items-center justify-center gap-1 shrink-0 cursor-pointer"
+                                    title="Abrir Modo Demo Estudiante en una nueva pestaña"
+                                >
+                                    <Compass size={14} />
+                                    <span>Probar</span>
+                                </button>
                             </div>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    const demoUrl = `${window.location.origin}${window.location.pathname}#demo`;
-                                    try {
-                                        navigator.clipboard.writeText(demoUrl);
-                                        showMessage("¡Enlace de Modo Demo copiado al portapapeles! 📋 Solo quienes tengan este link podrán ingresar.");
-                                    } catch (e) {
-                                        showMessage("Enlace demo: " + demoUrl);
-                                    }
-                                }}
-                                className="py-2 px-4 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white shadow-sm transition-transform active:scale-95 flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
-                            >
-                                <Copy size={14} />
-                                <span>Copiar enlace</span>
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    window.open(`${window.location.origin}${window.location.pathname}#demo`, '_blank');
-                                }}
-                                className="py-2 px-3 rounded-xl text-xs font-bold border border-purple-300 dark:border-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/40 text-purple-700 dark:text-purple-300 transition-colors flex items-center justify-center gap-1 shrink-0 cursor-pointer"
-                                title="Abrir y probar la experiencia de demo en una nueva pestaña"
-                            >
-                                <Compass size={14} />
-                                <span>Probar demo</span>
-                            </button>
+                        </div>
+
+                        {/* Enlace 2: Modo Demo Docente */}
+                        <div className="space-y-1.5 pt-2 border-t border-purple-500/15">
+                            <label className="text-[11px] font-extrabold text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
+                                <span>👩‍🏫 Enlace Modo Demo como Docente (Creación aislada temporal por 2 semanas):</span>
+                            </label>
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                                <div className="flex-1 relative">
+                                    <input 
+                                        type="text" 
+                                        readOnly 
+                                        value={typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}#demo-docente` : '#demo-docente'} 
+                                        className={`${glassInput} !py-2 text-xs font-mono text-amber-700 dark:text-amber-300 select-all`} 
+                                        onClick={(e) => e.target.select()}
+                                    />
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const demoTeacherUrl = `${window.location.origin}${window.location.pathname}#demo-docente`;
+                                        try {
+                                            navigator.clipboard.writeText(demoTeacherUrl);
+                                            showMessage("¡Enlace de Modo Demo como Docente copiado al portapapeles! 👩‍🏫✨");
+                                        } catch (e) {
+                                            showMessage("Enlace demo docente: " + demoTeacherUrl);
+                                        }
+                                    }}
+                                    className="py-2 px-3.5 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-sm transition-transform active:scale-95 flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
+                                >
+                                    <Copy size={14} />
+                                    <span>Copiar</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        window.open(`${window.location.origin}${window.location.pathname}#demo-docente`, '_blank');
+                                    }}
+                                    className="py-2 px-3 rounded-xl text-xs font-bold border border-amber-300 dark:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/40 text-amber-700 dark:text-amber-300 transition-colors flex items-center justify-center gap-1 shrink-0 cursor-pointer"
+                                    title="Abrir Modo Demo Docente en una nueva pestaña"
+                                >
+                                    <Compass size={14} />
+                                    <span>Probar</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -10543,6 +11139,8 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                   onExitDemo={handleExitDemo}
                   isDarkMode={isDarkMode}
                   glassCard={glassCard}
+                  role={role}
+                  onSwitchDemoRole={handleSwitchDemoRole}
                 />
               )}
 
@@ -10816,11 +11414,12 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                               prevTaskDesc={prevTaskDesc} setPrevTaskDesc={setPrevTaskDesc} hasAiModified={hasAiModified} setHasAiModified={setHasAiModified}
                               callGemini={callGemini} showMessage={showMessage} handleAiTranslate={handleAiTranslate} taskDate={taskDate}
                               setTaskDate={setTaskDate} taskTime={taskTime} setTaskTime={setTaskTime} allowLate={allowLate} setAllowLate={setAllowLate}
-                              db={db} appId={appId} loggedInName={loggedInName} getToday={getToday} tasks={tasks} user={user} isDarkMode={isDarkMode}
+                              db={db} appId={appId} loggedInName={loggedInName} getToday={getToday} tasks={tasks} setTasks={setTasks} user={user} isDarkMode={isDarkMode}
                               confirmAction={confirmAction} setFullScreenImage={setFullScreenImage} tasksLoading={tasksLoading} taskLimit={taskLimit} loadMoreTasks={loadMoreTasks} pinnedTasks={pinnedTasks}
                               wallSearchTerm={wallSearchTerm} setWallSearchTerm={setWallSearchTerm}
                               postTargetGroup={postTargetGroup} setPostTargetGroup={setPostTargetGroup}
                               isFormExpanded={isFormExpanded} setIsFormExpanded={setIsFormExpanded}
+                              isDemoMode={isDemoMode}
                           />
                           </React.Suspense>
                       )}
@@ -10842,6 +11441,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                               appId={appId}
                               user={user}
                               role={role}
+                              isDemoMode={isDemoMode}
                           />
                       )}
                   </main>

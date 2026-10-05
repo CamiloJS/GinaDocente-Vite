@@ -286,7 +286,8 @@ export default function TeacherToolsTab({
   db = null,
   appId = null,
   user = null,
-  role = 'teacher'
+  role = 'teacher',
+  isDemoMode = false
 }) {
   const [activeSubTab, setActiveSubTab] = useState('timer'); // 'timer' | 'picker' | 'groups' | 'coin' | 'ova'
   const tabsScrollRef = useRef(null);
@@ -1722,6 +1723,7 @@ export default function TeacherToolsTab({
             role={role}
             db={db}
             appId={appId}
+            isDemoMode={isDemoMode}
           />
         </div>
       )}

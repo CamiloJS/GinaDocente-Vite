@@ -676,3 +676,220 @@ export const DEMO_TAB_INFO = {
     summary: 'Panel de herramientas para crear Objetos Virtuales de Aprendizaje y dinamizar clases presenciales o remotas.'
   }
 };
+
+export const DEMO_TEACHER_TAB_INFO = {
+  tasks: {
+    title: '👩‍🏫 Modo Docente (Demo) — Muro de Clase Aislado',
+    summary: 'Crea publicaciones, tareas con entrega, encuestas interactivas o foros de debate en "Inglés Tecnico economico". Todo lo que publiques aquí está 100% aislado de la plataforma real y se borrará automáticamente en máximo 2 semanas (14 días).'
+  },
+  evaluaciones: {
+    title: '👩‍🏫 Modo Docente (Demo) — Creador de Evaluaciones',
+    summary: 'Crea evaluaciones de prueba manuales o con IA, edita preguntas, activa el modo anti-trampas y descarga reportes Excel demostrativos. Las evaluaciones creadas aquí son temporales (máx. 2 semanas) y aisladas.'
+  },
+  evaluations: {
+    title: '👩‍🏫 Modo Docente (Demo) — Creador de Evaluaciones',
+    summary: 'Crea evaluaciones de prueba manuales o con IA, edita preguntas, activa el modo anti-trampas y descarga reportes Excel demostrativos. Las evaluaciones creadas aquí son temporales (máx. 2 semanas) y aisladas.'
+  },
+  syllabus: {
+    title: '👩‍🏫 Modo Docente (Demo) — Gestión de Contenidos Programáticos',
+    summary: 'Agrega nuevas semanas o temas al plan de estudios de "Inglés Tecnico economico" manualmente o importando un PDF. Tus cambios quedan aislados en el entorno Demo y duran máximo 2 semanas.'
+  },
+  reviews: {
+    title: '👩‍🏫 Modo Docente (Demo) — Generador de Diapositivas (.PPTX)',
+    summary: 'Genera nuevas presentaciones con IA o edita las diapositivas demostrativas de "Inglés Tecnico economico". Las presentaciones creadas en el Demo se guardan de forma aislada por 2 semanas.'
+  },
+  groups: {
+    title: '👩‍🏫 Modo Docente (Demo) — Creación de Materias y Grupos',
+    summary: 'Prueba la creación de nuevos grupos académicos o explora la materia "Inglés Tecnico economico". Los grupos creados en modo Demo son temporales (máx. 2 semanas).'
+  },
+  tools: {
+    title: '👩‍🏫 Modo Docente (Demo) — OVA Studio y Ruleta de Participación',
+    summary: 'Explora el generador de Objetos Virtuales de Aprendizaje (OVA Studio) y la ruleta interactiva para dinamizar tus sesiones.'
+  },
+  settings: {
+    title: '⚙️ Ajustes de Modo Demo (Docente)',
+    summary: 'Prueba los temas visuales (Claro, Noche, AMOLED) y copia los enlaces directos de invitación a Modo Estudiante o Modo Docente.'
+  }
+};
+
+// Duración máxima de cualquier elemento creado en Modo Demo: 2 semanas (14 días)
+export const DEMO_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+export const DEMO_SANDBOX_STORAGE_KEY = 'englishTech_demoSandbox_v1';
+
+/**
+ * Determina si un elemento creado en Modo Demo ha superado las 2 semanas de vida.
+ * Los elementos base de demostración (que no tienen isDemoCreated ni expiresAt) nunca expiran.
+ */
+export function isDemoItemExpired(item, now = Date.now()) {
+  if (!item || typeof item !== 'object') return false;
+  const expiresAt = Number(item.expiresAt || 0);
+  if (expiresAt > 0) {
+    return now > expiresAt;
+  }
+  if (item.isDemoCreated) {
+    const createdAt = Number(item.createdAt || item.timestamp || 0);
+    if (createdAt > 0) {
+      return (now - createdAt) > DEMO_TTL_MS;
+    }
+  }
+  return false;
+}
+
+/**
+ * Calcula cuántos días restantes le quedan a un elemento temporal del Modo Demo (entre 1 y 14).
+ */
+export function getDemoRemainingDays(item, now = Date.now()) {
+  if (!item || (!item.isDemoCreated && !item.expiresAt)) return null;
+  const expiresAt = Number(item.expiresAt || 0) || (Number(item.createdAt || now) + DEMO_TTL_MS);
+  const diffMs = expiresAt - now;
+  if (diffMs <= 0) return 0;
+  return Math.max(1, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
+}
+
+/**
+ * Carga el sandbox local del Modo Demo desde localStorage y purga automáticamente
+ * cualquier elemento que haya cumplido más de 2 semanas (14 días).
+ */
+export function loadDemoSandbox(now = Date.now()) {
+  const empty = {
+    tasks: [],
+    evaluations: [],
+    syllabus: [],
+    reviews: [],
+    academicGroups: [],
+    grades: [],
+    deletedIds: []
+  };
+  if (typeof window === 'undefined') return empty;
+  try {
+    const raw = window.localStorage.getItem(DEMO_SANDBOX_STORAGE_KEY);
+    if (!raw) return empty;
+    const parsed = JSON.parse(raw);
+    let mutated = false;
+    const keys = ['tasks', 'evaluations', 'syllabus', 'reviews', 'academicGroups', 'grades'];
+    const result = { ...empty };
+
+    keys.forEach((k) => {
+      const list = Array.isArray(parsed?.[k]) ? parsed[k] : [];
+      const valid = list.filter((item) => !isDemoItemExpired(item, now));
+      if (valid.length !== list.length) mutated = true;
+      result[k] = valid;
+    });
+
+    const rawDeleted = Array.isArray(parsed?.deletedIds) ? parsed.deletedIds : [];
+    const validDeleted = rawDeleted.filter((entry) => {
+      if (!entry) return false;
+      if (typeof entry === 'string') return true;
+      return !isDemoItemExpired(entry, now);
+    });
+    if (validDeleted.length !== rawDeleted.length) mutated = true;
+    result.deletedIds = validDeleted;
+
+    if (mutated) {
+      window.localStorage.setItem(DEMO_SANDBOX_STORAGE_KEY, JSON.stringify(result));
+    }
+    return result;
+  } catch {
+    return empty;
+  }
+}
+
+/**
+ * Guarda o actualiza un elemento creado en el Modo Demo dentro del sandbox local,
+ * sellándolo con isDemoCreated = true y expiresAt = ahora + 14 días.
+ */
+export function saveDemoSandboxItem(category, item) {
+  if (typeof window === 'undefined' || !item) return item;
+  const now = Date.now();
+  const stamped = {
+    ...item,
+    isDemoCreated: true,
+    createdAt: Number(item.createdAt || now),
+    expiresAt: Number(item.expiresAt || (Number(item.createdAt || now) + DEMO_TTL_MS))
+  };
+  try {
+    const sandbox = loadDemoSandbox(now);
+    const list = Array.isArray(sandbox[category]) ? sandbox[category] : [];
+    const filtered = list.filter((x) => String(x.id) !== String(stamped.id));
+    sandbox[category] = [stamped, ...filtered];
+    // Si estaba marcado como eliminado, quitarlo de deletedIds
+    sandbox.deletedIds = (sandbox.deletedIds || []).filter((d) => {
+      const dId = typeof d === 'string' ? d : d?.id;
+      return String(dId) !== String(stamped.id);
+    });
+    window.localStorage.setItem(DEMO_SANDBOX_STORAGE_KEY, JSON.stringify(sandbox));
+  } catch {
+    // Ignorar errores de cuota de localStorage
+  }
+  return stamped;
+}
+
+/**
+ * Elimina un elemento del sandbox local del Modo Demo (o registra su ID para ocultarlo).
+ */
+export function removeDemoSandboxItem(category, id) {
+  if (typeof window === 'undefined' || !id) return;
+  const now = Date.now();
+  try {
+    const sandbox = loadDemoSandbox(now);
+    if (Array.isArray(sandbox[category])) {
+      sandbox[category] = sandbox[category].filter((x) => String(x.id) !== String(id));
+    }
+    const existingDeleted = sandbox.deletedIds || [];
+    const alreadyDeleted = existingDeleted.some((d) => String(typeof d === 'string' ? d : d?.id) === String(id));
+    if (!alreadyDeleted) {
+      sandbox.deletedIds = [
+        ...existingDeleted,
+        { id: String(id), isDemoCreated: true, createdAt: now, expiresAt: now + DEMO_TTL_MS }
+      ];
+    }
+    window.localStorage.setItem(DEMO_SANDBOX_STORAGE_KEY, JSON.stringify(sandbox));
+  } catch {
+    // Ignorar errores de almacenamiento
+  }
+}
+
+/**
+ * Combina los elementos base estáticos del Modo Demo con los creados temporalmente
+ * (en Firestore demo_* y en localStorage), filtrando automáticamente los expirados (> 2 semanas).
+ */
+export function mergeDemoItemsWithBase(baseItems = [], firestoreDemoItems = [], sandboxCategory = '') {
+  const now = Date.now();
+  const sandbox = sandboxCategory ? loadDemoSandbox(now) : { deletedIds: [] };
+  const localItems = sandboxCategory && Array.isArray(sandbox[sandboxCategory]) ? sandbox[sandboxCategory] : [];
+  const deletedSet = new Set(
+    (sandbox.deletedIds || []).map((d) => String(typeof d === 'string' ? d : d?.id))
+  );
+
+  const byId = new Map();
+
+  // 1. Primero los elementos creados en Firestore (colección aislada demo_*) vigentes
+  (firestoreDemoItems || []).forEach((item) => {
+    if (!item || !item.id) return;
+    if (deletedSet.has(String(item.id))) return;
+    if (isDemoItemExpired(item, now)) return;
+    byId.set(String(item.id), { ...item, isDemoCreated: true });
+  });
+
+  // 2. Elementos del sandbox local vigentes (por si se crearon offline o antes del snapshot)
+  localItems.forEach((item) => {
+    if (!item || !item.id) return;
+    if (deletedSet.has(String(item.id))) return;
+    if (isDemoItemExpired(item, now)) return;
+    if (!byId.has(String(item.id))) {
+      byId.set(String(item.id), { ...item, isDemoCreated: true });
+    }
+  });
+
+  // 3. Elementos estáticos base de demostración ("Inglés Tecnico economico")
+  (baseItems || []).forEach((item) => {
+    if (!item || !item.id) return;
+    if (deletedSet.has(String(item.id))) return;
+    if (!byId.has(String(item.id))) {
+      byId.set(String(item.id), item);
+    }
+  });
+
+  return Array.from(byId.values());
+}
+

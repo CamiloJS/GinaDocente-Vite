@@ -7,11 +7,12 @@ import {
   Wand2, Sparkles, Loader2, Download, Trash2, X, Plus, Maximize2,
   Minimize2, ChevronLeft, ChevronRight, BookOpen, Edit3, Copy,
   ArrowUp, ArrowDown, CheckCheck, Globe, CheckCircle2, ChevronDown,
-  Lightbulb, Pin
+  Lightbulb, Pin, Clock
 } from './Icons.jsx'
 import { TEACHER_NAME } from '../utils/helpers.js'
 import EmptyState from './EmptyState.jsx'
 import { doc, addDoc, collection, deleteDoc, updateDoc } from '../firebase/config.js'
+import { DEMO_TTL_MS, getDemoRemainingDays, saveDemoSandboxItem, removeDemoSandboxItem } from '../utils/demoData.js'
 
 // =========================================================================
 // 1. GENERADOR NATIVO DE ARCHIVOS MICROSOFT POWERPOINT (.PPTX)
@@ -1085,6 +1086,8 @@ export const ReviewsModule = ({
   glassInput,
   redButton,
   reviews = [],
+  setReviews,
+  isDemoMode = false,
   db,
   appId,
   academicGroups = [],
@@ -1150,6 +1153,7 @@ Devuelve ÚNICAMENTE un array JSON plano sin \`\`\`json ni texto extra:
 
       const targetGroup = (academicGroups || []).find(g => g?.id === reviewTargetGroup);
       const targetGroupName = targetGroup ? targetGroup.name : 'General';
+      const now = Date.now();
       const newDoc = {
         topic: generatedTitle,
         language: language,
@@ -1158,16 +1162,30 @@ Devuelve ÚNICAMENTE un array JSON plano sin \`\`\`json ni texto extra:
         author: TEACHER_NAME,
         targetGroupId: reviewTargetGroup || 'all',
         targetGroupName: targetGroupName,
-        createdAt: Date.now()
+        createdAt: now,
+        ...(isDemoMode ? { isDemoCreated: true, expiresAt: now + DEMO_TTL_MS } : {})
       };
 
-      const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'reviews'), newDoc);
-      newDoc.id = docRef.id;
+      const targetCollectionName = isDemoMode ? 'demo_reviews' : 'reviews';
+      try {
+        const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', targetCollectionName), newDoc);
+        newDoc.id = docRef.id;
+      } catch (fireErr) {
+        if (!isDemoMode) throw fireErr;
+        newDoc.id = `demo_review_${now}`;
+      }
+
+      if (isDemoMode) {
+        saveDemoSandboxItem('reviews', newDoc);
+        if (typeof setReviews === 'function') {
+          setReviews(prev => [newDoc, ...(prev || []).filter(r => String(r.id) !== String(newDoc.id))]);
+        }
+      }
 
       setTopic("");
       setReviewTargetGroup('all');
       setShowCreateForm(false);
-      showMessage("Diapositivas generadas con éxito.");
+      showMessage(isDemoMode ? "⏳ Diapositivas generadas en Modo Demo (aisladas • duran máx. 2 semanas)." : "Diapositivas generadas con éxito.");
       setActivePresentation(newDoc);
     } catch (err) {
       console.error(err);
@@ -1181,14 +1199,28 @@ Devuelve ÚNICAMENTE un array JSON plano sin \`\`\`json ni texto extra:
     if (!updatedPres || !updatedPres.id) return;
     try {
       const slidesList = updatedPres.slides || [];
-      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reviews', updatedPres.id), {
+      const updates = {
         slides: slidesList,
         slideCount: slidesList.length,
         topic: slidesList[0]?.title || updatedPres.topic || ''
-      });
+      };
+      if (isDemoMode || updatedPres.isDemoCreated || String(updatedPres.id).startsWith('demo_')) {
+        const merged = { ...updatedPres, ...updates };
+        if (typeof setReviews === 'function') {
+          setReviews(prev => (prev || []).map(r => String(r.id) === String(updatedPres.id) ? merged : r));
+        }
+        if (updatedPres.isDemoCreated) {
+          saveDemoSandboxItem('reviews', merged);
+          try {
+            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'demo_reviews', updatedPres.id), updates);
+          } catch (e) {}
+        }
+      } else {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reviews', updatedPres.id), updates);
+      }
       showMessage("Diapositivas actualizadas con éxito.");
       if (activePresentation?.id === updatedPres.id) {
-        setActivePresentation(updatedPres);
+        setActivePresentation({ ...updatedPres, ...updates });
       }
     } catch (err) {
       console.error(err);
@@ -1199,6 +1231,22 @@ Devuelve ÚNICAMENTE un array JSON plano sin \`\`\`json ni texto extra:
   const handleDelete = (id) => {
     confirmAction("¿Eliminar esta presentación de diapositivas?", async () => {
       try {
+        const targetReview = (reviews || []).find(r => String(r?.id) === String(id));
+        if (isDemoMode || targetReview?.isDemoCreated || String(id || '').startsWith('demo_')) {
+          removeDemoSandboxItem('reviews', id);
+          if (typeof setReviews === 'function') {
+            setReviews(prev => (prev || []).filter(r => String(r.id) !== String(id)));
+          }
+          if (targetReview?.isDemoCreated) {
+            try {
+              await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'demo_reviews', id));
+            } catch (e) {}
+          }
+          showMessage("Presentación eliminada del entorno Demo.");
+          if (activePresentation?.id === id) setActivePresentation(null);
+          if (editingPresentation?.id === id) setEditingPresentation(null);
+          return;
+        }
         await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reviews', id));
         showMessage("Presentación eliminada.");
         if (activePresentation?.id === id) setActivePresentation(null);
@@ -1417,6 +1465,12 @@ Devuelve ÚNICAMENTE un array JSON plano sin \`\`\`json ni texto extra:
                         {review.targetGroupName && review.targetGroupName !== 'General' && (
                           <span className="text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-md border border-blue-500/20">
                             {review.targetGroupName}
+                          </span>
+                        )}
+                        {review.isDemoCreated && (
+                          <span className="text-[10px] font-bold bg-purple-500/15 text-purple-600 dark:text-purple-300 px-2 py-0.5 rounded-md border border-purple-500/30 inline-flex items-center gap-1" title="Creada en Modo Demo • Se elimina automáticamente al cumplir 2 semanas">
+                            <Clock size={10} />
+                            <span>Temporal Demo ({getDemoRemainingDays(review) || 14}d)</span>
                           </span>
                         )}
                       </div>

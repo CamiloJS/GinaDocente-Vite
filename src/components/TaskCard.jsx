@@ -21,8 +21,9 @@ import { useVoiceRecorder } from '../utils/useVoiceRecorder.js'
 import { auth, signInAnonymously, doc, setDoc, updateDoc, deleteDoc } from '../firebase/config.js'
 import { runTransaction } from 'firebase/firestore'
 import AudioPlayer, { AudioRecordingVisualizer } from './AudioPlayer.jsx'
+import { getDemoRemainingDays, saveDemoSandboxItem, removeDemoSandboxItem } from '../utils/demoData.js'
 
-const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput: propGlassInput, callGemini, currentUser, showMessage, loggedInName, isDarkMode, confirmAction, handleOpenProfileByName, userMappings }) => {
+const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, appId, academicGroups, glassInput: propGlassInput, callGemini, currentUser, showMessage, loggedInName, isDarkMode, confirmAction, handleOpenProfileByName, userMappings }) => {
     const cardRef = React.useRef(null);
     const editTaskDescRef = React.useRef(null);
     const [isEditingTask, setIsEditingTask] = useState(false);
@@ -205,15 +206,56 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
     const [isVoting, setIsVoting] = useState(false);
     const [activeVotersOptionId, setActiveVotersOptionId] = useState(null);
 
+    const isDemoTask = Boolean(isDemoMode || task?.isDemoCreated || (task?.id && String(task.id).startsWith('demo-')));
 
-
-    const handleVote = async (optionId) => {
-        if (task.id && String(task.id).startsWith('demo-')) {
-            showMessage("ℹ️ ¡Modo Demo! Esta encuesta es de muestra y no altera la base de datos.");
+    const updateTaskDoc = async (updates) => {
+        if (isDemoTask) {
+            const nextTask = { ...task, ...updates };
+            if (typeof setTasks === 'function') {
+                setTasks(prev => (prev || []).map(t => String(t.id) === String(task.id) ? nextTask : t));
+            }
+            if (task?.isDemoCreated) {
+                saveDemoSandboxItem('tasks', nextTask);
+                try {
+                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'demo_tasks', task.id), updates);
+                } catch (e) { /* guardado local ya aplicado */ }
+            }
             return;
         }
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), updates);
+    };
+
+    const handleVote = async (optionId) => {
         if (isLocked) {
             showMessage("ℹ️ La votación para esta encuesta ya ha finalizado.");
+            return;
+        }
+        if (isDemoTask) {
+            const voterKey = currentUserId && currentUserId !== 'undefined' ? currentUserId : 'demo_guest';
+            const freshPoll = task.poll || {};
+            const freshOptions = freshPoll.options || [];
+            const multiple = Boolean(freshPoll.isMultipleChoice);
+            let updatedOptions;
+            if (multiple) {
+                updatedOptions = freshOptions.map((opt) => {
+                    if (opt.id !== optionId) return opt;
+                    const list = opt.voterIds || [];
+                    const yaVoto = list.includes(voterKey);
+                    return {
+                        ...opt,
+                        voterIds: yaVoto ? list.filter((id) => id !== voterKey) : [...list, voterKey]
+                    };
+                });
+            } else {
+                const alreadyVotedThis = (freshOptions.find((o) => o.id === optionId)?.voterIds || []).includes(voterKey);
+                updatedOptions = freshOptions.map((opt) => {
+                    const list = (opt.voterIds || []).filter((id) => id !== voterKey);
+                    if (opt.id === optionId && !alreadyVotedThis) list.push(voterKey);
+                    return { ...opt, voterIds: list };
+                });
+            }
+            await updateTaskDoc({ poll: { ...freshPoll, options: updatedOptions } });
+            showMessage("🗳️ Voto registrado en Modo Demo.");
             return;
         }
         if (!currentUserId || currentUserId === 'undefined') {
@@ -306,10 +348,6 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
     };
 
     const toggleReaction = async (type) => {
-        if (task.id && String(task.id).startsWith('demo-')) {
-            showMessage("✨ ¡Modo Demo! Reacción simulada.");
-            return;
-        }
         if (!currentUserId || currentUserId === 'undefined') return;
         try {
             if (!auth.currentUser) {
@@ -349,17 +387,13 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                 newReactions[currentUserId] = { type: type, name: loggedInName || (role === 'teacher' ? TEACHER_NAME : 'Estudiante'), timestamp: Date.now() };
             }
 
-            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), { reactions: newReactions });
+            await updateTaskDoc({ reactions: newReactions });
         } catch (err) {
             console.error("Error al reaccionar:", err);
         }
     };
 
     const toggleForumRating = async (score) => {
-        if (task.id && String(task.id).startsWith('demo-')) {
-            showMessage("⭐ ¡Modo Demo! Puntuación simulada.");
-            return;
-        }
         if (!currentUserId || currentUserId === 'undefined') return;
         try {
             if (!auth.currentUser) {
@@ -405,7 +439,7 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                 showMessage(`⭐ ¡Puntaje asignado: ${score} estrella${score > 1 ? 's' : ''}!`);
             }
 
-            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), { 
+            await updateTaskDoc({ 
                 ratings: newRatings,
                 forumRatings: newRatings 
             });
@@ -435,7 +469,7 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                 }
                 return c; 
             });
-            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), { comments: updatedComments });
+            await updateTaskDoc({ comments: updatedComments });
         } catch (err) {
             console.error("Error al reaccionar comentario:", err);
         }
@@ -455,7 +489,7 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                 if (currentCid === cid) return { ...c, grade, feedback: gradeFeedback.trim() };
                 return c;
             });
-            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), { comments: updatedComments });
+            await updateTaskDoc({ comments: updatedComments });
             setGradingCid(null); setGradeValue(""); setGradeFeedback("");
             showMessage("Calificación guardada");
         } catch (err) {
@@ -486,7 +520,7 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                 }
                 return c;
             });
-            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), { comments: updatedComments });
+            await updateTaskDoc({ comments: updatedComments });
             showMessage(`Has valorado con ${stars} estrella${stars > 1 ? 's' : ''}`);
         } catch (err) {
             console.error("Error al valorar comentario:", err);
@@ -708,10 +742,12 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                 }, 680);
             }
 
-            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), { isPinned: nextPinned });
+            await updateTaskDoc({ isPinned: nextPinned });
             showMessage(nextPinned ? "Publicación fijada al inicio del muro" : "Publicación desfijada");
         } catch (err) {
-            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), { ...task, isPinned: !task.isPinned }, { merge: true });
+            if (!isDemoTask) {
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), { ...task, isPinned: !task.isPinned }, { merge: true });
+            }
             showMessage(task.isPinned ? "Publicación desfijada" : "Publicación fijada al inicio del muro");
         }
     };
@@ -772,7 +808,7 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
             });
         }
         try {
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), { comments: updatedComments });
+            await updateTaskDoc({ comments: updatedComments });
         } catch (err) {
             console.error("Error al eliminar comentario:", err);
             showMessage("Hubo un error al eliminar el comentario.");
@@ -790,7 +826,7 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                 hideDate: Boolean(editTaskData.hideDate)
             };
             if (task.type !== 'post') { updates.dueDate = editTaskData.dueDate; updates.dueTime = editTaskData.dueTime; updates.allowLate = editTaskData.allowLate; }
-            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), updates);
+            await updateTaskDoc(updates);
             setIsEditingTask(false); showMessage("Publicación actualizada.");
         } catch (error) { showMessage("Hubo un error al actualizar."); }
     };
@@ -807,7 +843,7 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
             return c;
         });
         try {
-            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), { comments: updatedComments });
+            await updateTaskDoc({ comments: updatedComments });
         } catch (err) {
             console.error("Error al guardar comentario editado:", err);
             showMessage("Error al guardar edición del comentario.");
@@ -870,10 +906,6 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
 
     const handleAddComment = async (e) => {
         e.preventDefault();
-        if (task.id && String(task.id).startsWith('demo-')) {
-            showMessage("💬 ¡Modo Demo! Para entregar evidencias o comentar en tareas reales, ingresa con tu cuenta institucional.");
-            return;
-        }
         const hasText = Boolean(commentText && commentText.trim());
         const hasTitle = Boolean(commentTitle && commentTitle.trim());
         const hasMedia = Boolean((commentImageUrls && commentImageUrls.length > 0) || (commentImageUrl && commentImageUrl.trim()) || commentFileUrl || audioCom);
@@ -911,11 +943,11 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                 new Promise((_, reject) => setTimeout(() => reject(new Error("La conexión con el servidor tardó demasiado")), ms))
             ]);
 
-            await withTimeout(updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), { comments: [...(task.comments || []), newComment] }));
+            await withTimeout(updateTaskDoc({ comments: [...(task.comments || []), newComment] }));
             
             setCommentTitle(""); setCommentText(""); setCommentImageUrl(""); setCommentImageUrls([]); setCommentFileUrl(""); setCommentFileName(""); setAudioCom("");
             setShowCommentImageInput(false); setShowAttachmentMenu(false); setShowEmojiPicker(false); setReplyingTo(null);
-            showMessage(isForum ? "Aporte publicado en el foro." : isTask && role !== 'teacher' ? "Tarea entregada con éxito." : "Comentario publicado.");
+            showMessage(isDemoTask ? "💬 Comentario añadido en Modo Demo." : (isForum ? "Aporte publicado en el foro." : isTask && role !== 'teacher' ? "Tarea entregada con éxito." : "Comentario publicado."));
         } catch (err) {
             console.error("Error al publicar comentario:", err);
             showMessage(`Error al publicar: ${err?.message || 'Verifica tu conexión.'}`);
@@ -1146,6 +1178,16 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                                     {task.poll?.isMultipleChoice ? 'Encuesta múltiple' : 'Encuesta'}
                                 </span>
                             )}
+
+                            {task.isDemoCreated && (
+                                <span
+                                    className="inline-flex items-center gap-1 text-[9.5px] font-bold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-700/60 shrink-0 whitespace-nowrap"
+                                    title="Creado de forma aislada en el Modo Demo • Se elimina automáticamente al cumplir máximo 2 semanas"
+                                >
+                                    <Clock size={9} className="shrink-0" />
+                                    <span>Temporal Demo ({getDemoRemainingDays(task) || 14}d)</span>
+                                </span>
+                            )}
                         </div>
 
                         {/* Acciones de docente (Editar, Fijar, Borrar) */}
@@ -1170,6 +1212,19 @@ const TaskCard = React.memo(({ task, role, db, appId, academicGroups, glassInput
                                         </button>
                                         <button onClick={() => confirmAction("¿Desea eliminar esta publicación definitivamente?", async () => {
                                             try {
+                                                if (isDemoTask) {
+                                                    removeDemoSandboxItem('tasks', task.id);
+                                                    if (typeof setTasks === 'function') {
+                                                        setTasks(prev => (prev || []).filter(t => String(t.id) !== String(task.id)));
+                                                    }
+                                                    if (task?.isDemoCreated) {
+                                                        try {
+                                                            await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'demo_tasks', task.id));
+                                                        } catch (e) {}
+                                                    }
+                                                    showMessage("✅ Publicación eliminada del entorno Demo.");
+                                                    return;
+                                                }
                                                 await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id));
                                                 showMessage("✅ Publicación eliminada.");
                                             } catch (e) {
