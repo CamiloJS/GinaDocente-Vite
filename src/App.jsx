@@ -8288,7 +8288,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                     const unreadGroupPosts = getUnreadPostsForGroup(group.id);
                                     const unreadCount = unreadGroupPosts.length;
                                     const unreadBadgeLabel = unreadCount === 1
-                                        ? (unreadGroupPosts[0].type === 'task' ? 'Nueva tarea' : unreadGroupPosts[0].type === 'forum' ? 'Nuevo foro' : 'Nueva publicación')
+                                        ? (unreadGroupPosts[0].type === 'task' ? 'Nueva tarea' : unreadGroupPosts[0].type === 'forum' ? 'Nuevo foro' : unreadGroupPosts[0].type === 'kahoot' ? 'Nuevo Kahoot' : unreadGroupPosts[0].type === 'poll' ? 'Nueva encuesta' : 'Nueva publicación')
                                         : 'Nuevas publicaciones';
 
                                     return (

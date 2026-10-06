@@ -1,9 +1,10 @@
 // src/components/TasksTab.jsx
 import React, { useState, useRef } from 'react'
 import {
-  Book, BookOpen, CheckCheck, ChevronRight, Globe, ImageIcon, Mic, NavNotebook, PaperclipIcon, Plus, SearchIcon, Sparkles, Square, Target, Loader2, Undo2, X, Play, Pause, MessageCircle, BarChart2, Vote
+  Book, BookOpen, CheckCheck, ChevronRight, Globe, ImageIcon, Mic, NavNotebook, PaperclipIcon, Plus, SearchIcon, Sparkles, Square, Target, Loader2, Undo2, X, Play, Pause, MessageCircle, BarChart2, Vote, Gamepad2
 } from './Icons.jsx'
 import TaskCard from './TaskCard.jsx'
+import KahootBuilder from './KahootBuilder.jsx'
 import EmptyState from './EmptyState.jsx'
 import SkeletonCard from './SkeletonCard.jsx'
 import RichTextToolbar from './RichTextToolbar.jsx'
@@ -15,6 +16,7 @@ import CustomVideoPlayer from './CustomVideoPlayer.jsx'
 import GeniallyEmbedPlayer, { extractGeniallyUrl } from './GeniallyEmbedPlayer.jsx'
 import { DEMO_TTL_MS, saveDemoSandboxItem } from '../utils/demoData.js'
 import { getItemTeacherId } from '../utils/helpers.js'
+import { createDefaultKahootQuestion, validateKahootConfig, generateKahootPin } from '../utils/kahootEngine.js'
 
 const TasksTab = React.memo(({
 
@@ -54,6 +56,9 @@ const TasksTab = React.memo(({
     const [dynamicPlaceholder, setDynamicPlaceholder] = useState('Comparte algo con tu clase...');
     const [pollOptions, setPollOptions] = useState(["", ""]);
     const [isMultipleChoice, setIsMultipleChoice] = useState(false);
+    const [kahootQuestions, setKahootQuestions] = useState(() => [createDefaultKahootQuestion('quiz', 0)]);
+    const [kahootMusicEnabled, setKahootMusicEnabled] = useState(true);
+    const [kahootAllowNickname, setKahootAllowNickname] = useState(true);
     const wallSearchTerm = propWallSearchTerm !== undefined ? propWallSearchTerm : localWallSearchTerm;
     const setWallSearchTerm = propSetWallSearchTerm || setLocalWallSearchTerm;
     const { isRecording: recPub, audioUrl: audioPub, isUploading: upPub, recordingTime: recTimePub, setAudioUrl: setAudioPub, startRecording: startPub, stopRecording: stopPub, cancelRecording: cancelPub } = useVoiceRecorder('tasks_audios', showMessage);
@@ -398,6 +403,13 @@ const TasksTab = React.memo(({
                                 </button>
                                 <button 
                                     type="button" 
+                                    onClick={(e) => { e.stopPropagation(); setPostType('kahoot'); setIsFormExpanded(true); }} 
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-50 dark:bg-purple-950/30 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-950/60 transition-colors shrink-0 whitespace-nowrap"
+                                >
+                                    <Gamepad2 size={15} /> Kahoot
+                                </button>
+                                <button 
+                                    type="button" 
                                     onClick={(e) => { e.stopPropagation(); setIsFormExpanded(true); setShowPostAttachmentMenu(true); }} 
                                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors shrink-0 whitespace-nowrap"
                                 >
@@ -411,7 +423,7 @@ const TasksTab = React.memo(({
                     <div 
                         className={`transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
                             isFormExpanded 
-                                ? 'max-h-[1600px] opacity-100 p-6' 
+                                ? 'max-h-[8000px] opacity-100 p-6' 
                                 : 'max-h-0 opacity-0 p-0 pointer-events-none'
                         } flex flex-col gap-4 bg-white dark:bg-gray-900`}
                     >
@@ -436,7 +448,7 @@ const TasksTab = React.memo(({
                             </div>
 
                             <div className="flex items-center gap-2">
-                                <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-xl border border-gray-200 dark:border-gray-700">
+                                <div className="flex flex-wrap gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-xl border border-gray-200 dark:border-gray-700">
                                     <button 
                                         type="button" 
                                         onClick={() => setPostType('task')} 
@@ -464,6 +476,13 @@ const TasksTab = React.memo(({
                                         className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${postType === 'poll' ? 'bg-white dark:bg-gray-900 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'}`}
                                     >
                                         <BarChart2 size={14} /> Encuesta
+                                    </button>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setPostType('kahoot')} 
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${postType === 'kahoot' ? 'bg-white dark:bg-gray-900 shadow-sm text-purple-600 dark:text-purple-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'}`}
+                                    >
+                                        <Gamepad2 size={14} /> Kahoot
                                     </button>
                                 </div>
                                 
@@ -527,7 +546,7 @@ const TasksTab = React.memo(({
                             <input 
                                 value={taskTitle} 
                                 onChange={(e) => setTaskTitle(e.target.value)} 
-                                placeholder={postType === 'task' ? "Título claro de la tarea..." : postType === 'forum' ? "Tema central del foro de debate..." : postType === 'poll' ? "Pregunta de la encuesta (ej. ¿Cuál es tu horario preferido?)..." : "Título de la publicación..."} 
+                                placeholder={postType === 'task' ? "Título claro de la tarea..." : postType === 'forum' ? "Tema central del foro de debate..." : postType === 'poll' ? "Pregunta de la encuesta (ej. ¿Cuál es tu horario preferido?)..." : postType === 'kahoot' ? "Título del Kahoot en Vivo (ej. Kahoot Challenge: Economic Indicators & Past Simple)..." : "Título de la publicación..."} 
                                 className="w-full text-base font-bold bg-transparent outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 pb-2 border-b border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100" 
                                 required 
                             />
@@ -536,7 +555,7 @@ const TasksTab = React.memo(({
                                 <RichVisualEditor 
                                     value={taskDesc}
                                     onChange={setTaskDesc}
-                                    placeholder={postType === 'forum' ? "Escribe la pregunta detonante, pautas o tema de discusión para el debate..." : postType === 'poll' ? "Detalles, contexto o indicaciones adicionales de la encuesta (opcional)..." : "Escribe las instrucciones detalladas, indicaciones o una idea general..."}
+                                    placeholder={postType === 'forum' ? "Escribe la pregunta detonante, pautas o tema de discusión para el debate..." : postType === 'poll' ? "Detalles, contexto o indicaciones adicionales de la encuesta (opcional)..." : postType === 'kahoot' ? "Instrucciones o descripción de la actividad en vivo (opcional, también quedará guardada para que repasen después)..." : "Escribe las instrucciones detalladas, indicaciones o una idea general..."}
                                     isDarkMode={isDarkMode}
                                     minHeight="110px"
                                 />
@@ -896,6 +915,26 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                             </div>
                         )}
 
+                        {/* Constructor Interactivo de Kahoot */}
+                        {postType === 'kahoot' && (
+                            <div className="mt-2 animate-in fade-in duration-200">
+                                <KahootBuilder
+                                    questions={kahootQuestions}
+                                    setQuestions={setKahootQuestions}
+                                    taskTitle={taskTitle}
+                                    taskDesc={taskDesc}
+                                    callGemini={callGemini}
+                                    showMessage={showMessage}
+                                    musicEnabled={kahootMusicEnabled}
+                                    setMusicEnabled={setKahootMusicEnabled}
+                                    allowNicknameChange={kahootAllowNickname}
+                                    setAllowNicknameChange={setKahootAllowNickname}
+                                    isDarkMode={isDarkMode}
+                                    isDemoMode={isDemoMode}
+                                />
+                            </div>
+                        )}
+
                         {/* Parámetros de Entrega y Cierre (Tareas, Foros y Encuestas) */}
                         {(postType === 'task' || postType === 'forum' || postType === 'poll') && (
                             <div className={`p-4 rounded-2xl border mt-2 space-y-3 ${
@@ -1005,11 +1044,11 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                     const cleanDesc = (taskDesc || '').trim();
                                     const rawMainImg = (postImageUrls && postImageUrls.length > 0 ? postImageUrls[0] : (postImageUrl || ''));
                                     const hasAttachments = Boolean(rawMainImg || postVideoUrl || postGeniallyUrl || postFileUrl || audioPub);
-                                    if (!cleanTitle && !cleanDesc && !hasAttachments) {
+                                    const currentPostType = postType || 'task';
+                                    if (currentPostType !== 'kahoot' && !cleanTitle && !cleanDesc && !hasAttachments) {
                                         return showMessage("Por favor ingresa al menos un título o descripción para publicar.");
                                     }
 
-                                    const currentPostType = postType || 'task';
                                     let validPoll = null;
                                     if (currentPostType === 'poll') {
                                         if (!cleanTitle) {
@@ -1026,6 +1065,26 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                                 text: optText,
                                                 voterIds: []
                                             }))
+                                        };
+                                    }
+
+                                    let validKahoot = null;
+                                    if (currentPostType === 'kahoot') {
+                                        const validation = validateKahootConfig(kahootQuestions);
+                                        if (!validation.valid) {
+                                            return showMessage(`⚠️ ${validation.error}`);
+                                        }
+                                        validKahoot = {
+                                            pin: generateKahootPin(),
+                                            status: 'live',
+                                            phase: 'lobby',
+                                            currentQuestionIndex: 0,
+                                            questionStartedAt: 0,
+                                            musicEnabled: Boolean(kahootMusicEnabled),
+                                            allowNicknameChange: Boolean(kahootAllowNickname),
+                                            questions: validation.normalizedQuestions,
+                                            participants: {},
+                                            updatedAt: Date.now()
                                         };
                                     }
                                     isPublishingRef.current = true;
@@ -1070,9 +1129,11 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                             .filter(img => typeof img === 'string' && img.trim())
                                             .map(img => img.trim());
 
+                                        const resolvedPostTitle = cleanTitle || (currentPostType === 'kahoot' ? 'Actividad Interactiva Kahoot' : (hasAttachments ? 'Publicación adjunta' : 'Sin título'));
+
                                         const payload = { 
                                             type: currentPostType, 
-                                            title: cleanTitle || (hasAttachments ? 'Publicación adjunta' : 'Sin título'), 
+                                            title: resolvedPostTitle, 
                                             description: cleanDesc, 
                                             authorName: loggedInName || 'Profesora', 
                                             authorId: myChatId || 'teacher',
@@ -1085,7 +1146,7 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                             fileName: postFileName || '', 
                                             dueDate: (isTimed && taskDate) ? String(taskDate) : null, 
                                             dueTime: (isTimed && taskTime) ? String(taskTime) : null, 
-                                            allowLate: (isTimed && currentPostType !== 'poll') ? Boolean(allowLate) : (currentPostType === 'poll' ? false : true),
+                                            allowLate: (isTimed && currentPostType !== 'poll' && currentPostType !== 'kahoot') ? Boolean(allowLate) : (currentPostType === 'poll' || currentPostType === 'kahoot' ? false : true),
                                             hideDate: Boolean(hidePublicationDate),
                                             createdAt: Date.now(), 
                                             comments: [], 
@@ -1093,6 +1154,7 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                         };
 
                                         if (validPoll) payload.poll = validPoll;
+                                        if (validKahoot) payload.kahoot = validKahoot;
                                         if (postVideoUrl && postVideoUrl.trim()) payload.videoUrl = postVideoUrl.trim();
                                         if (postGeniallyUrl && postGeniallyUrl.trim()) payload.geniallyUrl = extractGeniallyUrl(postGeniallyUrl.trim());
                                         if (audioPub && typeof audioPub === 'string' && audioPub.trim()) payload.audioUrl = audioPub.trim();
@@ -1125,7 +1187,7 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                                 console.warn("Retrying task creation with basic schema:", primaryErr);
                                                 const basicPayload = {
                                                     type: currentPostType,
-                                                    title: cleanTitle || (hasAttachments ? 'Publicación adjunta' : 'Sin título'),
+                                                    title: resolvedPostTitle,
                                                     description: cleanDesc,
                                                     authorName: loggedInName || 'Profesora',
                                                     authorId: myChatId || 'teacher',
@@ -1138,7 +1200,7 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                                     fileName: postFileName || '',
                                                     dueDate: isTimed && taskDate ? String(taskDate) : null,
                                                     dueTime: isTimed && taskTime ? String(taskTime) : null,
-                                                    allowLate: (isTimed && currentPostType !== 'poll') ? Boolean(allowLate) : (currentPostType === 'poll' ? false : true),
+                                                    allowLate: (isTimed && currentPostType !== 'poll' && currentPostType !== 'kahoot') ? Boolean(allowLate) : (currentPostType === 'poll' || currentPostType === 'kahoot' ? false : true),
                                                     hideDate: Boolean(hidePublicationDate),
                                                     createdAt: Date.now(),
                                                     comments: [],
@@ -1146,6 +1208,7 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                                 };
                                                 if (postGeniallyUrl && postGeniallyUrl.trim()) basicPayload.geniallyUrl = extractGeniallyUrl(postGeniallyUrl.trim());
                                                 if (validPoll) basicPayload.poll = validPoll;
+                                                if (validKahoot) basicPayload.kahoot = validKahoot;
                                                 await withTimeout(addDoc(collection(effectiveDb, 'artifacts', effectiveAppId, 'public', 'data', 'tasks'), basicPayload), 10000);
                                             }
                                         }
@@ -1162,6 +1225,7 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                         if (typeof setAudioPub === 'function') setAudioPub(""); 
                                         setPollOptions(["", ""]);
                                         setIsMultipleChoice(false);
+                                        setKahootQuestions([createDefaultKahootQuestion('quiz', 0)]);
                                         setShowImageInput(false);
                                         setShowVideoInput(false);
                                         setShowPostAttachmentMenu(false); 
@@ -1177,7 +1241,7 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                         if (isDemoMode) {
                                             showMessage("⏳ Publicación creada en Modo Demo (aislada • dura máx. 2 semanas).");
                                         } else {
-                                            showMessage(currentPostType === 'poll' ? "Encuesta publicada con éxito." : currentPostType === 'forum' ? "Foro de debate publicado con éxito." : currentPostType === 'task' ? "Tarea publicada con éxito." : "Publicación compartida con éxito.");
+                                            showMessage(currentPostType === 'kahoot' ? "🎮 Kahoot interactivo publicado con éxito. ¡Ya pueden unirse!" : currentPostType === 'poll' ? "Encuesta publicada con éxito." : currentPostType === 'forum' ? "Foro de debate publicado con éxito." : currentPostType === 'task' ? "Tarea publicada con éxito." : "Publicación compartida con éxito.");
                                         }
                                     } catch (err) {
                                         console.error("Error al publicar:", err);
@@ -1194,13 +1258,15 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                         ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/30' 
                                         : postType === 'poll'
                                             ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/30'
-                                            : postType === 'post'
-                                                ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/30'
-                                                : `${redButton} shadow-red-600/30`
+                                            : postType === 'kahoot'
+                                                ? 'bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:from-fuchsia-700 hover:to-purple-700 shadow-fuchsia-600/30'
+                                                : postType === 'post'
+                                                    ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/30'
+                                                    : `${redButton} shadow-red-600/30`
                                 }`}
                             >
                                 {isPublishing && <Loader2 size={15} className="animate-spin" />}
-                                <span>{postType === 'forum' ? 'Publicar foro' : postType === 'poll' ? 'Publicar encuesta' : 'Publicar ahora'}</span>
+                                <span>{postType === 'forum' ? 'Publicar foro' : postType === 'poll' ? 'Publicar encuesta' : postType === 'kahoot' ? 'Publicar Kahoot' : 'Publicar ahora'}</span>
                             </button>
                         </div>
                     </div>

@@ -140,6 +140,138 @@ export const DEMO_TASKS = [
         reactions: { laura_restrepo: { emoji: '❤️', name: 'Laura Restrepo' } }
       }
     ]
+  },
+  {
+    id: 'demo-task-kahoot-1',
+    title: 'Kahoot en Vivo: Macroeconomics, Financial Markets & Trade Vocabulary',
+    description: '¡Únete al Kahoot interactivo de Inglés Tecnico economico en pantalla completa! Las opciones aparecen de arriba hacia abajo con el texto completo en tu pantalla, música tensa en vivo, sonido de gong cuando todos responden y puntos extra por velocidad.',
+    type: 'kahoot',
+    createdAt: Date.now() - 1000 * 60 * 60 * 6,
+    author: 'GinaDocente',
+    authorName: 'Prof. Gina Quintana',
+    authorRole: 'teacher',
+    targetGroupName: DEMO_SUBJECT_NAME,
+    targetGroupId: DEMO_SUBJECT_ID,
+    kahoot: {
+      pin: '749205',
+      status: 'live',
+      phase: 'lobby',
+      currentQuestionIndex: 0,
+      questionStartedAt: 0,
+      musicEnabled: true,
+      allowNicknameChange: true,
+      updatedAt: Date.now() - 1000 * 60 * 30,
+      participants: {
+        bot_carlos: {
+          id: 'bot_carlos',
+          realName: 'Carlos Mendoza',
+          nickname: 'Carlos_FX 📈',
+          avatar: '🦁',
+          score: 1840,
+          streak: 2,
+          correctCount: 2,
+          totalTimeMs: 4900,
+          isSimulatedBot: true,
+          answers: {}
+        },
+        bot_laura: {
+          id: 'bot_laura',
+          realName: 'Laura Restrepo',
+          nickname: 'LauEcon ✨',
+          avatar: '🦊',
+          score: 1710,
+          streak: 2,
+          correctCount: 2,
+          totalTimeMs: 6200,
+          isSimulatedBot: true,
+          answers: {}
+        }
+      },
+      questions: [
+        {
+          id: 'kq_demo_1',
+          type: 'quiz',
+          text: 'Which term describes a financial market where asset prices are rising and investor confidence is high?',
+          question: 'Which term describes a financial market where asset prices are rising and investor confidence is high?',
+          timeLimit: 20,
+          pointsMultiplier: 1,
+          allowMultiple: false,
+          imageUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="520" height="200" viewBox="0 0 520 200"><rect width="520" height="200" rx="16" fill="%230f172a"/><text x="24" y="36" font-family="Arial,sans-serif" font-size="14" font-weight="bold" fill="%23f8fafc">Market Index Confidence Trend (+24.8%)</text><polyline fill="none" stroke="%2310b981" stroke-width="5" points="40,160 130,138 210,144 300,98 390,72 480,42"/><circle cx="480" cy="42" r="6" fill="%2334d399"/></svg>',
+          imageReveal: 'none',
+          options: [
+            { id: 'kq_demo_1_opt_0', text: 'A Bull Market (tendencia alcista sostenida)', isCorrect: true },
+            { id: 'kq_demo_1_opt_1', text: 'A Bear Market (caída prolongada de precios)', isCorrect: false },
+            { id: 'kq_demo_1_opt_2', text: 'A Liquidity Trap (trampa de liquidez monetaria)', isCorrect: false },
+            { id: 'kq_demo_1_opt_3', text: 'A Tariff Embargo (restricción arancelaria)', isCorrect: false }
+          ],
+          correctAnswer: '',
+          acceptedAnswers: [],
+          puzzleItems: [],
+          explanation: '"Bull Market" refers to a market on the rise where economic conditions are generally favorable.'
+        },
+        {
+          id: 'kq_demo_2',
+          type: 'truefalse',
+          text: 'True or False: "Monetary policy" is controlled by the Central Bank through interest rates and money supply.',
+          question: 'True or False: "Monetary policy" is controlled by the Central Bank through interest rates and money supply.',
+          timeLimit: 20,
+          pointsMultiplier: 1,
+          allowMultiple: false,
+          imageUrl: '',
+          imageReveal: 'none',
+          options: [
+            { id: 'kq_demo_2_tf_0', text: 'True / Verdadero', isCorrect: true },
+            { id: 'kq_demo_2_tf_1', text: 'False / Falso', isCorrect: false }
+          ],
+          correctAnswer: '',
+          acceptedAnswers: [],
+          puzzleItems: [],
+          explanation: 'Central banks manage monetary policy, whereas governments manage fiscal policy (taxes and public spending).'
+        },
+        {
+          id: 'kq_demo_3',
+          type: 'type_answer',
+          text: 'Type the 3-letter English acronym for "Gross Domestic Product" (Producto Interno Bruto):',
+          question: 'Type the 3-letter English acronym for "Gross Domestic Product" (Producto Interno Bruto):',
+          timeLimit: 20,
+          pointsMultiplier: 2,
+          allowMultiple: false,
+          imageUrl: '',
+          imageReveal: 'none',
+          options: [],
+          correctAnswer: 'GDP',
+          acceptedAnswers: ['GDP', 'G.D.P.', 'Gross Domestic Product'],
+          puzzleItems: [],
+          explanation: 'GDP stands for Gross Domestic Product, the total monetary value of all finished goods and services made within a country.'
+        },
+        {
+          id: 'kq_demo_4',
+          type: 'puzzle',
+          text: 'Order the words from top to bottom to form a grammatical economic sentence in English:',
+          question: 'Order the words from top to bottom to form a grammatical economic sentence in English:',
+          timeLimit: 30,
+          pointsMultiplier: 2,
+          allowMultiple: false,
+          imageUrl: '',
+          imageReveal: 'none',
+          options: [],
+          correctAnswer: '',
+          acceptedAnswers: [],
+          puzzleItems: [
+            'Higher interest rates',
+            'usually reduce',
+            'consumer borrowing',
+            'and control inflation.'
+          ],
+          explanation: 'Complete sentence: "Higher interest rates usually reduce consumer borrowing and control inflation."'
+        }
+      ]
+    },
+    reactions: {
+      carlos_mendoza: { type: 'wow', name: 'Carlos Mendoza' },
+      laura_restrepo: { type: 'love', name: 'Laura Restrepo' }
+    },
+    comments: []
   }
 ];
 

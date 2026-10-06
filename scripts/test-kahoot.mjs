@@ -1,0 +1,336 @@
+// scripts/test-kahoot.mjs
+// Pruebas unitarias exhaustivas para el motor de Kahoot en vivo y repaso (kahootEngine.js y kahootAudio.js)
+
+import {
+  KAHOOT_COLORS,
+  KAHOOT_TIME_OPTIONS,
+  KAHOOT_POINTS_OPTIONS,
+  KAHOOT_QUESTION_TYPES,
+  DEMO_KAHOOT_BOTS,
+  sanitizeKahootPlayerId,
+  generateKahootPin,
+  createDefaultKahootQuestion,
+  normalizeKahootQuestion,
+  validateKahootConfig,
+  evaluateKahootAnswer,
+  calculateKahootPoints,
+  buildKahootLeaderboard,
+  buildSimulatedBotAnswer,
+  construirPromptKahootIA,
+  parsearKahootIA,
+  generarKahootConIA
+} from '../src/utils/kahootEngine.js';
+
+import {
+  startLobbyMusic,
+  startTensionMusic,
+  stopKahootMusic,
+  playGongSound,
+  playAnswerSelectSound,
+  playRevealResultSound,
+  playPodiumFanfare
+} from '../src/utils/kahootAudio.js';
+
+let okCount = 0;
+let failCount = 0;
+
+function check(label, condition, detail = '') {
+  if (condition) {
+    console.log(`  OK  ${label}`);
+    okCount++;
+  } else {
+    console.error(`  FAIL  ${label}${detail ? ' -> ' + detail : ''}`);
+    failCount++;
+  }
+}
+
+console.log('\n== 1. Constantes, PIN y Sanitizacion de Jugadores ==');
+check('4 colores Kahoot definidos', KAHOOT_COLORS.length === 4 && KAHOOT_COLORS[0].id === 'red');
+check('opciones de tiempo validas', KAHOOT_TIME_OPTIONS.includes(20) && KAHOOT_TIME_OPTIONS.includes(30));
+check('multiplicadores de puntos validos (1000 y 2000)', KAHOOT_POINTS_OPTIONS.some(p => p.maxPoints === 1000) && KAHOOT_POINTS_OPTIONS.some(p => p.maxPoints === 2000));
+check('4 tipos de preguntas soportados', Object.keys(KAHOOT_QUESTION_TYPES).length === 4);
+check('PIN generado tiene 6 digitos', /^\d{6}$/.test(generateKahootPin()));
+check('sanitizeKahootPlayerId limpia puntos, barras y espacios para Firestore', sanitizeKahootPlayerId('user.name/123@test') === 'user_name_123_test');
+check('sanitizeKahootPlayerId maneja vacio o nulo', sanitizeKahootPlayerId(null) === 'player_anon' && sanitizeKahootPlayerId('') === 'player_anon');
+
+console.log('\n== 2. Creacion y Normalizacion de los 4 Tipos de Preguntas ==');
+const qQuiz = createDefaultKahootQuestion('quiz', 0);
+check('quiz por defecto tiene 4 opciones y 1 correcta', qQuiz.options.length === 4 && qQuiz.options.filter(o => o.isCorrect).length === 1);
+
+const qTF = createDefaultKahootQuestion('truefalse', 1);
+check('truefalse por defecto tiene 2 opciones (Verdadero/Falso)', qTF.options.length === 2 && qTF.options[0].isCorrect === true && qTF.options[1].isCorrect === false);
+
+const qType = createDefaultKahootQuestion('type_answer', 2);
+check('type_answer inicializa acceptedAnswers', Array.isArray(qType.acceptedAnswers));
+
+const qPuzzle = createDefaultKahootQuestion('puzzle', 3);
+check('puzzle por defecto tiene 4 pasos en puzzleItems', qPuzzle.puzzleItems.length === 4);
+
+const normInvalid = normalizeKahootQuestion({
+  type: 'unknown_type',
+  question: '  What is GDP? ',
+  timeLimit: 999,
+  pointsMultiplier: 5000,
+  options: [{ text: 'Gross Domestic Product', isCorrect: false }, { text: 'Other', isCorrect: false }]
+}, 0);
+check('normalizeKahootQuestion corrige tipo invalido a quiz', normInvalid.type === 'quiz');
+check('normalizeKahootQuestion corrige timeLimit invalido a 20s', normInvalid.timeLimit === 20);
+check('normalizeKahootQuestion corrige pointsMultiplier invalido a 1 (estandar)', normInvalid.pointsMultiplier === 1);
+check('normalizeKahootQuestion garantiza al menos 1 opcion correcta en quiz', normInvalid.options.some(o => o.isCorrect));
+
+console.log('\n== 3. Validacion de Configuracion del Kahoot ==');
+check('rechaza lista vacia de preguntas', validateKahootConfig([]).valid === false);
+check('rechaza pregunta con enunciado vacio', validateKahootConfig([createDefaultKahootQuestion('quiz', 0)]).valid === false);
+
+const validQuizQ = normalizeKahootQuestion({
+  ...createDefaultKahootQuestion('quiz', 0),
+  text: 'Which currency is used in the United Kingdom?',
+  options: [
+    { id: 'o1', text: 'Pound Sterling (GBP)', isCorrect: true },
+    { id: 'o2', text: 'Euro (EUR)', isCorrect: false },
+    { id: 'o3', text: 'US Dollar (USD)', isCorrect: false },
+    { id: 'o4', text: 'Yen (JPY)', isCorrect: false }
+  ]
+}, 0);
+const valRes = validateKahootConfig([validQuizQ]);
+check('acepta configuracion valida de quiz', valRes.valid === true && valRes.normalizedQuestions.length === 1);
+
+const invalidTypeAnswer = {
+  ...createDefaultKahootQuestion('type_answer', 0),
+  text: 'Type the past tense of go:',
+  correctAnswer: '   ',
+  acceptedAnswers: ['   ']
+};
+check('rechaza type_answer sin respuestas aceptadas ni correctAnswer', validateKahootConfig([invalidTypeAnswer]).valid === false);
+
+const validTypeAnswer = {
+  ...invalidTypeAnswer,
+  correctAnswer: 'went',
+  acceptedAnswers: ['went', 'WENT']
+};
+check('acepta type_answer con respuestas aceptadas', validateKahootConfig([validTypeAnswer]).valid === true);
+
+console.log('\n== 4. Evaluacion de Respuestas (4 Modalidades + Casos Borde) ==');
+// 4.1 Quiz Selección Única
+check('quiz unica: acierta opcion correcta por optionIndex (0)', evaluateKahootAnswer(validQuizQ, { optionIndex: 0 }) === true);
+check('quiz unica: acierta opcion correcta por optionId (o1)', evaluateKahootAnswer(validQuizQ, { optionId: 'o1' }) === true);
+check('quiz unica: falla opcion incorrecta por optionIndex (1)', evaluateKahootAnswer(validQuizQ, { optionIndex: 1 }) === false);
+check('quiz unica: falla respuesta vacia o nula', evaluateKahootAnswer(validQuizQ, null) === false && evaluateKahootAnswer(validQuizQ, {}) === false);
+
+// 4.2 Quiz Selección Múltiple
+const multiQuizQ = normalizeKahootQuestion({
+  type: 'quiz',
+  text: 'Select all fiscal policy tools:',
+  allowMultiple: true,
+  options: [
+    { id: 'm1', text: 'Corporate Taxes', isCorrect: true },
+    { id: 'm2', text: 'Public Infrastructure Spending', isCorrect: true },
+    { id: 'm3', text: 'Central Bank Discount Rate', isCorrect: false },
+    { id: 'm4', text: 'Open Market Operations', isCorrect: false }
+  ]
+}, 0);
+check('quiz multiple: acierta cuando selecciona exactamente todas las correctas por indices', evaluateKahootAnswer(multiQuizQ, { optionIndices: [1, 0] }) === true);
+check('quiz multiple: acierta cuando selecciona exactamente todas las correctas por IDs', evaluateKahootAnswer(multiQuizQ, { optionIds: ['m2', 'm1'] }) === true);
+check('quiz multiple: falla si selecciona solo una de las dos correctas', evaluateKahootAnswer(multiQuizQ, { optionIndices: [0] }) === false);
+check('quiz multiple: falla si incluye una incorrecta', evaluateKahootAnswer(multiQuizQ, { optionIndices: [0, 1, 2] }) === false);
+
+// 4.3 True / False
+const tfQ = normalizeKahootQuestion({
+  type: 'truefalse',
+  text: 'Inflation reduces purchasing power.',
+  options: [
+    { id: 'tf_true', text: 'True', isCorrect: true },
+    { id: 'tf_false', text: 'False', isCorrect: false }
+  ]
+}, 0);
+check('truefalse: acierta True por indice y por ID', evaluateKahootAnswer(tfQ, { optionIndex: 0 }) === true && evaluateKahootAnswer(tfQ, { optionId: 'tf_true' }) === true);
+check('truefalse: falla False', evaluateKahootAnswer(tfQ, { optionIndex: 1 }) === false);
+
+// 4.4 Type Answer (insensible a mayúsculas, tildes y puntuación final)
+const shortAnsQ = normalizeKahootQuestion({
+  type: 'type_answer',
+  text: 'Acronym for Gross Domestic Product:',
+  correctAnswer: 'GDP',
+  acceptedAnswers: ['GDP', 'Gross Domestic Product', 'Inflación']
+}, 0);
+check('type_answer: coincide exacto en minusculas', evaluateKahootAnswer(shortAnsQ, { textAnswer: 'gdp' }) === true);
+check('type_answer: coincide frase con espacios y punto final', evaluateKahootAnswer(shortAnsQ, { textAnswer: '  gross domestic product. ' }) === true);
+check('type_answer: coincide ignorando tildes', evaluateKahootAnswer(shortAnsQ, { textAnswer: 'inflacion' }) === true);
+check('type_answer: rechaza texto incorrecto', evaluateKahootAnswer(shortAnsQ, { textAnswer: 'CPI' }) === false);
+
+// 4.5 Puzzle (Ordenar secuencia de arriba hacia abajo)
+const puzzleQ = normalizeKahootQuestion({
+  type: 'puzzle',
+  text: 'Order the sentence:',
+  puzzleItems: ['Supply', 'and', 'demand', 'determine prices.']
+}, 0);
+check('puzzle: acierta orden exacto de arriba hacia abajo', evaluateKahootAnswer(puzzleQ, { puzzleOrder: ['Supply', 'and', 'demand', 'determine prices.'] }) === true);
+check('puzzle: falla si dos elementos estan invertidos', evaluateKahootAnswer(puzzleQ, { puzzleOrder: ['Supply', 'demand', 'and', 'determine prices.'] }) === false);
+check('puzzle: falla si la longitud no coincide', evaluateKahootAnswer(puzzleQ, { puzzleOrder: ['Supply', 'and'] }) === false);
+
+console.log('\n== 5. Calculo de Puntos por Velocidad y Rachas (Speed Scoring) ==');
+const fastPts = calculateKahootPoints({ isCorrect: true, timeMs: 1000, timeLimitSec: 20, pointsMultiplier: 1, currentStreak: 0 }).pointsEarned;
+const mediumPts = calculateKahootPoints({ isCorrect: true, timeMs: 10000, timeLimitSec: 20, pointsMultiplier: 1, currentStreak: 0 }).pointsEarned;
+const slowPts = calculateKahootPoints({ isCorrect: true, timeMs: 19900, timeLimitSec: 20, pointsMultiplier: 1, currentStreak: 0 }).pointsEarned;
+const wrongPts = calculateKahootPoints({ isCorrect: false, timeMs: 500, timeLimitSec: 20, pointsMultiplier: 2, currentStreak: 5 }).pointsEarned;
+check('respuesta incorrecta siempre da 0 puntos', wrongPts === 0);
+check('respuesta rapida gana mas puntos que respuesta media y lenta', fastPts > mediumPts && mediumPts > slowPts);
+check('respuesta al limite de tiempo gana al menos la mitad (500 pts)', slowPts >= 500);
+check('respuesta en 0ms obtiene puntaje maximo (1000 pts)', calculateKahootPoints({ isCorrect: true, timeMs: 0, timeLimitSec: 20, pointsMultiplier: 1, currentStreak: 0 }).pointsEarned === 1000);
+const doublePts = calculateKahootPoints({ isCorrect: true, timeMs: 0, timeLimitSec: 20, pointsMultiplier: 2, currentStreak: 0 }).pointsEarned;
+check('multiplicador x2 otorga el doble de puntos base (2000 pts)', doublePts === 2000);
+const streakRes = calculateKahootPoints({ isCorrect: true, timeMs: 0, timeLimitSec: 20, pointsMultiplier: 1, currentStreak: 2 });
+check('racha de aciertos (streak >= 2) suma bono extra de racha', streakRes.pointsEarned > 1000 && streakRes.streakBonus === 200);
+
+console.log('\n== 6. Tabla de Posiciones (Leaderboard) y Desempate por Velocidad ==');
+const lbResult = buildKahootLeaderboard({
+  p1: { id: 'p1', nickname: 'Ana', score: 1500, correctCount: 2, totalTimeMs: 8000, streak: 2, answers: { '0': { isCorrect: true, timeMs: 3500, pointsEarned: 910 } } },
+  p2: { id: 'p2', nickname: 'Luis', score: 2100, correctCount: 2, totalTimeMs: 4200, streak: 2, answers: { '0': { isCorrect: true, timeMs: 1800, pointsEarned: 955 } } },
+  p3: { id: 'p3', nickname: 'Sofia', score: 1500, correctCount: 2, totalTimeMs: 5100, streak: 1, answers: { '0': { isCorrect: true, timeMs: 2400, pointsEarned: 940 } } }
+}, 0);
+check('ordena primero al mayor puntaje (Luis)', lbResult.leaderboard[0].nickname === 'Luis' && lbResult.leaderboard[0].rank === 1);
+check('desempata mismo puntaje a favor de quien respondio mas rapido (Sofia antes que Ana)', lbResult.leaderboard[1].nickname === 'Sofia' && lbResult.leaderboard[2].nickname === 'Ana');
+check('identifica al participante mas rapido de la ronda (fastestResponder)', lbResult.fastestResponder?.displayName === 'Luis' && lbResult.fastestResponder?.timeMs === 1800);
+
+console.log('\n== 7. Bots Simulados en Modo Demo ==');
+check('DEMO_KAHOOT_BOTS definidos', DEMO_KAHOOT_BOTS.length >= 4);
+const simAns = buildSimulatedBotAnswer(DEMO_KAHOOT_BOTS[0], validQuizQ, 0);
+check('buildSimulatedBotAnswer devuelve isCorrect, timeMs y questionIndex', typeof simAns.isCorrect === 'boolean' && simAns.timeMs > 0 && simAns.questionIndex === 0);
+
+console.log('\n== 8. Generador de Kahoot con IA (Prompt y Parseo) ==');
+const prompt = construirPromptKahootIA({
+  tema: 'Macroeconomics & Inflation',
+  total: 5,
+  dificultad: 'media',
+  idioma: 'en',
+  mezcla: 'completo'
+});
+check('prompt incluye tema y cantidad solicitada', prompt.includes('Macroeconomics & Inflation') && prompt.includes('5'));
+
+const sampleAiJson = `\`\`\`json
+[
+  {
+    "type": "quiz",
+    "text": "What does CPI stand for?",
+    "timeLimit": 20,
+    "pointsMultiplier": 1,
+    "options": [
+      { "text": "Consumer Price Index", "isCorrect": true },
+      { "text": "Central Price Indicator", "isCorrect": false },
+      { "text": "Corporate Profit Index", "isCorrect": false },
+      { "text": "Capital Payment Interest", "isCorrect": false }
+    ],
+    "explanation": "CPI measures changes in the price level of a basket of consumer goods."
+  },
+  {
+    "type": "type_answer",
+    "text": "Write the opposite of inflation (when prices fall):",
+    "timeLimit": 20,
+    "pointsMultiplier": 2,
+    "correctAnswer": "deflation",
+    "acceptedAnswers": ["deflation"],
+    "explanation": "Deflation is a decrease in the general price level of goods and services."
+  }
+]
+\`\`\``;
+
+const parsedAi = parsearKahootIA(sampleAiJson);
+check('parsearKahootIA extrae y normaliza bloques JSON con markdown', parsedAi.ok === true && parsedAi.questions.length === 2);
+check('parsearKahootIA preserva tipos quiz y type_answer', parsedAi.questions[0].type === 'quiz' && parsedAi.questions[1].type === 'type_answer');
+check('parsearKahootIA devuelve ok:false ante texto corrupto', parsearKahootIA('no es json').ok === false);
+
+const generatedViaMock = await generarKahootConIA({ tema: 'Inflation', total: 2 }, async () => sampleAiJson);
+check('generarKahootConIA integra callGemini y valida resultado', generatedViaMock.ok === true && generatedViaMock.questions.length === 2 && generatedViaMock.questions[0].text.includes('CPI'));
+
+console.log('\n== 9. Seguridad del Sintetizador de Audio + Gong en Entorno sin Navegador ==');
+let audioSafe = true;
+try {
+  startLobbyMusic(true);
+  startTensionMusic(true);
+  playGongSound(true);
+  playAnswerSelectSound(true);
+  playRevealResultSound(true, true);
+  playPodiumFanfare(true);
+  stopKahootMusic();
+} catch (err) {
+  audioSafe = false;
+}
+check('funciones de kahootAudio (incluyendo playGongSound y startTensionMusic) no fallan fuera del navegador', audioSafe);
+
+console.log('\n== 10. Regresiones: Edicion en Vivo (preserveDraft), IDs Deterministicos y Parseo IA Robusto ==');
+const draftQ = normalizeKahootQuestion(
+  {
+    type: 'quiz',
+    text: 'What is ',
+    allowMultiple: false,
+    options: [
+      { id: 'opt_1', text: 'Gross Domestic ', isCorrect: false },
+      { id: 'opt_2', text: '', isCorrect: true },
+      { id: 'opt_3', text: '', isCorrect: false },
+      { id: 'opt_4', text: '', isCorrect: false }
+    ]
+  },
+  0,
+  { preserveDraft: true }
+);
+check('preserveDraft conserva espacios finales mientras el docente escribe', draftQ.text === 'What is ' && draftQ.options[0].text === 'Gross Domestic ');
+check('preserveDraft no activa allowMultiple por accidente al marcar una opcion vacia', draftQ.allowMultiple === false && draftQ.options[1].isCorrect === true && draftQ.options[0].isCorrect === false);
+
+const draftPuzzle = normalizeKahootQuestion(
+  {
+    type: 'puzzle',
+    text: 'Order steps: ',
+    puzzleItems: ['', 'Second step ', '', 'Fourth step']
+  },
+  1,
+  { preserveDraft: true }
+);
+check('preserveDraft mantiene los 4 slots de puzzleItems sin desplazar indices vacios', draftPuzzle.puzzleItems.length === 4 && draftPuzzle.puzzleItems[0] === '' && draftPuzzle.puzzleItems[1] === 'Second step ' && draftPuzzle.puzzleItems[3] === 'Fourth step');
+
+const det1 = normalizeKahootQuestion({ type: 'quiz', text: 'Deterministic ID check' }, 4);
+const det2 = normalizeKahootQuestion({ type: 'quiz', text: 'Deterministic ID check' }, 4);
+check('IDs por defecto en normalizeKahootQuestion son deterministicos por indice', det1.id === 'kq_item_4' && det1.id === det2.id);
+
+const spanishTF = normalizeKahootQuestion({
+  tipo: 'verdadero_falso',
+  pregunta: 'El PIB nominal incluye la inflación.',
+  opciones: [
+    { texto: 'Verdadero', correcta: false },
+    { texto: 'Falso', correcta: true }
+  ]
+}, 0);
+check('truefalse soporta llaves en espanol (opciones, texto, correcta)', spanishTF.type === 'truefalse' && spanishTF.options[1].isCorrect === true && spanishTF.options[0].isCorrect === false);
+
+const unmarkedQuizValidation = validateKahootConfig([
+  {
+    type: 'quiz',
+    text: 'Question with no marked correct option',
+    options: [
+      { text: 'Option A', isCorrect: false },
+      { text: 'Option B', isCorrect: false }
+    ]
+  }
+]);
+check('validateKahootConfig rechaza pregunta quiz cuando ninguna opcion no vacia fue marcada como correcta', unmarkedQuizValidation.valid === false);
+
+const singleObjJson = `{"type":"quiz","text":"Single object AI question?","timeLimit":20,"pointsMultiplier":1,"options":[{"text":"Correct A","isCorrect":true},{"text":"Wrong B","isCorrect":false}]}`;
+const parsedSingleObj = parsearKahootIA(singleObjJson);
+check('parsearKahootIA soporta objeto JSON individual sin corromper su arreglo interno options', parsedSingleObj.ok === true && parsedSingleObj.questions.length === 1 && parsedSingleObj.questions[0].text === 'Single object AI question?');
+
+const preambleBracketJson = `Aquí tienes las preguntas [1-1] generadas:\n[{"type":"truefalse","text":"Bracket preamble test","options":[{"text":"True","isCorrect":true},{"text":"False","isCorrect":false}]}]`;
+const parsedPreamble = parsearKahootIA(preambleBracketJson);
+check('parsearKahootIA ignora corchetes en texto previo y extrae el arreglo JSON real', parsedPreamble.ok === true && parsedPreamble.questions.length === 1 && parsedPreamble.questions[0].text === 'Bracket preamble test');
+
+const promptSoloPuzzle = construirPromptKahootIA({ tema: 'Supply Chain', total: 1, mezcla: 'solo_puzzle' });
+const promptSoloType = construirPromptKahootIA({ tema: 'Supply Chain', total: 1, mezcla: 'solo_type_answer' });
+check(
+  'construirPromptKahootIA soporta modos solo_puzzle y solo_type_answer',
+  promptSoloPuzzle.includes('TODAS las preguntas de ordenar secuencia') &&
+    promptSoloType.includes('TODAS las preguntas de respuesta corta escrita')
+);
+
+console.log(`\nRESULTADO KAHOOT: ${okCount} OK, ${failCount} fallos\n`);
+if (failCount > 0) {
+  process.exit(1);
+}
+
