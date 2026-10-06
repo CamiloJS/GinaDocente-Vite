@@ -187,6 +187,43 @@ chequear("sin evaluaciones -> vacio", pendientesDeFeedback({ evaluaciones: [], n
 chequear("sin notas -> vacio", pendientesDeFeedback({ evaluaciones, notas: [], ahora: AHORA }).length === 0);
 chequear("sin argumentos -> vacio", pendientesDeFeedback().length === 0);
 
+console.log("\n== Generacion de feedback por lotes (evaluaciones > 20 preguntas) ==");
+const preguntas45 = Array.from({ length: 45 }, (_, idx) => ({
+  type: 'text',
+  text: `Question #${idx + 1}`,
+  correctAnswer: `ans${idx + 1}`,
+}));
+const respuestas45 = Object.fromEntries(preguntas45.map((_, idx) => [idx, `ans${idx + 1}`]));
+let llamadasLotesFb = 0;
+const tamLotesFb = [];
+const resFb45 = await generarFeedbackIA({
+  evaluacion: evVencida,
+  preguntas: preguntas45,
+  respuestas: respuestas45,
+  ahora: AHORA,
+  llamarIA: async (promptLote) => {
+    llamadasLotesFb++;
+    const matches = promptLote.match(/^\d+\) \[/gm) || [];
+    tamLotesFb.push(matches.length);
+    return JSON.stringify(
+      Array.from({ length: matches.length }, (_, idx) => ({
+        i: idx + 1,
+        explicacion: `Explicacion del lote ${llamadasLotesFb} item ${idx + 1}.`,
+      }))
+    );
+  },
+});
+chequear(
+  "generarFeedbackIA divide 45 preguntas en 3 lotes [20, 20, 5] y devuelve 45 explicaciones y minijuegos",
+  resFb45.ok === true &&
+    llamadasLotesFb === 3 &&
+    JSON.stringify(tamLotesFb) === JSON.stringify([20, 20, 5]) &&
+    resFb45.feedback.length === 45 &&
+    resFb45.feedback.every(Boolean) &&
+    resFb45.minijuegos.length === 45,
+  `llamadas=${llamadasLotesFb} tamLotes=${JSON.stringify(tamLotesFb)} len=${resFb45.feedback.length}`
+);
+
 console.log(`\nRESULTADO: ${ok} OK, ${fallos} fallos\n`);
 process.exit(fallos ? 1 : 0);
 

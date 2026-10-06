@@ -4,15 +4,16 @@
 
 import { textoPlano } from './textFormat.js';
 
-export const MAX_PREGUNTAS = 20;
+export const MAX_PREGUNTAS = 100;
 export const MIN_PREGUNTAS = 1;
+export const LOTE_MAX_PREGUNTAS = 20;
 
 /** Presets de mezcla de tipos. 'custom' lo define la docente a mano. */
 export const PRESETS = {
   variada: {
     etiqueta: 'Variada (recomendada)',
     calc: (total) => {
-      const match = total >= 8 ? 1 : 0;
+      const match = total >= 8 ? Math.min(10, Math.max(1, Math.round(total * 0.1))) : 0;
       const multiple = Math.max(1, Math.round(total * 0.4));
       const vf = total >= 4 ? Math.max(1, Math.round(total * 0.2)) : 0;
       const text = Math.max(1, Math.round(total * 0.2));
@@ -103,7 +104,7 @@ const desgloseDe = (t) =>
   ].filter(Boolean);
 
 /** Arma el prompt que se le envia a la IA. */
-export function construirPrompt({ tema, total, multiple, text, dificultad = 'media', idioma = 'es', titulo = '', publico = 'estudiantes', variasCorrectas = false, tipos }) {
+export function construirPrompt({ tema, total, multiple, text, dificultad = 'media', idioma = 'es', titulo = '', publico = 'estudiantes', variasCorrectas = false, tipos, evitar = [] }) {
   const t = normalizarTipos({ tipos, multiple, text });
   const desglose = desgloseDe(t);
 
@@ -132,17 +133,22 @@ export function construirPrompt({ tema, total, multiple, text, dificultad = 'med
     'Cada enunciado debe ser claro y resolverse sin material adicional.',
   ];
 
+  const listaEvitar = Array.isArray(evitar) ? evitar.filter(Boolean) : [];
+
   return [
     'Eres un docente experto en diseno de evaluaciones.',
     `Tema o instrucciones de la docente: "${tema}"`,
     titulo ? `Titulo de la evaluacion: "${titulo}"` : '',
     `Nivel de dificultad: ${DIFICULTADES[dificultad] || DIFICULTADES.media}`,
     `Idioma: ${IDIOMAS[idioma] || IDIOMAS.es}`,
-  idioma === 'en_fr' ? 'Reparte las preguntas: la mitad en INGL\u00c9S y la mitad en FRANC\u00c9S, alternando idiomas. Cada pregunta completa (enunciado y opciones) en un solo idioma.' : '',
+    idioma === 'en_fr' ? 'Reparte las preguntas: la mitad en INGL\u00c9S y la mitad en FRANC\u00c9S, alternando idiomas. Cada pregunta completa (enunciado y opciones) en un solo idioma.' : '',
     `Dirigido a: ${publico}.`,
     '',
     'Reglas obligatorias:',
     ...reglas.map((r) => '- ' + r),
+    listaEvitar.length > 0
+      ? `- No repitas ninguna de estas preguntas ya generadas en lotes anteriores: ${listaEvitar.slice(-MAX_PREGUNTAS).map((q) => `"${q}"`).join(', ')}.`
+      : '',
     '',
     'Responde solo con el JSON.',
   ]
@@ -264,7 +270,7 @@ export function clasificarPregunta(q) {
  * Parsea la respuesta de la IA y devuelve preguntas listas para el formulario.
  * @returns {{ ok: boolean, preguntas: Array, problemas: string[] }}
  */
-export function parsearEvaluacion(texto, totalEsperado = null, tiposEsperados = null) {
+export function parsearEvaluacion(texto, totalEsperado = null, tiposEsperados = null, vistosPrevios = null) {
   const problemas = [];
   const bruto = limpiarTexto(texto);
   let datos = null;
@@ -282,7 +288,7 @@ export function parsearEvaluacion(texto, totalEsperado = null, tiposEsperados = 
   if (!lista) return { ok: false, preguntas: [], problemas: ['La respuesta de la IA no tra\u00eda una lista de preguntas.'] };
 
   const preguntas = [];
-  const vistos = new Set();
+  const vistos = new Set(vistosPrevios || []);
   for (const q of lista) {
     const { pregunta, problema } = normalizarPregunta(q);
     if (problema) { problemas.push(problema); continue; }
@@ -312,29 +318,223 @@ export function parsearEvaluacion(texto, totalEsperado = null, tiposEsperados = 
 }
 
 /**
+ * Divide un total de preguntas y su distribucion por tipo en lotes de hasta maxPorLote
+ * para evitar que la respuesta de la IA se trunque por limite de tokens en examenes largos (hasta 100 preguntas).
+ */
+export function dividirEnLotes(total, tipos, maxPorLote = LOTE_MAX_PREGUNTAS) {
+  const claves = ['multiple', 'vf', 'text', 'orden', 'match'];
+  const restantes = {
+    multiple: Math.max(0, Number(tipos?.multiple) || 0),
+    vf: Math.max(0, Number(tipos?.vf) || 0),
+    text: Math.max(0, Number(tipos?.text) || 0),
+    orden: Math.max(0, Number(tipos?.orden) || 0),
+    match: Math.max(0, Number(tipos?.match) || 0),
+  };
+
+  let sumaTipos = claves.reduce((s, k) => s + restantes[k], 0);
+  // Si la suma de tipos excede el total (p.ej. porque total fue acotado a MAX_PREGUNTAS), ajustar
+  while (sumaTipos > total) {
+    const mayor = claves.reduce((a, b) => (restantes[b] > restantes[a] ? b : a), claves[0]);
+    if (restantes[mayor] <= 0) break;
+    restantes[mayor] -= 1;
+    sumaTipos -= 1;
+  }
+  // Si la suma de tipos es menor que el total (o no se especificaron tipos), completar con seleccion multiple
+  if (sumaTipos < total) {
+    restantes.multiple += total - sumaTipos;
+    sumaTipos = total;
+  }
+
+  const lotes = [];
+  let faltanTotal = total;
+
+  while (faltanTotal > 0) {
+    const tamLote = Math.min(maxPorLote, faltanTotal);
+    const tiposLote = { multiple: 0, vf: 0, text: 0, orden: 0, match: 0 };
+    const sumaRest = claves.reduce((s, k) => s + restantes[k], 0);
+
+    if (sumaRest > 0) {
+      let asignados = 0;
+      for (const k of claves) {
+        if (restantes[k] <= 0) continue;
+        const cuota = Math.min(restantes[k], Math.floor((restantes[k] / sumaRest) * tamLote));
+        tiposLote[k] = cuota;
+        asignados += cuota;
+      }
+      for (const k of claves) {
+        while (asignados < tamLote && asignados < sumaRest && restantes[k] > tiposLote[k]) {
+          tiposLote[k] += 1;
+          asignados += 1;
+        }
+      }
+      for (const k of claves) {
+        restantes[k] -= tiposLote[k];
+      }
+    }
+
+    lotes.push({ total: tamLote, tipos: tiposLote });
+    faltanTotal -= tamLote;
+  }
+
+  return lotes;
+}
+
+/**
  * Genera la evaluacion completa: pide a la IA, valida y (si algo falla) reintenta una vez.
+ * Cuando se piden mas de LOTE_MAX_PREGUNTAS (hasta 100), genera por lotes para no truncar el JSON.
  * @param {object} opciones { tema, total, multiple, text, dificultad, idioma, titulo }
  * @param {(prompt: string, timeoutMs?: number) => Promise<string>} llamarIA
  */
 export async function generarPreguntasConIA(opciones, llamarIA) {
+  const clavesTipos = ['multiple', 'vf', 'text', 'orden', 'match'];
   const total = Math.min(MAX_PREGUNTAS, Math.max(MIN_PREGUNTAS, Number(opciones.total) || 10));
-  const tipos = normalizarTipos(opciones);
-  const base = { ...opciones, total, tipos };
-
-  const prompt = construirPrompt(base);
-  let r = parsearEvaluacion(await llamarIA(prompt, 150000), total, tipos);
-
-  if (!r.ok) {
-    const aviso = r.problemas.slice(0, 4).join('; ');
-    const prompt2 =
-      construirPrompt(base) +
-      `\n\nCORRECCION OBLIGATORIA: tu respuesta anterior fallo por: ${aviso}.` +
-      `\nRecuerda: ${total} preguntas en total con esta mezcla exacta: ${desgloseDe(tipos).join('; ')}.` +
-      '\nLas de Verdadero o Falso llevan type "truefalse" (no "multiple"). Devuelve SOLO el JSON.';
-    const segundo = parsearEvaluacion(await llamarIA(prompt2, 150000), total, tipos);
-    // si el segundo intento mejora, usarlo
-    if (segundo.preguntas.length >= r.preguntas.length) r = segundo;
+  const tiposBrutos = normalizarTipos(opciones);
+  const sumaTiposOriginal = clavesTipos.reduce((s, k) => s + (Number(tiposBrutos[k]) || 0), 0);
+  const tipos = { ...tiposBrutos };
+  let sumaAjustada = sumaTiposOriginal;
+  while (sumaAjustada > total) {
+    const mayor = clavesTipos.reduce((a, b) => (tipos[b] > tipos[a] ? b : a), clavesTipos[0]);
+    if (tipos[mayor] <= 0) break;
+    tipos[mayor] -= 1;
+    sumaAjustada -= 1;
   }
 
-  return { ...r, total };
+  const base = { ...opciones, total, tipos };
+
+  if (total <= LOTE_MAX_PREGUNTAS) {
+    const prompt = construirPrompt(base);
+    let r = parsearEvaluacion(await llamarIA(prompt, 150000), total, tipos);
+
+    if (!r.ok) {
+      const aviso = r.problemas.slice(0, 4).join('; ');
+      const prompt2 =
+        construirPrompt(base) +
+        `\n\nCORRECCION OBLIGATORIA: tu respuesta anterior fallo por: ${aviso}.` +
+        `\nRecuerda: ${total} preguntas en total con esta mezcla exacta: ${desgloseDe(tipos).join('; ')}.` +
+        '\nLas de Verdadero o Falso llevan type "truefalse" (no "multiple"). Devuelve SOLO el JSON.';
+      const segundo = parsearEvaluacion(await llamarIA(prompt2, 150000), total, tipos);
+      // si el segundo intento mejora, usarlo
+      if (segundo.preguntas.length >= r.preguntas.length) r = segundo;
+    }
+
+    return { ...r, total };
+  }
+
+  // Generacion por lotes cuando total > LOTE_MAX_PREGUNTAS (hasta 100 preguntas)
+  const lotes = dividirEnLotes(total, tipos, LOTE_MAX_PREGUNTAS);
+  const acumuladas = [];
+  const vistosGlobal = new Set();
+
+  const agregarUnicasAlLote = (candidatas, destino, conteoLote, metaTipos, maxLote, soloNecesarias = false) => {
+    for (const p of candidatas) {
+      if (destino.length >= maxLote) break;
+      const clave = p.text.toLowerCase().slice(0, 80);
+      if (vistosGlobal.has(clave)) continue;
+      const tipoP = clasificarPregunta(p);
+      if (soloNecesarias && (conteoLote[tipoP] || 0) >= (metaTipos[tipoP] || 0)) continue;
+      vistosGlobal.add(clave);
+      conteoLote[tipoP] = (conteoLote[tipoP] || 0) + 1;
+      destino.push(p);
+    }
+  };
+
+  for (let idx = 0; idx < lotes.length; idx++) {
+    const lote = lotes[idx];
+    const baseLote = {
+      ...opciones,
+      total: lote.total,
+      tipos: lote.tipos,
+      evitar: acumuladas.map((q) => q.text.slice(0, 70)),
+    };
+
+    const respuesta1 = await llamarIA(construirPrompt(baseLote), 150000);
+
+    // Si en el primer lote el proveedor/mock devolvio ya el total completo valido, retornar directo
+    if (idx === 0) {
+      const intentoCompleto = parsearEvaluacion(respuesta1, total, tipos);
+      if (intentoCompleto.ok && intentoCompleto.preguntas.length === total) {
+        return { ...intentoCompleto, total };
+      }
+    }
+
+    const rLote = parsearEvaluacion(respuesta1, lote.total, lote.tipos, vistosGlobal);
+    let seleccionLote = [];
+    const conteoLote = { multiple: 0, vf: 0, text: 0, orden: 0, match: 0 };
+
+    if (rLote.ok) {
+      agregarUnicasAlLote(rLote.preguntas, seleccionLote, conteoLote, lote.tipos, lote.total, false);
+    } else {
+      const aviso = rLote.problemas.slice(0, 4).join('; ');
+      const prompt2 =
+        construirPrompt(baseLote) +
+        `\n\nCORRECCION OBLIGATORIA: tu respuesta anterior fallo por: ${aviso}.` +
+        `\nRecuerda: ${lote.total} preguntas en total con esta mezcla exacta: ${desgloseDe(lote.tipos).join('; ')}.` +
+        '\nLas de Verdadero o Falso llevan type "truefalse" (no "multiple"). Devuelve SOLO el JSON.';
+      const segundo = parsearEvaluacion(await llamarIA(prompt2, 150000), lote.total, lote.tipos, vistosGlobal);
+      const primario = segundo.ok || segundo.preguntas.length >= rLote.preguntas.length ? segundo.preguntas : rLote.preguntas;
+      const secundario = primario === segundo.preguntas ? rLote.preguntas : segundo.preguntas;
+      agregarUnicasAlLote(primario, seleccionLote, conteoLote, lote.tipos, lote.total, true);
+      agregarUnicasAlLote(secundario, seleccionLote, conteoLote, lote.tipos, lote.total, true);
+      agregarUnicasAlLote(primario, seleccionLote, conteoLote, lote.tipos, lote.total, false);
+      agregarUnicasAlLote(secundario, seleccionLote, conteoLote, lote.tipos, lote.total, false);
+    }
+
+    acumuladas.push(...seleccionLote);
+  }
+
+  // Si algun lote quedo incompleto por duplicados o preguntas invalidas, hacer un lote extra de recuperacion
+  const faltanTrasLotes = total - acumuladas.length;
+  if (faltanTrasLotes > 0 && faltanTrasLotes <= LOTE_MAX_PREGUNTAS) {
+    const conteoActual = { multiple: 0, vf: 0, text: 0, orden: 0, match: 0 };
+    acumuladas.forEach((p) => { conteoActual[clasificarPregunta(p)] += 1; });
+    const tiposFaltantes = { multiple: 0, vf: 0, text: 0, orden: 0, match: 0 };
+    let asignadosRec = 0;
+    for (const k of clavesTipos) {
+      const diff = Math.max(0, (Number(tipos[k]) || 0) - conteoActual[k]);
+      const usar = Math.min(diff, faltanTrasLotes - asignadosRec);
+      tiposFaltantes[k] = usar;
+      asignadosRec += usar;
+    }
+    if (asignadosRec < faltanTrasLotes) {
+      tiposFaltantes.multiple += faltanTrasLotes - asignadosRec;
+    }
+    const promptRec = construirPrompt({
+      ...opciones,
+      total: faltanTrasLotes,
+      tipos: tiposFaltantes,
+      evitar: acumuladas.map((q) => q.text.slice(0, 70)),
+    });
+    const rRec = parsearEvaluacion(await llamarIA(promptRec, 150000), faltanTrasLotes, tiposFaltantes, vistosGlobal);
+    for (const p of rRec.preguntas) {
+      if (acumuladas.length >= total) break;
+      const clave = p.text.toLowerCase().slice(0, 80);
+      if (!vistosGlobal.has(clave)) {
+        vistosGlobal.add(clave);
+        acumuladas.push(p);
+      }
+    }
+  }
+
+  const problemasFinales = [];
+  if (acumuladas.length !== total) {
+    problemasFinales.push(`se pidieron ${total} preguntas y llegaron ${acumuladas.length} v\u00e1lidas`);
+  }
+
+  if (sumaTiposOriginal > 0) {
+    const conteo = { multiple: 0, vf: 0, text: 0, orden: 0, match: 0 };
+    acumuladas.forEach((p) => { conteo[clasificarPregunta(p)] += 1; });
+    for (const k of clavesTipos) {
+      const esperado = Number(tipos[k]) || 0;
+      if (esperado > 0 && conteo[k] < esperado) {
+        problemasFinales.push(`pediste ${esperado} de ${TIPOS_ETIQUETAS[k] || k} y llegaron ${conteo[k]}`);
+      }
+    }
+  }
+
+  return {
+    ok: problemasFinales.length === 0 && acumuladas.length > 0,
+    preguntas: acumuladas.slice(0, total),
+    problemas: problemasFinales,
+    total,
+  };
 }

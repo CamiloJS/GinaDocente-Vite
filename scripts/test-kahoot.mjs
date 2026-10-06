@@ -18,7 +18,9 @@ import {
   buildSimulatedBotAnswer,
   construirPromptKahootIA,
   parsearKahootIA,
-  generarKahootConIA
+  generarKahootConIA,
+  KAHOOT_MAX_QUESTIONS,
+  KAHOOT_AI_BATCH_SIZE
 } from '../src/utils/kahootEngine.js';
 
 import {
@@ -330,8 +332,150 @@ check(
     promptSoloType.includes('TODAS las preguntas de respuesta corta escrita')
 );
 
+console.log('\n== 11. Limite de 50 Preguntas y Generacion con IA por Lotes ==');
+check('KAHOOT_MAX_QUESTIONS es 50', KAHOOT_MAX_QUESTIONS === 50);
+check('KAHOOT_AI_BATCH_SIZE es 20', KAHOOT_AI_BATCH_SIZE === 20);
+
+const list50 = Array.from({ length: 50 }, (_, idx) => ({
+  type: 'quiz',
+  text: `Valid Kahoot question #${idx + 1}`,
+  options: [
+    { text: `Correct ${idx + 1}`, isCorrect: true },
+    { text: `Wrong ${idx + 1}`, isCorrect: false }
+  ]
+}));
+const val50 = validateKahootConfig(list50);
+check('validateKahootConfig acepta exactamente 50 preguntas validas', val50.valid === true && val50.normalizedQuestions.length === 50);
+
+const list51 = [...list50, { type: 'quiz', text: 'Question #51', options: [{ text: 'A', isCorrect: true }, { text: 'B', isCorrect: false }] }];
+const val51 = validateKahootConfig(list51);
+check('validateKahootConfig rechaza mas de 50 preguntas (51)', val51.valid === false && String(val51.error || '').includes('50'));
+
+let kahootAiCounter = 0;
+let kahootBatchCalls = 0;
+const kahootBatchSizes = [];
+const mockKahootBatchAi = async (promptStr) => {
+  kahootBatchCalls++;
+  const mTotal = promptStr.match(/Cantidad exacta de preguntas:\s*(\d+)/);
+  const batchLen = mTotal ? Number(mTotal[1]) : 0;
+  kahootBatchSizes.push(batchLen);
+  const arr = [];
+  for (let i = 0; i < batchLen; i++) {
+    kahootAiCounter++;
+    arr.push({
+      type: 'quiz',
+      text: `Macroeconomics question #${kahootAiCounter}?`,
+      timeLimit: 20,
+      pointsMultiplier: 1,
+      options: [
+        { text: `Right answer ${kahootAiCounter}`, isCorrect: true },
+        { text: `Wrong A ${kahootAiCounter}`, isCorrect: false },
+        { text: `Wrong B ${kahootAiCounter}`, isCorrect: false },
+        { text: `Wrong C ${kahootAiCounter}`, isCorrect: false }
+      ],
+      explanation: `Explanation ${kahootAiCounter}`
+    });
+  }
+  return JSON.stringify(arr);
+};
+
+const genKahoot50 = await generarKahootConIA({ tema: 'Macroeconomics', total: 50 }, mockKahootBatchAi);
+check(
+  'generarKahootConIA genera 50 preguntas en 3 lotes [20, 20, 10] con IDs unicos secuenciales',
+  genKahoot50.ok === true &&
+    genKahoot50.questions.length === 50 &&
+    kahootBatchCalls === 3 &&
+    JSON.stringify(kahootBatchSizes) === JSON.stringify([20, 20, 10]) &&
+    genKahoot50.questions[0].id === 'kq_item_0' &&
+    genKahoot50.questions[49].id === 'kq_item_49'
+);
+
+// Verificar rotacion de opciones cuando un quiz tiene solo 2 o 3 opciones no vacias (no debe mover vacias a las primeras 2 posiciones)
+const parsed2OptRot = parsearKahootIA(
+  JSON.stringify([
+    {
+      type: 'quiz',
+      text: 'Two-option quiz rotated at index 2?',
+      options: [
+        { text: 'First non-empty', isCorrect: true },
+        { text: 'Second non-empty', isCorrect: false }
+      ]
+    }
+  ]),
+  1,
+  2
+);
+check(
+  'parsearKahootIA no rota opciones vacias hacia las posiciones requeridas en quiz de 2 opciones',
+  parsed2OptRot.ok === true &&
+    parsed2OptRot.questions.length === 1 &&
+    Boolean(parsed2OptRot.questions[0].options[0].text) &&
+    Boolean(parsed2OptRot.questions[0].options[1].text) &&
+    validateKahootConfig(parsed2OptRot.questions).valid === true
+);
+
+// Verificar deduplicacion dentro del mismo lote e IDs secuenciales sin huecos
+const parsedDupBatch = parsearKahootIA(
+  JSON.stringify([
+    { type: 'truefalse', text: 'Repeated statement?', options: [{ text: 'True', isCorrect: true }, { text: 'False', isCorrect: false }] },
+    { type: 'truefalse', text: 'Repeated statement?', options: [{ text: 'True', isCorrect: true }, { text: 'False', isCorrect: false }] },
+    { type: 'truefalse', text: 'Unique second statement?', options: [{ text: 'True', isCorrect: false }, { text: 'False', isCorrect: true }] }
+  ]),
+  2,
+  10
+);
+check(
+  'parsearKahootIA elimina duplicadas dentro del mismo lote y mantiene IDs secuenciales',
+  parsedDupBatch.ok === true &&
+    parsedDupBatch.questions.length === 2 &&
+    parsedDupBatch.questions[0].id === 'kq_item_10' &&
+    parsedDupBatch.questions[1].id === 'kq_item_11'
+);
+
+// Verificar reintento en lote unico (<= 20 preguntas)
+let singleBatchAttempts = 0;
+const genSingleRetry = await generarKahootConIA({ tema: 'Retry Test', total: 5 }, async () => {
+  singleBatchAttempts++;
+  if (singleBatchAttempts === 1) return 'invalid json response';
+  return JSON.stringify(
+    Array.from({ length: 5 }, (_, idx) => ({
+      type: 'truefalse',
+      text: `Retry question #${idx + 1}`,
+      options: [
+        { text: 'True', isCorrect: true },
+        { text: 'False', isCorrect: false }
+      ]
+    }))
+  );
+});
+check(
+  'generarKahootConIA reintenta cuando falla el primer intento en solicitud de 1 solo lote',
+  genSingleRetry.ok === true && genSingleRetry.questions.length === 5 && singleBatchAttempts === 2
+);
+
+let clampKahootCounter = 0;
+const genKahootClamp = await generarKahootConIA({ tema: 'Clamp Test', total: 80 }, async (promptStr) => {
+  const mTotal = promptStr.match(/Cantidad exacta de preguntas:\s*(\d+)/);
+  const batchLen = mTotal ? Number(mTotal[1]) : 0;
+  return JSON.stringify(
+    Array.from({ length: batchLen }, () => {
+      clampKahootCounter++;
+      return {
+        type: 'truefalse',
+        text: `Statement #${clampKahootCounter}`,
+        options: [
+          { text: 'True', isCorrect: true },
+          { text: 'False', isCorrect: false }
+        ]
+      };
+    })
+  );
+});
+check('generarKahootConIA limita solicitudes >50 a un maximo de 50 preguntas', genKahootClamp.ok === true && genKahootClamp.questions.length === 50 && clampKahootCounter === 50);
+
 console.log(`\nRESULTADO KAHOOT: ${okCount} OK, ${failCount} fallos\n`);
 if (failCount > 0) {
   process.exit(1);
 }
+
 

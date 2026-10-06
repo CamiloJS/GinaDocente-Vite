@@ -37,7 +37,6 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
 
   if (!isOpen) return null
 
-  const espacioLibre = Math.max(0, MAX_PREGUNTAS - existingCount)
   const sumaDist = CLAVES_TIPOS.reduce((s, k) => s + (Number(dist[k]) || 0), 0)
   const distOk = sumaDist === total
 
@@ -144,7 +143,7 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
             <div>
               <label className={label}>Cantidad de preguntas</label>
               <input
-                type="number" min={1} max={Math.min(MAX_PREGUNTAS, espacioLibre || MAX_PREGUNTAS)}
+                type="number" min={1} max={MAX_PREGUNTAS}
                 value={total}
                 onChange={(e) => cambiarTotal(e.target.value)}
                 className={input}
@@ -329,9 +328,9 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
           </button>
           {resultado?.preguntas?.length > 0 && (
             <>
-              {existingCount > 0 && existingCount + resultado.preguntas.length <= MAX_PREGUNTAS && (
+              {existingCount > 0 && existingCount < MAX_PREGUNTAS && (
                 <button type="button" onClick={() => usar('agregar')} className="px-4 py-2 rounded-xl border border-blue-500 text-blue-600 dark:text-blue-400 text-xs font-black hover:bg-blue-500/10 cursor-pointer">
-                  Agregar al final ({existingCount + resultado.preguntas.length}/{MAX_PREGUNTAS})
+                  Agregar al final ({Math.min(MAX_PREGUNTAS, existingCount + resultado.preguntas.length)}/{MAX_PREGUNTAS})
                 </button>
               )}
               <button type="button" onClick={() => usar('reemplazar')} className="px-4 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-xs font-black shadow-sm transition-all active:scale-95 cursor-pointer">

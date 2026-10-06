@@ -542,9 +542,13 @@ export function parsearFeedback(texto, totalPreguntas) {
   return { ok: salida.some(Boolean), feedback: salida, minijuegos, problemas };
 }
 
+export const FEEDBACK_BATCH_SIZE = 20;
+
 /**
  * Genera la retroalimentacion completa (todos los tipos, en espanol) y sus minijuegos.
  * Se niega si la evaluacion NO ha vencido y NO tiene activada la retroalimentacion inmediata.
+ * Cuando hay mas de 20 preguntas (hasta 100), divide la generacion en lotes de 20 para evitar
+ * que el JSON de salida se trunque por limite de tokens.
  * @param {object} opciones { evaluacion, preguntas, respuestas, llamarIA, ahora }
  */
 export async function generarFeedbackIA({ evaluacion, preguntas = [], respuestas = {}, llamarIA, ahora = Date.now() }) {
@@ -556,17 +560,36 @@ export async function generarFeedbackIA({ evaluacion, preguntas = [], respuestas
   const items = (preguntas || []).map((q, i) => describirPregunta(q, respuestas?.[i]));
   if (items.length === 0) return { ok: false, feedback: [], minijuegos: [], problemas: ['No hay preguntas para explicar.'], vencida: vencida || inmediata };
 
-  const prompt = construirPromptFeedback({ titulo: evaluacion?.title || '', items });
-  const bruto = await llamarIA(prompt, 120000);
-  const parsed = parsearFeedback(bruto, items.length);
+  const feedbackFinal = new Array(items.length).fill('');
+  const minijuegosIAFinal = new Array(items.length).fill(null);
+  const problemasTotal = [];
+
+  for (let offset = 0; offset < items.length; offset += FEEDBACK_BATCH_SIZE) {
+    const subItems = items.slice(offset, offset + FEEDBACK_BATCH_SIZE);
+    const prompt = construirPromptFeedback({ titulo: evaluacion?.title || '', items: subItems });
+    try {
+      const bruto = await llamarIA(prompt, 120000);
+      const parsed = parsearFeedback(bruto, subItems.length);
+      for (let j = 0; j < subItems.length; j++) {
+        feedbackFinal[offset + j] = parsed.feedback[j] || '';
+        minijuegosIAFinal[offset + j] = parsed.minijuegos?.[j] || null;
+      }
+      if (parsed.problemas?.length) {
+        problemasTotal.push(...parsed.problemas);
+      }
+    } catch (err) {
+      problemasTotal.push(err?.message || 'Error al generar retroalimentacion de un lote.');
+    }
+  }
+
   const minijuegosCompletos = (preguntas || []).map((q, i) =>
-    armarMinijuegoPregunta(q, respuestas?.[i], parsed.feedback[i] || '', parsed.minijuegos?.[i] || null)
+    armarMinijuegoPregunta(q, respuestas?.[i], feedbackFinal[i] || '', minijuegosIAFinal[i] || null)
   );
   return {
-    ok: parsed.ok,
-    feedback: parsed.feedback,
+    ok: feedbackFinal.some(Boolean),
+    feedback: feedbackFinal,
     minijuegos: minijuegosCompletos,
-    problemas: parsed.problemas,
+    problemas: problemasTotal,
     vencida: vencida || inmediata,
     inmediata,
   };

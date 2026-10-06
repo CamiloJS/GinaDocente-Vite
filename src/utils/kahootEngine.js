@@ -3,8 +3,9 @@
 
 import { textoPlano } from './textFormat.js';
 
-export const KAHOOT_MAX_QUESTIONS = 25;
+export const KAHOOT_MAX_QUESTIONS = 50;
 export const KAHOOT_MIN_QUESTIONS = 1;
+export const KAHOOT_AI_BATCH_SIZE = 20;
 
 export const KAHOOT_COLORS = [
   {
@@ -430,6 +431,15 @@ export function validateKahootConfig(kahootInput) {
     };
   }
 
+  if (rawQuestions.length > KAHOOT_MAX_QUESTIONS) {
+    return {
+      valid: false,
+      error: `El Kahoot puede tener máximo ${KAHOOT_MAX_QUESTIONS} preguntas.`,
+      normalizedQuestions: [],
+      questions: [],
+    };
+  }
+
   const normalizedQuestions = [];
 
   for (let i = 0; i < rawQuestions.length; i++) {
@@ -795,8 +805,10 @@ export function construirPromptKahootIA({
   idioma = 'en',
   mezcla = 'variado',
   timeLimit = 20,
+  evitar = [],
 }) {
   const num = Math.max(1, Math.min(KAHOOT_MAX_QUESTIONS, Number(total) || 6));
+  const listaEvitar = Array.isArray(evitar) ? evitar.filter(Boolean) : [];
 
   const mapaIdiomas = {
     es: 'Todo en español',
@@ -842,7 +854,12 @@ export function construirPromptKahootIA({
     '- En las últimas 1 o 2 preguntas más retadoras usa "pointsMultiplier": 2 (Puntos Dobles).',
     '- No uses asteriscos (** o *) ni etiquetas HTML.',
     '- Varía la posición de la opción correcta en las preguntas tipo quiz para que no sea siempre la primera.',
-  ].join('\n');
+    listaEvitar.length > 0
+      ? `- No repitas ninguna de estas preguntas ya creadas en lotes anteriores: ${listaEvitar.slice(-KAHOOT_MAX_QUESTIONS).map((q) => `"${q}"`).join(', ')}.`
+      : '',
+  ]
+    .filter((line) => line !== undefined)
+    .join('\n');
 }
 
 function limpiarBloqueJSON(texto) {
@@ -880,7 +897,7 @@ function limpiarBloqueJSON(texto) {
 /**
  * Parsea la salida de la IA en preguntas de Kahoot normalizadas y baraja la posición de las opciones si todas las correctas quedaron en el índice 0.
  */
-export function parsearKahootIA(rawText, defaultTimeLimit = 20) {
+export function parsearKahootIA(rawText, defaultTimeLimit = 20, startIndex = 0) {
   const cleaned = limpiarBloqueJSON(rawText);
   let parsed = null;
   try {
@@ -906,22 +923,30 @@ export function parsearKahootIA(rawText, defaultTimeLimit = 20) {
   }
 
   const questions = [];
-  list.slice(0, KAHOOT_MAX_QUESTIONS).forEach((item, idx) => {
+  const vistos = new Set();
+  list.slice(0, KAHOOT_MAX_QUESTIONS).forEach((item) => {
+    const globalIdx = startIndex + questions.length;
     const q = normalizeKahootQuestion(
-      { ...item, timeLimit: item?.timeLimit || defaultTimeLimit },
-      idx
+      { ...item, id: undefined, timeLimit: item?.timeLimit || defaultTimeLimit },
+      globalIdx
     );
     if (!q.text) return;
+    const clave = q.text.toLowerCase().slice(0, 80);
+    if (vistos.has(clave)) return;
+    vistos.add(clave);
 
-    // Si es quiz y la opción correcta siempre vino en índice 0, rotamos de forma determinista según idx
-    if (q.type === 'quiz' && q.options.length >= 2) {
-      const firstCorrect = q.options[0]?.isCorrect && !q.options.slice(1).some((o) => o.isCorrect);
-      if (firstCorrect && idx % 4 !== 0) {
-        const shift = idx % q.options.length;
-        const rotated = [...q.options];
+    // Si es quiz y la opción correcta siempre vino en índice 0, rotamos de forma determinista según globalIdx
+    // solo entre las opciones con texto para mantener las opciones vacías opcionales al final.
+    const nonEmptyOpts = (q.options || []).filter((o) => String(o.text || '').trim().length > 0);
+    const emptyOpts = (q.options || []).filter((o) => String(o.text || '').trim().length === 0);
+    if (q.type === 'quiz' && nonEmptyOpts.length >= 2) {
+      const firstCorrect = nonEmptyOpts[0]?.isCorrect && !nonEmptyOpts.slice(1).some((o) => o.isCorrect);
+      if (firstCorrect && globalIdx % nonEmptyOpts.length !== 0) {
+        const shift = globalIdx % nonEmptyOpts.length;
+        const rotated = [...nonEmptyOpts];
         const [first] = rotated.splice(0, 1);
         rotated.splice(shift, 0, first);
-        q.options = rotated.map((o, oi) => ({ ...o, id: `${q.id}_${oi}` }));
+        q.options = [...rotated, ...emptyOpts].map((o, oi) => ({ ...o, id: `${q.id}_${oi}` }));
       }
     }
 
@@ -937,20 +962,96 @@ export function parsearKahootIA(rawText, defaultTimeLimit = 20) {
 
 /**
  * Genera preguntas de Kahoot con IA llamando a callGemini.
+ * Si se piden más de KAHOOT_AI_BATCH_SIZE preguntas (hasta 50), genera por lotes para evitar truncamiento por límite de tokens.
  */
 export async function generarKahootConIA(config, callGemini) {
-  const prompt = construirPromptKahootIA(config);
-  let rawResponse = '';
-
-  if (typeof callGemini === 'function') {
-    rawResponse = await callGemini(prompt);
+  if (typeof callGemini !== 'function') {
+    return {
+      ok: false,
+      questions: [],
+      error: 'No se pudo generar el Kahoot con IA en este momento. Revisa tu conexión o intenta con otro tema.',
+    };
   }
 
-  if (rawResponse) {
-    const res = parsearKahootIA(rawResponse, config?.timeLimit || 20);
-    if (res.ok && res.questions.length > 0) {
-      return res;
+  const totalDeseado = Math.max(
+    KAHOOT_MIN_QUESTIONS,
+    Math.min(KAHOOT_MAX_QUESTIONS, Number(config?.total) || 6)
+  );
+  const defaultTimeLimit = config?.timeLimit || 20;
+
+  if (totalDeseado <= KAHOOT_AI_BATCH_SIZE) {
+    const prompt = construirPromptKahootIA({ ...config, total: totalDeseado });
+    for (let intento = 0; intento < 2; intento++) {
+      const rawResponse = await callGemini(prompt, 120000);
+      if (rawResponse) {
+        const res = parsearKahootIA(rawResponse, defaultTimeLimit, 0);
+        if (res.ok && res.questions.length > 0) {
+          return { ok: true, questions: res.questions.slice(0, totalDeseado), error: '' };
+        }
+      }
     }
+    return {
+      ok: false,
+      questions: [],
+      error: 'No se pudo generar el Kahoot con IA en este momento. Revisa tu conexión o intenta con otro tema.',
+    };
+  }
+
+  // Generación por lotes cuando se piden más de KAHOOT_AI_BATCH_SIZE preguntas (hasta 50)
+  const acumuladas = [];
+  const vistos = new Set();
+  let intentosFallidos = 0;
+  const maxIteraciones = Math.ceil(totalDeseado / KAHOOT_AI_BATCH_SIZE) + 2;
+
+  for (let iter = 0; iter < maxIteraciones && acumuladas.length < totalDeseado; iter++) {
+    const faltan = totalDeseado - acumuladas.length;
+    const cantidadLote = Math.min(KAHOOT_AI_BATCH_SIZE, faltan);
+    const prompt = construirPromptKahootIA({
+      ...config,
+      total: cantidadLote,
+      evitar: acumuladas.map((q) => q.text.slice(0, 80)),
+    });
+
+    const rawResponse = await callGemini(prompt, 120000);
+    if (!rawResponse) {
+      intentosFallidos++;
+      if (intentosFallidos >= 2) break;
+      continue;
+    }
+
+    const parsed = parsearKahootIA(rawResponse, defaultTimeLimit, acumuladas.length);
+    if (!parsed.ok || parsed.questions.length === 0) {
+      intentosFallidos++;
+      if (intentosFallidos >= 2) break;
+      continue;
+    }
+
+    let agregadasEnLote = 0;
+    for (const q of parsed.questions) {
+      if (acumuladas.length >= totalDeseado) break;
+      const clave = q.text.toLowerCase().slice(0, 80);
+      if (vistos.has(clave)) continue;
+      vistos.add(clave);
+      const idxReal = acumuladas.length;
+      const idReal = `kq_item_${idxReal}`;
+      acumuladas.push({
+        ...q,
+        id: idReal,
+        options: Array.isArray(q.options)
+          ? q.options.map((o, oi) => ({ ...o, id: `${idReal}_${oi}` }))
+          : [],
+      });
+      agregadasEnLote++;
+    }
+
+    if (agregadasEnLote === 0) {
+      intentosFallidos++;
+      if (intentosFallidos >= 2) break;
+    }
+  }
+
+  if (acumuladas.length > 0) {
+    return { ok: true, questions: acumuladas.slice(0, totalDeseado), error: '' };
   }
 
   return {

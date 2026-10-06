@@ -5141,6 +5141,9 @@ useEffect(() => {
               if (!evalFormData.questions || evalFormData.questions.length === 0) {
                   return showMessage("Añade al menos 1 pregunta.");
               }
+              if (evalFormData.questions.length > 100) {
+                  return showMessage("Máximo 100 preguntas por evaluación.");
+              }
               
               let firstError = null;
               for (let i = 0; i < evalFormData.questions.length; i++) {
@@ -10191,7 +10194,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                       </div>
                                       <div>
                                           <label className="text-xs font-bold text-gray-700 dark:text-gray-300 ml-1">Tiempo (minutos)</label>
-                                          <input type="number" min="1" max="180" value={evalFormData.timeLimit} onChange={e => setEvalFormData({...evalFormData, timeLimit: parseInt(e.target.value) || 30})} className={`${glassInput} !py-2 text-xs`} required />
+                                          <input type="number" min="1" max="300" value={evalFormData.timeLimit} onChange={e => setEvalFormData({...evalFormData, timeLimit: parseInt(e.target.value) || 30})} className={`${glassInput} !py-2 text-xs`} required />
                                       </div>
                                   </div>
                                    {/* Toggles de Modo Anti-Trampas y Retroalimentación inmediata */}
@@ -10255,7 +10258,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                               <div className="space-y-3">
                                   <div className="flex justify-between items-center px-1 gap-2">
                                       <h3 className="font-bold text-sm text-gray-800 dark:text-gray-200">
-                                          Preguntas ({evalFormData.questions.length}/20)
+                                          Preguntas ({evalFormData.questions.length}/100)
                                       </h3>
                                       <button
                                           type="button"
@@ -10272,11 +10275,13 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                       onClose={() => setShowAiEvalModal(false)}
                                       callGemini={callGemini}
                                       isDarkMode={isDarkMode}
-                                      existingCount={evalFormData.questions.length}
+                                      existingCount={(evalFormData.questions || []).filter((q) => (q?.text || '').trim()).length}
                                       onInsert={(preguntas, modo, meta) => {
                                           const actuales = evalFormData.questions || [];
-                                          let nuevas = modo === 'agregar' ? [...actuales, ...preguntas] : [...preguntas];
-                                          if (nuevas.length > 20) nuevas = nuevas.slice(0, 20);
+                                          const conContenido = actuales.filter((q) => (q?.text || '').trim());
+                                          let nuevas = modo === 'agregar' ? [...conContenido, ...preguntas] : [...preguntas];
+                                          if (nuevas.length > 100) nuevas = nuevas.slice(0, 100);
+                                          const cantidadReal = modo === 'agregar' ? Math.max(0, nuevas.length - conContenido.length) : nuevas.length;
                                           setEvalFormData((prev) => ({
                                               ...prev,
                                               questions: nuevas,
@@ -10284,8 +10289,8 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                           }));
                                           setShowAiEvalModal(false);
                                           showMessage(modo === 'agregar'
-                                              ? `Se agregaron ${preguntas.length} preguntas generadas. Revisalas antes de guardar.`
-                                              : `Se cargaron ${preguntas.length} preguntas generadas. Revisalas y guarda la evaluacion.`);
+                                              ? `Se agregaron ${cantidadReal} preguntas generadas. Revisalas antes de guardar.`
+                                              : `Se cargaron ${cantidadReal} preguntas generadas. Revisalas y guarda la evaluacion.`);
                                       }}
                                   />
 
@@ -10556,7 +10561,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                       </div>
                                   ))}
 
-                                  {evalFormData.questions.length < 20 && (
+                                  {evalFormData.questions.length < 100 && (
                                       <button 
                                           type="button" 
                                           onClick={() => {

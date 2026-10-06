@@ -1,5 +1,5 @@
 // Pruebas del generador de evaluaciones con IA (sin navegador, sin gastar cuota).
-import { construirPrompt, parsearEvaluacion, generarPreguntasConIA, TIPOS_MEZCLA, IDIOMAS, PRESETS, clasificarPregunta } from "../src/utils/aiEvalGenerator.js";
+import { construirPrompt, parsearEvaluacion, generarPreguntasConIA, TIPOS_MEZCLA, IDIOMAS, PRESETS, clasificarPregunta, MAX_PREGUNTAS, LOTE_MAX_PREGUNTAS, dividirEnLotes } from "../src/utils/aiEvalGenerator.js";
 
 let ok = 0, fallos = 0;
 const chequear = (nombre, cond, extra = "") => {
@@ -107,7 +107,7 @@ const suma = (d) => d.multiple + d.vf + d.text + d.orden + d.match;
 chequear("preset variada suma exacto (10)", suma(PRESETS.variada.calc(10)) === 10, JSON.stringify(PRESETS.variada.calc(10)));
 chequear("preset variada usa todos los tipos", ["multiple", "vf", "text", "orden"].every((k) => PRESETS.variada.calc(10)[k] > 0));
 chequear("preset variada incluye relacionar en examenes largos", PRESETS.variada.calc(10).match === 1 && PRESETS.variada.calc(5).match === 0);
-chequear("preset variada suma exacto en varios tamanos", [1, 2, 3, 4, 5, 7, 12, 20].every((t) => suma(PRESETS.variada.calc(t)) === t));
+chequear("preset variada suma exacto en varios tamanos (hasta 100)", [1, 2, 3, 4, 5, 7, 12, 20, 35, 50, 75, 100].every((t) => suma(PRESETS.variada.calc(t)) === t));
 chequear("preset mitad y mitad suma exacto", suma(PRESETS.mitad.calc(9)) === 9 && PRESETS.mitad.calc(9).vf === 0);
 chequear("preset solo multiple", suma(PRESETS.multiple.calc(6)) === 6 && PRESETS.multiple.calc(6).multiple === 6);
 chequear("preset solo escrita", suma(PRESETS.text.calc(6)) === 6 && PRESETS.text.calc(6).text === 6);
@@ -184,5 +184,127 @@ chequear("existe la opcion bilingue en+fr", typeof IDIOMAS.en_fr === "string" &&
 const pBilingue = construirPrompt({ tema: "greetings", total: 4, multiple: 4, text: 0, dificultad: "media", idioma: "en_fr" });
 chequear("el prompt reparte ingles y frances", pBilingue.includes("alternando idiomas") && pBilingue.includes("mitad en INGL"));
 
+// ---------- 10) Limite 100 preguntas y generacion por lotes ----------
+console.log("\n== Limite 100 preguntas y generacion por lotes ==");
+chequear("MAX_PREGUNTAS es 100", MAX_PREGUNTAS === 100, `MAX_PREGUNTAS=${MAX_PREGUNTAS}`);
+chequear("LOTE_MAX_PREGUNTAS es 20", LOTE_MAX_PREGUNTAS === 20, `LOTE_MAX_PREGUNTAS=${LOTE_MAX_PREGUNTAS}`);
+
+const tipos100 = PRESETS.variada.calc(100);
+chequear("preset variada escala match proporcionalmente en 100 preguntas (10)", tipos100.match === 10 && PRESETS.variada.calc(50).match === 5, JSON.stringify(tipos100));
+const lotes100 = dividirEnLotes(100, tipos100);
+chequear("dividirEnLotes parte 100 en 5 lotes de max 20", lotes100.length === 5 && lotes100.every((l) => l.total === 20), JSON.stringify(lotes100));
+const sumaTiposLotes = lotes100.reduce((acc, l) => {
+  for (const k of ["multiple", "vf", "text", "orden", "match"]) acc[k] = (acc[k] || 0) + (l.tipos[k] || 0);
+  return acc;
+}, {});
+chequear(
+  "dividirEnLotes conserva exactamente la suma por cada tipo en 100 preguntas",
+  ["multiple", "vf", "text", "orden", "match"].every((k) => sumaTiposLotes[k] === tipos100[k]),
+  `esperado=${JSON.stringify(tipos100)} obtenido=${JSON.stringify(sumaTiposLotes)}`
+);
+
+const lotesSinTipos = dividirEnLotes(35);
+chequear(
+  "dividirEnLotes sin tipos asigna multiple por defecto en cada lote",
+  lotesSinTipos.length === 2 && lotesSinTipos[0].tipos.multiple === 20 && lotesSinTipos[1].tipos.multiple === 15,
+  JSON.stringify(lotesSinTipos)
+);
+
+const evitar80 = Array.from({ length: 80 }, (_, idx) => `Existing question number ${idx + 1}`);
+const promptEvitar80 = construirPrompt({ tema: "Grammar", total: 20, multiple: 20, evitar: evitar80 });
+chequear(
+  "construirPrompt conserva hasta 100 preguntas en evitar sin truncar las primeras 40",
+  promptEvitar80.includes("Existing question number 1") && promptEvitar80.includes("Existing question number 80")
+);
+
+let contadorGlobal100 = 0;
+let llamadasLotes100 = 0;
+const iaLotes100 = async (promptLote) => {
+  llamadasLotes100++;
+  const mTotal = promptLote.match(/EXACTAMENTE (\d+) preguntas/);
+  const cant = mTotal ? Number(mTotal[1]) : 20;
+  const items = [];
+  for (let i = 0; i < cant; i++) {
+    contadorGlobal100++;
+    items.push({
+      type: "multiple",
+      text: `Question number ${contadorGlobal100} about grammar?`,
+      options: [
+        { text: `Correct ${contadorGlobal100}`, isCorrect: true },
+        { text: `Wrong A ${contadorGlobal100}`, isCorrect: false },
+        { text: `Wrong B ${contadorGlobal100}`, isCorrect: false },
+      ],
+      correctAnswer: "",
+    });
+  }
+  return JSON.stringify(items);
+};
+const gen100 = await generarPreguntasConIA(
+  { tema: "Comprehensive English Test", total: 100, tipos: PRESETS.multiple.calc(100), dificultad: "media", idioma: "en" },
+  iaLotes100
+);
+chequear(
+  "generarPreguntasConIA genera 100 preguntas en 5 lotes sin truncamiento",
+  gen100.ok && gen100.preguntas.length === 100 && llamadasLotes100 === 5,
+  `ok=${gen100.ok} len=${gen100.preguntas.length} llamadas=${llamadasLotes100} prob=${JSON.stringify(gen100.problemas)}`
+);
+
+let contadorParcial = 0;
+let llamadasParcial = 0;
+const genParcialRecuperado = await generarPreguntasConIA(
+  { tema: "Partial Batch Recovery", total: 25, tipos: PRESETS.multiple.calc(25), dificultad: "media", idioma: "en" },
+  async (promptLote) => {
+    llamadasParcial++;
+    const mTotal = promptLote.match(/EXACTAMENTE (\d+) preguntas/);
+    const cant = mTotal ? Number(mTotal[1]) : 20;
+    // En la primera llamada devolvemos solo 18 de las 20 pedidas para probar la recuperacion
+    const realCant = llamadasParcial === 1 ? 18 : cant;
+    return JSON.stringify(
+      Array.from({ length: realCant }, () => {
+        contadorParcial++;
+        return {
+          type: "multiple",
+          text: `Recovered question ${contadorParcial}?`,
+          options: [
+            { text: "Yes", isCorrect: true },
+            { text: "No", isCorrect: false },
+          ],
+          correctAnswer: "",
+        };
+      })
+    );
+  }
+);
+chequear(
+  "generarPreguntasConIA recupera preguntas faltantes cuando un lote devuelve menos de las pedidas",
+  genParcialRecuperado.ok && genParcialRecuperado.preguntas.length === 25,
+  `len=${genParcialRecuperado.preguntas.length}`
+);
+
+let contadorClamp = 0;
+const genClamp = await generarPreguntasConIA(
+  { tema: "Clamp Test", total: 150, tipos: PRESETS.multiple.calc(100), dificultad: "media", idioma: "en" },
+  async (promptLote) => {
+    const mTotal = promptLote.match(/EXACTAMENTE (\d+) preguntas/);
+    const cant = mTotal ? Number(mTotal[1]) : 20;
+    return JSON.stringify(
+      Array.from({ length: cant }, () => {
+        contadorClamp++;
+        return {
+          type: "multiple",
+          text: `Clamped question ${contadorClamp}?`,
+          options: [
+            { text: "Yes", isCorrect: true },
+            { text: "No", isCorrect: false },
+          ],
+          correctAnswer: "",
+        };
+      })
+    );
+  }
+);
+chequear("generarPreguntasConIA limita solicitudes >100 a un maximo de 100 preguntas", genClamp.ok && genClamp.preguntas.length === 100);
+
 console.log(`\nRESULTADO: ${ok} OK, ${fallos} fallos\n`);
 process.exit(fallos ? 1 : 0);
+

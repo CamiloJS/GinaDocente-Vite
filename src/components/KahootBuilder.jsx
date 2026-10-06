@@ -206,10 +206,23 @@ const KahootBuilder = ({
         return;
       }
       if (mode === 'append') {
-        const combined = [...safeQuestions.filter((q) => q.text?.trim()), ...res.questions].slice(0, KAHOOT_MAX_QUESTIONS);
+        const baseList = safeQuestions.filter((q) => q.text?.trim());
+        const combined = [...baseList, ...res.questions]
+          .slice(0, KAHOOT_MAX_QUESTIONS)
+          .map((q, idx) => {
+            const idReal = `kq_item_${idx}`;
+            return {
+              ...q,
+              id: idReal,
+              options: Array.isArray(q.options)
+                ? q.options.map((o, oi) => ({ ...o, id: `${idReal}_${oi}` }))
+                : [],
+            };
+          });
+        const addedCount = Math.max(0, combined.length - baseList.length);
         setQuestions(combined);
-        setActiveIndex(Math.max(0, combined.length - res.questions.length));
-        showMessage?.(`✨ Se añadieron ${res.questions.length} preguntas con IA.`);
+        setActiveIndex(Math.max(0, combined.length - (addedCount || 1)));
+        showMessage?.(`✨ Se añadieron ${addedCount} preguntas con IA.`);
       } else {
         setQuestions(res.questions);
         setActiveIndex(0);
@@ -352,9 +365,9 @@ const KahootBuilder = ({
               <input
                 type="number"
                 min={1}
-                max={20}
+                max={KAHOOT_MAX_QUESTIONS}
                 value={aiCount}
-                onChange={(e) => setAiCount(Math.max(1, Math.min(20, Number(e.target.value) || 1)))}
+                onChange={(e) => setAiCount(Math.max(1, Math.min(KAHOOT_MAX_QUESTIONS, Number(e.target.value) || 1)))}
                 className="w-full py-1.5 px-2.5 text-xs font-bold rounded-xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100"
               />
             </div>
@@ -426,7 +439,7 @@ const KahootBuilder = ({
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
-            {safeQuestions.some((q) => q.text?.trim()) && (
+            {safeQuestions.some((q) => q.text?.trim()) && safeQuestions.filter((q) => q.text?.trim()).length < KAHOOT_MAX_QUESTIONS && (
               <button
                 type="button"
                 disabled={isGeneratingAi}
