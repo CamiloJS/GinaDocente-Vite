@@ -110,15 +110,22 @@ export default function PublicOvaViewer({
         // Try localStorage cache
         if (!loaded) {
           try {
-            const rawCached = isDemoMode
-              ? (localStorage.getItem('englishTech_demo_ovas') || localStorage.getItem('englishTech_demo_ovas_teacher') || '[]')
-              : (localStorage.getItem('englishTech_ovas') || '[]');
-            const cachedList = JSON.parse(rawCached);
-            if (Array.isArray(cachedList) && cachedList.length > 0) {
+            const keysToCheck = isDemoMode
+              ? ['englishTech_demo_ovas', 'englishTech_demo_ovas_teacher', 'englishTech_demo_ovas_camilodocente']
+              : ['englishTech_ovas', 'englishTech_ovas_camilodocente'];
+            const combined = [];
+            keysToCheck.forEach(k => {
+              try {
+                const parsed = JSON.parse(localStorage.getItem(k) || '[]');
+                if (Array.isArray(parsed)) combined.push(...parsed);
+              } catch (e) {}
+            });
+            if (combined.length > 0) {
+              combined.sort((a, b) => (Number(b?.updatedAt) || 0) - (Number(a?.updatedAt) || 0));
               if (ovaId) {
-                loaded = cachedList.find(o => o.id === ovaId) || cachedList[0];
+                loaded = combined.find(o => o.id === ovaId) || combined[0];
               } else {
-                loaded = cachedList[0];
+                loaded = combined[0];
               }
             }
           } catch (e) {}
@@ -210,14 +217,23 @@ export default function PublicOvaViewer({
           prompt('Copia este enlace para compartir el OVA:', shareUrl);
         }
       } else if (type === 'OVA_SAVED' && project && isUnlocked) {
+        const updatedProject = { ...project, updatedAt: Date.now() };
         // Save locally
-        setOvaData(project);
+        setOvaData(updatedProject);
         try {
-          const storageKey = isDemoMode ? 'englishTech_demo_ovas' : 'englishTech_ovas';
-          const cachedList = JSON.parse(localStorage.getItem(storageKey) || '[]');
-          const idx = cachedList.findIndex(o => o.id === project.id);
-          const next = idx >= 0 ? cachedList.map((o, i) => i === idx ? project : o) : [project, ...cachedList];
-          localStorage.setItem(storageKey, JSON.stringify(next));
+          const storageKeys = isDemoMode
+            ? ['englishTech_demo_ovas', 'englishTech_demo_ovas_teacher']
+            : ['englishTech_ovas', 'englishTech_ovas_camilodocente'];
+          storageKeys.forEach(storageKey => {
+            const cachedList = JSON.parse(localStorage.getItem(storageKey) || '[]');
+            const idx = cachedList.findIndex(o => o.id === updatedProject.id);
+            if (idx >= 0 || storageKey === storageKeys[0]) {
+              const next = idx >= 0
+                ? cachedList.map((o, i) => i === idx ? updatedProject : o)
+                : [updatedProject, ...cachedList];
+              localStorage.setItem(storageKey, JSON.stringify(next));
+            }
+          });
         } catch (e) {}
 
         // Only write to production Firestore if authenticated real teacher and NOT in Demo Mode

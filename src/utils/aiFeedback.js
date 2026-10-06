@@ -24,6 +24,14 @@ export function puedeMostrarFeedback(ev, ahora = Date.now()) {
 /** Resumen legible de una pregunta con la respuesta del estudiante y la correcta. */
 export function describirPregunta(q, respuesta) {
   const limpio = (v) => String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
+  const normalizarComparacion = (v) =>
+    limpio(v)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[.,!?;:¡¿"']/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
   const tipo = q?.type || 'text';
   const enunciado = limpio(q?.text || q?.question || '').slice(0, 300);
 
@@ -57,20 +65,20 @@ export function describirPregunta(q, respuesta) {
   } else if (tipo === 'order') {
     const esperado = (q.words || []).map(limpio).join(' ');
     const dado = (Array.isArray(respuesta) ? respuesta : []).map(limpio).join(' ');
-    acierto = !!esperado && dado === esperado;
+    acierto = !!esperado && normalizarComparacion(dado) === normalizarComparacion(esperado);
     correcta = esperado;
     delEstudiante = dado || '(en blanco)';
   } else if (tipo === 'match') {
     const pares = q.pairs || [];
     const elegidas = respuesta && typeof respuesta === 'object' ? respuesta : {};
-    const aciertos = pares.filter((p, i) => limpio(elegidas[i]).toLowerCase() === limpio(p.right).toLowerCase()).length;
+    const aciertos = pares.filter((p, i) => normalizarComparacion(elegidas[i]) === normalizarComparacion(p.right)).length;
     acierto = pares.length > 0 && aciertos === pares.length;
     correcta = pares.map((p) => `${limpio(p.left)} -> ${limpio(p.right)}`).join('; ');
     delEstudiante = pares.map((p, i) => `${limpio(p.left)} -> ${limpio(elegidas[i]) || '(sin elegir)'}`).join('; ');
     extra = { parcial: aciertos };
   } else {
-    const validas = [q?.correctAnswer, ...(Array.isArray(q?.acceptedAnswers) ? q.acceptedAnswers : [])].map((x) => limpio(x).toLowerCase()).filter(Boolean);
-    const dada = limpio(respuesta).toLowerCase();
+    const validas = [q?.correctAnswer, ...(Array.isArray(q?.acceptedAnswers) ? q.acceptedAnswers : [])].map(normalizarComparacion).filter(Boolean);
+    const dada = normalizarComparacion(respuesta);
     acierto = validas.length > 0 && validas.includes(dada);
     correcta = limpio(q?.correctAnswer) + (Array.isArray(q?.acceptedAnswers) && q.acceptedAnswers.length ? ` (tambien vale: ${q.acceptedAnswers.map(limpio).join(', ')})` : '');
     delEstudiante = limpio(respuesta) || '(en blanco)';

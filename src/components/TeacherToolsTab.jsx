@@ -493,6 +493,9 @@ export default function TeacherToolsTab({
     }
   }, [academicGroups, selectedPickerGroupId]);
 
+  const rouletteSpeechTimeoutRef = useRef(null);
+  const rouletteChimeTimeoutRef = useRef(null);
+
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
@@ -501,7 +504,12 @@ export default function TeacherToolsTab({
       if (stopwatchIntervalRef.current) clearInterval(stopwatchIntervalRef.current);
       if (rouletteTickRef.current) clearInterval(rouletteTickRef.current);
       if (rouletteTimeoutRef.current) clearTimeout(rouletteTimeoutRef.current);
+      if (rouletteSpeechTimeoutRef.current) clearTimeout(rouletteSpeechTimeoutRef.current);
+      if (rouletteChimeTimeoutRef.current) clearTimeout(rouletteChimeTimeoutRef.current);
       if (coinTimeoutRef.current) clearTimeout(coinTimeoutRef.current);
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        try { window.speechSynthesis.cancel(); } catch (e) {}
+      }
     };
   }, []);
   const [isSpinning, setIsSpinning] = useState(false);
@@ -557,6 +565,8 @@ export default function TeacherToolsTab({
         return;
     }
 
+    if (rouletteSpeechTimeoutRef.current) clearTimeout(rouletteSpeechTimeoutRef.current);
+    if (rouletteChimeTimeoutRef.current) clearTimeout(rouletteChimeTimeoutRef.current);
     if ('speechSynthesis' in window) {
       try { window.speechSynthesis.cancel(); } catch (e) {}
     }
@@ -583,17 +593,20 @@ export default function TeacherToolsTab({
 
     rouletteTimeoutRef.current = setTimeout(() => {
       clearInterval(rouletteTickRef.current);
+      if (!isMountedRef.current) return;
       setIsSpinning(false);
       setPickedWinner(winner);
       playTone(1046.5, 'triangle', 0.25, 0.35);
-      setTimeout(() => playTone(1318.5, 'sine', 0.35, 0.3), 120);
+      rouletteChimeTimeoutRef.current = setTimeout(() => {
+        if (isMountedRef.current) playTone(1318.5, 'sine', 0.35, 0.3);
+      }, 120);
       try {
         confetti({ particleCount: 120, spread: 80, origin: { y: 0.5 } });
       } catch (e) {}
 
       if (winner?.name) {
-        setTimeout(() => {
-          speakText(`Estudiante seleccionado: ${winner.name}`);
+        rouletteSpeechTimeoutRef.current = setTimeout(() => {
+          if (isMountedRef.current) speakText(`Estudiante seleccionado: ${winner.name}`);
         }, 400);
       }
     }, 4000);
@@ -601,6 +614,10 @@ export default function TeacherToolsTab({
 
   const handleExcludeWinner = () => {
     if (pickedWinner) {
+      if (rouletteSpeechTimeoutRef.current) clearTimeout(rouletteSpeechTimeoutRef.current);
+      if ('speechSynthesis' in window) {
+        try { window.speechSynthesis.cancel(); } catch (e) {}
+      }
       setExcludedStudents(prev => new Set([...prev, pickedWinner.id]));
       setPickedWinner(null);
       showMessage(`"${pickedWinner.name}" excluido de las siguientes rondas.`);
@@ -1299,6 +1316,7 @@ export default function TeacherToolsTab({
                   <button
                     type="button"
                     onClick={() => {
+                      if (rouletteSpeechTimeoutRef.current) clearTimeout(rouletteSpeechTimeoutRef.current);
                       if ('speechSynthesis' in window) {
                         try { window.speechSynthesis.cancel(); } catch (e) {}
                       }

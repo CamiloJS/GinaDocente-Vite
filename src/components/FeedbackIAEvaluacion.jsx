@@ -6,6 +6,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, HelpCircle, Lightbulb, Target, Award, RotateCcw } from './Icons.jsx';
 import { auth, db, appId, doc, updateDoc } from '../firebase/config.js';
 import { isDemoSessionActive } from '../utils/helpers.js';
+import { saveDemoSandboxItem } from '../utils/demoData.js';
 import {
   puedeMostrarFeedback,
   describirPregunta,
@@ -86,14 +87,22 @@ export default function FeedbackIAEvaluacion({
     if (expandidoInicial) setMostrarDetalle(true);
   }, [expandidoInicial]);
 
+  const prevGradeIdRef = useRef(gradeId);
   useEffect(() => {
-    if (Array.isArray(grade?.feedbackIA) && grade.feedbackIA.some(Boolean)) {
-      setExplicaciones(grade.feedbackIA);
+    const fb = Array.isArray(grade?.feedbackIA) && grade.feedbackIA.some(Boolean) ? grade.feedbackIA : null;
+    const mj = Array.isArray(grade?.minijuegosIA) && grade.minijuegosIA.some(Boolean) ? grade.minijuegosIA : null;
+    if (prevGradeIdRef.current !== gradeId) {
+      prevGradeIdRef.current = gradeId;
+      intentosRef.current = 0;
+      setJugadas({});
+      setTrampasTocadas({});
+      setExplicaciones(fb);
+      setMinijuegosRemotos(mj);
+    } else {
+      if (fb) setExplicaciones(fb);
+      if (mj) setMinijuegosRemotos(mj);
     }
-    if (Array.isArray(grade?.minijuegosIA) && grade.minijuegosIA.some(Boolean)) {
-      setMinijuegosRemotos(grade.minijuegosIA);
-    }
-  }, [grade?.feedbackIA, grade?.minijuegosIA]);
+  }, [gradeId, grade?.feedbackIA, grade?.minijuegosIA]);
 
   const generar = async (forzar = false) => {
     const grado = gradeRef.current;
@@ -115,7 +124,16 @@ export default function FeedbackIAEvaluacion({
         return;
       }
       try {
-        if (!isDemoSessionActive() && !grado.isDemoCreated && grado.id && !String(grado.id).startsWith('demo')) {
+        if (isDemoSessionActive() || grado.isDemoCreated || String(grado.id || '').startsWith('demo')) {
+          if (grado.id) {
+            saveDemoSandboxItem('grades', {
+              ...grado,
+              feedbackIA: r.feedback,
+              minijuegosIA: r.minijuegos || [],
+              feedbackIAEn: Date.now(),
+            });
+          }
+        } else if (grado.id) {
           await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'grades', grado.id), {
             feedbackIA: r.feedback,
             minijuegosIA: r.minijuegos || [],
@@ -125,7 +143,7 @@ export default function FeedbackIAEvaluacion({
       } catch (errGuardar) {
         console.warn('No se pudo guardar la retroalimentación (se muestra igual):', errGuardar);
       }
-      if (vivoRef.current) {
+      if (vivoRef.current && gradeRef.current?.id === grado.id) {
         setExplicaciones(r.feedback);
         if (Array.isArray(r.minijuegos) && r.minijuegos.some(Boolean)) {
           setMinijuegosRemotos(r.minijuegos);
@@ -140,8 +158,9 @@ export default function FeedbackIAEvaluacion({
   };
 
   useEffect(() => {
-    if (disponible && !explicaciones) generar();
-  }, [gradeId, disponible]);
+    const fb = Array.isArray(grade?.feedbackIA) && grade.feedbackIA.some(Boolean);
+    if (disponible && !fb && !explicaciones) generar();
+  }, [gradeId, disponible, explicaciones]);
 
   if (!disponible) return null;
 

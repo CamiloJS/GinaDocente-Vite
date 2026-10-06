@@ -160,7 +160,8 @@ const TasksTab = React.memo(({
     // 4. Verificador estricto de visibilidad de publicaciones y tareas
     const isTaskVisibleForUser = React.useCallback((t) => {
         if (!t) return false;
-        if (String(t.id || '').startsWith('demo-')) return true;
+        const isDemoTask = Boolean(isDemoMode || t.isDemoCreated || String(t.id || '').startsWith('demo-') || String(t.id || '').startsWith('demo_'));
+        if (!fixedTargetGroup && String(t.id || '').startsWith('demo-')) return true;
 
         const taskTeacherId = getItemTeacherId(t);
 
@@ -177,7 +178,7 @@ const TasksTab = React.memo(({
 
             // Datos canónicos del grupo actual
             const targetGroupObj = (academicGroups || []).find(g => String(g?.id || '').trim().replace(/^acad_/i, '').toLowerCase() === cleanFixed);
-            if (targetGroupObj && getItemTeacherId(targetGroupObj) !== taskTeacherId) {
+            if (!isDemoTask && targetGroupObj && getItemTeacherId(targetGroupObj) !== taskTeacherId) {
                 return false;
             }
             const targetGroupName = (targetGroupObj?.name || '').toLowerCase().trim();

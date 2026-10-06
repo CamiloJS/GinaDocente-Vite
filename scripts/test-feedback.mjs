@@ -52,6 +52,8 @@ d = describirPregunta({ type: 'listening', text: 'Escucha', options: [{ text: 'a
 chequear("listening correcto", d.acierto === true && d.correcta === 'a');
 d = describirPregunta({ type: 'dictation', text: 'Dictado', correctAnswer: 'the cat is black' }, 'the cat is black');
 chequear("dictado correcto", d.acierto === true);
+d = describirPregunta({ type: 'text', text: 'Traduce economic', correctAnswer: 'económico' }, 'economico.');
+chequear("escrita ignora tildes y puntuacion igual que el calificador", d.acierto === true);
 d = describirPregunta({ type: 'speaking', text: 'Habla sobre tu rutina' }, 'https://audio/voz.webm');
 chequear("speaking con audio: se marca como audio y sin acierto automatico", d.esAudio === true && d.acierto === null && d.delEstudiante.includes('audio'), d);
 chequear("speaking sin audio", describirPregunta({ type: 'speaking', text: 'Habla' }, '').delEstudiante === '(no grabo nada)');

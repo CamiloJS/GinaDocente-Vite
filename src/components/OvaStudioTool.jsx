@@ -76,6 +76,23 @@ export default function OvaStudioTool({
       try {
         if (isDemoMode) {
           setSyncStatus('local');
+          try {
+            const cached = localStorage.getItem(ovaStorageKey);
+            if (cached) {
+              const parsed = JSON.parse(cached);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                const valid = parsed
+                  .filter(item => !isDemoItemExpired(item))
+                  .filter(item => item.id === 'ova-golden-ratio-01' || getItemTeacherId(item) === activeTeacherId);
+                if (valid.length > 0) {
+                  setOvas(valid);
+                  return;
+                }
+              }
+            }
+          } catch (e) {}
+          const seed = { ...goldenRatioTemplate, id: 'ova-golden-ratio-01', editPin: '1234' };
+          setOvas([seed]);
           return;
         }
         if (!firestoreDb || !activeAppId) return;

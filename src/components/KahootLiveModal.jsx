@@ -260,6 +260,10 @@ const KahootLiveModal = ({
   // Auto-registrar participante al entrar a la sala en vivo (si es estudiante o si está en Modo Demo)
   const hasAutoJoinedRef = useRef(false);
   useEffect(() => {
+    hasAutoJoinedRef.current = false;
+  }, [isOpen, task?.id]);
+
+  useEffect(() => {
     if (!isOpen || viewMode !== 'live') return;
     if (hasAutoJoinedRef.current) return;
     hasAutoJoinedRef.current = true;
@@ -397,6 +401,9 @@ const KahootLiveModal = ({
           ? myParticipantData.lastAnswer
           : null);
 
+  const gongBannerTimerRef = useRef(null);
+  const soloSubmitTimerRef = useRef(null);
+
   // Disparador del Gong y transición cuando todos terminan o el tiempo se agota
   const triggerRoundEndWithGong = useCallback(
     (reason = 'all_answered') => {
@@ -409,7 +416,8 @@ const KahootLiveModal = ({
         playGongSound();
       }
       setGongBannerVisible(true);
-      setTimeout(() => setGongBannerVisible(false), 2600);
+      if (gongBannerTimerRef.current) clearTimeout(gongBannerTimerRef.current);
+      gongBannerTimerRef.current = setTimeout(() => setGongBannerVisible(false), 2600);
 
       if (viewMode === 'solo') {
         setSoloState((prev) => ({ ...prev, phase: 'revealed' }));
@@ -449,7 +457,8 @@ const KahootLiveModal = ({
           playGongSound();
         }
         setGongBannerVisible(true);
-        setTimeout(() => setGongBannerVisible(false), 2600);
+        if (gongBannerTimerRef.current) clearTimeout(gongBannerTimerRef.current);
+        gongBannerTimerRef.current = setTimeout(() => setGongBannerVisible(false), 2600);
       }
     }
   }, [isOpen, viewMode, activePhase, activeQIndex, activeStartedAt]);
@@ -602,6 +611,7 @@ const KahootLiveModal = ({
       return undefined;
     }
 
+    let revealSoundTimer = null;
     if (activePhase === 'lobby') {
       startLobbyMusic();
     } else if (activePhase === 'question') {
@@ -609,7 +619,7 @@ const KahootLiveModal = ({
     } else if (activePhase === 'revealed') {
       stopKahootMusic();
       if (myLiveAnswer) {
-        setTimeout(() => {
+        revealSoundTimer = setTimeout(() => {
           if (!soundMutedRef.current) {
             playRevealResultSound(Boolean(myLiveAnswer.isCorrect));
           }
@@ -630,12 +640,17 @@ const KahootLiveModal = ({
     }
 
     return () => {
+      if (revealSoundTimer) clearTimeout(revealSoundTimer);
       stopKahootMusic();
     };
   }, [isOpen, viewMode, activePhase, activeQIndex, soundMuted]);
 
-  // Limpiar audio al desmontar
-  useEffect(() => () => stopKahootMusic(), []);
+  // Limpiar audio y temporizadores al desmontar
+  useEffect(() => () => {
+    stopKahootMusic();
+    if (gongBannerTimerRef.current) clearTimeout(gongBannerTimerRef.current);
+    if (soloSubmitTimerRef.current) clearTimeout(soloSubmitTimerRef.current);
+  }, []);
 
   if (!isOpen || !liveTask) return null;
 
@@ -682,7 +697,8 @@ const KahootLiveModal = ({
       }));
 
       // En modo práctica individual, tras responder todos (uno mismo), suena el Gong inmediatamente
-      setTimeout(() => {
+      if (soloSubmitTimerRef.current) clearTimeout(soloSubmitTimerRef.current);
+      soloSubmitTimerRef.current = setTimeout(() => {
         triggerRoundEndWithGong('all_answered');
       }, 350);
       return;

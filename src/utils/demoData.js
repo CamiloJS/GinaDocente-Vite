@@ -1598,6 +1598,7 @@ export function clearDemoSandbox() {
     window.localStorage.removeItem(DEMO_CHAT_STORAGE_KEY);
     window.localStorage.removeItem('englishTech_demo_ovas');
     window.localStorage.removeItem('englishTech_demo_ovas_teacher');
+    window.localStorage.removeItem('englishTech_demo_ovas_camilodocente');
   } catch {
     // Ignorar errores de localStorage
   }

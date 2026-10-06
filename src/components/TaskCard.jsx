@@ -1260,7 +1260,18 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                                         <button onClick={togglePin} className={`p-1 rounded-lg transition-colors ${task.isPinned ? 'text-amber-500 bg-amber-50 dark:bg-amber-950/40' : 'text-gray-400 hover:text-amber-500 hover:bg-gray-100 dark:hover:bg-gray-800'}`} title={task.isPinned ? 'Desfijar' : 'Fijar'}>
                                             <Pin size={15} />
                                         </button>
-                                        <button onClick={() => setIsEditingTask(true)} className="p-1 rounded-lg text-gray-400 hover:text-blue-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" title="Editar">
+                                        <button onClick={() => {
+                                            setEditTaskData({
+                                                title: task?.title || '',
+                                                description: task?.description || '',
+                                                dueDate: task?.dueDate || '',
+                                                dueTime: task?.dueTime || '',
+                                                allowLate: task?.allowLate || false,
+                                                geniallyUrl: task?.geniallyUrl || '',
+                                                hideDate: !!task?.hideDate
+                                            });
+                                            setIsEditingTask(true);
+                                        }} className="p-1 rounded-lg text-gray-400 hover:text-blue-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" title="Editar">
                                             <Edit3 size={15} />
                                         </button>
                                         <button onClick={() => confirmAction("¿Desea eliminar esta publicación definitivamente?", async () => {

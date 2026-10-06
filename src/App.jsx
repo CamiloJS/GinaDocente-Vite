@@ -11,7 +11,7 @@ import {
 import {
   CHAT_GRADIENTS, CHAT_PATTERNS, COMMENT_EMOJIS, FALLBACK_MAP, SLIDE_GRADIENTS,
   TEACHER_NAME, SECOND_TEACHER_NAME, isCamiloTeacher, isTeacherId, getCanonicalTeacherId,
-  getTeacherDisplayName, getTeacherUsername, getItemTeacherId,
+  getTeacherDisplayName, getTeacherUsername, getItemTeacherId, isDemoSessionActive,
   compressImage, containsBadWords, checkBadWordsAsync, formatChatDate, formatTime,
   uploadImageToStorage, uploadRawFileToStorage, speakText, splitNameFirstAndLast, format12HourTime, formatDateTime12H
 } from './utils/helpers.js'
@@ -52,7 +52,7 @@ import CommandPaletteModal from './components/CommandPaletteModal.jsx'
 import FeedbackIAEvaluacion from './components/FeedbackIAEvaluacion.jsx';
 import SimulacroEvaluacion from './components/SimulacroEvaluacion.jsx';
 import { extractTextFromPDF } from './utils/pdfExtractor.js'
-import { calculateScore, normalizarRespuesta, permiteVariasRespuestas } from './utils/evalScoring.js'
+import { calculateScore, normalizarRespuesta, respuestasValidasDe, permiteVariasRespuestas } from './utils/evalScoring.js'
 import { textoPlano } from './utils/textFormat.js';
 import { desordenarPalabras } from './utils/palabras.js'
 import {
@@ -366,8 +366,20 @@ function App() {
   const [editingIAId, setEditingIAId] = useState(null);
   const [editIAText, setEditIAText] = useState("");
 
-  const [loggedInUser, setLoggedInUser] = useState(() => initialIsDemo ? (initialDemoRole === 'teacher' ? 'DemoDocente' : '@invitado') : (initialActiveSession ? (initialActiveSession.role === 'teacher' ? getTeacherUsername(initialActiveSession.userKey || initialActiveSession.name) : `@${initialActiveSession.userKey}`) : "")); 
-  const [loggedInName, setLoggedInName] = useState(() => initialIsDemo ? (initialDemoRole === 'teacher' ? TEACHER_NAME : 'Invitado (Demo)') : (initialActiveSession ? (initialActiveSession.role === 'teacher' ? getTeacherDisplayName(initialActiveSession.userKey || initialActiveSession.name) : (initialActiveSession.name || initialActiveSession.userKey)) : "")); 
+  const [loggedInUser, setLoggedInUser] = useState(() => {
+    if (initialIsDemo) return initialDemoRole === 'teacher' ? 'DemoDocente' : '@invitado';
+    if (!initialActiveSession) return "";
+    const rawKey = (initialActiveSession.userKey || initialActiveSession.username || '').replace('@', '').trim();
+    if (initialActiveSession.role === 'teacher') return getTeacherUsername(rawKey || initialActiveSession.name);
+    return rawKey ? `@${rawKey}` : "";
+  });
+  const [loggedInName, setLoggedInName] = useState(() => {
+    if (initialIsDemo) return initialDemoRole === 'teacher' ? TEACHER_NAME : 'Invitado (Demo)';
+    if (!initialActiveSession) return "";
+    const rawKey = (initialActiveSession.userKey || initialActiveSession.username || '').replace('@', '').trim();
+    if (initialActiveSession.role === 'teacher') return getTeacherDisplayName(rawKey || initialActiveSession.name);
+    return initialActiveSession.name || rawKey || "";
+  });
   const [userMappings, setUserMappings] = useState(() => initialIsDemo ? DEMO_USER_MAPPINGS : {}); 
   const userMappingsRef = useRef(userMappings);
   const [userMappingsLoaded, setUserMappingsLoaded] = useState(() => initialIsDemo);
@@ -749,7 +761,7 @@ function App() {
       if (event.state?.tab) {
         setActiveTab(event.state.tab);
       } else if (activeTabRef.current !== 'feed' && activeTabRef.current !== 'tasks') {
-        setActiveTab('feed');
+        setActiveTab('tasks');
       }
     };
 
@@ -1619,8 +1631,9 @@ function App() {
     submittingEvalRef.current = true;
     try {
       if (isDemoMode) {
+        const now = Date.now();
         const demoCancelData = {
-          id: 'demo-cancel-' + Date.now(),
+          id: 'demo-cancel-' + now,
           evaluationId: targetEval.id,
           studentId: myChatId || 'invitado',
           studentEmail: 'invitado@demo.local',
@@ -1629,8 +1642,12 @@ function App() {
           status: 'cancelled_tab_change',
           statusReason: 'Cancelada por cambio de pestaña o pantalla (Simulación Demo)',
           answers: studentAnswersRef.current || {},
-          submittedAt: Date.now()
+          submittedAt: now,
+          createdAt: now,
+          expiresAt: now + DEMO_TTL_MS,
+          isDemoCreated: true
         };
+        saveDemoSandboxItem('grades', demoCancelData);
         setGrades(prev => [{ ...demoCancelData }, ...prev.filter(g => g.id !== demoCancelData.id)]);
         setActiveTakingEval(null);
         setStudentAnswers({});
@@ -1638,6 +1655,7 @@ function App() {
         submittingEvalRef.current = false;
         return;
       }
+      const now = Date.now();
       const cancelData = {
         evaluationId: targetEval.id,
         teacherId: getItemTeacherId(targetEval),
@@ -1648,7 +1666,8 @@ function App() {
         status: 'cancelled_tab_change',
         statusReason: 'Cancelada por cambio de pestaña o pantalla',
         answers: studentAnswersRef.current || {},
-        submittedAt: Date.now()
+        submittedAt: now,
+        createdAt: now
       };
       const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'grades'), cancelData);
       setGrades(prev => [{ id: docRef.id, ...cancelData }, ...prev.filter(g => g.id !== docRef.id)]);
@@ -1818,6 +1837,7 @@ function App() {
         submittingEvalRef.current = false;
         return;
       }
+      const now = Date.now();
       const gradeData = {
         evaluationId: evalSnapshot.id,
         teacherId: getItemTeacherId(evalSnapshot),
@@ -1826,7 +1846,8 @@ function App() {
         studentName: loggedInName || 'Estudiante',
         score: parseFloat((Number(score) || 0).toFixed(1)),
         answers: currentAnswers,
-        submittedAt: Date.now()
+        submittedAt: now,
+        createdAt: now
       };
       const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'grades'), gradeData);
       const savedGrade = { id: docRef.id, ...gradeData };
@@ -2740,7 +2761,20 @@ function App() {
               const updatedAccs = [newAcc, ...filtered];
               localStorage.setItem('englishTech_savedAccounts', JSON.stringify(updatedAccs));
               setSavedAccounts(updatedAccs);
+              localStorage.setItem('englishTech_activeSession', JSON.stringify({
+                email,
+                uid: registeredUser ? registeredUser.uid : username,
+                userKey: username,
+                username: '@' + username,
+                name: fullName,
+                role: 'student',
+                isGoogle: false
+              }));
 
+              setRole('student');
+              setLoggedInUser('@' + username);
+              setLoggedInName(fullName);
+              setHasEntered(true);
               setLoginType(null);
               setIsStudentRegisterMode(false);
               if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
@@ -2894,7 +2928,17 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
             }
           };
 
+          const demoAutoReplyTimeoutsRef = useRef([]);
+          const clearDemoAutoReplyTimeouts = () => {
+            if (demoAutoReplyTimeoutsRef.current.length > 0) {
+              demoAutoReplyTimeoutsRef.current.forEach(t => clearTimeout(t));
+              demoAutoReplyTimeoutsRef.current = [];
+            }
+          };
+          useEffect(() => () => clearDemoAutoReplyTimeouts(), []);
+
           const handleExitDemo = () => {
+            clearDemoAutoReplyTimeouts();
             try {
               sessionStorage.removeItem('englishTech_demoMode');
               sessionStorage.removeItem('englishTech_isDemo');
@@ -2946,6 +2990,7 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
           };
 
           const handleResetDemo = () => {
+            clearDemoAutoReplyTimeouts();
             clearDemoSandbox();
             setAcademicGroups(DEMO_ACADEMIC_GROUPS);
             setAcademicGroupsLoaded(true);
@@ -3165,18 +3210,20 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
 
                 try {
                     const activeSession = JSON.parse(rawSession);
-                    if (activeSession && (activeSession.userKey || activeSession.name)) {
-                        const cleanKey = (activeSession.userKey || '').replace('@', '');
+                    if (activeSession && (activeSession.userKey || activeSession.username || activeSession.name)) {
+                        const cleanKey = (activeSession.userKey || activeSession.username || '').replace('@', '').trim();
                         const finalRole = activeSession.role || 'student';
-                        const finalName = finalRole === 'teacher' ? getTeacherDisplayName(cleanKey || activeSession.name) : (activeSession.name || cleanKey);
-                        const finalUser = finalRole === 'teacher' ? getTeacherUsername(cleanKey || activeSession.name) : `@${cleanKey}`;
-                        
-                        setRole(finalRole);
-                        setLoggedInUser(finalUser);
-                        setLoggedInName(finalName);
-                        setHasEntered(true);
-                        setLoginType(null);
-                        return;
+                        if (finalRole === 'teacher' || cleanKey) {
+                            const finalName = finalRole === 'teacher' ? getTeacherDisplayName(cleanKey || activeSession.name) : (activeSession.name || cleanKey);
+                            const finalUser = finalRole === 'teacher' ? getTeacherUsername(cleanKey || activeSession.name) : `@${cleanKey}`;
+                            
+                            setRole(finalRole);
+                            setLoggedInUser(finalUser);
+                            setLoggedInName(finalName);
+                            setHasEntered(true);
+                            setLoginType(null);
+                            return;
+                        }
                     }
                 } catch (e) {
                     console.error('Error al restaurar sesión activa:', e);
@@ -3504,8 +3551,8 @@ useEffect(() => {
 // 6. PESTAÑA: EVALUACIONES Y NOTAS
 useEffect(() => {
     if (!hasEntered || !myChatId || isDemoMode || activeTab !== 'evaluations') return;
-    const uEvals = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'evaluations'), limit(100)), s => setEvaluations(s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => b.createdAt - a.createdAt)), err => console.error(err));
-    const uGrades = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'grades'), limit(500)), s => setGrades(s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => b.createdAt - a.createdAt)), err => console.error(err));
+    const uEvals = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'evaluations'), limit(100)), s => setEvaluations(s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))), err => console.error(err));
+    const uGrades = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'grades'), limit(500)), s => setGrades(s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.submittedAt || b.createdAt || 0) - (a.submittedAt || a.createdAt || 0))), err => console.error(err));
     return () => { uEvals(); uGrades(); };
 }, [hasEntered, myChatId, activeTab, isDemoMode]);
 
@@ -3698,7 +3745,7 @@ useEffect(() => {
                                   callerName: call.callerName || 'Alguien',
                                   offer: call.offer,
                                   targetId: call.initiator
-                              }, (err) => console.error('[llamadas] fallo la escucha:', err))
+                              })
                               break
                           }
                       } else {
@@ -3716,7 +3763,7 @@ useEffect(() => {
                           }
                       }
                   }
-              })
+              }, (err) => console.error('[llamadas] fallo la escucha:', err))
               return () => unsubscribe()
           }, [myChatId, isDemoMode])
 
@@ -4069,10 +4116,47 @@ useEffect(() => {
                       const nextMsgs = chatMessages.filter(m => m.id !== msgId);
                       setChatMessages(nextMsgs);
                       saveDemoChatMessages(activeChat.id, nextMsgs);
+                      if (nextMsgs.length === 0) {
+                          setLastMessages(prev => { const next = { ...prev }; delete next[activeChat.id]; return next; });
+                      } else {
+                          const last = nextMsgs[nextMsgs.length - 1];
+                          const prevLast = lastMessages?.[activeChat.id];
+                          const lastStudentAt = !isTeacherId(last?.authorId)
+                              ? (Number(last?.createdAt) || Number(prevLast?.lastStudentAt) || 0)
+                              : (Number(prevLast?.lastStudentAt) || 0);
+                          setLastMessages(prev => ({
+                              ...prev,
+                              [activeChat.id]: {
+                                  text: last?.isDeleted ? 'Mensaje eliminado' : (last?.text || (last?.imageUrl ? 'Imagen' : '')),
+                                  author: (last?.author || 'Usuario').split(' ')[0],
+                                  authorId: last?.authorId || '',
+                                  authorRole: isTeacherId(last?.authorId) ? 'teacher' : 'student',
+                                  createdAt: last?.createdAt || Date.now(),
+                                  ...(lastStudentAt > 0 ? { lastStudentAt } : {})
+                              }
+                          }));
+                      }
                   } else {
                       const nextMsgs = chatMessages.map(m => m.id === msgId ? { ...m, isDeleted: true, deletedAt: Date.now(), deletedBy: 'student', originalText: m.text || '', text: 'Este mensaje fue eliminado' } : m);
                       setChatMessages(nextMsgs);
                       saveDemoChatMessages(activeChat.id, nextMsgs);
+                      const isLatestInChat = chatMessages.length > 0 && chatMessages[chatMessages.length - 1]?.id === msgId;
+                      if (isLatestInChat) {
+                          const msgObj = chatMessages[chatMessages.length - 1];
+                          const msgTime = msgObj?.createdAt || Date.now();
+                          setLastMessages(prev => ({
+                              ...prev,
+                              [activeChat.id]: {
+                                  ...(prev?.[activeChat.id] || {}),
+                                  text: 'Este mensaje fue eliminado',
+                                  author: (msgObj?.author || 'Usuario').split(' ')[0],
+                                  authorId: msgObj?.authorId || myChatId,
+                                  authorRole: role,
+                                  createdAt: msgTime,
+                                  ...(role !== 'teacher' ? { lastStudentAt: msgTime } : {})
+                              }
+                          }));
+                      }
                   }
                   return;
               }
@@ -4175,18 +4259,28 @@ useEffect(() => {
               }
 
               if (isDemoMode) {
+                  const trimmedEdit = editAppMessageText.trim();
                   const nextMsgs = chatMessages.map(m => {
                       if (m.id !== editingAppMessageId) return m;
-                      if (role === 'teacher') return { ...m, text: editAppMessageText.trim() };
+                      if (role === 'teacher') return { ...m, text: trimmedEdit };
                       return {
                           ...m,
-                          text: editAppMessageText.trim(),
+                          text: trimmedEdit,
                           isEdited: true,
                           editHistory: [{ text: m.text || '', date: Date.now() }, ...(m.editHistory || [])]
                       };
                   });
                   setChatMessages(nextMsgs);
                   saveDemoChatMessages(activeChat.id, nextMsgs);
+                  if (chatMessages.length > 0 && chatMessages[chatMessages.length - 1]?.id === editingAppMessageId) {
+                      setLastMessages(prev => prev?.[activeChat.id] ? ({
+                          ...prev,
+                          [activeChat.id]: {
+                              ...prev[activeChat.id],
+                              text: trimmedEdit
+                          }
+                      }) : prev);
+                  }
                   setEditingAppMessageId(null);
                   return;
               }
@@ -4690,24 +4784,30 @@ useEffect(() => {
                   saveDemoChatMessages(currentChatId, next);
                   return next;
               });
-              setLastMessages(prev => ({
-                  ...prev,
-                  [currentChatId]: {
-                      text: msgPreviewText,
-                      author: previewName,
-                      authorId: myChatId,
-                      authorRole: role,
-                      createdAt: nowTs,
-                      timestamp: nowTs,
-                      ...(role !== 'teacher' ? { lastStudentAt: nowTs } : {})
-                  }
-              }));
+              setLastMessages(prev => {
+                  const prevLastStudentAt = Number(prev?.[currentChatId]?.lastStudentAt) || 0;
+                  const nextLastStudentAt = role !== 'teacher' ? nowTs : prevLastStudentAt;
+                  return {
+                      ...prev,
+                      [currentChatId]: {
+                          text: msgPreviewText,
+                          author: previewName,
+                          authorId: myChatId,
+                          authorRole: role,
+                          createdAt: nowTs,
+                          timestamp: nowTs,
+                          ...(nextLastStudentAt > 0 ? { lastStudentAt: nextLastStudentAt } : {})
+                      }
+                  };
+              });
               setTimeout(() => scrollToChatBottom('smooth'), 30);
 
               // Respuesta automática simulada para evaluación de la plataforma en Modo Demo
               const replyInfo = getDemoAutoReply(currentChatObj, role, textToSend);
               if (replyInfo && replyInfo.text) {
-                  setTimeout(() => {
+                  const timerId = setTimeout(() => {
+                      demoAutoReplyTimeoutsRef.current = demoAutoReplyTimeoutsRef.current.filter(id => id !== timerId);
+                      if (!isDemoSessionActive()) return;
                       const replyTs = Date.now();
                       const replyAuthorId = replyInfo.authorId || replyInfo.senderId || 'teacher';
                       const replyAuthor = replyInfo.author || replyInfo.senderName || 'La profe';
@@ -4732,19 +4832,24 @@ useEffect(() => {
                           setChatMessages(nextForChat);
                           setTimeout(() => scrollToChatBottom('smooth'), 50);
                       }
-                      setLastMessages(prev => ({
-                          ...prev,
-                          [currentChatId]: {
-                              text: replyInfo.text,
-                              author: (replyAuthor || 'Usuario').split(' ')[0],
-                              authorId: replyAuthorId,
-                              authorRole: replyRole,
-                              createdAt: replyTs,
-                              timestamp: replyTs,
-                              ...(replyRole !== 'teacher' ? { lastStudentAt: replyTs } : {})
-                          }
-                      }));
+                      setLastMessages(prev => {
+                          const prevLastStudentAt = Number(prev?.[currentChatId]?.lastStudentAt) || 0;
+                          const nextLastStudentAt = replyRole !== 'teacher' ? replyTs : prevLastStudentAt;
+                          return {
+                              ...prev,
+                              [currentChatId]: {
+                                  text: replyInfo.text,
+                                  author: (replyAuthor || 'Usuario').split(' ')[0],
+                                  authorId: replyAuthorId,
+                                  authorRole: replyRole,
+                                  createdAt: replyTs,
+                                  timestamp: replyTs,
+                                  ...(nextLastStudentAt > 0 ? { lastStudentAt: nextLastStudentAt } : {})
+                              }
+                          };
+                      });
                   }, 1300);
+                  demoAutoReplyTimeoutsRef.current.push(timerId);
               }
               return;
           }
@@ -6991,7 +7096,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                 setAcademicGroups(prev => {
                     const next = prev.map(g => g.id === matched.id ? { ...g, members: updatedMembers } : g);
                     const updated = next.find(g => g.id === matched.id);
-                    if (updated && updated.isDemoCreated) saveDemoSandboxItem('academicGroups', updated);
+                    if (updated) saveDemoSandboxItem('academicGroups', updated);
                     return next;
                 });
                 setSelectedGroupForFeed({ ...matched, members: updatedMembers });
@@ -9025,10 +9130,15 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                               studentAnswerText = paresM.map((p, pIdx) => `${p.left} -> ${elegidasM[pIdx] || '(sin elegir)'}`).join(' | ');
                               correctAnswerText = paresM.map((p) => `${p.left} -> ${p.right}`).join(' | ');
                               isCorrect = paresM.length > 0 && aciertosM === paresM.length;
+                          } else if (q.type === 'speaking') {
+                              studentAnswerText = qAns ? 'Audio grabado' : '(Sin respuesta)';
+                              correctAnswerText = 'Calificación manual';
+                              isCorrect = false;
                           } else {
                               studentAnswerText = qAns !== undefined && qAns !== null && String(qAns).trim() ? String(qAns).trim() : '(Sin respuesta)';
-                              correctAnswerText = (q.correctAnswer || '').trim();
-                              isCorrect = String(qAns ?? '').trim().toLowerCase() === String(q.correctAnswer ?? '').trim().toLowerCase();
+                              correctAnswerText = [q.correctAnswer, ...(Array.isArray(q.acceptedAnswers) ? q.acceptedAnswers : [])].filter(Boolean).join(' / ');
+                              const validas = respuestasValidasDe(q);
+                              isCorrect = validas.length > 0 && validas.includes(normalizarRespuesta(qAns));
                           }
 
                           if (isCorrect) correctCount++;
@@ -9064,19 +9174,33 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                       'Nota Final (0.0 - 5.0)': `${averageScore} / 5.0`,
                   };
 
+                  const isQuestionAnsweredCorrectly = (q, qAns) => {
+                      if (q.type === 'speaking') return false;
+                      if ((q.type === 'multiple' || q.type === 'listening') && Array.isArray(q.options) && q.options.length >= 2) {
+                          const correctIndices = (q.options || []).map((opt, oIdx) => opt?.isCorrect ? oIdx : null).filter(o => o !== null);
+                          const ansArr = Array.isArray(qAns) ? qAns : [];
+                          return correctIndices.length > 0 && ansArr.length === correctIndices.length && correctIndices.every(i => ansArr.includes(i));
+                      }
+                      if (q.type === 'order') {
+                          const secuencia = Array.isArray(qAns) ? qAns : [];
+                          return secuencia.length > 0 && normalizarRespuesta(secuencia.join(' ')) === normalizarRespuesta((q.words || []).join(' '));
+                      }
+                      if (q.type === 'match') {
+                          const paresM = q.pairs || [];
+                          const elegidasM = (qAns && typeof qAns === 'object') ? qAns : {};
+                          const aciertosM = paresM.filter((p, pIdx) => normalizarRespuesta(elegidasM[pIdx]) === normalizarRespuesta(p.right)).length;
+                          return paresM.length > 0 && aciertosM === paresM.length;
+                      }
+                      const validas = respuestasValidasDe(q);
+                      return validas.length > 0 && validas.includes(normalizarRespuesta(qAns));
+                  };
+
                   questions.forEach((q, qIdx) => {
-                      const rawQuestionText = (q.text || q.question || `Pregunta ${qIdx + 1}`).replace(/\r?\n/g, ' ').trim();
+                      const rawQuestionText = textoPlano(q.text || q.question || `Pregunta ${qIdx + 1}`).slice(0, 400);
                       const qColTitle = `P${qIdx + 1}: ${rawQuestionText.length > 60 ? rawQuestionText.slice(0, 57) + '...' : rawQuestionText}`;
                       let qCorrectCount = 0;
                       evalGrades.forEach(g => {
-                          const qAns = g.answers?.[qIdx];
-                          if (q.type === 'multiple') {
-                              const correctIndices = (q.options || []).map((opt, oIdx) => opt.isCorrect ? oIdx : null).filter(o => o !== null);
-                              const ansArr = Array.isArray(qAns) ? qAns : [];
-                              if (correctIndices.length > 0 && ansArr.length === correctIndices.length && correctIndices.every(i => ansArr.includes(i))) qCorrectCount++;
-                          } else {
-                              if (typeof qAns === 'string' && qAns.trim().toLowerCase() === (q.correctAnswer || '').trim().toLowerCase()) qCorrectCount++;
-                          }
+                          if (isQuestionAnsweredCorrectly(q, g.answers?.[qIdx])) qCorrectCount++;
                       });
                       const pct = evalGrades.length > 0 ? Math.round((qCorrectCount / evalGrades.length) * 100) : 0;
                       summaryRow[qColTitle] = `${qCorrectCount}/${evalGrades.length} acertaron (${pct}%)`;
@@ -9090,31 +9214,33 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                   const questionRows = questions.map((q, qIdx) => {
                       let correctAnswersText = '';
                       let optionsText = '';
-                      if (q.type === 'multiple') {
+                      if ((q.type === 'multiple' || q.type === 'listening') && Array.isArray(q.options) && q.options.length >= 2) {
                           optionsText = (q.options || []).map((opt, oIdx) => `${String.fromCharCode(65 + oIdx)}) ${opt.text}${opt.isCorrect ? ' [✔ CORRECTA]' : ''}`).join('  |  ');
                           correctAnswersText = (q.options || []).filter(o => o.isCorrect).map(o => o.text).join('; ');
+                      } else if (q.type === 'order') {
+                          optionsText = 'Ordenar palabras';
+                          correctAnswersText = (q.words || []).join(' ');
+                      } else if (q.type === 'match') {
+                          optionsText = 'Relacionar columnas';
+                          correctAnswersText = (q.pairs || []).map(p => `${p.left} -> ${p.right}`).join(' | ');
+                      } else if (q.type === 'speaking') {
+                          optionsText = 'Respuesta hablada (audio)';
+                          correctAnswersText = 'Calificación manual';
                       } else {
                           optionsText = 'Respuesta libre / escrita';
-                          correctAnswersText = q.correctAnswer || '';
+                          correctAnswersText = [q.correctAnswer, ...(Array.isArray(q.acceptedAnswers) ? q.acceptedAnswers : [])].filter(Boolean).join(' / ');
                       }
 
                       let qCorrectCount = 0;
                       evalGrades.forEach(g => {
-                          const qAns = g.answers?.[qIdx];
-                          if (q.type === 'multiple') {
-                              const correctIndices = (q.options || []).map((opt, oIdx) => opt.isCorrect ? oIdx : null).filter(o => o !== null);
-                              const ansArr = Array.isArray(qAns) ? qAns : [];
-                              if (correctIndices.length > 0 && ansArr.length === correctIndices.length && correctIndices.every(i => ansArr.includes(i))) qCorrectCount++;
-                          } else {
-                              if (typeof qAns === 'string' && qAns.trim().toLowerCase() === (q.correctAnswer || '').trim().toLowerCase()) qCorrectCount++;
-                          }
+                          if (isQuestionAnsweredCorrectly(q, g.answers?.[qIdx])) qCorrectCount++;
                       });
                       const pct = evalGrades.length > 0 ? ((qCorrectCount / evalGrades.length) * 100).toFixed(1) + '%' : '0%';
 
                       return {
                           'N° Pregunta': qIdx + 1,
                           'Enunciado': q.text || q.question || '',
-                          'Tipo de Pregunta': q.type === 'multiple' ? 'Selección Múltiple' : 'Respuesta Escrita',
+                          'Tipo de Pregunta': (q.type === 'multiple' || (q.type === 'listening' && Array.isArray(q.options) && q.options.length >= 2)) ? 'Selección Múltiple' : 'Respuesta Escrita',
                           'Opciones Disponibles': optionsText,
                           'Respuesta(s) Correcta(s)': correctAnswersText,
                           'Estudiantes que Acertaron': qCorrectCount,
@@ -9128,30 +9254,40 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                   sortedGrades.forEach((g) => {
                       questions.forEach((q, qIdx) => {
                           const qAns = g.answers?.[qIdx];
-                          let isCorrect = false;
+                          const isCorrect = isQuestionAnsweredCorrectly(q, qAns);
                           let studentAnswerText = '';
                           let correctAnswerText = '';
 
-                          if (q.type === 'multiple') {
-                              const correctIndices = (q.options || []).map((opt, oIdx) => opt.isCorrect ? oIdx : null).filter(o => o !== null);
+                          if ((q.type === 'multiple' || q.type === 'listening') && Array.isArray(q.options) && q.options.length >= 2) {
+                              const correctIndices = (q.options || []).map((opt, oIdx) => opt?.isCorrect ? oIdx : null).filter(o => o !== null);
                               const ansArr = Array.isArray(qAns) ? qAns : [];
-                              isCorrect = correctIndices.length > 0 && ansArr.length === correctIndices.length && correctIndices.every(i => ansArr.includes(i));
                               studentAnswerText = ansArr.length > 0 ? ansArr.map(idx => q.options?.[idx]?.text || `Opción ${idx + 1}`).join('; ') : '(Sin respuesta)';
                               correctAnswerText = correctIndices.map(idx => q.options?.[idx]?.text || `Opción ${idx + 1}`).join('; ');
+                          } else if (q.type === 'order') {
+                              studentAnswerText = Array.isArray(qAns) && qAns.length ? qAns.join(' ') : '(Sin respuesta)';
+                              correctAnswerText = (q.words || []).join(' ');
+                          } else if (q.type === 'match') {
+                              const paresM = q.pairs || [];
+                              const elegidasM = (qAns && typeof qAns === 'object') ? qAns : {};
+                              const allUnanswered = paresM.every((_, pIdx) => !elegidasM[pIdx]);
+                              studentAnswerText = allUnanswered ? '(Sin respuesta)' : paresM.map((p, pIdx) => `${p.left} -> ${elegidasM[pIdx] || '(sin elegir)'}`).join(' | ');
+                              correctAnswerText = paresM.map(p => `${p.left} -> ${p.right}`).join(' | ');
+                          } else if (q.type === 'speaking') {
+                              studentAnswerText = qAns ? '[Audio grabado]' : '(Sin respuesta)';
+                              correctAnswerText = 'Calificación manual';
                           } else {
-                              studentAnswerText = typeof qAns === 'string' && qAns.trim() ? qAns.trim() : '(Sin respuesta)';
-                              correctAnswerText = (q.correctAnswer || '').trim();
-                              isCorrect = typeof qAns === 'string' && qAns.trim().toLowerCase() === correctAnswerText.toLowerCase();
+                              studentAnswerText = qAns !== undefined && qAns !== null && String(qAns).trim() ? String(qAns).trim() : '(Sin respuesta)';
+                              correctAnswerText = [q.correctAnswer, ...(Array.isArray(q.acceptedAnswers) ? q.acceptedAnswers : [])].filter(Boolean).join(' / ');
                           }
 
                           detailedFeedbackRows.push({
                               'Estudiante': g.studentName || 'Estudiante',
                               'N° Pregunta': qIdx + 1,
                               'Enunciado de la Pregunta': q.text || q.question || '',
-                              'Tipo': q.type === 'multiple' ? 'Selección Múltiple' : 'Escrita',
+                              'Tipo': (q.type === 'multiple' || (q.type === 'listening' && Array.isArray(q.options) && q.options.length >= 2)) ? 'Selección Múltiple' : 'Escrita',
                               'Respuesta del Estudiante': studentAnswerText,
                               'Respuesta Correcta Esperada': correctAnswerText,
-                              'Resultado': isCorrect ? 'CORRECTA' : (studentAnswerText === '(Sin respuesta)' ? 'SIN RESPONDER' : 'INCORRECTA'),
+                              'Resultado': q.type === 'speaking' ? 'CALIFICACIÓN MANUAL' : (isCorrect ? 'CORRECTA' : (studentAnswerText === '(Sin respuesta)' ? 'SIN RESPONDER' : 'INCORRECTA')),
                               'Puntaje (1.0 / 0.0)': isCorrect ? 1.0 : 0.0,
                               'Retroalimentación del Docente': g.teacherFeedback || ''
                           });
@@ -9288,12 +9424,22 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                           let correctCount = 0;
                                           questions.forEach((q, qIdx) => {
                                               const qAns = grade.answers?.[qIdx];
+                                              if (q.type === 'speaking') return;
                                               if ((q.type === 'multiple' || q.type === 'listening') && Array.isArray(q.options) && q.options.length >= 2) {
-                                                  const correctOpts = (q.options || []).map((opt, oIdx) => opt.isCorrect ? oIdx : null).filter(o => o !== null);
+                                                  const correctOpts = (q.options || []).map((opt, oIdx) => opt?.isCorrect ? oIdx : null).filter(o => o !== null);
                                                   const ansArr = Array.isArray(qAns) ? qAns : [];
                                                   if (correctOpts.length > 0 && ansArr.length === correctOpts.length && correctOpts.every(i => ansArr.includes(i))) correctCount++;
+                                              } else if (q.type === 'order') {
+                                                  const secuencia = Array.isArray(qAns) ? qAns : [];
+                                                  if (secuencia.length > 0 && normalizarRespuesta(secuencia.join(' ')) === normalizarRespuesta((q.words || []).join(' '))) correctCount++;
+                                              } else if (q.type === 'match') {
+                                                  const paresM = q.pairs || [];
+                                                  const elegidasM = (qAns && typeof qAns === 'object') ? qAns : {};
+                                                  const aciertosM = paresM.filter((p, pIdx) => normalizarRespuesta(elegidasM[pIdx]) === normalizarRespuesta(p.right)).length;
+                                                  if (paresM.length > 0 && aciertosM === paresM.length) correctCount++;
                                               } else {
-                                                  if (String(qAns ?? '').trim().toLowerCase() === String(q.correctAnswer ?? '').trim().toLowerCase()) correctCount++;
+                                                  const validas = respuestasValidasDe(q);
+                                                  if (validas.length > 0 && validas.includes(normalizarRespuesta(qAns))) correctCount++;
                                               }
                                           });
 
@@ -9498,12 +9644,22 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                           let studentCorrect = 0;
                                           questions.forEach((q, qIdx) => {
                                               const qAns = selectedStudentGradeForReview.answers?.[qIdx];
-                                              if (q.type === 'multiple') {
-                                                  const correctOpts = (q.options || []).map((opt, oIdx) => opt.isCorrect ? oIdx : null).filter(o => o !== null);
+                                              if (q.type === 'speaking') return;
+                                              if ((q.type === 'multiple' || q.type === 'listening') && Array.isArray(q.options) && q.options.length >= 2) {
+                                                  const correctOpts = (q.options || []).map((opt, oIdx) => opt?.isCorrect ? oIdx : null).filter(o => o !== null);
                                                   const ansArr = Array.isArray(qAns) ? qAns : [];
                                                   if (correctOpts.length > 0 && ansArr.length === correctOpts.length && correctOpts.every(i => ansArr.includes(i))) studentCorrect++;
+                                              } else if (q.type === 'order') {
+                                                  const secuencia = Array.isArray(qAns) ? qAns : [];
+                                                  if (secuencia.length > 0 && normalizarRespuesta(secuencia.join(' ')) === normalizarRespuesta((q.words || []).join(' '))) studentCorrect++;
+                                              } else if (q.type === 'match') {
+                                                  const paresM = q.pairs || [];
+                                                  const elegidasM = (qAns && typeof qAns === 'object') ? qAns : {};
+                                                  const aciertosM = paresM.filter((p, pIdx) => normalizarRespuesta(elegidasM[pIdx]) === normalizarRespuesta(p.right)).length;
+                                                  if (paresM.length > 0 && aciertosM === paresM.length) studentCorrect++;
                                               } else {
-                                                  if (typeof qAns === 'string' && qAns.trim().toLowerCase() === (q.correctAnswer || '').trim().toLowerCase()) studentCorrect++;
+                                                  const validas = respuestasValidasDe(q);
+                                                  if (validas.length > 0 && validas.includes(normalizarRespuesta(qAns))) studentCorrect++;
                                               }
                                           });
 
@@ -9565,8 +9721,8 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                               let esParcial = false;
                                               let detalleParcial = '';
 
-                                              if (q.type === 'multiple') {
-                                                  const correctOpts = (q.options || []).map((opt, oIdx) => opt.isCorrect ? oIdx : null).filter(o => o !== null);
+                                              if ((q.type === 'multiple' || q.type === 'listening') && Array.isArray(q.options) && q.options.length >= 2) {
+                                                  const correctOpts = (q.options || []).map((opt, oIdx) => opt?.isCorrect ? oIdx : null).filter(o => o !== null);
                                                   const ansArr = Array.isArray(qAns) ? qAns : [];
                                                   isUnanswered = ansArr.length === 0;
                                                   isCorrect = correctOpts.length > 0 && ansArr.length === correctOpts.length && correctOpts.every(i => ansArr.includes(i));
@@ -9582,9 +9738,13 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                   isCorrect = paresR.length > 0 && aciertosR === paresR.length;
                                                   esParcial = !isCorrect && !isUnanswered && aciertosR > 0;
                                                   if (esParcial) detalleParcial = aciertosR + ' de ' + paresR.length;
+                                              } else if (q.type === 'speaking') {
+                                                  isUnanswered = !qAns || (typeof qAns === 'string' && !qAns.trim());
+                                                  isCorrect = false;
                                               } else {
                                                   isUnanswered = !qAns || (typeof qAns === 'string' && !qAns.trim());
-                                                  isCorrect = typeof qAns === 'string' && qAns.trim().toLowerCase() === (q.correctAnswer || '').trim().toLowerCase();
+                                                  const validas = respuestasValidasDe(q);
+                                                  isCorrect = !isUnanswered && validas.length > 0 && validas.includes(normalizarRespuesta(qAns));
                                               }
 
                                               return (
@@ -9635,10 +9795,10 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                       {/* Enunciado de la pregunta */}
                                                       <p className="text-xs sm:text-sm font-bold text-gray-900 dark:text-gray-100 mb-3 pl-8">
                                                           {q.text || q.question || 'Pregunta sin enunciado'}
-                                                          {selectedStudentGradeForReview?.feedbackIA?.[qIdx] && (
-                                                              <p className="text-[11px] text-blue-700 dark:text-blue-300 font-medium pl-8 mb-2">{'\ud83d\udcac '}{textoPlano(selectedStudentGradeForReview.feedbackIA[qIdx])}</p>
-                                                          )}
                                                       </p>
+                                                      {selectedStudentGradeForReview?.feedbackIA?.[qIdx] && (
+                                                          <p className="text-[11px] text-blue-700 dark:text-blue-300 font-medium pl-8 mb-2">{'\ud83d\udcac '}{textoPlano(selectedStudentGradeForReview.feedbackIA[qIdx])}</p>
+                                                      )}
 
                                                       {q.imageUrl && (
                                                           <div className="pl-8 mb-3">
@@ -9654,7 +9814,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                       )}
 
                                                       {/* Respuestas detalladas */}
-                                                      {(q.type === 'multiple' || q.type === 'listening') ? (
+                                                      {((q.type === 'multiple' || q.type === 'listening') && Array.isArray(q.options) && q.options.length >= 2) ? (
                                                           <div className="space-y-1.5 pl-8">
                                                               {(q.options || []).map((opt, oIdx) => {
                                                                   const wasSelected = (Array.isArray(qAns) ? qAns : []).includes(oIdx);
@@ -9856,12 +10016,22 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                               let qCorrectCount = 0;
                                               evalGrades.forEach(g => {
                                                   const qAns = g.answers?.[qIdx];
-                                                  if (q.type === 'multiple') {
-                                                      const correctOpts = (q.options || []).map((opt, oIdx) => opt.isCorrect ? oIdx : null).filter(o => o !== null);
+                                                  if (q.type === 'speaking') return;
+                                                  if ((q.type === 'multiple' || q.type === 'listening') && Array.isArray(q.options) && q.options.length >= 2) {
+                                                      const correctOpts = (q.options || []).map((opt, oIdx) => opt?.isCorrect ? oIdx : null).filter(o => o !== null);
                                                       const ansArr = Array.isArray(qAns) ? qAns : [];
                                                       if (correctOpts.length > 0 && ansArr.length === correctOpts.length && correctOpts.every(i => ansArr.includes(i))) qCorrectCount++;
+                                                  } else if (q.type === 'order') {
+                                                      const secuencia = Array.isArray(qAns) ? qAns : [];
+                                                      if (secuencia.length > 0 && normalizarRespuesta(secuencia.join(' ')) === normalizarRespuesta((q.words || []).join(' '))) qCorrectCount++;
+                                                  } else if (q.type === 'match') {
+                                                      const paresM = q.pairs || [];
+                                                      const elegidasM = (qAns && typeof qAns === 'object') ? qAns : {};
+                                                      const aciertosM = paresM.filter((p, pIdx) => normalizarRespuesta(elegidasM[pIdx]) === normalizarRespuesta(p.right)).length;
+                                                      if (paresM.length > 0 && aciertosM === paresM.length) qCorrectCount++;
                                                   } else {
-                                                      if (typeof qAns === 'string' && qAns.trim().toLowerCase() === (q.correctAnswer || '').trim().toLowerCase()) qCorrectCount++;
+                                                      const validas = respuestasValidasDe(q);
+                                                      if (validas.length > 0 && validas.includes(normalizarRespuesta(qAns))) qCorrectCount++;
                                                   }
                                               });
                                               const pct = evalGrades.length > 0 ? Math.round((qCorrectCount / evalGrades.length) * 100) : 0;
@@ -9874,7 +10044,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                                   {qIdx + 1}
                                                               </span>
                                                               <span className="text-[11px] font-bold text-gray-500 uppercase">
-                                                                  {q.type === 'multiple' ? 'Selección Múltiple' : 'Respuesta Escrita'}
+                                                                  {(q.type === 'multiple' || (q.type === 'listening' && Array.isArray(q.options) && q.options.length >= 2)) ? 'Selección Múltiple' : 'Respuesta Escrita'}
                                                               </span>
                                                           </div>
                                                           <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
@@ -9899,7 +10069,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                           </div>
                                                       )}
 
-                                                      {q.type === 'multiple' ? (
+                                                      {((q.type === 'multiple' || q.type === 'listening') && Array.isArray(q.options) && q.options.length >= 2) ? (
                                                           <div className="space-y-1.5 pl-8">
                                                               {(q.options || []).map((opt, oIdx) => (
                                                                   <div 
@@ -9931,7 +10101,13 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                                       Respuesta correcta esperada:
                                                                   </span>
                                                                   <span className="font-bold text-emerald-900 dark:text-emerald-200 text-xs sm:text-sm">
-                                                                      "{q.correctAnswer}"
+                                                                      {q.type === 'order'
+                                                                          ? `"${(q.words || []).join(' ')}"`
+                                                                          : q.type === 'match'
+                                                                              ? (q.pairs || []).map(p => `${p.left} → ${p.right}`).join(' | ')
+                                                                              : q.type === 'speaking'
+                                                                                  ? 'Calificación manual (respuesta hablada)'
+                                                                                  : `"${[q.correctAnswer, ...(Array.isArray(q.acceptedAnswers) ? q.acceptedAnswers : [])].filter(Boolean).join(' / ')}"`}
                                                                   </span>
                                                               </div>
                                                           </div>
