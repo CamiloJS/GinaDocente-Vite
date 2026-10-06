@@ -9,7 +9,7 @@ export const DEMO_ACADEMIC_GROUPS = [
   {
     id: DEMO_SUBJECT_ID,
     name: DEMO_SUBJECT_NAME,
-    description: 'Curso demostrativo de Inglés Técnico Económico: lectura de indicadores macroeconómicos, comercio internacional, estados financieros, análisis de mercados y negociación en inglés.',
+    description: 'Lectura de indicadores macroeconómicos, comercio internacional, estados financieros, análisis de mercados y negociación en inglés.',
     emoji: 'BookOpen',
     coverPattern: 'doodle-1',
     teacherId: 'teacher',
@@ -143,8 +143,8 @@ export const DEMO_TASKS = [
   },
   {
     id: 'demo-task-kahoot-1',
-    title: 'Kahoot en Vivo: Macroeconomics, Financial Markets & Trade Vocabulary',
-    description: '¡Únete al Kahoot interactivo de Inglés Tecnico economico en pantalla completa! Las opciones aparecen de arriba hacia abajo con el texto completo en tu pantalla, música tensa en vivo, sonido de gong cuando todos responden y puntos extra por velocidad.',
+    title: 'Kahoot: Macroeconomics, Financial Markets & Trade Vocabulary',
+    description: 'Actividad interactiva de repaso sobre indicadores macroeconómicos, mercados financieros y vocabulario de comercio internacional.',
     type: 'kahoot',
     createdAt: Date.now() - 1000 * 60 * 60 * 6,
     author: 'GinaDocente',
@@ -753,108 +753,108 @@ export const DEMO_REVIEWS = [
 
 export const DEMO_GUIDE_TOUR = [
   {
-    title: '📰 Muro de Clase (Inglés Tecnico economico)',
-    badge: 'Publicaciones y Tareas',
-    description: 'Es el centro de la materia "Inglés Tecnico economico". Aquí la profesora Gina publica talleres, glosarios financieros, foros calificables y encuestas interactivas. Puedes escuchar la pronunciación en voz alta con IA, votar en encuestas, reaccionar con emojis y probar los comentarios.'
+    title: 'Muro de Clase',
+    badge: 'Publicaciones',
+    description: 'Publicaciones de la materia: talleres, foros, encuestas y actividades interactivas de Kahoot.'
   },
   {
-    title: '📝 Evaluaciones de Prueba',
-    badge: 'Calificación automática',
-    description: 'Incluye 3 exámenes demostrativos de "Inglés Tecnico economico" listos para resolver: selección múltiple, verdadero/falso, ordenar oraciones, relacionar columnas, respuesta escrita, Listening con audio integrado y demostración del modo estricto anti-trampas.'
+    title: 'Evaluaciones',
+    badge: 'Exámenes',
+    description: 'Exámenes prácticos de inglés técnico económico con calificación inmediata.'
   },
   {
-    title: '📊 Diapositivas Demo (.PPTX)',
-    badge: 'Presentaciones interactivas',
-    description: 'Explora 3 presentaciones completas de "Inglés Tecnico economico" con tarjetas de conceptos, listas clave y quizzes integrados. Puedes abrirlas en modo presentador a pantalla completa o descargarlas como archivo PowerPoint (.pptx).'
+    title: 'Diapositivas',
+    badge: 'Presentaciones',
+    description: 'Presentaciones de clase para proyectar en pantalla o descargar en PowerPoint (.pptx).'
   },
   {
-    title: '📚 Contenidos Programáticos (Syllabus)',
-    badge: 'Plan de estudios completo',
-    description: 'Visualiza el cronograma detallado de 6 semanas de "Inglés Tecnico economico": cada semana muestra su unidad, tema central, descripción pedagógica, conceptos clave y actividades prácticas.'
+    title: 'Contenidos',
+    badge: 'Plan de estudios',
+    description: 'Cronograma semanal con temas, conceptos clave y actividades de la asignatura.'
   },
   {
-    title: '👥 Materia y Grupos Académicos',
-    badge: 'Inglés Tecnico economico',
-    description: 'Organiza a los estudiantes por asignatura y grupo con su propio muro exclusivo, conteo de publicaciones y miembros inscritos.'
+    title: 'Materias',
+    badge: 'Grupos',
+    description: 'Acceso directo al grupo académico y su listado de participantes.'
   },
   {
-    title: '🛡️ Reportes en Excel y Gestión Docente',
-    badge: 'Exclusivo Profesora',
-    description: 'Desde su cuenta docente, la profesora Gina puede generar evaluaciones y diapositivas con IA (Gemini), usar OVA Studio, y exportar planillas completas en Excel (.xlsx) con el desglose pregunta por pregunta.'
+    title: 'Gestión Docente',
+    badge: 'Docente',
+    description: 'Herramientas para crear actividades, evaluaciones, presentaciones y reportes en Excel.'
   }
 ];
 
 export const DEMO_TAB_INFO = {
   tasks: {
-    title: '📰 Muro de Clase — Materia: Inglés Tecnico economico',
-    summary: 'Explora las publicaciones de demostración de "Inglés Tecnico economico": talleres con nota de voz, encuesta en vivo, glosario financiero y foro de debate. Puedes votar, reaccionar, comentar y escuchar la narración con IA.'
+    title: 'Muro de Clase',
+    summary: 'Publicaciones, talleres, encuestas, foros y actividades de la materia.'
   },
   evaluaciones: {
-    title: '📝 Evaluaciones de Prueba — Inglés Tecnico economico',
-    summary: 'Haz clic en "Empezar prueba" en cualquiera de las 3 evaluaciones de "Inglés Tecnico economico" (incluye Listening con audio, columnas, ordenar frases y modo anti-trampas). La nota se calcula al instante sin afectar datos reales.'
+    title: 'Evaluaciones',
+    summary: 'Exámenes de práctica con calificación inmediata.'
   },
   evaluations: {
-    title: '📝 Evaluaciones de Prueba — Inglés Tecnico economico',
-    summary: 'Haz clic en "Empezar prueba" en cualquiera de las 3 evaluaciones de "Inglés Tecnico economico" (incluye Listening con audio, columnas, ordenar frases y modo anti-trampas). La nota se calcula al instante sin afectar datos reales.'
+    title: 'Evaluaciones',
+    summary: 'Exámenes de práctica con calificación inmediata.'
   },
   syllabus: {
-    title: '📚 Contenidos Programáticos — Inglés Tecnico economico',
-    summary: 'Cronograma académico completo de las 6 semanas de "Inglés Tecnico economico" con unidades, temas, objetivos pedagógicos, conceptos clave y actividades.'
+    title: 'Contenidos Programáticos',
+    summary: 'Cronograma semanal de la asignatura.'
   },
   reviews: {
-    title: '📊 Diapositivas Demo — Inglés Tecnico economico',
-    summary: 'Haz clic en cualquiera de las 3 presentaciones de "Inglés Tecnico economico" para abrir el visor interactivo a pantalla completa, responder el quiz final de cada presentación o descargar el archivo PowerPoint (.pptx).'
+    title: 'Diapositivas',
+    summary: 'Presentaciones interactivas y descargables en PowerPoint (.pptx).'
   },
   groups: {
-    title: '👥 Grupo Académico — Inglés Tecnico economico',
-    summary: 'Haz clic en la materia "Inglés Tecnico economico" para ver su portada y su canal exclusivo de publicaciones y actividades.'
+    title: 'Materia',
+    summary: 'Canal y participantes de la asignatura.'
   },
   profile: {
-    title: '👤 Perfil de Invitado (Modo Demo)',
-    summary: 'Vista demostrativa del perfil estudiantil donde se agrupan las participaciones y personalización de cuenta.'
+    title: 'Perfil',
+    summary: 'Información de tu cuenta.'
   },
   settings: {
-    title: '⚙️ Ajustes de Apariencia y Sonido',
-    summary: 'Prueba el cambio de tema visual en vivo (Claro, Noche / Dim y AMOLED Lights Out) y los sonidos de la plataforma.'
+    title: 'Ajustes',
+    summary: 'Apariencia y preferencias.'
   },
   tools: {
-    title: '🛠️ Herramientas Docentes (OVA Studio & Ruleta)',
-    summary: 'Panel de herramientas para crear Objetos Virtuales de Aprendizaje y dinamizar clases presenciales o remotas.'
+    title: 'Herramientas',
+    summary: 'OVA Studio y ruleta de participación.'
   }
 };
 
 export const DEMO_TEACHER_TAB_INFO = {
   tasks: {
-    title: '👩‍🏫 Modo Docente (Demo) — Muro de Clase Aislado',
-    summary: 'Crea publicaciones, tareas con entrega, encuestas interactivas o foros de debate en "Inglés Tecnico economico". Todo lo que publiques aquí está 100% aislado de la plataforma real y se borrará automáticamente en máximo 2 semanas (14 días).'
+    title: 'Muro de Clase',
+    summary: 'Crea publicaciones, tareas, encuestas, foros o actividades de Kahoot.'
   },
   evaluaciones: {
-    title: '👩‍🏫 Modo Docente (Demo) — Creador de Evaluaciones',
-    summary: 'Crea evaluaciones de prueba manuales o con IA, edita preguntas, activa el modo anti-trampas y descarga reportes Excel demostrativos. Las evaluaciones creadas aquí son temporales (máx. 2 semanas) y aisladas.'
+    title: 'Evaluaciones',
+    summary: 'Crea evaluaciones y descarga reportes de calificaciones.'
   },
   evaluations: {
-    title: '👩‍🏫 Modo Docente (Demo) — Creador de Evaluaciones',
-    summary: 'Crea evaluaciones de prueba manuales o con IA, edita preguntas, activa el modo anti-trampas y descarga reportes Excel demostrativos. Las evaluaciones creadas aquí son temporales (máx. 2 semanas) y aisladas.'
+    title: 'Evaluaciones',
+    summary: 'Crea evaluaciones y descarga reportes de calificaciones.'
   },
   syllabus: {
-    title: '👩‍🏫 Modo Docente (Demo) — Gestión de Contenidos Programáticos',
-    summary: 'Agrega nuevas semanas o temas al plan de estudios de "Inglés Tecnico economico" manualmente o importando un PDF. Tus cambios quedan aislados en el entorno Demo y duran máximo 2 semanas.'
+    title: 'Contenidos',
+    summary: 'Organiza las semanas y temas del plan de estudios.'
   },
   reviews: {
-    title: '👩‍🏫 Modo Docente (Demo) — Generador de Diapositivas (.PPTX)',
-    summary: 'Genera nuevas presentaciones con IA o edita las diapositivas demostrativas de "Inglés Tecnico economico". Las presentaciones creadas en el Demo se guardan de forma aislada por 2 semanas.'
+    title: 'Diapositivas',
+    summary: 'Crea y edita presentaciones para tus clases.'
   },
   groups: {
-    title: '👩‍🏫 Modo Docente (Demo) — Creación de Materias y Grupos',
-    summary: 'Prueba la creación de nuevos grupos académicos o explora la materia "Inglés Tecnico economico". Los grupos creados en modo Demo son temporales (máx. 2 semanas).'
+    title: 'Materias',
+    summary: 'Gestiona tus grupos académicos.'
   },
   tools: {
-    title: '👩‍🏫 Modo Docente (Demo) — OVA Studio y Ruleta de Participación',
-    summary: 'Explora el generador de Objetos Virtuales de Aprendizaje (OVA Studio) y la ruleta interactiva para dinamizar tus sesiones.'
+    title: 'Herramientas',
+    summary: 'OVA Studio y ruleta de participación.'
   },
   settings: {
-    title: '⚙️ Ajustes de Modo Demo (Docente)',
-    summary: 'Prueba los temas visuales (Claro, Noche, AMOLED) y copia los enlaces directos de invitación a Modo Estudiante o Modo Docente.'
+    title: 'Ajustes',
+    summary: 'Preferencias y enlaces de invitación.'
   }
 };
 
@@ -874,18 +874,18 @@ export const DEMO_USER_MAPPINGS = {
     email: 'demo.docente@unipamplona.edu.co',
     role: 'teacher',
     profilePicUrl: '/icono.png',
-    bio: 'Docente de Inglés Técnico Económico — Universidad de Pamplona (Entorno de Demostración Aislado).',
+    bio: 'Docente de Inglés Técnico Económico — Universidad de Pamplona.',
     isDemoUser: true
   },
   invitado: {
     id: 'invitado',
     username: 'invitado',
     name: 'Invitado Demo',
-    fullName: 'Estudiante Invitado (Demo)',
+    fullName: 'Estudiante Invitado',
     email: 'invitado.demo@unipamplona.edu.co',
     role: 'student',
     profilePicUrl: '',
-    bio: 'Explorando la plataforma English Tech en Modo Demostración.',
+    bio: 'Estudiante de Inglés Técnico Económico.',
     academicGroupId: DEMO_SUBJECT_ID,
     isDemoUser: true
   },
@@ -1024,7 +1024,7 @@ const demoInvitadoTeacherMessages = [
     authorRole: 'teacher',
     senderId: 'teacher',
     senderName: 'La profe',
-    text: '¡Hola! Bienvenido/a al chat demostrativo de English Tech. Este canal está 100% aislado para pruebas: puedes enviar mensajes, notas de voz, imágenes o iniciar una llamada de prueba sin contactar a usuarios reales.',
+    text: '¡Hola! Bienvenido/a a English Tech. Escríbeme por aquí si tienes dudas sobre las actividades del curso.',
     createdAt: nowMs - 45 * 60 * 1000,
     timestamp: nowMs - 45 * 60 * 1000,
     status: 'read',
@@ -1171,7 +1171,7 @@ export const DEMO_LAST_MESSAGES = {
     senderName: 'La profe'
   },
   'dm_invitado_teacher': {
-    text: '¡Hola! Bienvenido/a al chat demostrativo de English Tech. Este canal está 100% aislado para pruebas.',
+    text: '¡Hola! Bienvenido/a a English Tech. Escríbeme por aquí si tienes dudas sobre las actividades del curso.',
     createdAt: nowMs - 45 * 60 * 1000,
     timestamp: nowMs - 45 * 60 * 1000,
     authorId: 'teacher',
@@ -1234,8 +1234,8 @@ export const DEMO_USER_POSTS = [
     authorUsername: 'GinaDocente',
     authorName: 'Gina Marcela Quintana Delgado',
     authorRole: 'teacher',
-    text: '📊 "An investment in knowledge pays the best interest." — Benjamin Franklin.\nBienvenidos al espacio académico demostrativo de Inglés Técnico Económico.',
-    content: '📊 "An investment in knowledge pays the best interest." — Benjamin Franklin.\nBienvenidos al espacio académico demostrativo de Inglés Técnico Económico.',
+    text: '📊 "An investment in knowledge pays the best interest." — Benjamin Franklin.\nBienvenidos al curso de Inglés Técnico Económico.',
+    content: '📊 "An investment in knowledge pays the best interest." — Benjamin Franklin.\nBienvenidos al curso de Inglés Técnico Económico.',
     createdAt: nowMs - 2 * dayMs,
     timestamp: nowMs - 2 * dayMs,
     reactions: { carlos_mendoza: '👍', laura_restrepo: '❤️', mateo_gomez: '🔥' },
@@ -1300,14 +1300,14 @@ export const DEMO_ALERTS = [
   {
     id: 'demo_alert_1',
     type: 'demo_info',
-    author: 'Mateo Alejandro Gómez (Simulación Anti-Trampas)',
-    studentName: 'Mateo Alejandro Gómez (Simulación Anti-Trampas)',
+    author: 'Mateo Alejandro Gómez',
+    studentName: 'Mateo Alejandro Gómez',
     studentUsername: 'mateo_gomez',
     evaluationTitle: 'Quiz 1: Supply, Demand & Market Equilibrium',
     context: 'Evaluación: Quiz 1 (Modo Estricto)',
-    text: 'Demostración de alerta preventiva por cambio de pestaña durante una evaluación en modo estricto.',
-    originalText: 'Intento de cambio de ventana detectado durante la pregunta 2 (Simulación de seguridad del Modo Demo).',
-    reason: 'Demostración de alerta preventiva por cambio de pestaña durante una evaluación en modo estricto.',
+    text: 'Alerta preventiva por cambio de pestaña durante una evaluación en modo estricto.',
+    originalText: 'Intento de cambio de ventana detectado durante la pregunta 2.',
+    reason: 'Alerta preventiva por cambio de pestaña durante una evaluación en modo estricto.',
     createdAt: nowMs - 4 * 3600 * 1000,
     timestamp: nowMs - 4 * 3600 * 1000,
     isDemoItem: true
@@ -1428,7 +1428,7 @@ export function getDemoAutoReply(chatOrId, arg2 = 'student', arg3 = '') {
         authorRole: 'student',
         senderId: authorId,
         senderName: author,
-        text: 'Thank you Professor! We received your message in the demo group. Everyone is reviewing the economic material. 📊👍'
+        text: 'Thank you Professor! Everyone is reviewing the economic material. 📊👍'
       };
     }
     const authorId = 'teacher';
@@ -1439,7 +1439,7 @@ export function getDemoAutoReply(chatOrId, arg2 = 'student', arg3 = '') {
       authorRole: 'teacher',
       senderId: authorId,
       senderName: author,
-      text: 'Thanks for participating in the demo class group! Remember that this chat is 100% isolated in Demo Mode. 🌟'
+      text: 'Thanks for participating in the class group! 🌟'
     };
   }
 
@@ -1458,8 +1458,8 @@ export function getDemoAutoReply(chatOrId, arg2 = 'student', arg3 = '') {
       senderId: studentId,
       senderName: studentName,
       text: clean.includes('?')
-        ? 'Yes Professor! I am working on the economic vocabulary workshop right now. Thank you for the feedback! (Respuesta simulada en Modo Demo)'
-        : 'Got it, Professor! Thank you very much for the update. 📚✅ (Respuesta simulada en Modo Demo)'
+        ? 'Yes Professor! I am working on the economic vocabulary workshop right now. Thank you for the feedback!'
+        : 'Got it, Professor! Thank you very much for the update. 📚✅'
     };
   }
 
@@ -1472,8 +1472,8 @@ export function getDemoAutoReply(chatOrId, arg2 = 'student', arg3 = '') {
       senderId: matchedStudent.id,
       senderName: matchedStudent.name,
       text: clean.includes('?')
-        ? 'Hey! Yes, let’s review the GDP and inflation slides together before the quiz. 📊 (Respuesta simulada de compañero en Modo Demo)'
-        : 'Awesome! See you in the Technical Economic English session! 👍 (Respuesta simulada en Modo Demo)'
+        ? 'Hey! Yes, let’s review the GDP and inflation slides together before the quiz. 📊'
+        : 'Awesome! See you in the Technical Economic English session! 👍'
     };
   }
 
@@ -1484,8 +1484,8 @@ export function getDemoAutoReply(chatOrId, arg2 = 'student', arg3 = '') {
     senderId: 'teacher',
     senderName: 'La profe',
     text: clean.includes('?')
-      ? 'Great question! For this unit on Technical Economic English, focus on the relationship between inflation, interest rates, and GDP growth. (Respuesta automática aislada en Modo Demo)'
-      : '¡Excelente aporte! Recuerda que este chat funciona en un entorno de demostración 100% aislado para que puedas probar mensajes, audios y reacciones con total seguridad.'
+      ? 'Great question! For this unit on Technical Economic English, focus on the relationship between inflation, interest rates, and GDP growth.'
+      : '¡Excelente aporte! Nos vemos en la próxima sesión.'
   };
 }
 

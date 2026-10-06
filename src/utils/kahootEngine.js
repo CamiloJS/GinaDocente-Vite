@@ -56,9 +56,9 @@ export const KAHOOT_COLORS = [
 export const KAHOOT_TIME_OPTIONS = [10, 15, 20, 30, 45, 60, 90, 120];
 
 export const KAHOOT_POINTS_OPTIONS = [
-  { value: 1, label: 'Estándar (hasta 1000 pts)', shortLabel: '1000 pts', maxPoints: 1000 },
-  { value: 2, label: 'Puntos dobles x2 (hasta 2000 pts)', shortLabel: 'x2 (2000 pts)', maxPoints: 2000 },
-  { value: 0, label: 'Sin puntos (0 pts • práctica)', shortLabel: '0 pts', maxPoints: 0 },
+  { value: 1, label: 'Puntos normales', shortLabel: '1000 pts', maxPoints: 1000 },
+  { value: 2, label: 'Puntos dobles (x2)', shortLabel: 'x2 (2000 pts)', maxPoints: 2000 },
+  { value: 0, label: 'Sin puntos', shortLabel: '0 pts', maxPoints: 0 },
 ];
 
 export const KAHOOT_QUESTION_TYPES = {
@@ -66,25 +66,25 @@ export const KAHOOT_QUESTION_TYPES = {
     id: 'quiz',
     label: 'Selección múltiple',
     shortLabel: 'Quiz',
-    description: '2 a 4 opciones en lista vertical con respuesta única o múltiple',
+    description: 'Selección múltiple',
   },
   truefalse: {
     id: 'truefalse',
     label: 'Verdadero o Falso',
     shortLabel: 'V / F',
-    description: '2 opciones directas: Verdadero o Falso',
+    description: 'Verdadero o Falso',
   },
   type_answer: {
     id: 'type_answer',
     label: 'Respuesta corta',
     shortLabel: 'Escribir',
-    description: 'Los participantes escriben la respuesta exacta',
+    description: 'Respuesta escrita',
   },
   puzzle: {
     id: 'puzzle',
-    label: 'Puzzle (Ordenar)',
+    label: 'Puzzle',
     shortLabel: 'Puzzle',
-    description: 'Ordenar 3 o 4 elementos o palabras de arriba hacia abajo',
+    description: 'Ordenar elementos',
   },
 };
 
@@ -515,6 +515,8 @@ export function validateKahootConfig(kahootInput) {
     error: '',
     normalizedQuestions,
     questions: normalizedQuestions,
+    musicEnabled: true,
+    allowNicknameChange: true,
   };
 }
 

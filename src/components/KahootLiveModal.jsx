@@ -142,7 +142,7 @@ const KahootLiveModal = ({
   });
 
   // Estado de sonido y edición de apodo
-  const [soundMuted, setSoundMuted] = useState(() => kahoot.musicEnabled === false);
+  const [soundMuted, setSoundMuted] = useState(false);
   const soundMutedRef = useRef(soundMuted);
   useEffect(() => {
     soundMutedRef.current = soundMuted;
@@ -944,22 +944,22 @@ const KahootLiveModal = ({
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="font-black text-sm sm:text-base truncate max-w-[220px] sm:max-w-[400px]">
-                {liveTask.title || 'Kahoot en Vivo'}
+                {liveTask.title || 'Kahoot'}
               </h2>
               <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-white/15 border border-white/20 tracking-wider">
                 PIN: {kahoot.pin || '482915'}
               </span>
               {viewMode === 'solo' ? (
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-gray-950 uppercase">
-                  Práctica Individual
+                  Práctica
                 </span>
               ) : viewMode === 'review' ? (
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-400 text-gray-950 uppercase">
-                  Modo Repaso Guardado
+                  Repaso
                 </span>
               ) : (
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-red-500 text-white uppercase flex items-center gap-1 animate-pulse">
-                  <span className="w-1.5 h-1.5 rounded-full bg-white" /> En Vivo
+                  <span className="w-1.5 h-1.5 rounded-full bg-white" /> En vivo
                 </span>
               )}
             </div>
@@ -975,80 +975,78 @@ const KahootLiveModal = ({
         {/* Controles derechos: Cambio de nombre en vivo, Música/Gong, Modo Repaso y Salir */}
         <div className="flex items-center gap-2 flex-wrap">
           {/* Píldora para cambiar el nombre/apodo en cualquier momento */}
-          {(kahoot.allowNicknameChange !== false || role === 'teacher') && (
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => {
-                  setNicknameDraft(myNickname);
-                  setIsEditingNickname(!isEditingNickname);
-                }}
-                className="px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 border border-white/20 text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
-                title="Cambiar tu nombre o apodo mientras participas"
-              >
-                <span className="text-base">{myAvatar}</span>
-                <span className="max-w-[130px] truncate">{myNickname}</span>
-                <Edit3 size={12} className="text-purple-200" />
-              </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setNicknameDraft(myNickname);
+                setIsEditingNickname(!isEditingNickname);
+              }}
+              className="px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 border border-white/20 text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+              title="Cambiar nombre"
+            >
+              <span className="text-base">{myAvatar}</span>
+              <span className="max-w-[130px] truncate">{myNickname}</span>
+              <Edit3 size={12} className="text-purple-200" />
+            </button>
 
-              {isEditingNickname && (
-                <div className="absolute right-0 mt-2 w-72 p-3.5 rounded-2xl bg-gray-900/95 backdrop-blur-xl border border-purple-400/40 shadow-2xl z-50 space-y-3 animate-in fade-in zoom-in-95 duration-150">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-purple-200">
-                      ✏️ Cambia tu nombre en vivo
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setIsEditingNickname(false)}
-                      className="text-gray-400 hover:text-white"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                  <input
-                    type="text"
-                    value={nicknameDraft}
-                    maxLength={28}
-                    onChange={(e) => setNicknameDraft(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleSaveNickname(nicknameDraft, myAvatar);
-                    }}
-                    placeholder="Escribe el nombre que quieras..."
-                    className="w-full py-2 px-3 rounded-xl bg-white/10 border border-white/20 text-xs font-bold text-white outline-none focus:border-purple-400"
-                    autoFocus
-                  />
-                  <div>
-                    <span className="text-[10px] font-bold text-purple-300 block mb-1">
-                      Elige tu ícono:
-                    </span>
-                    <div className="grid grid-cols-8 gap-1">
-                      {KAHOOT_AVATARS.map((av) => (
-                        <button
-                          key={av}
-                          type="button"
-                          onClick={() => setMyAvatar(av)}
-                          className={`p-1 rounded-lg text-sm flex items-center justify-center transition-transform cursor-pointer ${
-                            myAvatar === av
-                              ? 'bg-purple-600 scale-110 ring-2 ring-white'
-                              : 'bg-white/5 hover:bg-white/15'
-                          }`}
-                        >
-                          {av}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+            {isEditingNickname && (
+              <div className="absolute right-0 mt-2 w-72 p-3.5 rounded-2xl bg-gray-900/95 backdrop-blur-xl border border-purple-400/40 shadow-2xl z-50 space-y-3 animate-in fade-in zoom-in-95 duration-150">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-purple-200">
+                    Cambiar nombre
+                  </span>
                   <button
                     type="button"
-                    onClick={() => handleSaveNickname(nicknameDraft, myAvatar)}
-                    className="w-full py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-gray-950 font-black text-xs transition-all cursor-pointer"
+                    onClick={() => setIsEditingNickname(false)}
+                    className="text-gray-400 hover:text-white"
                   >
-                    Guardar mi nombre
+                    <X size={14} />
                   </button>
                 </div>
-              )}
-            </div>
-          )}
+                <input
+                  type="text"
+                  value={nicknameDraft}
+                  maxLength={28}
+                  onChange={(e) => setNicknameDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSaveNickname(nicknameDraft, myAvatar);
+                  }}
+                  placeholder="Tu nombre o apodo..."
+                  className="w-full py-2 px-3 rounded-xl bg-white/10 border border-white/20 text-xs font-bold text-white outline-none focus:border-purple-400"
+                  autoFocus
+                />
+                <div>
+                  <span className="text-[10px] font-bold text-purple-300 block mb-1">
+                    Ícono:
+                  </span>
+                  <div className="grid grid-cols-8 gap-1">
+                    {KAHOOT_AVATARS.map((av) => (
+                      <button
+                        key={av}
+                        type="button"
+                        onClick={() => setMyAvatar(av)}
+                        className={`p-1 rounded-lg text-sm flex items-center justify-center transition-transform cursor-pointer ${
+                          myAvatar === av
+                            ? 'bg-purple-600 scale-110 ring-2 ring-white'
+                            : 'bg-white/5 hover:bg-white/15'
+                        }`}
+                      >
+                        {av}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleSaveNickname(nicknameDraft, myAvatar)}
+                  className="w-full py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-gray-950 font-black text-xs transition-all cursor-pointer"
+                >
+                  Guardar
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Conmutador entre Sala en Vivo y Guía de Repaso */}
           <button
@@ -1058,7 +1056,7 @@ const KahootLiveModal = ({
           >
             <BookOpen size={14} />
             <span className="hidden sm:inline">
-              {viewMode === 'review' ? 'Volver al Juego' : 'Repasar Preguntas'}
+              {viewMode === 'review' ? 'Volver al juego' : 'Repasar'}
             </span>
           </button>
 
@@ -1071,10 +1069,10 @@ const KahootLiveModal = ({
                 ? 'bg-purple-600/80 border-purple-400/50 text-white'
                 : 'bg-white/10 border-white/15 text-gray-300'
             }`}
-            title={soundMuted ? 'Activar música de tensión y sonidos' : 'Silenciar música'}
+            title={soundMuted ? 'Activar sonido' : 'Silenciar'}
           >
             {soundMuted ? <VolumeX size={15} /> : <Volume2 size={15} />}
-            <span className="hidden md:inline">{soundMuted ? 'Silenciado' : 'Música Activa'}</span>
+            <span className="hidden md:inline">{soundMuted ? 'Silenciado' : 'Sonido'}</span>
           </button>
 
           {/* Botón para salir de pantalla completa */}
@@ -1085,7 +1083,7 @@ const KahootLiveModal = ({
               onClose();
             }}
             className="px-3 py-1.5 rounded-xl bg-red-500/80 hover:bg-red-600 text-white text-xs font-black flex items-center gap-1 transition-all cursor-pointer shadow-sm"
-            title="Salir de pantalla completa"
+            title="Salir"
           >
             <X size={15} />
             <span>Salir</span>
@@ -1097,28 +1095,25 @@ const KahootLiveModal = ({
       {gongBannerVisible && (
         <div className="relative z-30 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-gray-950 font-black text-xs sm:text-sm py-2 px-4 text-center shadow-lg flex items-center justify-center gap-2 animate-in slide-in-from-top duration-200">
           <Bell size={16} className="animate-bounce" />
-          <span>🔔 ¡GONG! Todos terminaron de responder • Mostrando resultados y puntajes por velocidad</span>
+          <span>Tiempo finalizado</span>
         </div>
       )}
 
       {/* CUERPO PRINCIPAL DE PANTALLA COMPLETA */}
       <div className="relative z-10 flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col">
         {/* =====================================================================
-            MODO 1: GUÍA DE REPASO Y ESTUDIO (Queda guardada para repasar)
+            MODO 1: GUÍA DE REPASO Y ESTUDIO
            ===================================================================== */}
         {viewMode === 'review' ? (
           <div className="max-w-4xl w-full mx-auto space-y-5 pb-10 animate-in fade-in">
             <div className="p-5 rounded-3xl bg-white/10 backdrop-blur-md border border-white/15 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-400/20 text-emerald-300 border border-emerald-400/30 mb-1.5">
-                  <BookOpen size={12} /> Material de Repaso Guardado
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-400/20 text-emerald-300 border border-emerald-400/30 mb-1">
+                  <BookOpen size={12} /> Repaso
                 </span>
                 <h3 className="text-lg sm:text-xl font-black text-white">
-                  Repaso de la actividad: {liveTask.title}
+                  {liveTask.title}
                 </h3>
-                <p className="text-xs text-purple-200 mt-0.5">
-                  Revisa todas las preguntas, opciones e indicaciones practicadas en este Kahoot o vuelve a jugarlo en modo práctica individual.
-                </p>
               </div>
               <div className="flex flex-wrap items-center gap-2 shrink-0">
                 <button
@@ -1127,7 +1122,7 @@ const KahootLiveModal = ({
                   className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-400 to-teal-500 hover:from-emerald-500 hover:to-teal-600 text-gray-950 font-black text-xs flex items-center gap-1.5 shadow-lg cursor-pointer transition-transform hover:scale-102"
                 >
                   <Play size={14} />
-                  <span>Practicar con música y tiempo</span>
+                  <span>Practicar</span>
                 </button>
                 {canControlGame && (
                   <button
@@ -1136,7 +1131,7 @@ const KahootLiveModal = ({
                     className="px-4 py-2.5 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-black text-xs flex items-center gap-1.5 border border-purple-400/40 shadow-lg cursor-pointer"
                   >
                     <RotateCcw size={14} />
-                    <span>Nueva partida en vivo</span>
+                    <span>Nueva partida</span>
                   </button>
                 )}
               </div>
@@ -1169,7 +1164,7 @@ const KahootLiveModal = ({
                             </span>
                             {q.pointsMultiplier === 2 && (
                               <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-amber-400 text-gray-950">
-                                Puntos Dobles x2
+                                Puntos dobles x2
                               </span>
                             )}
                           </div>
@@ -1188,8 +1183,8 @@ const KahootLiveModal = ({
                           }`}
                         >
                           {mySavedAns.isCorrect
-                            ? `✔ Acertaste (+${mySavedAns.pointsEarned || 0} pts)`
-                            : '✘ Por reforzar'}
+                            ? `✔ +${mySavedAns.pointsEarned || 0} pts`
+                            : '✘ Incorrecta'}
                         </span>
                       )}
                     </div>
@@ -1266,7 +1261,7 @@ const KahootLiveModal = ({
                     {q.type === 'puzzle' && (
                       <div className="space-y-1.5">
                         <span className="text-xs font-bold text-emerald-300 block">
-                          ✔ Orden correcto de arriba hacia abajo:
+                          ✔ Orden correcto:
                         </span>
                         {(q.puzzleItems || []).map((item, idx) => {
                           const color = KAHOOT_COLORS[idx % KAHOOT_COLORS.length];
@@ -1289,7 +1284,7 @@ const KahootLiveModal = ({
 
                     {q.explanation && (
                       <div className="p-3 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 text-xs text-indigo-100">
-                        <strong className="text-indigo-300">💡 Explicación:</strong> {q.explanation}
+                        <strong className="text-indigo-300">Retroalimentación:</strong> {q.explanation}
                       </div>
                     )}
                   </div>
@@ -1305,7 +1300,7 @@ const KahootLiveModal = ({
             {/* Tarjeta superior con PIN gigante */}
             <div className="p-6 sm:p-8 rounded-3xl bg-white/10 backdrop-blur-xl border border-white/20 text-center space-y-4 shadow-2xl">
               <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple-500/30 border border-purple-300/30 text-xs font-black uppercase tracking-widest text-purple-200">
-                <Sparkles size={14} /> ¡Únete al Kahoot en Vivo!
+                <Sparkles size={14} /> Sala de espera
               </div>
 
               <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white">
@@ -1314,7 +1309,7 @@ const KahootLiveModal = ({
 
               <div className="inline-flex flex-col sm:flex-row items-center gap-3 bg-white text-gray-950 px-6 py-3.5 rounded-2xl shadow-xl">
                 <span className="text-xs font-black uppercase tracking-wider text-gray-500">
-                  PIN de la sala:
+                  PIN:
                 </span>
                 <span className="text-3xl sm:text-4xl font-black tracking-widest text-[#46178F]">
                   {kahoot.pin || '482915'}
@@ -1322,52 +1317,50 @@ const KahootLiveModal = ({
               </div>
 
               {/* Editor directo de Nombre / Apodo para el participante */}
-              {(kahoot.allowNicknameChange !== false || role === 'teacher') && (
-                <div className="max-w-md mx-auto pt-2">
-                  <div className="p-4 rounded-2xl bg-black/30 border border-white/15 space-y-3">
-                    <label className="block text-xs font-extrabold text-purple-200">
-                      🎭 Tu nombre / apodo para participar (puedes cambiarlo cuando quieras):
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <span className="text-2xl select-none">{myAvatar}</span>
-                      <input
-                        type="text"
-                        value={nicknameDraft}
-                        maxLength={28}
-                        onChange={(e) => setNicknameDraft(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleSaveNickname(nicknameDraft, myAvatar);
-                        }}
-                        placeholder="Escribe tu apodo..."
-                        className="flex-1 py-2.5 px-3.5 rounded-xl bg-white/15 border border-white/25 text-sm font-black text-white placeholder:text-purple-300/60 outline-none focus:border-amber-400"
-                      />
+              <div className="max-w-md mx-auto pt-2">
+                <div className="p-4 rounded-2xl bg-black/30 border border-white/15 space-y-3">
+                  <label className="block text-xs font-extrabold text-purple-200">
+                    Tu nombre o apodo
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl select-none">{myAvatar}</span>
+                    <input
+                      type="text"
+                      value={nicknameDraft}
+                      maxLength={28}
+                      onChange={(e) => setNicknameDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSaveNickname(nicknameDraft, myAvatar);
+                      }}
+                      placeholder="Escribe tu apodo..."
+                      className="flex-1 py-2.5 px-3.5 rounded-xl bg-white/15 border border-white/25 text-sm font-black text-white placeholder:text-purple-300/60 outline-none focus:border-amber-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleSaveNickname(nicknameDraft, myAvatar)}
+                      className="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-gray-950 font-black text-xs transition-all cursor-pointer shrink-0 shadow-md"
+                    >
+                      Guardar
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-center gap-1.5 flex-wrap pt-1">
+                    {KAHOOT_AVATARS.slice(0, 10).map((av) => (
                       <button
+                        key={av}
                         type="button"
-                        onClick={() => handleSaveNickname(nicknameDraft, myAvatar)}
-                        className="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-gray-950 font-black text-xs transition-all cursor-pointer shrink-0 shadow-md"
+                        onClick={() => handleSaveNickname(nicknameDraft || myNickname, av)}
+                        className={`w-8 h-8 rounded-xl text-base flex items-center justify-center transition-all cursor-pointer ${
+                          myAvatar === av
+                            ? 'bg-amber-400 text-gray-950 scale-110 shadow-md'
+                            : 'bg-white/10 hover:bg-white/20'
+                        }`}
                       >
-                        Cambiar
+                        {av}
                       </button>
-                    </div>
-                    <div className="flex items-center justify-center gap-1.5 flex-wrap pt-1">
-                      {KAHOOT_AVATARS.slice(0, 10).map((av) => (
-                        <button
-                          key={av}
-                          type="button"
-                          onClick={() => handleSaveNickname(nicknameDraft || myNickname, av)}
-                          className={`w-8 h-8 rounded-xl text-base flex items-center justify-center transition-all cursor-pointer ${
-                            myAvatar === av
-                              ? 'bg-amber-400 text-gray-950 scale-110 shadow-md'
-                              : 'bg-white/10 hover:bg-white/20'
-                          }`}
-                        >
-                          {av}
-                        </button>
-                      ))}
-                    </div>
+                    ))}
                   </div>
                 </div>
-              )}
+              </div>
             </div>
 
             {/* Lista de Participantes Conectados en Vivo */}
@@ -1376,7 +1369,7 @@ const KahootLiveModal = ({
                 <div className="flex items-center gap-2">
                   <Users size={18} className="text-amber-400" />
                   <span className="font-black text-sm sm:text-base">
-                    Participantes en sala ({leaderboard.length})
+                    Participantes ({leaderboard.length})
                   </span>
                 </div>
 
@@ -1387,14 +1380,14 @@ const KahootLiveModal = ({
                     className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-xs font-bold text-purple-200 flex items-center gap-1.5 cursor-pointer"
                   >
                     <Sparkles size={13} />
-                    <span>Simular participantes de prueba</span>
+                    <span>Simular participantes</span>
                   </button>
                 )}
               </div>
 
               {leaderboard.length === 0 ? (
                 <div className="py-8 text-center text-sm text-purple-200/70 font-semibold italic">
-                  Esperando a que los participantes se unan...
+                  Esperando participantes...
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-2.5 justify-center py-2">
@@ -1428,23 +1421,23 @@ const KahootLiveModal = ({
                   <button
                     type="button"
                     onClick={() => handleStartLiveQuestion(0)}
-                    className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-emerald-400 via-green-500 to-teal-500 hover:from-emerald-500 hover:to-teal-600 text-gray-950 font-black text-base flex items-center justify-center gap-2.5 shadow-xl shadow-emerald-500/25 transition-all hover:scale-105 cursor-pointer"
+                    className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-400 via-green-500 to-teal-500 hover:from-emerald-500 hover:to-teal-600 text-gray-950 font-black text-base flex items-center justify-center gap-2.5 shadow-xl shadow-emerald-500/25 transition-all hover:scale-105 cursor-pointer"
                   >
-                    <Play size={20} />
-                    <span>¡Iniciar Kahoot en Vivo! ({questions.length} preguntas)</span>
+                    <Play size={18} />
+                    <span>Iniciar Kahoot</span>
                   </button>
                 ) : (
                   <div className="flex flex-col sm:flex-row items-center gap-3">
                     <div className="px-5 py-3 rounded-2xl bg-white/10 border border-white/15 text-xs sm:text-sm font-bold text-purple-100 flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-                      <span>¡Ya estás dentro! Esperando a que el docente inicie la primera pregunta...</span>
+                      <span>Esperando a que inicie la partida...</span>
                     </div>
                     <button
                       type="button"
                       onClick={startSoloPractice}
                       className="px-4 py-3 rounded-2xl bg-white/15 hover:bg-white/25 text-white text-xs font-extrabold border border-white/20 cursor-pointer"
                     >
-                      O practicar por mi cuenta
+                      Practicar individualmente
                     </button>
                   </div>
                 )}
@@ -1510,9 +1503,9 @@ const KahootLiveModal = ({
                       type="button"
                       onClick={() => triggerRoundEndWithGong('teacher_skip')}
                       className="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-gray-950 text-xs font-black cursor-pointer shadow-sm"
-                      title="Terminar pregunta ahora y sonar el Gong"
+                      title="Terminar pregunta"
                     >
-                      🔔 Terminar ahora
+                      Terminar pregunta
                     </button>
                   )}
                 </div>
@@ -1542,16 +1535,13 @@ const KahootLiveModal = ({
 
             {/* Estado de espera si el estudiante ya respondió */}
             {myLiveAnswer && (
-              <div className="p-4 rounded-2xl bg-emerald-500/25 border-2 border-emerald-400 text-center space-y-1 animate-in zoom-in-95">
+              <div className="p-3.5 rounded-2xl bg-emerald-500/25 border-2 border-emerald-400 text-center animate-in zoom-in-95">
                 <div className="text-sm sm:text-base font-black text-emerald-200 flex items-center justify-center gap-2">
                   <CheckCircle2 size={18} />
                   <span>
-                    ¡Respuesta registrada en {(myLiveAnswer.timeMs / 1000).toFixed(1)}s!
+                    Respuesta enviada ({(myLiveAnswer.timeMs / 1000).toFixed(1)}s)
                   </span>
                 </div>
-                <p className="text-xs text-purple-100">
-                  Esperando a que todos terminen para sonar el Gong 🔔 y revelar puntajes...
-                </p>
               </div>
             )}
 
@@ -1625,7 +1615,7 @@ const KahootLiveModal = ({
                     }
                     className="mt-1 w-full py-3.5 rounded-2xl bg-emerald-400 hover:bg-emerald-300 disabled:opacity-40 text-gray-950 font-black text-sm shadow-xl cursor-pointer transition-all"
                   >
-                    Confirmar respuestas seleccionadas ({selectedMultiIndices.length})
+                    Confirmar ({selectedMultiIndices.length})
                   </button>
                 )}
               </div>
@@ -1636,7 +1626,7 @@ const KahootLiveModal = ({
               myLiveAnswer ? (
                 <div className="p-4 rounded-2xl bg-white/10 border border-white/20 text-center">
                   <span className="text-xs font-bold text-purple-200 block mb-1">
-                    Tu respuesta enviada:
+                    Tu respuesta:
                   </span>
                   <span className="text-base sm:text-lg font-black text-white">
                     “{myLiveAnswer.textAnswer || ''}”
@@ -1664,7 +1654,7 @@ const KahootLiveModal = ({
                     disabled={!typedAnswerText.trim()}
                     className="px-8 py-4 rounded-2xl bg-emerald-400 hover:bg-emerald-300 disabled:opacity-40 text-gray-950 font-black text-base shadow-xl cursor-pointer"
                   >
-                    Enviar respuesta
+                    Enviar
                   </button>
                 </form>
               )
@@ -1675,8 +1665,8 @@ const KahootLiveModal = ({
               <div className="space-y-2.5 w-full">
                 <p className="text-xs font-bold text-center text-purple-200">
                   {myLiveAnswer
-                    ? 'Orden enviado (de arriba hacia abajo):'
-                    : 'Usa las flechas ↑ ↓ para ordenar la secuencia de arriba hacia abajo y pulsa Confirmar:'}
+                    ? 'Orden enviado:'
+                    : 'Ordena las opciones con las flechas ↑ ↓:'}
                 </p>
                 {(myLiveAnswer?.puzzleOrder || puzzleOrderDraft).map((item, idx) => {
                   const color = KAHOOT_COLORS[idx % KAHOOT_COLORS.length];
@@ -1734,7 +1724,7 @@ const KahootLiveModal = ({
                     onClick={() => handleSubmitAnswer({ puzzleOrder: puzzleOrderDraft })}
                     className="w-full py-3.5 rounded-2xl bg-emerald-400 hover:bg-emerald-300 text-gray-950 font-black text-sm shadow-xl cursor-pointer"
                   >
-                    Confirmar orden del Puzzle
+                    Confirmar orden
                   </button>
                 )}
               </div>
@@ -1765,13 +1755,13 @@ const KahootLiveModal = ({
                   <div>
                     <h4 className="text-base sm:text-xl font-black">
                       {myLiveAnswer.isCorrect
-                        ? `¡Respuesta Correcta! +${myLiveAnswer.pointsEarned} pts`
-                        : 'Respuesta Incorrecta • +0 pts'}
+                        ? `¡Correcto! +${myLiveAnswer.pointsEarned} pts`
+                        : 'Incorrecto • +0 pts'}
                     </h4>
                     <p className="text-xs text-purple-100">
-                      Respondiste en {(Number(myLiveAnswer.timeMs || 0) / 1000).toFixed(1)} segundos
+                      {(Number(myLiveAnswer.timeMs || 0) / 1000).toFixed(1)}s
                       {myLiveAnswer.streakBonus > 0
-                        ? ` • Incluye bono de racha 🔥 +${myLiveAnswer.streakBonus} pts`
+                        ? ` • Racha 🔥 +${myLiveAnswer.streakBonus} pts`
                         : ''}
                     </p>
                   </div>
@@ -1779,7 +1769,7 @@ const KahootLiveModal = ({
 
                 <div className="text-right">
                   <span className="text-[11px] uppercase font-bold text-purple-200 block">
-                    Tu puntaje acumulado
+                    Puntaje total
                   </span>
                   <span className="text-xl sm:text-2xl font-black text-amber-300">
                     {viewMode === 'solo' ? soloState.score : (myParticipantData?.score || 0)} pts
@@ -1788,7 +1778,7 @@ const KahootLiveModal = ({
               </div>
             ) : (
               <div className="p-4 rounded-3xl bg-white/10 border border-white/20 text-center text-sm font-bold text-purple-200">
-                🔔 ¡Sonó el Gong! Tiempo finalizado para la pregunta #{activeQIndex + 1}.
+                Tiempo finalizado.
               </div>
             )}
 
@@ -1801,11 +1791,10 @@ const KahootLiveModal = ({
                   </div>
                   <div>
                     <span className="text-[11px] font-black uppercase tracking-wider text-amber-300 block">
-                      ⚡ ¡Más rápido en esta pregunta!
+                      Más rápido
                     </span>
                     <span className="text-sm sm:text-base font-black text-white">
-                      {fastestResponder.avatar} {fastestResponder.displayName} — respondió en{' '}
-                      {fastestResponder.timeSec}s (+{fastestResponder.pointsEarned} pts)
+                      {fastestResponder.avatar} {fastestResponder.displayName} ({fastestResponder.timeSec}s • +{fastestResponder.pointsEarned} pts)
                     </span>
                   </div>
                 </div>
@@ -1854,7 +1843,7 @@ const KahootLiveModal = ({
                           <div className="flex items-center gap-2 shrink-0">
                             {viewMode === 'live' && (
                               <span className="text-xs font-extrabold px-2 py-0.5 rounded-lg bg-black/30">
-                                {votesForOpt} {votesForOpt === 1 ? 'voto' : 'votos'}
+                                {votesForOpt}
                               </span>
                             )}
                             {opt.isCorrect && (
@@ -1891,7 +1880,7 @@ const KahootLiveModal = ({
 
                 {currentQuestion.explanation && (
                   <div className="p-3 rounded-2xl bg-indigo-500/25 border border-indigo-400/40 text-xs text-indigo-100">
-                    <strong>💡 Explicación:</strong> {currentQuestion.explanation}
+                    <strong>Retroalimentación:</strong> {currentQuestion.explanation}
                   </div>
                 )}
               </div>
@@ -1902,10 +1891,10 @@ const KahootLiveModal = ({
                   <div className="flex items-center justify-between">
                     <h4 className="font-black text-sm sm:text-base flex items-center gap-2">
                       <Trophy size={17} className="text-amber-400" />
-                      <span>Tabla de Posiciones Acumulada</span>
+                      <span>Posiciones</span>
                     </h4>
                     <span className="text-xs font-bold text-purple-200">
-                      Ronda {activeQIndex + 1}/{questions.length}
+                      {activeQIndex + 1}/{questions.length}
                     </span>
                   </div>
 
@@ -1974,8 +1963,8 @@ const KahootLiveModal = ({
                   >
                     <span>
                       {activeQIndex + 1 < questions.length
-                        ? `Siguiente pregunta (${activeQIndex + 2} de ${questions.length})`
-                        : '🏆 Ver Podio Final y Guardar Publicación'}
+                        ? `Siguiente pregunta (${activeQIndex + 2}/${questions.length})`
+                        : 'Ver podio final'}
                     </span>
                     <ChevronRight size={18} />
                   </button>
@@ -1985,21 +1974,18 @@ const KahootLiveModal = ({
           </div>
         ) : (
           /* =====================================================================
-              MODO 5: PODIO FINAL Y ACTIVIDAD GUARDADA PARA REPASO
+              MODO 5: PODIO FINAL
              ===================================================================== */
           <div className="max-w-4xl w-full mx-auto space-y-6 py-4 text-center animate-in fade-in">
             <div className="space-y-2">
               <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-400/20 border border-amber-300/40 text-amber-300 text-xs font-black uppercase tracking-widest">
-                <Trophy size={14} /> ¡Kahoot Completado!
+                <Trophy size={14} /> Resultados
               </div>
               <h2 className="text-2xl sm:text-4xl font-black text-white">
                 {viewMode === 'solo'
-                  ? `¡Gran práctica, ${myNickname}! Obtuviste ${soloState.score} pts`
-                  : `Podio Final — ${liveTask.title}`}
+                  ? `${myNickname} • ${soloState.score} pts`
+                  : liveTask.title}
               </h2>
-              <p className="text-xs sm:text-sm text-purple-200">
-                Esta publicación ha quedado guardada en el grupo para que puedas repasar todas las preguntas cuando quieras.
-              </p>
             </div>
 
             {/* Podio 1°, 2° y 3° lugar */}
@@ -2053,29 +2039,29 @@ const KahootLiveModal = ({
               <button
                 type="button"
                 onClick={() => setViewMode('review')}
-                className="px-6 py-3.5 rounded-2xl bg-white text-[#46178F] hover:bg-purple-50 font-black text-sm flex items-center gap-2 shadow-xl cursor-pointer transition-transform hover:scale-105"
+                className="px-6 py-3 rounded-2xl bg-white text-[#46178F] hover:bg-purple-50 font-black text-sm flex items-center gap-2 shadow-xl cursor-pointer transition-transform hover:scale-105"
               >
                 <BookOpen size={17} />
-                <span>📚 Repasar Preguntas y Respuestas Practicadas</span>
+                <span>Repasar preguntas</span>
               </button>
 
               <button
                 type="button"
                 onClick={startSoloPractice}
-                className="px-5 py-3.5 rounded-2xl bg-emerald-400 hover:bg-emerald-300 text-gray-950 font-black text-sm flex items-center gap-2 shadow-xl cursor-pointer transition-transform hover:scale-105"
+                className="px-5 py-3 rounded-2xl bg-emerald-400 hover:bg-emerald-300 text-gray-950 font-black text-sm flex items-center gap-2 shadow-xl cursor-pointer transition-transform hover:scale-105"
               >
                 <Gamepad2 size={17} />
-                <span>Volver a practicar por mi cuenta</span>
+                <span>Practicar de nuevo</span>
               </button>
 
               {canControlGame && (
                 <button
                   type="button"
                   onClick={handleRestartLiveGame}
-                  className="px-5 py-3.5 rounded-2xl bg-white/15 hover:bg-white/25 border border-white/25 text-white font-bold text-sm flex items-center gap-2 cursor-pointer"
+                  className="px-5 py-3 rounded-2xl bg-white/15 hover:bg-white/25 border border-white/25 text-white font-bold text-sm flex items-center gap-2 cursor-pointer"
                 >
                   <RotateCcw size={16} />
-                  <span>Reiniciar sala en vivo</span>
+                  <span>Nueva partida</span>
                 </button>
               )}
             </div>

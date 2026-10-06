@@ -94,6 +94,7 @@ const validQuizQ = normalizeKahootQuestion({
 }, 0);
 const valRes = validateKahootConfig([validQuizQ]);
 check('acepta configuracion valida de quiz', valRes.valid === true && valRes.normalizedQuestions.length === 1);
+check('validateKahootConfig garantiza musicEnabled: true y allowNicknameChange: true siempre activos', valRes.musicEnabled === true && valRes.allowNicknameChange === true);
 
 const invalidTypeAnswer = {
   ...createDefaultKahootQuestion('type_answer', 0),

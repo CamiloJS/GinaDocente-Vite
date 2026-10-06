@@ -354,7 +354,7 @@ export default function OvaStudioTool({
     setShowNewModal(false);
     setNewTitle('');
     setNewSubject('');
-    showMessage(isDemoMode ? 'Nuevo OVA creado en Modo Demo (se borra automáticamente en 2 semanas).' : 'Nuevo OVA creado con éxito. ¡Listo para diseñar!');
+    showMessage('Nuevo OVA creado con éxito.');
   };
 
   // Duplicate current OVA

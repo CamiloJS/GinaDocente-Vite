@@ -24,7 +24,7 @@ import { useVoiceRecorder } from '../utils/useVoiceRecorder.js'
 import { auth, signInAnonymously, doc, setDoc, updateDoc, deleteDoc } from '../firebase/config.js'
 import { runTransaction } from 'firebase/firestore'
 import AudioPlayer, { AudioRecordingVisualizer } from './AudioPlayer.jsx'
-import { getDemoRemainingDays, saveDemoSandboxItem, removeDemoSandboxItem } from '../utils/demoData.js'
+import { saveDemoSandboxItem, removeDemoSandboxItem } from '../utils/demoData.js'
 
 const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, appId, academicGroups, glassInput: propGlassInput, callGemini, currentUser, showMessage, loggedInName, myChatId, isDarkMode, confirmAction, handleOpenProfileByName, userMappings }) => {
     const cardRef = React.useRef(null);
@@ -36,8 +36,6 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
     const [kahootModalStartInReview, setKahootModalStartInReview] = useState(false);
     const [isEditingKahootQuestions, setIsEditingKahootQuestions] = useState(false);
     const [editedKahootQuestions, setEditedKahootQuestions] = useState(() => task?.kahoot?.questions || []);
-    const [editedKahootMusic, setEditedKahootMusic] = useState(() => task?.kahoot?.musicEnabled !== false);
-    const [editedKahootNickname, setEditedKahootNickname] = useState(() => task?.kahoot?.allowNicknameChange !== false);
     // Narracion de la publicacion: voz de mujer y deteccion del idioma de cada parte.
     const narracionRef = useRef(null);
     const solicitudNarracionRef = useRef(0);
@@ -1228,17 +1226,13 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                             {isKahoot && (
                                 <span className="inline-flex items-center gap-1 text-[9.5px] font-bold px-2 py-0.5 rounded-full bg-fuchsia-50 dark:bg-fuchsia-950/40 text-fuchsia-600 dark:text-fuchsia-400 border border-fuchsia-200 dark:border-fuchsia-800/60 shrink-0 whitespace-nowrap">
                                     <Gamepad2 size={10} className="shrink-0" />
-                                    {task.kahoot?.status === 'finished' ? 'Kahoot (Repaso)' : 'Kahoot en Vivo'}
+                                    Kahoot
                                 </span>
                             )}
 
                             {task.isDemoCreated && (
-                                <span
-                                    className="inline-flex items-center gap-1 text-[9.5px] font-bold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-700/60 shrink-0 whitespace-nowrap"
-                                    title="Creado de forma aislada en el Modo Demo • Se elimina automáticamente al cumplir máximo 2 semanas"
-                                >
-                                    <Clock size={9} className="shrink-0" />
-                                    <span>Temporal Demo ({getDemoRemainingDays(task) || 14}d)</span>
+                                <span className="inline-flex items-center gap-1 text-[9.5px] font-bold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-700/60 shrink-0 whitespace-nowrap">
+                                    <span>Demo</span>
                                 </span>
                             )}
                         </div>
@@ -1657,32 +1651,25 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                         {/* Cabecera del Kahoot */}
                         <div className="p-4 sm:p-5 border-b border-white/10 flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-fuchsia-600/20 via-purple-600/15 to-indigo-600/20">
                             <div className="flex items-center gap-3">
-                                <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-fuchsia-500 to-purple-600 flex items-center justify-center shadow-lg shadow-fuchsia-600/30 shrink-0">
-                                    <Gamepad2 size={22} className="text-white" />
+                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-fuchsia-500 to-purple-600 flex items-center justify-center shadow-lg shadow-fuchsia-600/30 shrink-0">
+                                    <Gamepad2 size={20} className="text-white" />
                                 </div>
-                                <div>
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-white/15 border border-white/20 text-fuchsia-200">
-                                            PIN: {formattedPin}
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-white/15 border border-white/20 text-fuchsia-200">
+                                        PIN: {formattedPin}
+                                    </span>
+                                    <span className="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-indigo-500/30 border border-indigo-400/30 text-indigo-200">
+                                        {questions.length} {questions.length === 1 ? 'pregunta' : 'preguntas'}
+                                    </span>
+                                    {status === 'finished' ? (
+                                        <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-500/25 border border-amber-400/40 text-amber-300 flex items-center gap-1">
+                                            <Trophy size={11} /> Finalizado
                                         </span>
-                                        <span className="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-indigo-500/30 border border-indigo-400/30 text-indigo-200">
-                                            {questions.length} {questions.length === 1 ? 'pregunta' : 'preguntas'}
+                                    ) : (
+                                        <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-500/25 border border-emerald-400/40 text-emerald-300 flex items-center gap-1 animate-pulse">
+                                            <Zap size={11} /> En vivo
                                         </span>
-                                        {status === 'finished' ? (
-                                            <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-500/25 border border-amber-400/40 text-amber-300 flex items-center gap-1">
-                                                <Trophy size={11} /> Finalizado • Guardado para repasar
-                                            </span>
-                                        ) : (
-                                            <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-500/25 border border-emerald-400/40 text-emerald-300 flex items-center gap-1 animate-pulse">
-                                                <Zap size={11} /> En vivo • Sala activa
-                                            </span>
-                                        )}
-                                    </div>
-                                    <p className="text-xs text-purple-200/85 font-medium mt-1">
-                                        {status === 'finished'
-                                            ? 'La sesión en vivo concluyó. Puedes repasar todas las preguntas y respuestas practicadas o volver a jugar.'
-                                            : 'Opciones con texto completo de arriba hacia abajo • Puntaje por velocidad • Gong al terminar'}
-                                    </p>
+                                    )}
                                 </div>
                             </div>
 
@@ -1696,28 +1683,11 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
 
                         {/* Cuerpo: Podio / Ranking en vivo + Botones de acción */}
                         <div className="p-4 sm:p-5 space-y-4">
-                            {/* Mini vista previa de preguntas */}
-                            {questions.length > 0 && (
-                                <div className="flex flex-wrap gap-1.5">
-                                    {questions.slice(0, 6).map((q, qIdx) => (
-                                        <span key={q.id || qIdx} className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-white/10 border border-white/10 text-purple-100 truncate max-w-[220px]">
-                                            #{qIdx + 1} {q.text || q.question}
-                                        </span>
-                                    ))}
-                                    {questions.length > 6 && (
-                                        <span className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-white/5 text-purple-300">
-                                            +{questions.length - 6} más
-                                        </span>
-                                    )}
-                                </div>
-                            )}
-
                             {/* Mini Podio / Top 3 si hay participantes */}
                             {topThree.length > 0 && (
                                 <div className="p-3 rounded-xl bg-black/25 border border-white/10 space-y-2">
                                     <div className="flex items-center justify-between text-[11px] font-extrabold text-amber-300 uppercase tracking-wider">
-                                        <span className="flex items-center gap-1.5"><Trophy size={13} /> Tabla de posiciones ({totalParticipants})</span>
-                                        <span>Puntos por rapidez</span>
+                                        <span className="flex items-center gap-1.5"><Trophy size={13} /> Posiciones</span>
                                     </div>
                                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                         {topThree.map((p, idx) => (
@@ -1757,15 +1727,15 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                                         setKahootModalStartInReview(false);
                                         setShowKahootLiveModal(true);
                                     }}
-                                    className="flex-1 min-w-[220px] py-3 px-5 rounded-xl font-black text-xs sm:text-sm bg-gradient-to-r from-fuchsia-500 via-purple-500 to-indigo-500 hover:from-fuchsia-400 hover:via-purple-400 hover:to-indigo-400 text-white shadow-lg shadow-fuchsia-500/30 flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+                                    className="flex-1 min-w-[180px] py-2.5 px-5 rounded-xl font-black text-xs sm:text-sm bg-gradient-to-r from-fuchsia-500 via-purple-500 to-indigo-500 hover:from-fuchsia-400 hover:via-purple-400 hover:to-indigo-400 text-white shadow-lg shadow-fuchsia-500/30 flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
                                 >
-                                    <Gamepad2 size={18} />
+                                    <Gamepad2 size={17} />
                                     <span>
                                         {status === 'finished'
-                                            ? '🎮 Volver a Jugar Kahoot (Pantalla Completa)'
+                                            ? 'Volver a jugar'
                                             : role === 'teacher'
-                                                ? '🎮 Abrir Panel Kahoot en Vivo (Pantalla Completa)'
-                                                : '🎮 Participar en Kahoot en Vivo (Pantalla Completa)'}
+                                                ? 'Iniciar Kahoot'
+                                                : 'Unirse al Kahoot'}
                                     </span>
                                 </button>
 
@@ -1775,10 +1745,10 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                                         setKahootModalStartInReview(true);
                                         setShowKahootLiveModal(true);
                                     }}
-                                    className="py-3 px-4 rounded-xl font-extrabold text-xs bg-white/15 hover:bg-white/25 text-white border border-white/20 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                                    className="py-2.5 px-4 rounded-xl font-extrabold text-xs bg-white/15 hover:bg-white/25 text-white border border-white/20 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                                 >
                                     <BookOpen size={15} />
-                                    <span>📚 Repasar Preguntas y Respuestas</span>
+                                    <span>Repasar preguntas</span>
                                 </button>
 
                                 {role === 'teacher' && (
@@ -1786,14 +1756,12 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                                         type="button"
                                         onClick={() => {
                                             setEditedKahootQuestions(questions);
-                                            setEditedKahootMusic(kahoot.musicEnabled !== false);
-                                            setEditedKahootNickname(kahoot.allowNicknameChange !== false);
                                             setIsEditingKahootQuestions(prev => !prev);
                                         }}
-                                        className="py-3 px-3.5 rounded-xl font-bold text-xs bg-fuchsia-950/60 hover:bg-fuchsia-900/70 text-fuchsia-200 border border-fuchsia-400/30 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                                        className="py-2.5 px-3.5 rounded-xl font-bold text-xs bg-fuchsia-950/60 hover:bg-fuchsia-900/70 text-fuchsia-200 border border-fuchsia-400/30 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                                     >
                                         <Edit3 size={14} />
-                                        <span>{isEditingKahootQuestions ? 'Cerrar editor' : 'Editar preguntas'}</span>
+                                        <span>{isEditingKahootQuestions ? 'Cerrar' : 'Editar'}</span>
                                     </button>
                                 )}
                             </div>
@@ -1808,10 +1776,6 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                                         taskDesc={task.description}
                                         callGemini={callGemini}
                                         showMessage={showMessage}
-                                        musicEnabled={editedKahootMusic}
-                                        setMusicEnabled={setEditedKahootMusic}
-                                        allowNicknameChange={editedKahootNickname}
-                                        setAllowNicknameChange={setEditedKahootNickname}
                                         isDarkMode={isDarkMode}
                                         isDemoMode={isDemoTask}
                                     />
@@ -1835,20 +1799,20 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                                                         kahoot: {
                                                             ...kahoot,
                                                             questions: validation.normalizedQuestions,
-                                                            musicEnabled: Boolean(editedKahootMusic),
-                                                            allowNicknameChange: Boolean(editedKahootNickname),
+                                                            musicEnabled: true,
+                                                            allowNicknameChange: true,
                                                             updatedAt: Date.now()
                                                         }
                                                     });
                                                     setIsEditingKahootQuestions(false);
-                                                    showMessage("✅ Preguntas del Kahoot actualizadas.");
+                                                    showMessage("Cambios guardados.");
                                                 } catch (err) {
-                                                    showMessage("❌ No se pudieron guardar los cambios del Kahoot.");
+                                                    showMessage("No se pudieron guardar los cambios.");
                                                 }
                                             }}
                                             className="px-5 py-2 rounded-xl text-xs font-black bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:from-fuchsia-700 hover:to-purple-700 text-white shadow-md"
                                         >
-                                            Guardar cambios del Kahoot
+                                            Guardar cambios
                                         </button>
                                     </div>
                                 </div>

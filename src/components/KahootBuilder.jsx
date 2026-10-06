@@ -1,7 +1,5 @@
 // src/components/KahootBuilder.jsx
-// Organizador y editor visual de preguntas para Kahoot en Vivo, con funciones de Inteligencia Artificial,
-// soporte de imágenes (con revelado progresivo opcional), Selección Múltiple, Verdadero/Falso,
-// Respuesta Corta y Puzzle, además de Puntos Dobles y tiempos configurables.
+// Editor de preguntas para Kahoot.
 
 import React, { useState } from 'react';
 import {
@@ -16,8 +14,6 @@ import {
   ArrowDown,
   Copy,
   Zap,
-  Music,
-  Edit3,
   X,
   Gamepad2,
 } from './Icons.jsx';
@@ -34,21 +30,17 @@ import {
 import { compressImage, uploadImageToStorage } from '../utils/helpers.js';
 
 const IDIOMAS_IA = [
-  { value: 'en', label: 'Todo en inglés' },
-  { value: 'es', label: 'Todo en español' },
-  { value: 'bilingue', label: 'Bilingüe (inglés + español)' },
-  { value: 'fr', label: 'Todo en francés' },
-  { value: 'bilingue_fr', label: 'Bilingüe (francés + español)' },
-  { value: 'en_fr', label: 'Mitad inglés + mitad francés' },
+  { value: 'en', label: 'Inglés' },
+  { value: 'es', label: 'Español' },
+  { value: 'bilingue', label: 'Bilingüe (EN/ES)' },
+  { value: 'fr', label: 'Francés' },
+  { value: 'bilingue_fr', label: 'Bilingüe (FR/ES)' },
+  { value: 'en_fr', label: 'Inglés y francés' },
 ];
 
 const KahootBuilder = ({
   questions = [],
   setQuestions,
-  musicEnabled = true,
-  setMusicEnabled,
-  allowNicknameChange = true,
-  setAllowNicknameChange,
   taskTitle = '',
   taskDesc = '',
   callGemini,
@@ -290,23 +282,18 @@ const KahootBuilder = ({
 
   return (
     <div className="p-4 rounded-2xl border border-purple-200 dark:border-purple-800/60 bg-gradient-to-br from-purple-50/60 via-white to-indigo-50/40 dark:from-purple-950/25 dark:via-gray-900 dark:to-indigo-950/20 space-y-4 mt-2 animate-in fade-in duration-200">
-      {/* Cabecera del Organizador Kahoot */}
+      {/* Cabecera */}
       <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-purple-200/70 dark:border-purple-800/50">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#46178F] to-[#7B2CBF] text-white flex items-center justify-center shadow-sm shrink-0">
             <Gamepad2 size={17} />
           </div>
-          <div>
-            <h4 className="text-xs font-black text-purple-950 dark:text-purple-100 flex items-center gap-1.5">
-              <span>Organizador de Kahoot en Vivo</span>
-              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-purple-600 text-white">
-                {safeQuestions.length} {safeQuestions.length === 1 ? 'pregunta' : 'preguntas'}
-              </span>
-            </h4>
-            <p className="text-[11px] text-gray-500 dark:text-gray-400">
-              Pantalla completa en vivo • Opciones en lista vertical • Música de tensión y Gong • Puntos por velocidad
-            </p>
-          </div>
+          <h4 className="text-xs font-black text-purple-950 dark:text-purple-100 flex items-center gap-2">
+            <span>Kahoot</span>
+            <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-purple-600 text-white">
+              {safeQuestions.length} {safeQuestions.length === 1 ? 'pregunta' : 'preguntas'}
+            </span>
+          </h4>
         </div>
 
         <button
@@ -319,17 +306,17 @@ const KahootBuilder = ({
           }`}
         >
           <Sparkles size={14} />
-          <span>{showAiPanel ? 'Ocultar Generador IA' : 'Crear Kahoot Rápido con IA'}</span>
+          <span>{showAiPanel ? 'Cerrar IA' : 'Crear Kahoot con IA'}</span>
         </button>
       </div>
 
-      {/* Panel Desplegable de Generación Rápida con IA */}
+      {/* Panel de generación con IA */}
       {showAiPanel && (
         <div className="p-4 rounded-2xl border border-purple-300 dark:border-purple-700/80 bg-purple-100/50 dark:bg-purple-950/40 space-y-3 animate-in fade-in duration-150">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-black text-purple-900 dark:text-purple-200 flex items-center gap-1.5">
               <Sparkles size={15} className="text-purple-600 dark:text-purple-400" />
-              Asistente IA para Kahoot (Genera preguntas, opciones, V/F y explicaciones al instante)
+              Crear Kahoot con IA
             </span>
             <button
               type="button"
@@ -342,7 +329,7 @@ const KahootBuilder = ({
 
           <div>
             <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 mb-1">
-              Tema, vocabulario o instrucciones para la IA:
+              Tema:
             </label>
             <textarea
               rows={2}
@@ -350,8 +337,8 @@ const KahootBuilder = ({
               onChange={(e) => setAiTopic(e.target.value)}
               placeholder={
                 taskTitle
-                  ? `Usará "${taskTitle}" o escribe aquí detalles (ej: Phrasal verbs de negocios, nivel B1, con casos prácticos)...`
-                  : 'Ej: Past Simple vs Present Perfect, vocabulario financiero, nivel A2-B1...'
+                  ? `Escribe detalles o usa "${taskTitle}"...`
+                  : 'Escribe el tema de las preguntas...'
               }
               className="w-full py-2 px-3 text-xs font-medium rounded-xl bg-white dark:bg-gray-900 border border-purple-200 dark:border-purple-800 text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-purple-500"
             />
@@ -360,7 +347,7 @@ const KahootBuilder = ({
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
             <div>
               <label className="block text-[10px] font-bold text-gray-600 dark:text-gray-400 mb-1">
-                N° de preguntas
+                Preguntas
               </label>
               <input
                 type="number"
@@ -374,17 +361,17 @@ const KahootBuilder = ({
 
             <div>
               <label className="block text-[10px] font-bold text-gray-600 dark:text-gray-400 mb-1">
-                Mezcla de tipos
+                Formato
               </label>
               <select
                 value={aiMix}
                 onChange={(e) => setAiMix(e.target.value)}
                 className="w-full py-1.5 px-2 text-xs font-bold rounded-xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100"
               >
-                <option value="variado">Quiz + Verdadero/Falso</option>
-                <option value="completo">Completo (Quiz + V/F + Escribir + Puzzle)</option>
-                <option value="solo_quiz">Solo Selección Múltiple</option>
-                <option value="solo_vf">Solo Verdadero / Falso</option>
+                <option value="variado">Quiz y V/F</option>
+                <option value="completo">Todos los tipos</option>
+                <option value="solo_quiz">Solo Quiz</option>
+                <option value="solo_vf">Solo V/F</option>
               </select>
             </div>
 
@@ -399,7 +386,7 @@ const KahootBuilder = ({
               >
                 <option value="facil">Fácil</option>
                 <option value="media">Media</option>
-                <option value="alta">Alta / Retadora</option>
+                <option value="alta">Alta</option>
               </select>
             </div>
 
@@ -422,7 +409,7 @@ const KahootBuilder = ({
 
             <div>
               <label className="block text-[10px] font-bold text-gray-600 dark:text-gray-400 mb-1">
-                Tiempo por preg.
+                Tiempo
               </label>
               <select
                 value={aiTimeLimit}
@@ -431,7 +418,7 @@ const KahootBuilder = ({
               >
                 {KAHOOT_TIME_OPTIONS.map((sec) => (
                   <option key={sec} value={sec}>
-                    {sec} segundos
+                    {sec} s
                   </option>
                 ))}
               </select>
@@ -457,13 +444,13 @@ const KahootBuilder = ({
               className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-black flex items-center gap-1.5 shadow-md shadow-purple-600/20 disabled:opacity-50 cursor-pointer"
             >
               {isGeneratingAi ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-              <span>{isGeneratingAi ? 'Generando Kahoot...' : `Generar ${aiCount} preguntas con IA`}</span>
+              <span>{isGeneratingAi ? 'Generando...' : 'Generar preguntas'}</span>
             </button>
           </div>
         </div>
       )}
 
-      {/* Barra horizontal de diapositivas / preguntas */}
+      {/* Barra horizontal de preguntas */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-0.5 no-scrollbar">
         {safeQuestions.map((q, idx) => {
           const norm = normalizeKahootQuestion(q, idx, { preserveDraft: true });
@@ -509,14 +496,14 @@ const KahootBuilder = ({
                     isSelected ? 'text-purple-200' : 'text-gray-400'
                   }`}
                 >
-                  {norm.text || 'Sin texto...'}
+                  {norm.text || 'Pregunta'}
                 </span>
               </div>
             </button>
           );
         })}
 
-        {/* Botones rápidos para agregar nueva pregunta */}
+        {/* Botones para agregar nueva pregunta */}
         <div className="flex items-center gap-1 shrink-0 pl-1">
           <button
             type="button"
@@ -568,7 +555,7 @@ const KahootBuilder = ({
                 value={currentQ.timeLimit}
                 onChange={(e) => updateQuestionAt(safeIdx, { timeLimit: Number(e.target.value) })}
                 className="py-1 px-2 text-xs font-bold rounded-xl bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 outline-none"
-                title="Tiempo límite de esta pregunta"
+                title="Tiempo límite"
               >
                 {KAHOOT_TIME_OPTIONS.map((sec) => (
                   <option key={sec} value={sec}>
@@ -595,7 +582,7 @@ const KahootBuilder = ({
                 value={currentQ.pointsMultiplier}
                 onChange={(e) => updateQuestionAt(safeIdx, { pointsMultiplier: Number(e.target.value) })}
                 className="py-1 px-2 text-xs font-bold rounded-xl bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 outline-none"
-                title="Puntaje de la pregunta"
+                title="Puntaje"
               >
                 {KAHOOT_POINTS_OPTIONS.map((p) => (
                   <option key={p.value} value={p.value}>
@@ -606,14 +593,14 @@ const KahootBuilder = ({
             </div>
           </div>
 
-          {/* Acciones de organización de la pregunta (Subir, Bajar, Duplicar, Borrar) */}
+          {/* Acciones de la pregunta */}
           <div className="flex items-center gap-1">
             <button
               type="button"
               disabled={safeIdx === 0}
               onClick={() => handleMoveQuestion(safeIdx, -1)}
               className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30"
-              title="Mover pregunta antes"
+              title="Subir"
             >
               <ArrowUp size={14} />
             </button>
@@ -622,7 +609,7 @@ const KahootBuilder = ({
               disabled={safeIdx === safeQuestions.length - 1}
               onClick={() => handleMoveQuestion(safeIdx, 1)}
               className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30"
-              title="Mover pregunta después"
+              title="Bajar"
             >
               <ArrowDown size={14} />
             </button>
@@ -630,7 +617,7 @@ const KahootBuilder = ({
               type="button"
               onClick={() => handleDuplicateQuestion(safeIdx)}
               className="p-1.5 rounded-lg text-gray-500 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/40"
-              title="Duplicar pregunta"
+              title="Duplicar"
             >
               <Copy size={14} />
             </button>
@@ -638,14 +625,14 @@ const KahootBuilder = ({
               type="button"
               onClick={() => handleDeleteQuestion(safeIdx)}
               className="p-1.5 rounded-lg text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
-              title="Eliminar pregunta"
+              title="Eliminar"
             >
               <Trash2 size={14} />
             </button>
           </div>
         </div>
 
-        {/* Enunciado de la pregunta + Botón IA para autocompletar */}
+        {/* Enunciado de la pregunta */}
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <label className="text-xs font-extrabold text-gray-700 dark:text-gray-200">
@@ -658,7 +645,7 @@ const KahootBuilder = ({
               className="text-[11px] font-bold text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-50"
             >
               {isGeneratingSingleAi ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-              <span>Autocompletar opciones de esta pregunta con IA</span>
+              <span>Completar con IA</span>
             </button>
           </div>
 
@@ -666,12 +653,12 @@ const KahootBuilder = ({
             type="text"
             value={currentQ.text}
             onChange={(e) => updateQuestionAt(safeIdx, { text: e.target.value })}
-            placeholder="Escribe aquí el enunciado de la pregunta (ej. Which macroeconomic indicator measures inflation?)..."
+            placeholder="Escribe la pregunta aquí..."
             className="w-full py-3 px-4 text-sm sm:text-base font-extrabold rounded-2xl bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 outline-none focus:border-purple-500 text-center shadow-inner"
           />
         </div>
 
-        {/* Área Multimedia de la Pregunta (Imagen / GIF / Efecto de Revelado) */}
+        {/* Imagen de la pregunta */}
         <div className="p-3 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-800/40">
           {currentQ.imageUrl ? (
             <div className="flex flex-col sm:flex-row items-center gap-3">
@@ -693,41 +680,36 @@ const KahootBuilder = ({
                   <X size={12} />
                 </button>
               </div>
-              <div className="flex-1 space-y-2 text-xs">
-                <span className="font-bold text-gray-700 dark:text-gray-200 block">
-                  Efecto visual de la imagen durante el juego:
-                </span>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => updateQuestionAt(safeIdx, { imageReveal: 'none' })}
-                    className={`px-3 py-1.5 rounded-xl font-bold text-xs border transition-all cursor-pointer ${
-                      currentQ.imageReveal !== 'blur'
-                        ? 'bg-purple-600 text-white border-purple-600'
-                        : 'bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300'
-                    }`}
-                  >
-                    🖼️ Imagen normal
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => updateQuestionAt(safeIdx, { imageReveal: 'blur' })}
-                    className={`px-3 py-1.5 rounded-xl font-bold text-xs border transition-all cursor-pointer ${
-                      currentQ.imageReveal === 'blur'
-                        ? 'bg-purple-600 text-white border-purple-600'
-                        : 'bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300'
-                    }`}
-                  >
-                    🔍 Revelado progresivo (Se aclara poco a poco)
-                  </button>
-                </div>
+              <div className="flex-1 flex flex-wrap gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => updateQuestionAt(safeIdx, { imageReveal: 'none' })}
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs border transition-all cursor-pointer ${
+                    currentQ.imageReveal !== 'blur'
+                      ? 'bg-purple-600 text-white border-purple-600'
+                      : 'bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300'
+                  }`}
+                >
+                  Imagen normal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateQuestionAt(safeIdx, { imageReveal: 'blur' })}
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs border transition-all cursor-pointer ${
+                    currentQ.imageReveal === 'blur'
+                      ? 'bg-purple-600 text-white border-purple-600'
+                      : 'bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300'
+                  }`}
+                >
+                  Revelado progresivo
+                </button>
               </div>
             </div>
           ) : (
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
                 <ImageIcon size={15} className="text-purple-500" />
-                <span>Imagen o apoyo visual de la pregunta (opcional):</span>
+                <span>Imagen (opcional)</span>
               </span>
               <div className="flex flex-wrap items-center gap-2">
                 <label className="px-3 py-1.5 rounded-xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-xs font-bold text-gray-700 dark:text-gray-200 hover:border-purple-500 cursor-pointer flex items-center gap-1.5 shadow-2xs">
@@ -745,7 +727,7 @@ const KahootBuilder = ({
                   onClick={() => setShowImageUrlInput(!showImageUrlInput)}
                   className="px-3 py-1.5 rounded-xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-xs font-bold text-gray-700 dark:text-gray-200 hover:border-purple-500 cursor-pointer"
                 >
-                  Pegar enlace URL
+                  Enlace URL
                 </button>
                 {typeof window !== 'undefined' && window.openGifPicker && (
                   <button
@@ -781,19 +763,18 @@ const KahootBuilder = ({
           )}
         </div>
 
-        {/* Opciones en Lista Vertical según el tipo de pregunta */}
+        {/* Opciones según el tipo de pregunta */}
         {(currentQ.type === 'quiz' || currentQ.type === 'truefalse') && (
           <div className="space-y-2.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
-                Opciones en lista vertical (así las verán los estudiantes en su pantalla y teléfono):
+                Opciones
               </span>
               {currentQ.type === 'quiz' && (
                 <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-xl border border-gray-200 dark:border-gray-700">
                   <button
                     type="button"
                     onClick={() => {
-                      // Asegurar solo 1 correcta
                       const firstCorrectIdx = Math.max(
                         0,
                         currentQ.options.findIndex((o) => o.isCorrect)
@@ -823,7 +804,7 @@ const KahootBuilder = ({
                         : 'text-gray-600 dark:text-gray-400'
                     }`}
                   >
-                    Selección múltiple (varias correctas)
+                    Varias correctas
                   </button>
                 </div>
               )}
@@ -850,7 +831,6 @@ const KahootBuilder = ({
                     <input
                       type="text"
                       value={opt.text}
-                      readOnly={currentQ.type === 'truefalse' && false}
                       onChange={(e) => {
                         const val = e.target.value;
                         updateQuestionAt(safeIdx, (prev) => ({
@@ -863,9 +843,9 @@ const KahootBuilder = ({
                       placeholder={
                         currentQ.type === 'truefalse'
                           ? oIdx === 0
-                            ? 'Verdadero / True'
-                            : 'Falso / False'
-                          : `Opción ${oIdx + 1} (${colorInfo.name})${oIdx >= 2 ? ' (opcional)' : ' *'}...`
+                            ? 'Verdadero'
+                            : 'Falso'
+                          : `Opción ${oIdx + 1}${oIdx >= 2 ? ' (opcional)' : ''}`
                       }
                       className="flex-1 py-2 px-3 text-xs sm:text-sm font-bold rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-purple-500"
                     />
@@ -908,24 +888,24 @@ const KahootBuilder = ({
           </div>
         )}
 
-        {/* Editor para Respuesta Corta (Type Answer) */}
+        {/* Editor para Respuesta Corta */}
         {currentQ.type === 'type_answer' && (
           <div className="space-y-3 p-3.5 rounded-2xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/60">
             <div>
               <label className="block text-xs font-bold text-gray-700 dark:text-gray-200 mb-1">
-                Respuesta exacta esperada <span className="text-red-500">*</span>:
+                Respuesta correcta <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 value={currentQ.correctAnswer || ''}
                 onChange={(e) => updateQuestionAt(safeIdx, { correctAnswer: e.target.value })}
-                placeholder="Ej: Gross Domestic Product"
+                placeholder="Escribe la respuesta correcta"
                 className="w-full py-2 px-3 text-xs sm:text-sm font-bold rounded-xl bg-white dark:bg-gray-900 border border-blue-300 dark:border-blue-700 text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-700 dark:text-gray-200 mb-1">
-                Otras respuestas válidas / sinónimos (separados por coma, opcional):
+                Otras respuestas válidas (separadas por coma, opcional)
               </label>
               <input
                 type="text"
@@ -944,18 +924,18 @@ const KahootBuilder = ({
                       .filter(Boolean),
                   });
                 }}
-                placeholder="Ej: GDP, Producto Interno Bruto, PIB"
+                placeholder="Opcional"
                 className="w-full py-2 px-3 text-xs font-semibold rounded-xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
           </div>
         )}
 
-        {/* Editor para Puzzle (Ordenar secuencia de arriba hacia abajo) */}
+        {/* Editor para Puzzle */}
         {currentQ.type === 'puzzle' && (
           <div className="space-y-2.5 p-3.5 rounded-2xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/60">
             <label className="block text-xs font-bold text-gray-700 dark:text-gray-200">
-              Escribe los elementos en el ORDEN CORRECTO de arriba hacia abajo (a los estudiantes les saldrán desordenados):
+              Escribe los elementos en el orden correcto:
             </label>
             {[0, 1, 2, 3].map((pIdx) => {
               const colorInfo = KAHOOT_COLORS[pIdx % KAHOOT_COLORS.length];
@@ -975,7 +955,7 @@ const KahootBuilder = ({
                       nextItems[pIdx] = e.target.value;
                       updateQuestionAt(safeIdx, { puzzleItems: nextItems });
                     }}
-                    placeholder={`Elemento o fragmento #${pIdx + 1}${pIdx === 3 ? ' (opcional)' : ' *'}...`}
+                    placeholder={`Opción ${pIdx + 1}${pIdx === 3 ? ' (opcional)' : ''}`}
                     className="flex-1 py-2 px-3 text-xs font-bold rounded-xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-amber-500"
                   />
                 </div>
@@ -984,44 +964,19 @@ const KahootBuilder = ({
           </div>
         )}
 
-        {/* Explicación didáctica opcional para el repaso */}
+        {/* Retroalimentación breve */}
         <div>
           <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-400 mb-1">
-            💡 Explicación o retroalimentación breve (se muestra tras el Gong y queda guardada para repaso):
+            Explicación o retroalimentación breve
           </label>
           <input
             type="text"
             value={currentQ.explanation || ''}
             onChange={(e) => updateQuestionAt(safeIdx, { explanation: e.target.value })}
-            placeholder="Opcional: Explica brevemente por qué esa es la respuesta correcta para que puedan repasar después..."
+            placeholder="Escribe aquí tu retroalimentación"
             className="w-full py-2 px-3 text-xs font-medium rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 outline-none focus:ring-2 focus:ring-purple-500"
           />
         </div>
-      </div>
-
-      {/* Ajustes globales del Kahoot en Vivo */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-purple-200/60 dark:border-purple-800/40 text-xs">
-        <label className="flex items-center gap-2 cursor-pointer select-none font-bold text-gray-700 dark:text-gray-200">
-          <input
-            type="checkbox"
-            checked={Boolean(musicEnabled)}
-            onChange={(e) => setMusicEnabled?.(e.target.checked)}
-            className="w-4 h-4 rounded accent-purple-600"
-          />
-          <Music size={14} className="text-purple-600 dark:text-purple-400" />
-          <span>Música ambiental de tensión y Gong al terminar cada pregunta</span>
-        </label>
-
-        <label className="flex items-center gap-2 cursor-pointer select-none font-bold text-gray-700 dark:text-gray-200">
-          <input
-            type="checkbox"
-            checked={Boolean(allowNicknameChange)}
-            onChange={(e) => setAllowNicknameChange?.(e.target.checked)}
-            className="w-4 h-4 rounded accent-purple-600"
-          />
-          <Edit3 size={14} className="text-purple-600 dark:text-purple-400" />
-          <span>Permitir a los estudiantes cambiarse el nombre mientras participan</span>
-        </label>
       </div>
     </div>
   );

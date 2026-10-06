@@ -83,7 +83,6 @@ import {
   DEMO_TEACHER_BOT_INFO_LIST,
   DEMO_TTL_MS,
   isDemoItemExpired,
-  getDemoRemainingDays,
   loadDemoSandbox,
   clearDemoSandbox,
   saveDemoSandboxItem,
@@ -1833,7 +1832,7 @@ function App() {
             confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
           } catch(e) {}
         }
-        showMessage(`¡Evaluación demo completada! Tu nota fue: ${demoGradeData.score} / 5.0 (Aislada en Modo Demo • puedes revisarla cambiando a vista Docente).`);
+        showMessage(`Evaluación completada. Nota: ${demoGradeData.score} / 5.0`);
         submittingEvalRef.current = false;
         return;
       }
@@ -2984,8 +2983,8 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
             }
             showMessage(
               nextRole === 'teacher'
-                ? '👩‍🏫 Vista Docente (Modo Demo) activada: puedes crear tareas, evaluaciones, diapositivas y contenidos 100% aislados.'
-                : '🎓 Vista Estudiante (Modo Demo) activada: explora las publicaciones, diapositivas y presenta las evaluaciones.'
+                ? 'Vista Docente activada.'
+                : 'Vista Estudiante activada.'
             );
           };
 
@@ -5220,7 +5219,7 @@ useEffect(() => {
                           targetGroupName: "Todos los estudiantes (Global)",
                           questions: [{ type: 'multiple', text: '', options: [{text: '', isCorrect: false}, {text: '', isCorrect: false}], correctAnswer: '' }]
                       });
-                      showMessage("⏳ Evaluación creada en Modo Demo (solo en tu sesión).");
+                      showMessage("Evaluación creada en Modo Demo.");
                       return;
                   }
 
@@ -5346,7 +5345,7 @@ useEffect(() => {
                 setUserMappings(prev => ({ ...prev, [myChatId]: updatedEntry }));
                 saveDemoSandboxItem('userMappings', { id: myChatId, ...updatedEntry });
                 setAvatarPreviewUrl("");
-                showMessage("Foto de perfil actualizada en Modo Demo (solo en tu sesión).");
+                showMessage("Foto de perfil actualizada.");
                 setIsUploadingAvatar(false);
                 return;
             }
@@ -6940,9 +6939,8 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                             {item.isDemoCreated && (
                               <span
                                 className="px-2.5 py-1 rounded-xl bg-amber-500/15 text-amber-700 dark:text-amber-300 text-[10px] font-bold border border-amber-500/30"
-                                title="Contenido temporal creado en Modo Demo (se elimina automáticamente a las 2 semanas)"
                               >
-                                ⏳ Temporal Demo ({getDemoRemainingDays(item) ?? 14}d)
+                                Demo
                               </span>
                             )}
                           </div>
@@ -7220,7 +7218,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                 setNewAcadGroupEmoji('BookOpen');
                 setIsCreatingAcadGroup(false);
                 setShowMateriasList(true);
-                showMessage("⏳ Materia y chat grupal creados en Modo Demo (solo en tu sesión).");
+                showMessage("Materia y chat grupal creados en Modo Demo.");
             } catch (error) {
                 console.error(error);
                 showMessage("Error al crear materia demo.");
@@ -7289,7 +7287,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                 [studentEditModal.userKey]: updatedStudent
             }));
             saveDemoSandboxItem('userMappings', { id: studentEditModal.userKey, ...updatedStudent });
-            showMessage("Perfil de estudiante actualizado en Modo Demo (solo en tu sesión).");
+            showMessage("Perfil de estudiante actualizado.");
             setStudentEditModal({ isOpen: false, userKey: '', fullName: '', customLabel: '', email: '', profilePicUrl: '' });
             return;
         }
@@ -7872,9 +7870,8 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                         {g.isDemoCreated && (
                                                             <span
                                                                 className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30"
-                                                                title="Materia temporal creada en Modo Demo (se elimina automáticamente a las 2 semanas)"
                                                             >
-                                                                ⏳ Temporal Demo ({getDemoRemainingDays(g) ?? 14}d)
+                                                                Demo
                                                             </span>
                                                         )}
                                                     </div>
@@ -8066,7 +8063,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                             saveDemoSandboxItem('userMappings', { id: u, ...newStudent });
                             e.target.reset();
                             setShowRegisterStudentForm(false);
-                            showMessage("Estudiante de prueba añadido en Modo Demo (solo en tu sesión).");
+                            showMessage("Estudiante añadido en Modo Demo.");
                             return;
                         }
                         try {
@@ -10713,8 +10710,8 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                        {ev.targetGroupName || 'Global'}
                                                    </span>
                                                    {ev.isDemoCreated && (
-                                                       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/50 px-2 py-0.5 rounded-md border border-amber-300/70 dark:border-amber-700/60" title="Evaluación creada en Modo Demo: se elimina automáticamente a las 2 semanas">
-                                                           ⏳ Temporal Demo ({getDemoRemainingDays(ev)}d)
+                                                       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/50 px-2 py-0.5 rounded-md border border-amber-300/70 dark:border-amber-700/60">
+                                                           Demo
                                                        </span>
                                                    )}
                                                    {ev.strictAntiCheat && (
@@ -10832,7 +10829,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                                }}
                                                                className="w-full py-1.5 px-3 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-600 dark:text-amber-300 font-bold text-xs transition-colors cursor-pointer"
                                                            >
-                                                               Volver a probar (Modo Demo)
+                                                               Volver a intentar
                                                            </button>
                                                        )}
                                                    </div>
@@ -10864,7 +10861,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                                 }}
                                                                 className="w-full mt-2 py-1.5 px-3 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-600 dark:text-amber-300 font-bold text-xs transition-colors cursor-pointer"
                                                             >
-                                                                Volver a intentar prueba (Modo Demo)
+                                                                Volver a intentar
                                                             </button>
                                                         )}
 
@@ -11640,13 +11637,10 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                 </div>
                                 <div>
                                     <h3 className={`text-sm font-bold flex flex-wrap items-center gap-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                                        <span>Enlaces de Modo Demo (Estudiante y Docente)</span>
-                                        <span className="px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 text-[10px] font-black">
-                                            Entorno Aislado • Temporal 2 Semanas
-                                        </span>
+                                        <span>Enlaces de Modo Demo</span>
                                     </h3>
                                     <p className="text-[11px] text-gray-500 leading-relaxed mt-0.5">
-                                        Comparte el Modo Demo como <strong>Estudiante</strong> o como <strong>Docente</strong>. Todo lo que se cree en el Modo Demo queda 100% aislado de tus datos reales y se borra automáticamente a las <strong>2 semanas (14 días)</strong>.
+                                        Comparte el acceso de prueba como estudiante o docente.
                                     </p>
                                 </div>
                             </div>
@@ -11655,7 +11649,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                         {/* Enlace 1: Modo Demo Estudiante */}
                         <div className="space-y-1.5 pt-1">
                             <label className="text-[11px] font-extrabold text-purple-700 dark:text-purple-300 flex items-center gap-1.5">
-                                <span>🎓 Enlace Modo Demo como Estudiante:</span>
+                                <span>Vista Estudiante:</span>
                             </label>
                             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                                 <div className="flex-1 relative">
@@ -11673,9 +11667,9 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                         const demoUrl = `${window.location.origin}${window.location.pathname}#demo`;
                                         try {
                                             navigator.clipboard.writeText(demoUrl);
-                                            showMessage("¡Enlace de Modo Demo (Estudiante) copiado al portapapeles! 📋");
+                                            showMessage("Enlace copiado.");
                                         } catch (e) {
-                                            showMessage("Enlace demo estudiante: " + demoUrl);
+                                            showMessage("Enlace: " + demoUrl);
                                         }
                                     }}
                                     className="py-2 px-3.5 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white shadow-sm transition-transform active:scale-95 flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
@@ -11689,7 +11683,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                         window.open(`${window.location.origin}${window.location.pathname}#demo`, '_blank');
                                     }}
                                     className="py-2 px-3 rounded-xl text-xs font-bold border border-purple-300 dark:border-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/40 text-purple-700 dark:text-purple-300 transition-colors flex items-center justify-center gap-1 shrink-0 cursor-pointer"
-                                    title="Abrir Modo Demo Estudiante en una nueva pestaña"
+                                    title="Abrir en nueva pestaña"
                                 >
                                     <Compass size={14} />
                                     <span>Probar</span>
@@ -11700,7 +11694,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                         {/* Enlace 2: Modo Demo Docente */}
                         <div className="space-y-1.5 pt-2 border-t border-purple-500/15">
                             <label className="text-[11px] font-extrabold text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
-                                <span>👩‍🏫 Enlace Modo Demo como Docente (Creación aislada temporal por 2 semanas):</span>
+                                <span>Vista Docente:</span>
                             </label>
                             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                                 <div className="flex-1 relative">
@@ -11718,9 +11712,9 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                         const demoTeacherUrl = `${window.location.origin}${window.location.pathname}#demo-docente`;
                                         try {
                                             navigator.clipboard.writeText(demoTeacherUrl);
-                                            showMessage("¡Enlace de Modo Demo como Docente copiado al portapapeles! 👩‍🏫✨");
+                                            showMessage("Enlace copiado.");
                                         } catch (e) {
-                                            showMessage("Enlace demo docente: " + demoTeacherUrl);
+                                            showMessage("Enlace: " + demoTeacherUrl);
                                         }
                                     }}
                                     className="py-2 px-3.5 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-sm transition-transform active:scale-95 flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
@@ -11734,7 +11728,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                         window.open(`${window.location.origin}${window.location.pathname}#demo-docente`, '_blank');
                                     }}
                                     className="py-2 px-3 rounded-xl text-xs font-bold border border-amber-300 dark:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/40 text-amber-700 dark:text-amber-300 transition-colors flex items-center justify-center gap-1 shrink-0 cursor-pointer"
-                                    title="Abrir Modo Demo Docente en una nueva pestaña"
+                                    title="Abrir en nueva pestaña"
                                 >
                                     <Compass size={14} />
                                     <span>Probar</span>

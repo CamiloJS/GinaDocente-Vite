@@ -57,8 +57,6 @@ const TasksTab = React.memo(({
     const [pollOptions, setPollOptions] = useState(["", ""]);
     const [isMultipleChoice, setIsMultipleChoice] = useState(false);
     const [kahootQuestions, setKahootQuestions] = useState(() => [createDefaultKahootQuestion('quiz', 0)]);
-    const [kahootMusicEnabled, setKahootMusicEnabled] = useState(true);
-    const [kahootAllowNickname, setKahootAllowNickname] = useState(true);
     const wallSearchTerm = propWallSearchTerm !== undefined ? propWallSearchTerm : localWallSearchTerm;
     const setWallSearchTerm = propSetWallSearchTerm || setLocalWallSearchTerm;
     const { isRecording: recPub, audioUrl: audioPub, isUploading: upPub, recordingTime: recTimePub, setAudioUrl: setAudioPub, startRecording: startPub, stopRecording: stopPub, cancelRecording: cancelPub } = useVoiceRecorder('tasks_audios', showMessage);
@@ -547,7 +545,7 @@ const TasksTab = React.memo(({
                             <input 
                                 value={taskTitle} 
                                 onChange={(e) => setTaskTitle(e.target.value)} 
-                                placeholder={postType === 'task' ? "Título claro de la tarea..." : postType === 'forum' ? "Tema central del foro de debate..." : postType === 'poll' ? "Pregunta de la encuesta (ej. ¿Cuál es tu horario preferido?)..." : postType === 'kahoot' ? "Título del Kahoot en Vivo (ej. Kahoot Challenge: Economic Indicators & Past Simple)..." : "Título de la publicación..."} 
+                                placeholder={postType === 'task' ? "Título claro de la tarea..." : postType === 'forum' ? "Tema central del foro de debate..." : postType === 'poll' ? "Pregunta de la encuesta (ej. ¿Cuál es tu horario preferido?)..." : postType === 'kahoot' ? "Título del Kahoot..." : "Título de la publicación..."} 
                                 className="w-full text-base font-bold bg-transparent outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 pb-2 border-b border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100" 
                                 required 
                             />
@@ -556,7 +554,7 @@ const TasksTab = React.memo(({
                                 <RichVisualEditor 
                                     value={taskDesc}
                                     onChange={setTaskDesc}
-                                    placeholder={postType === 'forum' ? "Escribe la pregunta detonante, pautas o tema de discusión para el debate..." : postType === 'poll' ? "Detalles, contexto o indicaciones adicionales de la encuesta (opcional)..." : postType === 'kahoot' ? "Instrucciones o descripción de la actividad en vivo (opcional, también quedará guardada para que repasen después)..." : "Escribe las instrucciones detalladas, indicaciones o una idea general..."}
+                                    placeholder={postType === 'forum' ? "Escribe la pregunta detonante, pautas o tema de discusión para el debate..." : postType === 'poll' ? "Detalles, contexto o indicaciones adicionales de la encuesta (opcional)..." : postType === 'kahoot' ? "Descripción o instrucciones (opcional)..." : "Escribe las instrucciones detalladas, indicaciones o una idea general..."}
                                     isDarkMode={isDarkMode}
                                     minHeight="110px"
                                 />
@@ -926,10 +924,6 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                     taskDesc={taskDesc}
                                     callGemini={callGemini}
                                     showMessage={showMessage}
-                                    musicEnabled={kahootMusicEnabled}
-                                    setMusicEnabled={setKahootMusicEnabled}
-                                    allowNicknameChange={kahootAllowNickname}
-                                    setAllowNicknameChange={setKahootAllowNickname}
                                     isDarkMode={isDarkMode}
                                     isDemoMode={isDemoMode}
                                 />
@@ -1081,8 +1075,8 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                             phase: 'lobby',
                                             currentQuestionIndex: 0,
                                             questionStartedAt: 0,
-                                            musicEnabled: Boolean(kahootMusicEnabled),
-                                            allowNicknameChange: Boolean(kahootAllowNickname),
+                                            musicEnabled: true,
+                                            allowNicknameChange: true,
                                             questions: validation.normalizedQuestions,
                                             participants: {},
                                             updatedAt: Date.now()
@@ -1130,7 +1124,7 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                             .filter(img => typeof img === 'string' && img.trim())
                                             .map(img => img.trim());
 
-                                        const resolvedPostTitle = cleanTitle || (currentPostType === 'kahoot' ? 'Actividad Interactiva Kahoot' : (hasAttachments ? 'Publicación adjunta' : 'Sin título'));
+                                        const resolvedPostTitle = cleanTitle || (currentPostType === 'kahoot' ? 'Kahoot' : (hasAttachments ? 'Publicación adjunta' : 'Sin título'));
 
                                         const payload = { 
                                             type: currentPostType, 
@@ -1240,9 +1234,9 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                         setIsFormExpanded(false);
                                         setPostTargetGroup(fixedTargetGroup || "all");
                                         if (isDemoMode) {
-                                            showMessage("⏳ Publicación creada en Modo Demo (aislada • dura máx. 2 semanas).");
+                                            showMessage("Publicación creada en Modo Demo.");
                                         } else {
-                                            showMessage(currentPostType === 'kahoot' ? "🎮 Kahoot interactivo publicado con éxito. ¡Ya pueden unirse!" : currentPostType === 'poll' ? "Encuesta publicada con éxito." : currentPostType === 'forum' ? "Foro de debate publicado con éxito." : currentPostType === 'task' ? "Tarea publicada con éxito." : "Publicación compartida con éxito.");
+                                            showMessage(currentPostType === 'kahoot' ? "Kahoot publicado con éxito." : currentPostType === 'poll' ? "Encuesta publicada con éxito." : currentPostType === 'forum' ? "Foro de debate publicado con éxito." : currentPostType === 'task' ? "Tarea publicada con éxito." : "Publicación compartida con éxito.");
                                         }
                                     } catch (err) {
                                         console.error("Error al publicar:", err);

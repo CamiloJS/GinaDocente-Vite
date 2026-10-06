@@ -7,12 +7,12 @@ import {
   Wand2, Sparkles, Loader2, Download, Trash2, X, Plus, Maximize2,
   Minimize2, ChevronLeft, ChevronRight, BookOpen, Edit3, Copy,
   ArrowUp, ArrowDown, CheckCheck, Globe, CheckCircle2, ChevronDown,
-  Lightbulb, Pin, Clock
+  Lightbulb, Pin
 } from './Icons.jsx'
 import { TEACHER_NAME, getTeacherDisplayName, getItemTeacherId } from '../utils/helpers.js'
 import EmptyState from './EmptyState.jsx'
 import { doc, addDoc, collection, deleteDoc, updateDoc } from '../firebase/config.js'
-import { DEMO_TTL_MS, getDemoRemainingDays, saveDemoSandboxItem, removeDemoSandboxItem } from '../utils/demoData.js'
+import { DEMO_TTL_MS, saveDemoSandboxItem, removeDemoSandboxItem } from '../utils/demoData.js'
 
 // =========================================================================
 // 1. GENERADOR NATIVO DE ARCHIVOS MICROSOFT POWERPOINT (.PPTX)
@@ -1184,7 +1184,7 @@ Devuelve ÚNICAMENTE un array JSON plano sin \`\`\`json ni texto extra:
       setTopic("");
       setReviewTargetGroup('all');
       setShowCreateForm(false);
-      showMessage(isDemoMode ? "⏳ Diapositivas generadas en Modo Demo (aisladas • duran máx. 2 semanas)." : "Diapositivas generadas con éxito.");
+      showMessage("Diapositivas generadas con éxito.");
       setActivePresentation(newDoc);
     } catch (err) {
       console.error(err);
@@ -1460,9 +1460,8 @@ Devuelve ÚNICAMENTE un array JSON plano sin \`\`\`json ni texto extra:
                           </span>
                         )}
                         {review.isDemoCreated && (
-                          <span className="text-[10px] font-bold bg-purple-500/15 text-purple-600 dark:text-purple-300 px-2 py-0.5 rounded-md border border-purple-500/30 inline-flex items-center gap-1" title="Creada en Modo Demo • Se elimina automáticamente al cumplir 2 semanas">
-                            <Clock size={10} />
-                            <span>Temporal Demo ({getDemoRemainingDays(review) || 14}d)</span>
+                          <span className="text-[10px] font-bold bg-purple-500/15 text-purple-600 dark:text-purple-300 px-2 py-0.5 rounded-md border border-purple-500/30 inline-flex items-center gap-1">
+                            <span>Demo</span>
                           </span>
                         )}
                       </div>
