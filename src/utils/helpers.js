@@ -142,10 +142,37 @@ export const compressImage = async (file, maxWidth = 2048, maxHeight = 2048, qua
   });
 };
 
+export const isDemoSessionActive = () => {
+  try {
+    if (typeof window !== 'undefined') {
+      if (window.__ENGLISH_TECH_DEMO__) return true;
+      const hash = (window.location?.hash || '').toLowerCase();
+      const search = (window.location?.search || '').toLowerCase();
+      if (hash.startsWith('#demo') || hash.startsWith('#invitado') || search.includes('demo=1') || search.includes('demo=true') || search.includes('demo=teacher')) {
+        return true;
+      }
+    }
+    if (typeof sessionStorage !== 'undefined') {
+      const isDemoFlag = sessionStorage.getItem('englishTech_isDemo');
+      const demoModeFlag = sessionStorage.getItem('englishTech_demoMode');
+      if (isDemoFlag === '1' || isDemoFlag === 'true' || demoModeFlag === '1' || demoModeFlag === 'true') {
+        return true;
+      }
+    }
+  } catch {
+    // ignore storage access errors
+  }
+  return false;
+};
+
 export const uploadImageToStorage = async (fileOrBase64, folderName) => {
   if (!fileOrBase64) return '';
   if (typeof fileOrBase64 !== 'string') {
     return await uploadRawFileToStorage(fileOrBase64, folderName);
+  }
+  // En Modo Demo, nunca subir imágenes al Firebase Storage de producción
+  if (isDemoSessionActive()) {
+    return fileOrBase64;
   }
   // Generamos un nombre único según el formato (soporte completo para GIFs animados)
   const isGif = fileOrBase64.startsWith('data:image/gif');
@@ -163,6 +190,25 @@ export const uploadImageToStorage = async (fileOrBase64, folderName) => {
 
 export const uploadRawFileToStorage = async (file, folderName) => {
   if (!file) return "";
+  // En Modo Demo, nunca subir archivos ni notas de voz al Firebase Storage de producción
+  if (isDemoSessionActive()) {
+    try {
+      if (typeof file.size === 'number' && file.size <= 1.5 * 1024 * 1024 && typeof FileReader !== 'undefined') {
+        return await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target.result);
+          reader.onerror = (e) => reject(e);
+          reader.readAsDataURL(file);
+        });
+      }
+      if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+        return URL.createObjectURL(file);
+      }
+    } catch {
+      // Fallback
+    }
+    return "";
+  }
   // Optimización silenciosa y transparente (fotos <= 10MB, documentos <= 30MB)
   const optimized = await autoOptimizeFile(file);
   const safeName = ((optimized && optimized.name) || (file && file.name) || 'file').replace(/[^a-zA-Z0-9.]/g, '_');

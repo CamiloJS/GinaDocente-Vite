@@ -215,12 +215,7 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
             if (typeof setTasks === 'function') {
                 setTasks(prev => (prev || []).map(t => String(t.id) === String(task.id) ? nextTask : t));
             }
-            if (task?.isDemoCreated) {
-                saveDemoSandboxItem('tasks', nextTask);
-                try {
-                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'demo_tasks', task.id), updates);
-                } catch (e) { /* guardado local ya aplicado */ }
-            }
+            saveDemoSandboxItem('tasks', nextTask);
             return;
         }
         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), updates);
@@ -351,7 +346,7 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
     const toggleReaction = async (type) => {
         if (!currentUserId || currentUserId === 'undefined') return;
         try {
-            if (!auth.currentUser) {
+            if (!isDemoTask && !auth.currentUser) {
                 try {
                     await signInAnonymously(auth);
                 } catch (e) {}
@@ -399,7 +394,7 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
     const toggleForumRating = async (score) => {
         if (!currentUserId || currentUserId === 'undefined') return;
         try {
-            if (!auth.currentUser) {
+            if (!isDemoTask && !auth.currentUser) {
                 try {
                     await signInAnonymously(auth);
                 } catch (e) {}
@@ -457,7 +452,7 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
     const toggleCommentReaction = async (commentId, emoji) => {
         if (!currentUserId) return;
         try {
-            if (!auth.currentUser) {
+            if (!isDemoTask && !auth.currentUser) {
                 try {
                     await signInAnonymously(auth);
                 } catch (e) {}
@@ -484,7 +479,7 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
         const grade = parseFloat(String(gradeValue).replace(',', '.'));
         if (isNaN(grade) || grade < 0 || grade > 5) return showMessage("Nota inválida (0-5).");
         try {
-            if (!auth.currentUser) {
+            if (!isDemoTask && !auth.currentUser) {
                 try {
                     await signInAnonymously(auth);
                 } catch (e) {}
@@ -506,7 +501,7 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
     const handleRateForumComment = async (cid, stars) => {
         if (!currentUserId) return;
         try {
-            if (!auth.currentUser) {
+            if (!isDemoTask && !auth.currentUser) {
                 try {
                     await signInAnonymously(auth);
                 } catch (e) {}
@@ -1255,11 +1250,6 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                                                     removeDemoSandboxItem('tasks', task.id);
                                                     if (typeof setTasks === 'function') {
                                                         setTasks(prev => (prev || []).filter(t => String(t.id) !== String(task.id)));
-                                                    }
-                                                    if (task?.isDemoCreated) {
-                                                        try {
-                                                            await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'demo_tasks', task.id));
-                                                        } catch (e) {}
                                                     }
                                                     showMessage("✅ Publicación eliminada del entorno Demo.");
                                                     return;

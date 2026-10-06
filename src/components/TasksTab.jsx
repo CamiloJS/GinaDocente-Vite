@@ -1054,7 +1054,7 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                     };
 
                                     try {
-                                        if (!auth.currentUser) {
+                                        if (!isDemoMode && !auth.currentUser) {
                                             try {
                                                 await Promise.race([
                                                     signInAnonymously(auth),
@@ -1110,54 +1110,43 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                             }
                                         });
 
-                                        const targetCollectionName = isDemoMode ? 'demo_tasks' : 'tasks';
-                                        let createdDocId = null;
-
-                                        try {
-                                            const docRef = await withTimeout(addDoc(collection(effectiveDb, 'artifacts', effectiveAppId, 'public', 'data', targetCollectionName), payload));
-                                            createdDocId = docRef?.id || null;
-                                        } catch (primaryErr) {
-                                            console.warn("Retrying task creation with basic schema:", primaryErr);
-                                            const basicPayload = {
-                                                type: currentPostType,
-                                                title: cleanTitle || (hasAttachments ? 'Publicación adjunta' : 'Sin título'),
-                                                description: cleanDesc,
-                                                authorName: loggedInName || 'Profesora',
-                                                authorId: myChatId || 'teacher',
-                                                teacherId: myChatId || 'teacher',
-                                                ownerTeacherId: myChatId || 'teacher',
-                                                targetGroupId: resolvedTargetGroupId,
-                                                imageUrl: cleanMainImg,
-                                                imageUrls: cleanImgList,
-                                                fileUrl: postFileUrl || '',
-                                                fileName: postFileName || '',
-                                                dueDate: isTimed && taskDate ? String(taskDate) : null,
-                                                dueTime: isTimed && taskTime ? String(taskTime) : null,
-                                                allowLate: (isTimed && currentPostType !== 'poll') ? Boolean(allowLate) : (currentPostType === 'poll' ? false : true),
-                                                hideDate: Boolean(hidePublicationDate),
-                                                createdAt: Date.now(),
-                                                comments: [],
-                                                reactions: {},
-                                                ...(isDemoMode ? { isDemoCreated: true, expiresAt: Date.now() + DEMO_TTL_MS } : {})
-                                            };
-                                            if (postGeniallyUrl && postGeniallyUrl.trim()) basicPayload.geniallyUrl = extractGeniallyUrl(postGeniallyUrl.trim());
-                                            if (validPoll) basicPayload.poll = validPoll;
-                                            try {
-                                                const retryRef = await withTimeout(addDoc(collection(effectiveDb, 'artifacts', effectiveAppId, 'public', 'data', targetCollectionName), basicPayload), 10000);
-                                                createdDocId = retryRef?.id || null;
-                                            } catch (retryErr) {
-                                                if (!isDemoMode) throw retryErr;
-                                                createdDocId = `demo-task-${Date.now()}`;
-                                            }
-                                        }
-
                                         if (isDemoMode) {
                                             const demoCreatedTask = saveDemoSandboxItem('tasks', {
-                                                id: createdDocId || `demo-task-${Date.now()}`,
+                                                id: `demo-task-${Date.now()}`,
                                                 ...payload
                                             });
                                             if (typeof setTasks === 'function') {
                                                 setTasks(prev => [demoCreatedTask, ...(prev || []).filter(t => String(t.id) !== String(demoCreatedTask.id))]);
+                                            }
+                                        } else {
+                                            try {
+                                                await withTimeout(addDoc(collection(effectiveDb, 'artifacts', effectiveAppId, 'public', 'data', 'tasks'), payload));
+                                            } catch (primaryErr) {
+                                                console.warn("Retrying task creation with basic schema:", primaryErr);
+                                                const basicPayload = {
+                                                    type: currentPostType,
+                                                    title: cleanTitle || (hasAttachments ? 'Publicación adjunta' : 'Sin título'),
+                                                    description: cleanDesc,
+                                                    authorName: loggedInName || 'Profesora',
+                                                    authorId: myChatId || 'teacher',
+                                                    teacherId: myChatId || 'teacher',
+                                                    ownerTeacherId: myChatId || 'teacher',
+                                                    targetGroupId: resolvedTargetGroupId,
+                                                    imageUrl: cleanMainImg,
+                                                    imageUrls: cleanImgList,
+                                                    fileUrl: postFileUrl || '',
+                                                    fileName: postFileName || '',
+                                                    dueDate: isTimed && taskDate ? String(taskDate) : null,
+                                                    dueTime: isTimed && taskTime ? String(taskTime) : null,
+                                                    allowLate: (isTimed && currentPostType !== 'poll') ? Boolean(allowLate) : (currentPostType === 'poll' ? false : true),
+                                                    hideDate: Boolean(hidePublicationDate),
+                                                    createdAt: Date.now(),
+                                                    comments: [],
+                                                    reactions: {}
+                                                };
+                                                if (postGeniallyUrl && postGeniallyUrl.trim()) basicPayload.geniallyUrl = extractGeniallyUrl(postGeniallyUrl.trim());
+                                                if (validPoll) basicPayload.poll = validPoll;
+                                                await withTimeout(addDoc(collection(effectiveDb, 'artifacts', effectiveAppId, 'public', 'data', 'tasks'), basicPayload), 10000);
                                             }
                                         }
 

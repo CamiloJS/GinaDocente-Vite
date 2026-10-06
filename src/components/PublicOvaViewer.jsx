@@ -12,7 +12,8 @@ export default function PublicOvaViewer({
   isDarkMode = false,
   onBackToPortal = () => {},
   user = null,
-  role = null
+  role = null,
+  isDemoMode = false
 }) {
   const isTeacher = role === 'teacher';
   const [ovaData, setOvaData] = useState(null);
@@ -32,12 +33,12 @@ export default function PublicOvaViewer({
       : `/ova-studio/index.html?mode=viewer&locked=true&theme=${isDarkMode ? 'dark' : 'light'}`
   );
 
-  // Auto sign-in anonymously for visitors if needed to satisfy Firestore security rules
+  // Auto sign-in anonymously for visitors only when not in Demo Mode
   useEffect(() => {
-    if (auth && !auth.currentUser) {
+    if (!isDemoMode && auth && !auth.currentUser) {
       signInAnonymously(auth).catch(() => {});
     }
-  }, []);
+  }, [isDemoMode]);
 
   // Sync fullscreen state with browser events
   useEffect(() => {
@@ -93,8 +94,8 @@ export default function PublicOvaViewer({
       try {
         let loaded = null;
 
-        // Try Firestore first if ID is given
-        if (ovaId && db && appId) {
+        // Try Firestore first if ID is given and not in Demo Mode
+        if (!isDemoMode && ovaId && db && appId) {
           try {
             const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'ovas', ovaId);
             const snap = await getDoc(docRef);
@@ -109,7 +110,10 @@ export default function PublicOvaViewer({
         // Try localStorage cache
         if (!loaded) {
           try {
-            const cachedList = JSON.parse(localStorage.getItem('englishTech_ovas') || '[]');
+            const rawCached = isDemoMode
+              ? (localStorage.getItem('englishTech_demo_ovas') || localStorage.getItem('englishTech_demo_ovas_teacher') || '[]')
+              : (localStorage.getItem('englishTech_ovas') || '[]');
+            const cachedList = JSON.parse(rawCached);
             if (Array.isArray(cachedList) && cachedList.length > 0) {
               if (ovaId) {
                 loaded = cachedList.find(o => o.id === ovaId) || cachedList[0];
@@ -140,7 +144,7 @@ export default function PublicOvaViewer({
 
     loadOva();
     return () => { isMounted = false; };
-  }, [ovaId]);
+  }, [ovaId, isDemoMode]);
 
   // Send project data to iframe
   const sendProjectToIframe = (project, unlockedMode) => {
@@ -206,16 +210,18 @@ export default function PublicOvaViewer({
           prompt('Copia este enlace para compartir el OVA:', shareUrl);
         }
       } else if (type === 'OVA_SAVED' && project && isUnlocked) {
-        // Save if unlocked
+        // Save locally
         setOvaData(project);
         try {
-          const cachedList = JSON.parse(localStorage.getItem('englishTech_ovas') || '[]');
+          const storageKey = isDemoMode ? 'englishTech_demo_ovas' : 'englishTech_ovas';
+          const cachedList = JSON.parse(localStorage.getItem(storageKey) || '[]');
           const idx = cachedList.findIndex(o => o.id === project.id);
           const next = idx >= 0 ? cachedList.map((o, i) => i === idx ? project : o) : [project, ...cachedList];
-          localStorage.setItem('englishTech_ovas', JSON.stringify(next));
+          localStorage.setItem(storageKey, JSON.stringify(next));
         } catch (e) {}
 
-        if (db && appId && project.id) {
+        // Only write to production Firestore if authenticated real teacher and NOT in Demo Mode
+        if (!isDemoMode && isTeacher && user && db && appId && project.id) {
           setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'ovas', project.id), {
             ...project,
             updatedAt: Date.now()
@@ -226,7 +232,7 @@ export default function PublicOvaViewer({
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [ovaData, isUnlocked]);
+  }, [ovaData, isUnlocked, isDemoMode, isTeacher, user]);
 
   // Handle PIN unlock submission
   const handleUnlockWithPin = () => {

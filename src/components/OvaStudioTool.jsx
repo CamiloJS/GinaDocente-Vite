@@ -69,11 +69,15 @@ export default function OvaStudioTool({
     currentOvaRef.current = currentOva;
   }, [currentOva]);
 
-  // Load OVAs from Firestore on mount
+  // Load OVAs from Firestore on mount (or local sandbox only in Demo Mode)
   useEffect(() => {
     let isMounted = true;
     const fetchOvas = async () => {
       try {
+        if (isDemoMode) {
+          setSyncStatus('local');
+          return;
+        }
         if (!firestoreDb || !activeAppId) return;
         const ovasColl = collection(firestoreDb, 'artifacts', activeAppId, 'public', 'data', ovaCollName);
         let snap;
@@ -86,13 +90,10 @@ export default function OvaStudioTool({
         }
 
         if (!snap.empty && isMounted) {
-          const now = Date.now();
           const list = [];
           snap.docs.forEach(d => {
             const data = d.data();
-            if (isDemoMode && isDemoItemExpired(data, now)) {
-              try { deleteDoc(d.ref); } catch (e) {}
-            } else if (d.id === 'ova-golden-ratio-01' || getItemTeacherId(data) === activeTeacherId) {
+            if (d.id === 'ova-golden-ratio-01' || getItemTeacherId(data) === activeTeacherId) {
               list.push({ id: d.id, ...data });
             }
           });
@@ -215,8 +216,8 @@ export default function OvaStudioTool({
           return next;
         });
 
-        // Persist to Firestore
-        if (firestoreDb && activeAppId && updatedProject.id) {
+        // Persist to Firestore only when not in Demo Mode
+        if (!isDemoMode && firestoreDb && activeAppId && updatedProject.id) {
           setDoc(doc(firestoreDb, 'artifacts', activeAppId, 'public', 'data', ovaCollName, updatedProject.id), updatedProject, { merge: true })
             .then(() => setSyncStatus('synced'))
             .catch(err => {
@@ -326,7 +327,7 @@ export default function OvaStudioTool({
       localStorage.setItem(ovaStorageKey, JSON.stringify(nextList));
     } catch (e) {}
 
-    if (firestoreDb && activeAppId) {
+    if (!isDemoMode && firestoreDb && activeAppId) {
       try {
         await setDoc(doc(firestoreDb, 'artifacts', activeAppId, 'public', 'data', ovaCollName, newId), newOva);
       } catch (e) {}
@@ -365,7 +366,7 @@ export default function OvaStudioTool({
       localStorage.setItem(ovaStorageKey, JSON.stringify(nextList));
     } catch (e) {}
 
-    if (firestoreDb && activeAppId) {
+    if (!isDemoMode && firestoreDb && activeAppId) {
       try {
         await setDoc(doc(firestoreDb, 'artifacts', activeAppId, 'public', 'data', ovaCollName, newId), clone);
       } catch (e) {}
@@ -392,7 +393,7 @@ export default function OvaStudioTool({
       localStorage.setItem(ovaStorageKey, JSON.stringify(nextList));
     } catch (e) {}
 
-    if (firestoreDb && activeAppId) {
+    if (!isDemoMode && firestoreDb && activeAppId) {
       try {
         await deleteDoc(doc(firestoreDb, 'artifacts', activeAppId, 'public', 'data', ovaCollName, idToDelete));
       } catch (e) {}
@@ -443,7 +444,7 @@ export default function OvaStudioTool({
       return next;
     });
 
-    if (firestoreDb && activeAppId) {
+    if (!isDemoMode && firestoreDb && activeAppId) {
       try {
         await setDoc(doc(firestoreDb, 'artifacts', activeAppId, 'public', 'data', ovaCollName, updated.id), updated, { merge: true });
       } catch (e) {}

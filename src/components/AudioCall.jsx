@@ -32,7 +32,7 @@ const normalizeParticipants = (raw) => {
 }
 
 // activeCall: { callId, role: 'initiator'|'participant', isGroup, name, targetId?, groupId?, participants?, offer? }
-const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onClose }) => {
+const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onClose, isDemoMode = false }) => {
   const [callState, setCallState] = useState('idle')
   const [isMuted, setIsMuted] = useState(false)
   const [callDuration, setCallDuration] = useState(0)
@@ -175,14 +175,15 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
   }
 
   const updateSpeakingStatus = useCallback(async (isSpeaking) => {
-    if (!isGroup || !callId || !myChatId) return
+    if (isDemoMode || !isGroup || !callId || !myChatId) return
     try {
       await setDoc(doc(db, ...callsBase(callId), 'speaking', myChatId), { isSpeaking, updatedAt: Date.now() }, { merge: true })
     } catch (e) {}
-  }, [isGroup, callId, myChatId])
+  }, [isDemoMode, isGroup, callId, myChatId])
 
   // Diagnóstico en Firestore para rastrear dónde se rompe el flujo de audio
   const logDiag = (event, detail) => {
+    if (isDemoMode) return
     try {
       const id = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
       setDoc(doc(db, ...callsBase(callId), 'diag', id), {
@@ -241,7 +242,7 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
 
   // Sincronizar speakingMap grupal vía Firestore para que todos vean quién habla
   useEffect(() => {
-    if (!isGroup || !callId) return
+    if (isDemoMode || !isGroup || !callId) return
     const speakingCol = collection(db, ...callsBase(callId), 'speaking')
     const unsub = onSnapshot(speakingCol, (snap) => {
       const remoteSpeaking = {}
@@ -640,6 +641,26 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
   // ---------- Ciclo de vida ----------
   useEffect(() => {
     if (!activeCall || !callId) return
+    if (isDemoMode) {
+      setCallState('calling')
+      setCallError(null)
+      const demoConnectTimer = setTimeout(() => {
+        if (!isMountedRef.current) return
+        setCallState('connected')
+        if (isGroup) {
+          const baseParts = normalizeParticipants(activeCall.participants).map(p => ({ ...p, joined: true }))
+          setLiveParticipants(baseParts)
+          setConnectedPeers(Math.max(1, baseParts.filter(p => p.id !== myChatId).length))
+          setGroupCallStatus('connected')
+        } else {
+          setConnectedPeers(1)
+        }
+      }, 1100)
+      return () => {
+        clearTimeout(demoConnectTimer)
+        endCall()
+      }
+    }
     if (isGroup) {
       startGroupMesh()
     } else {
@@ -649,7 +670,7 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
     return () => {
       endCall()
     }
-  }, [activeCall?.callId])
+  }, [activeCall?.callId, isDemoMode])
 
   // Timer duración
   useEffect(() => {
@@ -676,7 +697,7 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
     const wasGroup = isGroup
     const wasInitiator = isInitiator
     const leavingId = myChatId
-    const callRefToClean = callDocRef.current
+    const callRefToClean = isDemoMode ? null : callDocRef.current
     try {
       iceBatchRef.current.forEach(b => { if (b?.timer) clearTimeout(b.timer); });
       iceBatchRef.current.clear();
@@ -765,8 +786,8 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
   const toggleMute = () => {
     if (localStreamRef.current) {
       localStreamRef.current.getAudioTracks().forEach(t => { t.enabled = !t.enabled })
-      setIsMuted(!isMuted)
     }
+    setIsMuted(prev => !prev)
   }
 
   if (callState === 'idle') return null

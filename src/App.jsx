@@ -72,12 +72,26 @@ import {
   DEMO_SYLLABUS,
   DEMO_REVIEWS,
   DEMO_ACADEMIC_GROUPS,
+  DEMO_USER_MAPPINGS,
+  DEMO_USER_PRESENCE,
+  DEMO_CHAT_GROUPS,
+  DEMO_LAST_MESSAGES,
+  DEMO_USER_POSTS,
+  DEMO_SUGGESTIONS,
+  DEMO_ALERTS,
+  DEMO_BOT_INFO_LIST,
+  DEMO_TEACHER_BOT_INFO_LIST,
   DEMO_TTL_MS,
   isDemoItemExpired,
   getDemoRemainingDays,
+  loadDemoSandbox,
+  clearDemoSandbox,
   saveDemoSandboxItem,
   removeDemoSandboxItem,
-  mergeDemoItemsWithBase
+  mergeDemoItemsWithBase,
+  loadDemoChatMessages,
+  saveDemoChatMessages,
+  getDemoAutoReply
 } from './utils/demoData.js'
 
 const TasksTab = React.lazy(() => import('./components/TasksTab.jsx'))
@@ -259,6 +273,9 @@ function App() {
   };
   const initialIsDemo = isInitialDemoLink();
   const initialDemoRole = initialIsDemo ? getInitialDemoRole() : 'student';
+  if (typeof window !== 'undefined') {
+    window.__ENGLISH_TECH_DEMO__ = initialIsDemo;
+  }
 
   // Recuperar sesión activa guardada si existe
   const getInitialActiveSession = () => {
@@ -305,13 +322,22 @@ function App() {
 
   // --- TODOS LOS ESTADOS (useState) ---
   const [isDemoMode, setIsDemoMode] = useState(() => initialIsDemo);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.__ENGLISH_TECH_DEMO__ = isDemoMode;
+      try {
+        if (isDemoMode) sessionStorage.setItem('englishTech_isDemo', '1');
+        else sessionStorage.removeItem('englishTech_isDemo');
+      } catch (e) {}
+    }
+  }, [isDemoMode]);
   const [hasEntered, setHasEntered] = useState(() => initialIsDemo || !!initialActiveSession); 
   const [loginType, setLoginType] = useState(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [viewingProfileId, setViewingProfileId] = useState(() => initialHashInfo.profileId);
   const [publicOvaId, setPublicOvaId] = useState(() => initialHashInfo.ovaId);
   const [profileCommentInputs, setProfileCommentInputs] = useState({});
-  const [userPosts, setUserPosts] = useState([]);
+  const [userPosts, setUserPosts] = useState(() => initialIsDemo ? mergeDemoItemsWithBase(DEMO_USER_POSTS, [], 'userPosts') : []);
   const [profilePostText, setProfilePostText] = useState("");
   const [profilePostImage, setProfilePostImage] = useState("");
   const [isPublishingProfile, setIsPublishingProfile] = useState(false);
@@ -332,7 +358,7 @@ function App() {
   const [isTeacherBotOpen, setIsTeacherBotOpen] = useState(false);
   const [teacherBotHistory, setTeacherBotHistory] = useState([]);
   const [teacherBotInput, setTeacherBotInput] = useState("");
-  const [teacherBotInfoList, setTeacherBotInfoList] = useState([]);
+  const [teacherBotInfoList, setTeacherBotInfoList] = useState(() => initialIsDemo ? DEMO_TEACHER_BOT_INFO_LIST : []);
   const [isTeacherBotLoading, setIsTeacherBotLoading] = useState(false);
   const [isAiSessionPaused, setIsAiSessionPaused] = useState(false);
   const [showIAKnowledgeModal, setShowIAKnowledgeModal] = useState(false);
@@ -342,9 +368,9 @@ function App() {
 
   const [loggedInUser, setLoggedInUser] = useState(() => initialIsDemo ? (initialDemoRole === 'teacher' ? 'DemoDocente' : '@invitado') : (initialActiveSession ? (initialActiveSession.role === 'teacher' ? getTeacherUsername(initialActiveSession.userKey || initialActiveSession.name) : `@${initialActiveSession.userKey}`) : "")); 
   const [loggedInName, setLoggedInName] = useState(() => initialIsDemo ? (initialDemoRole === 'teacher' ? TEACHER_NAME : 'Invitado (Demo)') : (initialActiveSession ? (initialActiveSession.role === 'teacher' ? getTeacherDisplayName(initialActiveSession.userKey || initialActiveSession.name) : (initialActiveSession.name || initialActiveSession.userKey)) : "")); 
-  const [userMappings, setUserMappings] = useState({}); 
+  const [userMappings, setUserMappings] = useState(() => initialIsDemo ? DEMO_USER_MAPPINGS : {}); 
   const userMappingsRef = useRef(userMappings);
-  const [userMappingsLoaded, setUserMappingsLoaded] = useState(false);
+  const [userMappingsLoaded, setUserMappingsLoaded] = useState(() => initialIsDemo);
   const [showPassword, setShowPassword] = useState(false);
   const [prefillUsername, setPrefillUsername] = useState("");
   const [savedAccounts, setSavedAccounts] = useState([]);
@@ -480,7 +506,7 @@ function App() {
 
   const [isChatOpen, setIsChatOpen] = useState(false); 
   const [botTrainingInfo, setBotTrainingInfo] = useState("");
-  const [botInfoList, setBotInfoList] = useState([]); 
+  const [botInfoList, setBotInfoList] = useState(() => initialIsDemo ? DEMO_BOT_INFO_LIST : []); 
   const [chatHistory, setChatHistory] = useState([]);
   const [chatInput, setChatInput] = useState("");
   const [isChatLoading, setIsChatLoading] = useState(false);
@@ -489,13 +515,15 @@ function App() {
   const [isChatAppOpen, setIsChatAppOpen] = useState(() => initialHashInfo.tab === 'chat');
   const [hasUnreadChat, setHasUnreadChat] = useState(false);
   const [unreadChats, setUnreadChats] = useState({});
-  const [lastMessages, setLastMessages] = useState({});
+  const [lastMessages, setLastMessages] = useState(() => initialIsDemo ? DEMO_LAST_MESSAGES : {});
   const [activeChat, setActiveChat] = useState(null); 
+  const activeChatIdRef = useRef(null);
+  activeChatIdRef.current = activeChat?.id || null;
   const [chatMessages, setChatMessages] = useState([]);
   const [chatWindow, setChatWindow] = useState(300); // cuantos mensajes del chat se cargan
   const cargandoMasRef = useRef(false);
   useEffect(() => { setChatWindow(300); cargandoMasRef.current = false; }, [activeChat?.id]);
-  const [rawChatGroups, setChatGroups] = useState([]);
+  const [rawChatGroups, setChatGroups] = useState(() => initialIsDemo ? DEMO_CHAT_GROUPS : []);
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
     const [rawAcademicGroups, setAcademicGroups] = useState(() => initialIsDemo ? DEMO_ACADEMIC_GROUPS : []);
     const [academicGroupsLoaded, setAcademicGroupsLoaded] = useState(() => initialIsDemo);
@@ -572,8 +600,8 @@ function App() {
   });
 
   const [chatPreferences, setChatPreferences] = useState({});
-  const [userPresence, setUserPresence] = useState({});
-  const userPresenceRef = useRef({});
+  const [userPresence, setUserPresence] = useState(() => initialIsDemo ? DEMO_USER_PRESENCE : {});
+  const userPresenceRef = useRef(initialIsDemo ? DEMO_USER_PRESENCE : {});
   const [typingStatus, setTypingStatus] = useState({});
   const [showChatSettings, setShowChatSettings] = useState(false);
   const [showGroupInfo, setShowGroupInfo] = useState(false);
@@ -630,8 +658,8 @@ function App() {
   const [syllabusSubjectFilter, setSyllabusSubjectFilter] = useState("all");
   const [rawEvaluations, setEvaluations] = useState(() => initialIsDemo ? DEMO_EVALUATIONS : []);
   const [rawGrades, setGrades] = useState([]);
-  const [suggestions, setSuggestions] = useState([]);
-  const [alerts, setAlerts] = useState([]);
+  const [suggestions, setSuggestions] = useState(() => initialIsDemo ? DEMO_SUGGESTIONS : []);
+  const [alerts, setAlerts] = useState(() => initialIsDemo ? DEMO_ALERTS : []);
   const [rawReviews, setReviews] = useState(() => initialIsDemo ? DEMO_REVIEWS : []);
   const [inboxTab, setInboxTab] = useState('suggestions');
   const [inboxFilter, setInboxFilter] = useState('all');
@@ -792,6 +820,8 @@ function App() {
     return ids;
   };
 
+  const activeFallbackMap = isDemoMode ? DEMO_USER_MAPPINGS : FALLBACK_MAP;
+
   const getAllIdentifiersForStudentKey = (studentKey) => {
     const ids = new Set();
     if (!studentKey) return ids;
@@ -817,7 +847,7 @@ function App() {
       }
     });
 
-    Object.entries(FALLBACK_MAP || {}).forEach(([fk, fd]) => {
+    Object.entries(activeFallbackMap || {}).forEach(([fk, fd]) => {
       const cFk = fk.toLowerCase().replace('@', '').trim();
       const cEmail = (fd?.email || '').toLowerCase().trim();
       const cPrefix = cEmail.split('@')[0];
@@ -905,8 +935,10 @@ function App() {
   }, [rawTasks, isDemoMode, role, currentTeacherId, matchesStudentTeacher]);
 
   const pinnedTasks = useMemo(() => {
+    if (isDemoMode) {
+      return (rawTasks || []).filter(t => t && t.isPinned);
+    }
     const list = rawPinnedTasks || [];
-    if (isDemoMode) return list;
     if (role === 'teacher') {
       return list.filter(t => String(t?.id || '').startsWith('demo') || getItemTeacherId(t) === currentTeacherId);
     }
@@ -916,7 +948,7 @@ function App() {
       const isGlobal = !rawGrp || rawGrp === 'all' || rawGrp === 'global' || rawGrp === 'todos';
       return isGlobal ? matchesStudentTeacher(t) : true;
     });
-  }, [rawPinnedTasks, isDemoMode, role, currentTeacherId, matchesStudentTeacher]);
+  }, [rawPinnedTasks, rawTasks, isDemoMode, role, currentTeacherId, matchesStudentTeacher]);
 
   const syllabus = useMemo(() => {
     const list = rawSyllabus || [];
@@ -1011,6 +1043,12 @@ function App() {
     setSelectedGroupForFeed(prev => prev && prev.id === acadId ? { ...prev, members: updatedAcadMembers } : prev);
     setGroupMembersModal(prev => prev && prev.group && (prev.group.id === acadId || prev.group.id === chatGroupId) ? { ...prev, group: { ...prev.group, members: updatedAcadMembers } } : prev);
 
+    if (isDemoMode) {
+      if (currentAcadGroup) saveDemoSandboxItem('academicGroups', { ...currentAcadGroup, members: updatedAcadMembers });
+      if (currentChatGroup) saveDemoSandboxItem('chatGroups', { ...currentChatGroup, members: updatedChatMembers });
+      return;
+    }
+
     // 2. Persistir en Firestore
     try {
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', acadId), {
@@ -1060,6 +1098,13 @@ function App() {
     setSelectedSubjectDetail(prev => prev && prev.id === acadId ? { ...prev, members: updatedAcadMembers } : prev);
     setSelectedGroupForFeed(prev => prev && prev.id === acadId ? { ...prev, members: updatedAcadMembers } : prev);
     setGroupMembersModal(prev => prev && prev.group && (prev.group.id === acadId || prev.group.id === chatGroupId) ? { ...prev, group: { ...prev.group, members: updatedAcadMembers } } : prev);
+
+    if (isDemoMode) {
+      if (currentAcadGroup) saveDemoSandboxItem('academicGroups', { ...currentAcadGroup, members: updatedAcadMembers });
+      if (currentChatGroup) saveDemoSandboxItem('chatGroups', { ...currentChatGroup, members: updatedChatMembers });
+      showMessage("Estudiante agregado al grupo (Modo Demo).");
+      return;
+    }
 
     // 2. Persistir en Firestore
     try {
@@ -1224,7 +1269,7 @@ function App() {
   const allChatUsers = (() => {
     const rawList = [
       { id: 'teacher', name: TEACHER_NAME, role: 'teacher', profilePicUrl: userMappings['teacher']?.profilePicUrl || '' },
-      { id: 'camilodocente', name: SECOND_TEACHER_NAME, role: 'teacher', profilePicUrl: userMappings['camilodocente']?.profilePicUrl || '' },
+      ...(isDemoMode ? [] : [{ id: 'camilodocente', name: SECOND_TEACHER_NAME, role: 'teacher', profilePicUrl: userMappings['camilodocente']?.profilePicUrl || '' }]),
       ...Object.entries(userMappings || {})
         .filter(([id, data]) => {
           if (!data?.email) return false;
@@ -1235,14 +1280,14 @@ function App() {
         })
         .map(([id, data]) => ({ 
           id, 
-          name: data?.fullName || FALLBACK_MAP[id]?.name || id, 
+          name: data?.fullName || activeFallbackMap[id]?.name || id, 
           role: data?.role || 'student', 
           customLabel: data?.customLabel || "",
           profilePicUrl: data?.profilePicUrl || '',
           uid: data?.uid || '',
           email: data?.email || ''
         })),
-      ...Object.entries(FALLBACK_MAP)
+      ...(isDemoMode ? [] : Object.entries(FALLBACK_MAP)
         .filter(([id, data]) => {
           const cleanId = id.toLowerCase().replace('@', '').trim();
           if (isTeacherId(cleanId)) return false;
@@ -1257,7 +1302,7 @@ function App() {
           profilePicUrl: data.profilePicUrl || '',
           uid: '',
           email: ''
-        }))
+        })))
     ];
 
     // Deduplicar por ID único
@@ -1429,8 +1474,8 @@ function App() {
           if (matchEmail) {
             targetId = matchEmail[0];
           } else {
-            // 4. Buscar en FALLBACK_MAP
-            const matchFallback = Object.entries(FALLBACK_MAP || {}).find(([k, u]) => k.toLowerCase() === cleanKey || (u?.name || '').trim().toLowerCase() === cleanName);
+            // 4. Buscar en activeFallbackMap
+            const matchFallback = Object.entries(activeFallbackMap || {}).find(([k, u]) => k.toLowerCase() === cleanKey || (u?.name || '').trim().toLowerCase() === cleanName);
             if (matchFallback) {
               targetId = matchFallback[0];
             } else {
@@ -1509,6 +1554,13 @@ function App() {
   const updatePresenceStatus = async (newStatus) => {
     const finalPresenceId = myChatId;
     if (finalPresenceId) {
+      if (isDemoMode) {
+        setUserPresence(prev => ({
+          ...prev,
+          [finalPresenceId]: { ...(prev[finalPresenceId] || {}), isOnline: true, status: newStatus, lastPing: Date.now() }
+        }));
+        return;
+      }
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'presence', finalPresenceId), {
         isOnline: true,
         status: newStatus,
@@ -1748,13 +1800,7 @@ function App() {
           expiresAt: now + DEMO_TTL_MS,
           isDemoCreated: true
         };
-        let createdId = 'demo-grade-' + now;
-        try {
-          const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'demo_grades'), demoGradePayload);
-          if (docRef?.id) createdId = docRef.id;
-        } catch (e) {
-          // Local sandbox fallback
-        }
+        const createdId = 'demo-grade-' + now;
         const demoGradeData = { id: createdId, ...demoGradePayload };
         saveDemoSandboxItem('grades', demoGradeData);
         setGrades(prev => [{ ...demoGradeData }, ...prev.filter(g => g.id !== demoGradeData.id)]);
@@ -1810,9 +1856,6 @@ function App() {
       if (isDemoMode || String(gradeId).startsWith('demo')) {
         removeDemoSandboxItem('grades', gradeId);
         setGrades(prev => prev.filter(g => g.id !== gradeId));
-        try {
-          await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'demo_grades', gradeId));
-        } catch (e) {}
         showMessage(`Reintento autorizado para ${studentName} (Modo Demo).`);
         return;
       }
@@ -1832,14 +1875,9 @@ function App() {
       setEvaluations(prev => {
         const next = prev.map(e => e.id === evalId ? { ...e, isArchived: !currentIsArchived } : e);
         const updated = next.find(e => e.id === evalId);
-        if (updated && updated.isDemoCreated) saveDemoSandboxItem('evaluations', updated);
+        if (updated) saveDemoSandboxItem('evaluations', updated);
         return next;
       });
-      try {
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'demo_evaluations', evalId), {
-          isArchived: !currentIsArchived
-        });
-      } catch (e) {}
       showMessage(!currentIsArchived ? "Evaluación archivada en Modo Demo." : "Evaluación desarchivada en Modo Demo.");
       return;
     }
@@ -1865,9 +1903,6 @@ function App() {
         if (updated) saveDemoSandboxItem('grades', updated);
         return next;
       });
-      try {
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'demo_grades', gradeId), { score: newScore });
-      } catch (e) {}
       setEditingGrade({ id: null, score: '' });
       showMessage("Nota actualizada (Modo Demo).");
       return;
@@ -1889,11 +1924,6 @@ function App() {
     try {
       const feedbackClean = (reviewFeedbackText || '').trim();
       if (isDemoMode || String(selectedStudentGradeForReview.id).startsWith('demo')) {
-        try {
-          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'demo_grades', selectedStudentGradeForReview.id), {
-            teacherFeedback: feedbackClean
-          });
-        } catch (e) {}
         setSelectedStudentGradeForReview(prev => prev ? ({
           ...prev,
           teacherFeedback: feedbackClean
@@ -1971,7 +2001,7 @@ function App() {
   useEffect(() => {
     const handleOffline = () => {
       showMessage("Estás sin conexión. Algunas funciones pueden estar limitadas.");
-      if (myChatId) {
+      if (myChatId && !isDemoMode) {
         const finalPresenceId = myChatId;
         setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'presence', finalPresenceId), {
           isOnline: false,
@@ -1982,7 +2012,7 @@ function App() {
     };
     const handleOnline = () => {
       showMessage("Conexión restaurada.");
-      if (myChatId) {
+      if (myChatId && !isDemoMode) {
         const finalPresenceId = myChatId;
         setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'presence', finalPresenceId), {
           isOnline: true,
@@ -1997,7 +2027,7 @@ function App() {
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('online', handleOnline);
     };
-  }, [myChatId, role]);
+  }, [myChatId, role, isDemoMode]);
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -2288,13 +2318,19 @@ function App() {
             try {
               if (await checkBadWordsAsync(sugText)) {
                 showMessage("Contenido inapropiado, se le será notificado a la profesora.");
-                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'alerts'), { studentName: loggedInName, originalText: sugText, createdAt: Date.now() });
+                if (isDemoMode) {
+                  const demoAlert = { id: `demo_alert_${Date.now()}`, studentName: loggedInName, originalText: sugText, createdAt: Date.now(), isDemoCreated: true };
+                  setAlerts(prev => [demoAlert, ...prev]);
+                  saveDemoSandboxItem('alerts', demoAlert);
+                } else {
+                  await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'alerts'), { studentName: loggedInName, originalText: sugText, createdAt: Date.now() });
+                }
                 setShowSugModal(false); 
                 setSugText("");
                 setSugCategory("");
               } else {
                 const studentPhoto = userMappings?.[myChatId]?.profilePicUrl || auth.currentUser?.photoURL || '';
-                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'suggestions'), { 
+                const sugPayload = { 
                     studentName: loggedInName, 
                     studentId: myChatId || null,
                     studentPhoto: studentPhoto,
@@ -2302,8 +2338,16 @@ function App() {
                     category: sugCategory || null,
                     createdAt: Date.now(), 
                     read: false 
-                });
-                showMessage("Sugerencia enviada."); 
+                };
+                if (isDemoMode) {
+                  const demoSug = { id: `demo_sug_${Date.now()}`, ...sugPayload, isDemoCreated: true };
+                  setSuggestions(prev => [demoSug, ...prev]);
+                  saveDemoSandboxItem('suggestions', demoSug);
+                  showMessage("Sugerencia enviada (Modo Demo).");
+                } else {
+                  await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'suggestions'), sugPayload);
+                  showMessage("Sugerencia enviada."); 
+                }
                 setShowSugModal(false); 
                 setSugText("");
                 setSugCategory("");
@@ -2762,6 +2806,10 @@ function App() {
 
           const handleResetStudentPasswordByTeacher = async (studentEmail, studentName) => {
             if (!studentEmail) return showMessage("Este estudiante no tiene un correo registrado.");
+            if (isDemoMode) {
+              showMessage(`Enlace de restablecimiento simulado para ${studentName} (${studentEmail}) en Modo Demo.`);
+              return;
+            }
             try {
               await sendPasswordResetEmail(auth, studentEmail);
               showMessage(`Enlace de restablecimiento enviado a ${studentName} (${studentEmail}).`);
@@ -2849,8 +2897,10 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
           const handleExitDemo = () => {
             try {
               sessionStorage.removeItem('englishTech_demoMode');
+              sessionStorage.removeItem('englishTech_isDemo');
               sessionStorage.removeItem('englishTech_demoRole');
             } catch (e) {}
+            setActiveChat(null);
             setIsDemoMode(false);
             setHasEntered(false);
             setRole('student');
@@ -2874,6 +2924,7 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
             const nextRole = targetRole === 'teacher' ? 'teacher' : 'student';
             try {
               sessionStorage.setItem('englishTech_demoMode', '1');
+              sessionStorage.setItem('englishTech_isDemo', '1');
               sessionStorage.setItem('englishTech_demoRole', nextRole);
             } catch (e) {}
             setIsDemoMode(true);
@@ -2881,14 +2932,45 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
             setRole(nextRole);
             setLoggedInUser(nextRole === 'teacher' ? 'DemoDocente' : '@invitado');
             setLoggedInName(nextRole === 'teacher' ? TEACHER_NAME : 'Invitado (Demo)');
+            if (activeChat && activeChat.type !== 'group') {
+              setActiveChat(null);
+            }
             if (nextRole === 'student' && (activeTab === 'directory' || activeTab === 'tools' || activeTab === 'inbox')) {
               changeTab('tasks');
             }
             showMessage(
               nextRole === 'teacher'
-                ? '👩‍🏫 Vista Docente (Modo Demo) activada: puedes crear tareas, evaluaciones, diapositivas y contenidos aislados (se borran automáticamente en 2 semanas).'
+                ? '👩‍🏫 Vista Docente (Modo Demo) activada: puedes crear tareas, evaluaciones, diapositivas y contenidos 100% aislados.'
                 : '🎓 Vista Estudiante (Modo Demo) activada: explora las publicaciones, diapositivas y presenta las evaluaciones.'
             );
+          };
+
+          const handleResetDemo = () => {
+            clearDemoSandbox();
+            setAcademicGroups(DEMO_ACADEMIC_GROUPS);
+            setAcademicGroupsLoaded(true);
+            setChatGroups(DEMO_CHAT_GROUPS);
+            setUserMappings(DEMO_USER_MAPPINGS);
+            userMappingsRef.current = DEMO_USER_MAPPINGS;
+            setUserMappingsLoaded(true);
+            setUserPresence(DEMO_USER_PRESENCE);
+            userPresenceRef.current = DEMO_USER_PRESENCE;
+            setLastMessages(DEMO_LAST_MESSAGES);
+            setUserPosts(DEMO_USER_POSTS);
+            setSuggestions(DEMO_SUGGESTIONS);
+            setAlerts(DEMO_ALERTS);
+            setBotInfoList(DEMO_BOT_INFO_LIST);
+            setTeacherBotInfoList(DEMO_TEACHER_BOT_INFO_LIST);
+            setTasks(DEMO_TASKS);
+            setPinnedTasks(DEMO_TASKS.filter(t => t.isPinned));
+            setEvaluations(DEMO_EVALUATIONS);
+            setSyllabus(DEMO_SYLLABUS.slice().sort((a, b) => (Number(a.week) || 0) - (Number(b.week) || 0)));
+            setReviews(DEMO_REVIEWS);
+            setGrades([]);
+            if (activeChat?.id) {
+              setChatMessages(loadDemoChatMessages(activeChat.id));
+            }
+            showMessage('🔄 Entorno de demostración restaurado a su estado original.');
           };
 
           useEffect(() => {
@@ -2902,6 +2984,21 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
                 setLoggedInName(demoRole === 'teacher' ? TEACHER_NAME : 'Invitado (Demo)');
                 setAcademicGroups(mergeDemoItemsWithBase(DEMO_ACADEMIC_GROUPS, [], 'academicGroups'));
                 setAcademicGroupsLoaded(true);
+                setChatGroups(mergeDemoItemsWithBase(DEMO_CHAT_GROUPS, [], 'chatGroups'));
+                const sandboxMappings = {};
+                (loadDemoSandbox().userMappings || []).forEach(u => { if (u.id) sandboxMappings[u.id] = u; });
+                const mergedMappings = { ...DEMO_USER_MAPPINGS, ...sandboxMappings };
+                setUserMappings(mergedMappings);
+                userMappingsRef.current = mergedMappings;
+                setUserMappingsLoaded(true);
+                setUserPresence(DEMO_USER_PRESENCE);
+                userPresenceRef.current = DEMO_USER_PRESENCE;
+                setLastMessages(DEMO_LAST_MESSAGES);
+                setUserPosts(mergeDemoItemsWithBase(DEMO_USER_POSTS, [], 'userPosts'));
+                setSuggestions(mergeDemoItemsWithBase(DEMO_SUGGESTIONS, [], 'suggestions'));
+                setAlerts(mergeDemoItemsWithBase(DEMO_ALERTS, [], 'alerts'));
+                setBotInfoList(DEMO_BOT_INFO_LIST);
+                setTeacherBotInfoList(DEMO_TEACHER_BOT_INFO_LIST);
                 const mergedTasks = mergeDemoItemsWithBase(DEMO_TASKS, [], 'tasks');
                 setTasks(mergedTasks);
                 setPinnedTasks(mergedTasks.filter(t => t.isPinned));
@@ -2970,17 +3067,35 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
               try {
                   const reply = await callGemini(prompt);
                   const finalHistory = [...newHistory, { role: 'bot', text: reply || "Disculpa, no pude procesar la respuesta en este momento. Por favor intenta de nuevo." }];
-                  await setDoc(doc(db, 'artifacts', appId, 'users', user?.uid || myChatId || 'guest', 'chatbot', 'history'), { messages: finalHistory });
+                  setChatHistory(finalHistory);
+                  if (!isDemoMode) {
+                      await setDoc(doc(db, 'artifacts', appId, 'users', user?.uid || myChatId || 'guest', 'chatbot', 'history'), { messages: finalHistory });
+                  }
               } catch (err) {
                   console.error(err);
                   const finalHistory = [...newHistory, { role: 'bot', text: "Ocurrió una interrupción al conectar con el asistente. Intenta de nuevo." }];
-                  await setDoc(doc(db, 'artifacts', appId, 'users', user?.uid || myChatId || 'guest', 'chatbot', 'history'), { messages: finalHistory }).catch(()=>{});
+                  setChatHistory(finalHistory);
+                  if (!isDemoMode) {
+                      await setDoc(doc(db, 'artifacts', appId, 'users', user?.uid || myChatId || 'guest', 'chatbot', 'history'), { messages: finalHistory }).catch(()=>{});
+                  }
               } finally {
                   setIsChatLoading(false);
               }
           };
 
           useEffect(() => {
+            if (isDemoMode || isInitialDemoLink()) {
+                const sandboxMappings = {};
+                (loadDemoSandbox().userMappings || []).forEach(u => { if (u.id) sandboxMappings[u.id] = u; });
+                const mergedMappings = { ...DEMO_USER_MAPPINGS, ...sandboxMappings };
+                setUserMappings(mergedMappings);
+                userMappingsRef.current = mergedMappings;
+                setUserMappingsLoaded(true);
+                setAcademicGroups(mergeDemoItemsWithBase(DEMO_ACADEMIC_GROUPS, [], 'academicGroups'));
+                setAcademicGroupsLoaded(true);
+                setChatGroups(mergeDemoItemsWithBase(DEMO_CHAT_GROUPS, [], 'chatGroups'));
+                return;
+            }
             const uMappings = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'userMappings'), s => {
                 const maps = {};
                 s.docs.forEach(d => { maps[d.id] = d.data(); });
@@ -3016,21 +3131,13 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
                 uAcadGlobal();
                 uChatGroupsGlobal();
             };
-          }, []);
+          }, [isDemoMode]);
 
           useEffect(() => {
             const unsubscribe = onAuthStateChanged(auth, async (u) => {
                 setUser(u);
-                
-                if (!u) {
-                  try {
-                    await signInAnonymously(auth);
-                  } catch (e) {
-                    console.warn('Anonymous auth note:', e);
-                  }
-                }
 
-                if (isInitialDemoLink()) {
+                if (isInitialDemoLink() || isDemoMode) {
                     const demoRole = getInitialDemoRole();
                     setIsDemoMode(true);
                     setRole(demoRole);
@@ -3041,6 +3148,14 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
                     setAcademicGroups(mergeDemoItemsWithBase(DEMO_ACADEMIC_GROUPS, [], 'academicGroups'));
                     setAcademicGroupsLoaded(true);
                     return;
+                }
+                
+                if (!u) {
+                  try {
+                    await signInAnonymously(auth);
+                  } catch (e) {
+                    console.warn('Anonymous auth note:', e);
+                  }
                 }
                 
                 const rawSession = localStorage.getItem('englishTech_activeSession');
@@ -3099,6 +3214,30 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
           // 1. COSAS GLOBALES (Se necesitan siempre para notificaciones y chats)
 useEffect(() => {
     if (!myChatId) return;
+    if (isDemoMode) {
+        setBotInfoList(DEMO_BOT_INFO_LIST);
+        setTeacherBotInfoList(DEMO_TEACHER_BOT_INFO_LIST);
+        setUserPresence(DEMO_USER_PRESENCE);
+        userPresenceRef.current = DEMO_USER_PRESENCE;
+        setLastMessages(prev => {
+            const safeDemoPrev = Object.fromEntries(
+                Object.entries(prev || {}).filter(([k]) =>
+                    k in DEMO_LAST_MESSAGES ||
+                    k.includes('demo') ||
+                    k.includes('invitado') ||
+                    k.includes('carlos_mendoza') ||
+                    k.includes('laura_restrepo') ||
+                    k.includes('mateo_gomez') ||
+                    k.includes('valeria_castro')
+                )
+            );
+            return { ...DEMO_LAST_MESSAGES, ...safeDemoPrev };
+        });
+        setHasUnreadChat(false);
+        setUnreadChats({});
+        setTypingStatus({});
+        return;
+    }
     const base = ['artifacts', appId, 'public', 'data'];
     const uidKey = isCamiloTeacher(myChatId) ? 'camilodocente' : (user?.uid || myChatId);
     const botDocId = isCamiloTeacher(myChatId) ? 'teacherBot_camilodocente' : 'teacherBot';
@@ -3243,7 +3382,7 @@ useEffect(() => {
     });
 
    return () => { uBotSettings(); uChat(); uUnread(); uLastMsgs(); uChatPrefs(); uPresence(); uTyping(); uTeacherBot(); uTeacherBotHist(); clearInterval(ghostInterval); };
-}, [user, myChatId]);
+}, [user, myChatId, isDemoMode]);
 
 // Rotación de mensajes del bot mientras "piensa"
 useEffect(() => {
@@ -3279,13 +3418,22 @@ useEffect(() => {
   });
 }, [academicGroups, chatGroups, myChatId, isDemoMode]);
 
-// EFECTO PARA MODO DEMO: Carga base + escucha colecciones aisladas 'demo_*' con limpieza automática a las 2 semanas (14 días)
+// EFECTO PARA MODO DEMO: Carga 100% aislada (DEMO ONLY) en sesión local sin tocar Firestore
 useEffect(() => {
     if (!isDemoMode) return;
 
-    // 1. Hidratación instantánea con base + sandbox local (filtrando vencidos > 14 días)
     setAcademicGroups(mergeDemoItemsWithBase(DEMO_ACADEMIC_GROUPS, [], 'academicGroups'));
     setAcademicGroupsLoaded(true);
+    setChatGroups(mergeDemoItemsWithBase(DEMO_CHAT_GROUPS, [], 'chatGroups'));
+    const sandboxMappings = {};
+    (loadDemoSandbox().userMappings || []).forEach(u => { if (u.id) sandboxMappings[u.id] = u; });
+    const mergedMappings = { ...DEMO_USER_MAPPINGS, ...sandboxMappings };
+    setUserMappings(mergedMappings);
+    userMappingsRef.current = mergedMappings;
+    setUserMappingsLoaded(true);
+    setUserPresence(DEMO_USER_PRESENCE);
+    userPresenceRef.current = DEMO_USER_PRESENCE;
+    setLastMessages(DEMO_LAST_MESSAGES);
     const initialTasks = mergeDemoItemsWithBase(DEMO_TASKS, [], 'tasks');
     setTasks(initialTasks);
     setPinnedTasks(initialTasks.filter(t => t.isPinned));
@@ -3293,86 +3441,12 @@ useEffect(() => {
     setSyllabus(mergeDemoItemsWithBase(DEMO_SYLLABUS, [], 'syllabus').slice().sort((a, b) => (Number(a.week) || 0) - (Number(b.week) || 0)));
     setReviews(mergeDemoItemsWithBase(DEMO_REVIEWS, [], 'reviews'));
     setGrades(mergeDemoItemsWithBase([], [], 'grades'));
-    setSuggestions([
-      {
-        id: 'demo-sug-1',
-        studentName: 'Mariana Gómez (Demo)',
-        category: 'Metodología',
-        text: '[Metodología] Teacher, los casos de estudio sobre inflación y tasas de interés del Banco de la República nos ayudaron muchísimo a practicar vocabulario financiero real.',
-        read: false,
-        createdAt: Date.now() - 3600000 * 5
-      },
-      {
-        id: 'demo-sug-2',
-        studentName: 'Andrés Felipe Ríos (Demo)',
-        category: 'Material de apoyo',
-        text: '[Material de apoyo] Las diapositivas bilingües de Supply & Demand con glosario técnico están súper claras para repasar antes del quiz.',
-        read: true,
-        createdAt: Date.now() - 3600000 * 28
-      }
-    ]);
-    setAlerts([]);
+    setUserPosts(mergeDemoItemsWithBase(DEMO_USER_POSTS, [], 'userPosts'));
+    setSuggestions(mergeDemoItemsWithBase(DEMO_SUGGESTIONS, [], 'suggestions'));
+    setAlerts(mergeDemoItemsWithBase(DEMO_ALERTS, [], 'alerts'));
+    setBotInfoList(DEMO_BOT_INFO_LIST);
+    setTeacherBotInfoList(DEMO_TEACHER_BOT_INFO_LIST);
     setTasksLoading(false);
-
-    // 2. Suscripción a colecciones aisladas 'demo_*' en Firestore con purga automática de elementos > 2 semanas
-    const base = ['artifacts', appId, 'public', 'data'];
-    const collectValidAndPurgeExpired = (snap) => {
-      const now = Date.now();
-      const valid = [];
-      snap.docs.forEach(d => {
-        const data = { id: d.id, ...d.data(), isDemoCreated: true };
-        if (isDemoItemExpired(data, now)) {
-          deleteDoc(d.ref).catch(() => {});
-        } else {
-          valid.push(data);
-        }
-      });
-      return valid;
-    };
-
-    const uDemoTasks = onSnapshot(collection(db, ...base, 'demo_tasks'), snap => {
-      const valid = collectValidAndPurgeExpired(snap);
-      const merged = mergeDemoItemsWithBase(DEMO_TASKS, valid, 'tasks');
-      setTasks(merged);
-      setPinnedTasks(merged.filter(t => t.isPinned));
-    }, () => {});
-
-    const uDemoEvals = onSnapshot(collection(db, ...base, 'demo_evaluations'), snap => {
-      const valid = collectValidAndPurgeExpired(snap);
-      setEvaluations(mergeDemoItemsWithBase(DEMO_EVALUATIONS, valid, 'evaluations'));
-    }, () => {});
-
-    const uDemoSyllabus = onSnapshot(collection(db, ...base, 'demo_syllabus'), snap => {
-      const valid = collectValidAndPurgeExpired(snap);
-      const merged = mergeDemoItemsWithBase(DEMO_SYLLABUS, valid, 'syllabus')
-        .slice()
-        .sort((a, b) => (Number(a.week) || 0) - (Number(b.week) || 0));
-      setSyllabus(merged);
-    }, () => {});
-
-    const uDemoReviews = onSnapshot(collection(db, ...base, 'demo_reviews'), snap => {
-      const valid = collectValidAndPurgeExpired(snap);
-      setReviews(mergeDemoItemsWithBase(DEMO_REVIEWS, valid, 'reviews'));
-    }, () => {});
-
-    const uDemoGroups = onSnapshot(collection(db, ...base, 'demo_academicGroups'), snap => {
-      const valid = collectValidAndPurgeExpired(snap);
-      setAcademicGroups(mergeDemoItemsWithBase(DEMO_ACADEMIC_GROUPS, valid, 'academicGroups'));
-    }, () => {});
-
-    const uDemoGrades = onSnapshot(collection(db, ...base, 'demo_grades'), snap => {
-      const valid = collectValidAndPurgeExpired(snap);
-      setGrades(mergeDemoItemsWithBase([], valid, 'grades'));
-    }, () => {});
-
-    return () => {
-      uDemoTasks();
-      uDemoEvals();
-      uDemoSyllabus();
-      uDemoReviews();
-      uDemoGroups();
-      uDemoGrades();
-    };
 }, [isDemoMode]);
 
 // 2. PESTAÑA: ASIGNACIONES (Muro de clase)
@@ -3553,7 +3627,7 @@ useEffect(() => {
                       document.removeEventListener('visibilitychange', handleVisibilityForPresence);
                   };
               }
-          }, [myChatId, role]);
+          }, [myChatId, role, isDemoMode]);
 
           // Cleanup de MediaRecorder y typingTimeout al desmontar
           useEffect(() => {
@@ -3570,7 +3644,7 @@ useEffect(() => {
 
           // Listener de llamadas entrantes (Firestore) — fix multi-sesión y limpieza de llamadas fantasma
           useEffect(() => {
-              if (!myChatId) return
+              if (!myChatId || isDemoMode) return
               const callsRef = collection(db, 'artifacts', appId, 'public', 'data', 'calls')
               const unsubscribe = onSnapshot(callsRef, (snapshot) => {
                   const currentIncoming = incomingCallRef.current
@@ -3644,7 +3718,7 @@ useEffect(() => {
                   }
               })
               return () => unsubscribe()
-          }, [myChatId])
+          }, [myChatId, isDemoMode])
 
           // Ringtone para llamada entrante
           useEffect(() => {
@@ -3692,6 +3766,7 @@ useEffect(() => {
               if (!incomingCall) return
               const callIdToReject = incomingCall.callId
               setIncomingCall(null)
+              if (isDemoMode) return
               const callRef = doc(db, 'artifacts', appId, 'public', 'data', 'calls', callIdToReject)
               setDoc(callRef, { status: 'ended' }, { merge: true }).catch(() => {})
               deleteDoc(callRef).catch(() => {})
@@ -3700,9 +3775,11 @@ useEffect(() => {
           useEffect(() => {
               if (isChatAppOpen && myChatId) {
                   setHasUnreadChat(false);
-                  setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatAlerts', myChatId), { hasUnread: false }, { merge: true });
+                  if (!isDemoMode) {
+                      setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatAlerts', myChatId), { hasUnread: false }, { merge: true });
+                  }
               }
-          }, [isChatAppOpen, myChatId, appId]);
+          }, [isChatAppOpen, myChatId, appId, isDemoMode]);
 
           const scrollToChatBottom = (behavior = 'smooth') => {
               if (chatMessagesEndRef.current) {
@@ -3726,6 +3803,19 @@ useEffect(() => {
 
           useEffect(() => {
               if (!activeChat || !myChatId) return;
+              if (isDemoMode) {
+                  const rawDemoMsgs = loadDemoChatMessages(activeChat.id);
+                  const normalizedMsgs = rawDemoMsgs.map(m => ({
+                      ...m,
+                      authorId: m.authorId || m.senderId || 'teacher',
+                      author: m.author || m.senderName || 'Usuario',
+                      createdAt: m.createdAt || m.timestamp || Date.now(),
+                      status: m.status || 'read'
+                  })).sort((a, b) => a.createdAt - b.createdAt);
+                  setChatMessages(normalizedMsgs);
+                  setTimeout(() => scrollToChatBottom('auto'), 30);
+                  return;
+              }
               const base = ['artifacts', appId, 'public', 'data'];
               let isInitialLoad = true;
 
@@ -3810,24 +3900,26 @@ useEffect(() => {
               }, err => console.error('Chat messages listener error:', err));
 
               return () => unsubscribe();
-          }, [activeChat?.id, myChatId, chatWindow]);
+          }, [activeChat?.id, myChatId, chatWindow, isDemoMode]);
 
           // Si el chat está abierto y expandido, limpiar la marca de "nuevo no abierto" (pasa de puntico azul a puntico rojo si falta responder)
           useEffect(() => {
               if (!activeChat?.id || isChatMinimized || !myChatId) return;
               if (unreadChats[activeChat.id]) {
                   setUnreadChats(prev => ({ ...prev, [activeChat.id]: false }));
-                  const alertRef = doc(db, 'artifacts', appId, 'public', 'data', 'chatAlerts', myChatId);
-                  updateDoc(alertRef, { [`chats.${activeChat.id}`]: false }).then(() => {
-                      const stillUnread = Object.entries(unreadChats).some(([id, isUn]) => isUn && id !== activeChat.id);
-                      if (!stillUnread) updateDoc(alertRef, { hasUnread: false }).catch(() => {});
-                  }).catch(() => {});
+                  if (!isDemoMode) {
+                      const alertRef = doc(db, 'artifacts', appId, 'public', 'data', 'chatAlerts', myChatId);
+                      updateDoc(alertRef, { [`chats.${activeChat.id}`]: false }).then(() => {
+                          const stillUnread = Object.entries(unreadChats).some(([id, isUn]) => isUn && id !== activeChat.id);
+                          if (!stillUnread) updateDoc(alertRef, { hasUnread: false }).catch(() => {});
+                      }).catch(() => {});
+                  }
               }
-          }, [activeChat?.id, isChatMinimized, unreadChats, myChatId, appId]);
+          }, [activeChat?.id, isChatMinimized, unreadChats, myChatId, appId, isDemoMode]);
 
           // Efecto para marcar los mensajes como leídos cuando entras al chat
           useEffect(() => {
-              if (!activeChat || isChatMinimized || !myChatId || chatMessages.length === 0) return;
+              if (!activeChat || isChatMinimized || !myChatId || isDemoMode || chatMessages.length === 0) return;
               if (markingReadRef.current) return;
 
               const unreadMessages = chatMessages.filter(m => m.authorId !== myChatId && m.status !== 'read');
@@ -3848,7 +3940,7 @@ useEffect(() => {
               };
 
               markAsRead();
-          }, [chatMessages, activeChat?.id, isChatMinimized, myChatId, db, appId]);
+          }, [chatMessages, activeChat?.id, isChatMinimized, myChatId, isDemoMode, db, appId]);
 
           // Efecto para asegurar auto-scroll siempre que cambien los mensajes o se abra/maximice el chat
           useEffect(() => {
@@ -3862,7 +3954,7 @@ useEffect(() => {
             
 // NUEVO: Efecto para compartir en qué chat estamos actualmente
 useEffect(() => {
-    if (!myChatId) return;
+    if (!myChatId || isDemoMode) return;
     const finalPresenceId = myChatId;
     const presenceRef = doc(db, 'artifacts', appId, 'public', 'data', 'presence', finalPresenceId);
 
@@ -3884,7 +3976,7 @@ useEffect(() => {
         document.removeEventListener('visibilitychange', updateChatPresence);
         setDoc(presenceRef, { currentChatId: null }, { merge: true }).catch(() => {});
     };
-}, [activeChat, isChatMinimized, isChatAppOpen, myChatId, role, db, appId]);
+}, [activeChat, isChatMinimized, isChatAppOpen, myChatId, role, isDemoMode, db, appId]);
             
 
 
@@ -3950,11 +4042,13 @@ useEffect(() => {
               setReplyingTo(null); // <--- PEGA ESTA LÍNEA AQUÍ
               if (unreadChats[chat.id]) {
                   setUnreadChats(prev => ({ ...prev, [chat.id]: false }));
-                  const alertRef = doc(db, 'artifacts', appId, 'public', 'data', 'chatAlerts', myChatId);
-                  updateDoc(alertRef, { [`chats.${chat.id}`]: false }).then(() => {
-                      const stillUnread = Object.entries(unreadChats).some(([id, isUnread]) => isUnread && id !== chat.id);
-                      if (!stillUnread) updateDoc(alertRef, { hasUnread: false }).catch(()=>{});
-                  }).catch(()=>{});
+                  if (!isDemoMode) {
+                      const alertRef = doc(db, 'artifacts', appId, 'public', 'data', 'chatAlerts', myChatId);
+                      updateDoc(alertRef, { [`chats.${chat.id}`]: false }).then(() => {
+                          const stillUnread = Object.entries(unreadChats).some(([id, isUnread]) => isUnread && id !== chat.id);
+                          if (!stillUnread) updateDoc(alertRef, { hasUnread: false }).catch(()=>{});
+                      }).catch(()=>{});
+                  }
               }
           };
 
@@ -3970,6 +4064,18 @@ useEffect(() => {
 
           const handleDeleteAppMessage = async (msgId, forcePermanent = false) => {
               if (!activeChat) return;
+              if (isDemoMode) {
+                  if (role === 'teacher' || forcePermanent) {
+                      const nextMsgs = chatMessages.filter(m => m.id !== msgId);
+                      setChatMessages(nextMsgs);
+                      saveDemoChatMessages(activeChat.id, nextMsgs);
+                  } else {
+                      const nextMsgs = chatMessages.map(m => m.id === msgId ? { ...m, isDeleted: true, deletedAt: Date.now(), deletedBy: 'student', originalText: m.text || '', text: 'Este mensaje fue eliminado' } : m);
+                      setChatMessages(nextMsgs);
+                      saveDemoChatMessages(activeChat.id, nextMsgs);
+                  }
+                  return;
+              }
               const msgRef = doc(db, 'artifacts', appId, 'public', 'data', 'chats', activeChat.id, 'messages', msgId);
               const msgObj = chatMessages.find(m => m.id === msgId);
 
@@ -4068,6 +4174,23 @@ useEffect(() => {
                   return;
               }
 
+              if (isDemoMode) {
+                  const nextMsgs = chatMessages.map(m => {
+                      if (m.id !== editingAppMessageId) return m;
+                      if (role === 'teacher') return { ...m, text: editAppMessageText.trim() };
+                      return {
+                          ...m,
+                          text: editAppMessageText.trim(),
+                          isEdited: true,
+                          editHistory: [{ text: m.text || '', date: Date.now() }, ...(m.editHistory || [])]
+                      };
+                  });
+                  setChatMessages(nextMsgs);
+                  saveDemoChatMessages(activeChat.id, nextMsgs);
+                  setEditingAppMessageId(null);
+                  return;
+              }
+
               const msgRef = doc(db, 'artifacts', appId, 'public', 'data', 'chats', activeChat.id, 'messages', editingAppMessageId);
 
               try {
@@ -4093,7 +4216,6 @@ useEffect(() => {
 
           const toggleChatAppReaction = async (msgId, emoji) => {
               if (!activeChat) return;
-              const msgRef = doc(db, 'artifacts', appId, 'public', 'data', 'chats', activeChat.id, 'messages', msgId);
               const msgObj = chatMessages.find(m => m.id === msgId);
               if (!msgObj) return;
 
@@ -4104,6 +4226,15 @@ useEffect(() => {
               if (userReaction === emoji) delete newReactions[myChatId]; // Quita la reacción si toca el mismo emoji
               else newReactions[myChatId] = emoji; // Agrega o cambia la reacción
 
+              if (isDemoMode) {
+                  const nextMsgs = chatMessages.map(m => m.id === msgId ? { ...m, reactions: newReactions } : m);
+                  setChatMessages(nextMsgs);
+                  saveDemoChatMessages(activeChat.id, nextMsgs);
+                  setActiveChatReactionMsgId(null);
+                  return;
+              }
+
+              const msgRef = doc(db, 'artifacts', appId, 'public', 'data', 'chats', activeChat.id, 'messages', msgId);
               try {
                   await updateDoc(msgRef, { reactions: newReactions });
               } catch (err) {
@@ -4121,6 +4252,36 @@ useEffect(() => {
                   return;
               }
               const roundedGrade = Math.round(parsedGrade * 10) / 10;
+              if (isDemoMode) {
+                  if (gradingItemModal.type === 'chat' && gradingItemModal.chatId) {
+                      const nextMsgs = chatMessages.map(m => m.id === gradingItemModal.itemId ? {
+                          ...m,
+                          grade: roundedGrade,
+                          gradeFeedback: (gradingItemModal.feedback || '').trim(),
+                          gradedAt: Date.now(),
+                          gradedBy: myDisplayName
+                      } : m);
+                      setChatMessages(nextMsgs);
+                      saveDemoChatMessages(gradingItemModal.chatId, nextMsgs);
+                      showMessage("Calificación guardada para el mensaje (Modo Demo).");
+                  } else if (gradingItemModal.type === 'post') {
+                      setUserPosts(prev => prev.map(p => {
+                          if (p.id !== gradingItemModal.itemId) return p;
+                          const updated = {
+                              ...p,
+                              grade: roundedGrade,
+                              gradeFeedback: (gradingItemModal.feedback || '').trim(),
+                              gradedAt: Date.now(),
+                              gradedBy: myDisplayName
+                          };
+                          saveDemoSandboxItem('userPosts', updated);
+                          return updated;
+                      }));
+                      showMessage("Calificación guardada para la publicación (Modo Demo).");
+                  }
+                  setGradingItemModal(prev => ({ ...prev, isOpen: false }));
+                  return;
+              }
               try {
                   if (gradingItemModal.type === 'chat') {
                       if (!gradingItemModal.chatId) return;
@@ -4151,6 +4312,23 @@ useEffect(() => {
 
           const handleDeleteGradingItem = async () => {
               if (!gradingItemModal.itemId || role !== 'teacher') return;
+              if (isDemoMode) {
+                  if (gradingItemModal.type === 'chat' && gradingItemModal.chatId) {
+                      const nextMsgs = chatMessages.map(m => m.id === gradingItemModal.itemId ? { ...m, grade: null, gradeFeedback: null, gradedAt: null, gradedBy: null } : m);
+                      setChatMessages(nextMsgs);
+                      saveDemoChatMessages(gradingItemModal.chatId, nextMsgs);
+                  } else if (gradingItemModal.type === 'post') {
+                      setUserPosts(prev => prev.map(p => {
+                          if (p.id !== gradingItemModal.itemId) return p;
+                          const updated = { ...p, grade: null, gradeFeedback: null, gradedAt: null, gradedBy: null };
+                          saveDemoSandboxItem('userPosts', updated);
+                          return updated;
+                      }));
+                  }
+                  showMessage("Calificación eliminada (Modo Demo).");
+                  setGradingItemModal(prev => ({ ...prev, isOpen: false }));
+                  return;
+              }
               try {
                   if (gradingItemModal.type === 'chat') {
                       if (!gradingItemModal.chatId) return;
@@ -4183,6 +4361,7 @@ useEffect(() => {
               const newPrefs = { ...chatPreferences };
               newPrefs[chatId] = { ...(newPrefs[chatId] || { gradient: '', pattern: 'none' }), [key]: value };
               setChatPreferences(newPrefs);
+              if (isDemoMode) return;
               const prefsUid = isCamiloTeacher(myChatId) ? 'camilodocente' : (user?.uid || myChatId);
               if (prefsUid) {
                   await setDoc(doc(db, 'artifacts', appId, 'users', prefsUid, 'preferences', 'chat'), { prefs: newPrefs }, { merge: true }).catch(err => console.error('Error saving chat prefs:', err));
@@ -4190,10 +4369,18 @@ useEffect(() => {
           };
 
           const handleLeaveGroup = async () => {
-              const group = chatGroups.find(g => `group_${g.id}` === activeChat.id);
+              const group = chatGroups.find(g => `group_${g.id}` === activeChat.id || g.id === activeChat.id);
               if (!group) return;
               const currentMembers = Array.isArray(group.members) ? group.members : (group.members && typeof group.members === 'object' ? Object.keys(group.members) : []);
               const newMembers = currentMembers.filter(id => id !== myChatId);
+              if (isDemoMode) {
+                  const updated = { ...group, members: newMembers };
+                  setChatGroups(prev => prev.map(g => g.id === group.id ? updated : g));
+                  saveDemoSandboxItem('chatGroups', updated);
+                  setActiveChat(null);
+                  showMessage("Abandonaste el grupo (Modo Demo).");
+                  return;
+              }
               await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', group.id), { members: newMembers }, { merge: true });
               setActiveChat(null);
               showMessage("Abandonaste el grupo.");
@@ -4202,6 +4389,13 @@ useEffect(() => {
           const handleDeleteGroup = async () => {
               const group = chatGroups.find(g => g.id === activeChat.id || `group_${g.id}` === activeChat.id || `acad_${g.academicGroupId}` === activeChat.id || `acad_${g.id}` === activeChat.id);
               if (!group) return;
+              if (isDemoMode) {
+                  setChatGroups(prev => prev.filter(g => g.id !== group.id));
+                  removeDemoSandboxItem('chatGroups', group.id);
+                  setActiveChat(null);
+                  showMessage("Grupo eliminado (Modo Demo).");
+                  return;
+              }
               try {
                   await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', group.id));
                   setActiveChat(null);
@@ -4214,6 +4408,14 @@ useEffect(() => {
 
             const handleDeleteEntireChat = async () => {
               if (!activeChat) return;
+              if (isDemoMode) {
+                  setChatMessages([]);
+                  saveDemoChatMessages(activeChat.id, []);
+                  setLastMessages(prev => { const next = { ...prev }; delete next[activeChat.id]; return next; });
+                  setActiveChat(null);
+                  showMessage("Historial de chat eliminado (Modo Demo).");
+                  return;
+              }
               const msgsSnapshot = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'chats', activeChat.id, 'messages'));
 
               // Esperar a que todos los mensajes se borren correctamente
@@ -4240,10 +4442,24 @@ useEffect(() => {
           const url = await uploadImageToStorage(compressed, 'group_avatars');
           const grp = chatGroups.find(g => g.id === activeChat.id || `group_${g.id}` === activeChat.id || `acad_${g.academicGroupId}` === activeChat.id || `acad_${g.id}` === activeChat.id);
           if (grp) {
-              await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', grp.id), { avatarUrl: url });
-              if (grp.academicGroupId || grp.id.startsWith('acad_')) {
-                  const acadId = grp.academicGroupId || grp.id.replace('acad_', '');
-                  await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', acadId), { avatarUrl: url }).catch(() => {});
+              if (isDemoMode) {
+                  const updatedGrp = { ...grp, avatarUrl: url };
+                  saveDemoSandboxItem('chatGroups', updatedGrp);
+                  if (grp.academicGroupId || grp.id.startsWith('acad_')) {
+                      const acadId = grp.academicGroupId || grp.id.replace('acad_', '');
+                      setAcademicGroups(prev => prev.map(ag => {
+                          if (ag.id !== acadId) return ag;
+                          const u = { ...ag, avatarUrl: url };
+                          saveDemoSandboxItem('academicGroups', u);
+                          return u;
+                      }));
+                  }
+              } else {
+                  await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', grp.id), { avatarUrl: url });
+                  if (grp.academicGroupId || grp.id.startsWith('acad_')) {
+                      const acadId = grp.academicGroupId || grp.id.replace('acad_', '');
+                      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', acadId), { avatarUrl: url }).catch(() => {});
+                  }
               }
           }
           setActiveChat(prev => ({ ...prev, avatarUrl: url }));
@@ -4263,10 +4479,25 @@ useEffect(() => {
       const grp = chatGroups.find(g => g.id === activeChat.id || `group_${g.id}` === activeChat.id || `acad_${g.academicGroupId}` === activeChat.id || `acad_${g.id}` === activeChat.id);
       try {
           if (grp) {
-              await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', grp.id), { name: editGroupNameVal.trim() });
-              if (grp.academicGroupId || grp.id.startsWith('acad_')) {
-                  const acadId = grp.academicGroupId || grp.id.replace('acad_', '');
-                  await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', acadId), { name: editGroupNameVal.trim() }).catch(() => {});
+              if (isDemoMode) {
+                  const updatedGrp = { ...grp, name: editGroupNameVal.trim() };
+                  setChatGroups(prev => prev.map(cg => cg.id === grp.id ? updatedGrp : cg));
+                  saveDemoSandboxItem('chatGroups', updatedGrp);
+                  if (grp.academicGroupId || grp.id.startsWith('acad_')) {
+                      const acadId = grp.academicGroupId || grp.id.replace('acad_', '');
+                      setAcademicGroups(prev => prev.map(ag => {
+                          if (ag.id !== acadId) return ag;
+                          const u = { ...ag, name: editGroupNameVal.trim() };
+                          saveDemoSandboxItem('academicGroups', u);
+                          return u;
+                      }));
+                  }
+              } else {
+                  await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', grp.id), { name: editGroupNameVal.trim() });
+                  if (grp.academicGroupId || grp.id.startsWith('acad_')) {
+                      const acadId = grp.academicGroupId || grp.id.replace('acad_', '');
+                      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', acadId), { name: editGroupNameVal.trim() }).catch(() => {});
+                  }
               }
           }
           setActiveChat(prev => ({ ...prev, name: editGroupNameVal.trim() }));
@@ -4283,10 +4514,25 @@ useEffect(() => {
       const grp = chatGroups.find(g => g.id === activeChat.id || `group_${g.id}` === activeChat.id || `acad_${g.academicGroupId}` === activeChat.id || `acad_${g.id}` === activeChat.id);
       try {
           if (grp) {
-              await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', grp.id), { description: editGroupDescVal.trim() });
-              if (grp.academicGroupId || grp.id.startsWith('acad_')) {
-                  const acadId = grp.academicGroupId || grp.id.replace('acad_', '');
-                  await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', acadId), { description: editGroupDescVal.trim() }).catch(() => {});
+              if (isDemoMode) {
+                  const updatedGrp = { ...grp, description: editGroupDescVal.trim() };
+                  setChatGroups(prev => prev.map(cg => cg.id === grp.id ? updatedGrp : cg));
+                  saveDemoSandboxItem('chatGroups', updatedGrp);
+                  if (grp.academicGroupId || grp.id.startsWith('acad_')) {
+                      const acadId = grp.academicGroupId || grp.id.replace('acad_', '');
+                      setAcademicGroups(prev => prev.map(ag => {
+                          if (ag.id !== acadId) return ag;
+                          const u = { ...ag, description: editGroupDescVal.trim() };
+                          saveDemoSandboxItem('academicGroups', u);
+                          return u;
+                      }));
+                  }
+              } else {
+                  await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', grp.id), { description: editGroupDescVal.trim() });
+                  if (grp.academicGroupId || grp.id.startsWith('acad_')) {
+                      const acadId = grp.academicGroupId || grp.id.replace('acad_', '');
+                      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', acadId), { description: editGroupDescVal.trim() }).catch(() => {});
+                  }
               }
           }
           setIsEditingGroupDesc(false);
@@ -4312,6 +4558,25 @@ useEffect(() => {
       if (!grp) return;
       const rawGrpMembers = Array.isArray(grp.members) ? grp.members : (grp.members && typeof grp.members === 'object' ? Object.keys(grp.members) : []);
       const updatedMembers = Array.from(new Set([...rawGrpMembers, ...selectedNewMembers]));
+      if (isDemoMode) {
+          const updatedGrp = { ...grp, members: updatedMembers };
+          setChatGroups(prev => prev.map(cg => cg.id === grp.id ? updatedGrp : cg));
+          saveDemoSandboxItem('chatGroups', updatedGrp);
+          if (grp.academicGroupId || grp.id.startsWith('acad_')) {
+              const acadId = grp.academicGroupId || grp.id.replace('acad_', '');
+              setAcademicGroups(prev => prev.map(ag => {
+                  if (ag.id !== acadId) return ag;
+                  const u = { ...ag, members: updatedMembers.filter(m => !isTeacherId(m)) };
+                  saveDemoSandboxItem('academicGroups', u);
+                  return u;
+              }));
+          }
+          setShowAddMembersModal(false);
+          setSelectedNewMembers([]);
+          setAddMemberSearch("");
+          showMessage(`Se añadieron ${selectedNewMembers.length} integrante(s) al grupo (Modo Demo)`);
+          return;
+      }
       try {
           await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', grp.id), { members: updatedMembers });
           if (grp.academicGroupId || grp.id.startsWith('acad_')) {
@@ -4334,6 +4599,15 @@ useEffect(() => {
           if (!grp) return;
           const currentMembers = Array.isArray(grp.members) ? grp.members : (grp.members && typeof grp.members === 'object' ? Object.keys(grp.members) : []);
           const updatedMembers = currentMembers.filter(m => m !== myChatId);
+          if (isDemoMode) {
+              const updatedGrp = { ...grp, members: updatedMembers };
+              setChatGroups(prev => prev.map(cg => cg.id === grp.id ? updatedGrp : cg));
+              saveDemoSandboxItem('chatGroups', updatedGrp);
+              setActiveChat(null);
+              setShowGroupInfo(false);
+              showMessage("Has salido del grupo (Modo Demo).");
+              return;
+          }
           await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', grp.id), { members: updatedMembers });
           if (grp.academicGroupId || grp.id.startsWith('acad_')) {
               const acadId = grp.academicGroupId || grp.id.replace('acad_', '');
@@ -4373,7 +4647,7 @@ useEffect(() => {
       setReplyingTo(null);
 
       // Apagar estado 'Escribiendo...' inmediatamente
-      if (activeChat?.id && myChatId) {
+      if (activeChat?.id && myChatId && !isDemoMode) {
           setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'typing', activeChat.id), { [myChatId]: false }, { merge: true }).catch(()=>{});
       }
       clearTimeout(typingTimeout.current);
@@ -4389,6 +4663,92 @@ useEffect(() => {
           const previewName = role === 'teacher' ? (isCamiloTeacher(myChatId) ? 'Prof. Camilo' : 'Profesora') : (loggedInName || 'Estudiante').split(' ')[0];
 
           const nowTs = Date.now();
+          if (isDemoMode) {
+              const currentChatId = activeChat.id;
+              const currentChatObj = activeChat;
+              const newDemoMsg = {
+                  id: `demo_msg_${nowTs}`,
+                  text: textToSend,
+                  imageUrl: imgToSend,
+                  fileUrl: fileToSend,
+                  fileName: fileNameToSend,
+                  audioUrl: audioToSend,
+                  author: authorName,
+                  authorId: myChatId,
+                  authorRole: role,
+                  senderId: myChatId,
+                  senderName: authorName,
+                  uid: myChatId,
+                  status: 'read',
+                  reactions: {},
+                  replyTo: replyToSend,
+                  createdAt: nowTs,
+                  timestamp: nowTs
+              };
+              setChatMessages(prev => {
+                  const next = [...prev, newDemoMsg];
+                  saveDemoChatMessages(currentChatId, next);
+                  return next;
+              });
+              setLastMessages(prev => ({
+                  ...prev,
+                  [currentChatId]: {
+                      text: msgPreviewText,
+                      author: previewName,
+                      authorId: myChatId,
+                      authorRole: role,
+                      createdAt: nowTs,
+                      timestamp: nowTs,
+                      ...(role !== 'teacher' ? { lastStudentAt: nowTs } : {})
+                  }
+              }));
+              setTimeout(() => scrollToChatBottom('smooth'), 30);
+
+              // Respuesta automática simulada para evaluación de la plataforma en Modo Demo
+              const replyInfo = getDemoAutoReply(currentChatObj, role, textToSend);
+              if (replyInfo && replyInfo.text) {
+                  setTimeout(() => {
+                      const replyTs = Date.now();
+                      const replyAuthorId = replyInfo.authorId || replyInfo.senderId || 'teacher';
+                      const replyAuthor = replyInfo.author || replyInfo.senderName || 'La profe';
+                      const replyRole = replyInfo.authorRole || (replyAuthorId === 'teacher' ? 'teacher' : 'student');
+                      const autoReplyMsg = {
+                          id: `demo_reply_${replyTs}`,
+                          text: replyInfo.text,
+                          author: replyAuthor,
+                          authorId: replyAuthorId,
+                          authorRole: replyRole,
+                          senderId: replyAuthorId,
+                          senderName: replyAuthor,
+                          status: 'read',
+                          reactions: {},
+                          createdAt: replyTs,
+                          timestamp: replyTs
+                      };
+                      const existingForChat = loadDemoChatMessages(currentChatId);
+                      const nextForChat = [...existingForChat, autoReplyMsg];
+                      saveDemoChatMessages(currentChatId, nextForChat);
+                      if (activeChatIdRef.current === currentChatId) {
+                          setChatMessages(nextForChat);
+                          setTimeout(() => scrollToChatBottom('smooth'), 50);
+                      }
+                      setLastMessages(prev => ({
+                          ...prev,
+                          [currentChatId]: {
+                              text: replyInfo.text,
+                              author: (replyAuthor || 'Usuario').split(' ')[0],
+                              authorId: replyAuthorId,
+                              authorRole: replyRole,
+                              createdAt: replyTs,
+                              timestamp: replyTs,
+                              ...(replyRole !== 'teacher' ? { lastStudentAt: replyTs } : {})
+                          }
+                      }));
+                  }, 1300);
+              }
+              return;
+          }
+
           await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'chats', activeChat.id, 'messages'), {
               text: textToSend,
               imageUrl: imgToSend,
@@ -4463,6 +4823,24 @@ useEffect(() => {
               e.preventDefault();
               if (!newGroupName.trim() || newGroupMembers.length === 0) {
                   showMessage("Ingresa un nombre y selecciona al menos 1 miembro.");
+                  return;
+              }
+              if (isDemoMode) {
+                  const demoGrp = {
+                      id: `demo_chatgrp_${Date.now()}`,
+                      name: newGroupName.trim(),
+                      members: [myChatId, ...newGroupMembers],
+                      createdBy: myChatId,
+                      ...(role === 'teacher' ? { teacherId: myChatId } : {}),
+                      createdAt: Date.now(),
+                      isDemoCreated: true
+                  };
+                  setChatGroups(prev => [demoGrp, ...prev]);
+                  saveDemoSandboxItem('chatGroups', demoGrp);
+                  setIsCreatingGroup(false);
+                  setNewGroupName("");
+                  setNewGroupMembers([]);
+                  showMessage("Grupo de chat creado (Modo Demo).");
                   return;
               }
               try {
@@ -4719,13 +5097,7 @@ useEffect(() => {
                   };
 
                   if (isDemoMode) {
-                      let createdId = `demo_eval_${now}`;
-                      try {
-                          const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'demo_evaluations'), newEval);
-                          if (docRef?.id) createdId = docRef.id;
-                      } catch (e) {
-                          // Local sandbox fallback
-                      }
+                      const createdId = `demo_eval_${now}`;
                       const createdEval = { id: createdId, ...newEval };
                       saveDemoSandboxItem('evaluations', createdEval);
                       setEvaluations(prev => [createdEval, ...prev.filter(ev => ev.id !== createdId)]);
@@ -4743,7 +5115,7 @@ useEffect(() => {
                           targetGroupName: "Todos los estudiantes (Global)",
                           questions: [{ type: 'multiple', text: '', options: [{text: '', isCorrect: false}, {text: '', isCorrect: false}], correctAnswer: '' }]
                       });
-                      showMessage("⏳ Evaluación creada en Modo Demo (aislada • se borrará automáticamente en 2 semanas).");
+                      showMessage("⏳ Evaluación creada en Modo Demo (solo en tu sesión).");
                       return;
                   }
 
@@ -4864,6 +5236,15 @@ useEffect(() => {
             setShowAvatarUploadModal(false); 
             
             const url = await uploadImageToStorage(finalImagePayload, 'avatars');
+            if (isDemoMode) {
+                const updatedEntry = { ...(userMappings[myChatId] || { fullName: myDisplayName, role }), profilePicUrl: url };
+                setUserMappings(prev => ({ ...prev, [myChatId]: updatedEntry }));
+                saveDemoSandboxItem('userMappings', { id: myChatId, ...updatedEntry });
+                setAvatarPreviewUrl("");
+                showMessage("Foto de perfil actualizada en Modo Demo (solo en tu sesión).");
+                setIsUploadingAvatar(false);
+                return;
+            }
             await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userMappings', myChatId), { profilePicUrl: url }, { merge: true });
             
             setAvatarPreviewUrl("");
@@ -4911,12 +5292,7 @@ useEffect(() => {
         }
         setIsPublishingProfile(true);
         try {
-            const withTimeout = (promise, ms = 12000) => Promise.race([
-                promise,
-                new Promise((_, reject) => setTimeout(() => reject(new Error("La conexión con el servidor tardó demasiado")), ms))
-            ]);
-
-            await withTimeout(addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'userPosts'), {
+            const postPayload = {
                 authorId: role === 'teacher' ? myChatId : (user?.uid || myChatId || 'user'), 
                 authorUsername: myChatId || '', 
                 authorName: loggedInName || 'Usuario',
@@ -4926,7 +5302,21 @@ useEffect(() => {
                 comments: [], 
                 reactions: {}, 
                 createdAt: Date.now()
-            }));
+            };
+            if (isDemoMode) {
+                const demoPost = { id: `demo_post_${Date.now()}`, ...postPayload, isDemoCreated: true };
+                setUserPosts(prev => [demoPost, ...prev]);
+                saveDemoSandboxItem('userPosts', demoPost);
+                setProfilePostTitle(""); setProfilePostText(""); setProfilePostImage("");
+                showMessage("Publicación guardada en tu perfil (Modo Demo).");
+                return;
+            }
+            const withTimeout = (promise, ms = 12000) => Promise.race([
+                promise,
+                new Promise((_, reject) => setTimeout(() => reject(new Error("La conexión con el servidor tardó demasiado")), ms))
+            ]);
+
+            await withTimeout(addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'userPosts'), postPayload));
             setProfilePostTitle(""); setProfilePostText(""); setProfilePostImage("");
             showMessage("Publicación guardada en tu perfil con éxito.");
         } catch (err) {
@@ -4939,6 +5329,17 @@ useEffect(() => {
 
     const saveEditedProfilePost = async (postId) => {
         if (!editProfilePostData.title.trim() && !editProfilePostData.text.trim()) return;
+        if (isDemoMode) {
+            setUserPosts(prev => prev.map(p => {
+                if (p.id !== postId) return p;
+                const updated = { ...p, title: editProfilePostData.title.trim(), text: editProfilePostData.text.trim(), isEdited: true };
+                saveDemoSandboxItem('userPosts', updated);
+                return updated;
+            }));
+            setEditingProfilePostId(null);
+            showMessage("Publicación actualizada (Modo Demo).");
+            return;
+        }
         try {
             await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userPosts', postId), {
                 title: editProfilePostData.title.trim(), text: editProfilePostData.text.trim(), isEdited: true
@@ -4958,6 +5359,12 @@ useEffect(() => {
         let newReactions = { ...currentReactions };
         if (newReactions[myChatId] === emoji) delete newReactions[myChatId]; 
         else newReactions[myChatId] = emoji; 
+        if (isDemoMode) {
+            const updated = { ...post, reactions: newReactions };
+            setUserPosts(prev => prev.map(p => p.id === postId ? updated : p));
+            saveDemoSandboxItem('userPosts', updated);
+            return;
+        }
         try {
             await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userPosts', postId), { reactions: newReactions });
         } catch (err) {
@@ -4973,6 +5380,14 @@ useEffect(() => {
         if (!post) return;
         const rep = profileReplyingTo[postId];
         const newComment = { id: Date.now().toString(), author: loggedInName, text: text.trim(), createdAt: Date.now(), replyTo: rep ? { id: rep.id, author: rep.author, text: rep.text } : null };
+        if (isDemoMode) {
+            const updated = { ...post, comments: [...(post.comments || []), newComment] };
+            setUserPosts(prev => prev.map(p => p.id === postId ? updated : p));
+            saveDemoSandboxItem('userPosts', updated);
+            setProfileCommentInputs({ ...profileCommentInputs, [postId]: "" });
+            setProfileReplyingTo({ ...profileReplyingTo, [postId]: null });
+            return;
+        }
         try {
             await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userPosts', postId), { comments: [...(post.comments || []), newComment] });
             setProfileCommentInputs({ ...profileCommentInputs, [postId]: "" });
@@ -4997,7 +5412,7 @@ useEffect(() => {
         let targetUserKey = rawTargetId || myChatId || (role === 'teacher' ? 'teacher' : '');
         let userData = null;
 
-        if (isCamiloTeacher(targetUserKey) || (role === 'teacher' && isMyProfile && myChatId === 'camilodocente')) {
+        if (!isDemoMode && (isCamiloTeacher(targetUserKey) || (role === 'teacher' && isMyProfile && myChatId === 'camilodocente'))) {
             userData = {
                 fullName: SECOND_TEACHER_NAME,
                 role: 'teacher',
@@ -5020,11 +5435,11 @@ useEffect(() => {
                 targetUserKey = matchKey;
                 userData = userMappings[matchKey];
             } else {
-                // 2. Buscar en FALLBACK_MAP
+                // 2. Buscar en activeFallbackMap
                 const cleanFbKey = targetUserKey.toLowerCase().replace('@', '');
-                if (FALLBACK_MAP[cleanFbKey]) {
+                if (activeFallbackMap[cleanFbKey]) {
                     targetUserKey = cleanFbKey;
-                    const fb = FALLBACK_MAP[cleanFbKey];
+                    const fb = activeFallbackMap[cleanFbKey];
                     userData = { fullName: fb.fullName || fb.name, role: fb.role, customLabel: fb.customLabel, profilePicUrl: fb.profilePicUrl, email: fb.email };
                 } else {
                     // 3. Buscar por UID en userMappings
@@ -5294,7 +5709,15 @@ useEffect(() => {
                             {isMyProfile && !isEditingThis && (
                                 <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
                                     <button onClick={() => {setEditingProfilePostId(post.id); setEditProfilePostData({title: post.title || "", text: post.text || ""});}} className="bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-300 p-1.5 rounded-lg shadow-xs hover:bg-blue-100"><Edit3 size={14}/></button>
-                                    <button onClick={() => confirmAction("¿Eliminar publicación de tu perfil?", () => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userPosts', post.id)))} className="bg-red-50 dark:bg-red-950/50 text-red-600 dark:text-red-300 p-1.5 rounded-lg shadow-xs hover:bg-red-100"><Trash2 size={14}/></button>
+                                    <button onClick={() => confirmAction("¿Eliminar publicación de tu perfil?", () => {
+                                        if (isDemoMode) {
+                                            setUserPosts(prev => prev.filter(p => p.id !== post.id));
+                                            removeDemoSandboxItem('userPosts', post.id);
+                                            showMessage("Publicación eliminada (Modo Demo).");
+                                            return;
+                                        }
+                                        return deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userPosts', post.id));
+                                    })} className="bg-red-50 dark:bg-red-950/50 text-red-600 dark:text-red-300 p-1.5 rounded-lg shadow-xs hover:bg-red-100"><Trash2 size={14}/></button>
                                 </div>
                             )}
                             
@@ -5608,18 +6031,14 @@ Devuelve ÚNICAMENTE un array JSON plano (sin bloques markdown \`\`\`json ni tex
                       expiresAt: now + DEMO_TTL_MS,
                       isDemoCreated: true
                     };
-                    let createdId = `demo_syl_${now}_${idx}`;
-                    try {
-                      const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'demo_syllabus'), payload);
-                      if (docRef?.id) createdId = docRef.id;
-                    } catch (e) {}
+                    const createdId = `demo_syl_${now}_${idx}`;
                     const finalItem = { id: createdId, ...payload };
                     saveDemoSandboxItem('syllabus', finalItem);
                     createdItems.push(finalItem);
                   }
                   setSyllabus(prev => [...createdItems, ...prev].sort((a, b) => (Number(a.week) || 0) - (Number(b.week) || 0)));
                   confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
-                  showMessage(`⏳ ${extractedSyllabusPreview.length} semanas añadidas en Modo Demo (aisladas • se borran en 2 semanas).`);
+                  showMessage(`⏳ ${extractedSyllabusPreview.length} semanas añadidas en Modo Demo (solo en tu sesión).`);
                   setShowPdfSyllabusModal(false);
                   setExtractedSyllabusPreview(null);
                   setSyllabusPdfFile(null);
@@ -5797,17 +6216,13 @@ Devuelve ÚNICAMENTE un array JSON plano (sin bloques markdown \`\`\`json ni tex
                           expiresAt: now + DEMO_TTL_MS,
                           isDemoCreated: true
                         };
-                        let createdId = `demo_syl_${now}`;
-                        try {
-                          const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'demo_syllabus'), payload);
-                          if (docRef?.id) createdId = docRef.id;
-                        } catch (err) {}
+                        const createdId = `demo_syl_${now}`;
                         const createdItem = { id: createdId, ...payload };
                         saveDemoSandboxItem('syllabus', createdItem);
                         setSyllabus(prev => [createdItem, ...prev.filter(s => s.id !== createdId)].sort((a, b) => (Number(a.week) || 0) - (Number(b.week) || 0)));
                         e.target.reset();
                         setShowAddSyllabus(false);
-                        showMessage("⏳ Contenido programático añadido en Modo Demo (aislado • se borrará en 2 semanas).");
+                        showMessage("⏳ Contenido programático añadido en Modo Demo (solo en tu sesión).");
                         return;
                       }
 
@@ -6447,9 +6862,6 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                   if (isDemoMode || item.isDemoCreated || String(item.id).startsWith('demo')) {
                                     removeDemoSandboxItem('syllabus', item.id);
                                     setSyllabus(prev => prev.filter(s => s.id !== item.id));
-                                    if (item.isDemoCreated) {
-                                      try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'demo_syllabus', item.id)); } catch (e) {}
-                                    }
                                     showMessage("Tema eliminado en Modo Demo.");
                                     return;
                                   }
@@ -6677,21 +7089,33 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                     expiresAt: now + DEMO_TTL_MS,
                     isDemoCreated: true
                 };
-                let createdId = `demo_group_${now}`;
-                try {
-                    const newGroupDoc = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'demo_academicGroups'), demoGroupPayload);
-                    if (newGroupDoc?.id) createdId = newGroupDoc.id;
-                } catch (err) {}
+                const createdId = `demo_group_${now}`;
                 const createdGroup = { id: createdId, ...demoGroupPayload };
                 saveDemoSandboxItem('academicGroups', createdGroup);
                 setAcademicGroups(prev => [createdGroup, ...prev.filter(g => g.id !== createdId)]);
+                const groupChatMembers = Array.from(new Set([myChatId, ...selectedAcadMembers]));
+                const demoChatGroup = {
+                    id: `acad_${createdId}`,
+                    academicGroupId: createdId,
+                    name: newAcadGroupName.trim(),
+                    members: groupChatMembers,
+                    emoji: newAcadGroupEmoji || 'BookOpen',
+                    avatarUrl: newAcadGroupAvatarUrl.trim() || '',
+                    createdBy: myChatId,
+                    teacherId: myChatId,
+                    isAcademicGroupChat: true,
+                    createdAt: now,
+                    isDemoCreated: true
+                };
+                saveDemoSandboxItem('chatGroups', demoChatGroup);
+                setChatGroups(prev => [demoChatGroup, ...prev.filter(cg => cg.id !== demoChatGroup.id)]);
                 setNewAcadGroupName(""); 
                 setSelectedAcadMembers([]); 
                 setNewAcadGroupAvatarUrl("");
                 setNewAcadGroupEmoji('BookOpen');
                 setIsCreatingAcadGroup(false);
                 setShowMateriasList(true);
-                showMessage("⏳ Materia creada en Modo Demo (aislada • se borrará automáticamente en 2 semanas).");
+                showMessage("⏳ Materia y chat grupal creados en Modo Demo (solo en tu sesión).");
             } catch (error) {
                 console.error(error);
                 showMessage("Error al crear materia demo.");
@@ -6746,18 +7170,20 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
         e.preventDefault();
         if (!studentEditModal.userKey) return;
         if (isDemoMode) {
+            const updatedStudent = {
+                ...(userMappings[studentEditModal.userKey] || {}),
+                fullName: studentEditModal.fullName.trim(),
+                customLabel: studentEditModal.customLabel.trim(),
+                profilePicUrl: studentEditModal.profilePicUrl.trim(),
+                email: studentEditModal.email.trim(),
+                role: 'student',
+                updatedAt: Date.now()
+            };
             setUserMappings(prev => ({
                 ...prev,
-                [studentEditModal.userKey]: {
-                    ...(prev[studentEditModal.userKey] || {}),
-                    fullName: studentEditModal.fullName.trim(),
-                    customLabel: studentEditModal.customLabel.trim(),
-                    profilePicUrl: studentEditModal.profilePicUrl.trim(),
-                    email: studentEditModal.email.trim(),
-                    role: 'student',
-                    updatedAt: Date.now()
-                }
+                [studentEditModal.userKey]: updatedStudent
             }));
+            saveDemoSandboxItem('userMappings', { id: studentEditModal.userKey, ...updatedStudent });
             showMessage("Perfil de estudiante actualizado en Modo Demo (solo en tu sesión).");
             setStudentEditModal({ isOpen: false, userKey: '', fullName: '', customLabel: '', email: '', profilePicUrl: '' });
             return;
@@ -6787,7 +7213,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
           })
         : studentEntries;
 
-    // VISTA DE GESTIÓN DE UNA MATERIA ESPECÍFICA
+    // VISTA DE GESTIÓN DE UNA MATERIA ESPECÍFFICA
     if (selectedSubjectDetail) {
         const currentGroup = academicGroups.find(g => g.id === selectedSubjectDetail.id) || selectedSubjectDetail;
         
@@ -6802,13 +7228,13 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                 return uk.toLowerCase() === cleanM || (ud?.uid && ud.uid.toLowerCase() === cleanM) || (ud?.email && (ud.email.toLowerCase() === cleanM || ud.email.split('@')[0].toLowerCase() === cleanM));
             });
             if (!foundKey) {
-                foundKey = Object.keys(FALLBACK_MAP || {}).find(fk => {
-                    const fd = FALLBACK_MAP[fk];
+                foundKey = Object.keys(activeFallbackMap || {}).find(fk => {
+                    const fd = activeFallbackMap[fk];
                     return fk.toLowerCase() === cleanM || (fd?.email && (fd.email.toLowerCase() === cleanM || fd.email.split('@')[0].toLowerCase() === cleanM));
                 });
             }
             const finalKey = foundKey || cleanM;
-            const uData = userMappings[finalKey] || FALLBACK_MAP[finalKey] || { fullName: finalKey, email: '' };
+            const uData = userMappings[finalKey] || activeFallbackMap[finalKey] || { fullName: finalKey, email: '' };
             if (!enrolledStudentsMap.has(finalKey)) {
                 enrolledStudentsMap.set(finalKey, uData);
             }
@@ -6829,13 +7255,15 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
         });
 
         const handleRemoveStudentFromSubject = async (studentKey) => {
-            const studentName = userMappings[studentKey]?.fullName || FALLBACK_MAP[studentKey]?.name || studentKey;
+            const studentName = userMappings[studentKey]?.fullName || activeFallbackMap[studentKey]?.name || studentKey;
             confirmAction(`¿Quitar a ${studentName} de la materia "${currentGroup.name}"?`, async () => {
                 if (isDemoMode) {
                     const rawMembers = Array.isArray(currentGroup.members) ? currentGroup.members : (currentGroup.members && typeof currentGroup.members === 'object' ? Object.keys(currentGroup.members) : []);
                     const updatedMembers = rawMembers.filter(m => String(m).toLowerCase().replace('@', '') !== String(studentKey).toLowerCase().replace('@', ''));
-                    setAcademicGroups(prev => prev.map(g => g.id === currentGroup.id ? { ...g, members: updatedMembers } : g));
+                    const updatedGroup = { ...currentGroup, members: updatedMembers };
+                    setAcademicGroups(prev => prev.map(g => g.id === currentGroup.id ? updatedGroup : g));
                     setSelectedSubjectDetail(prev => prev ? { ...prev, members: updatedMembers } : null);
+                    saveDemoSandboxItem('academicGroups', updatedGroup);
                     showMessage("Estudiante removido de la materia (Modo Demo).");
                     return;
                 }
@@ -6855,12 +7283,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                 setAcademicGroups(prev => prev.map(g => g.id === currentGroup.id ? { ...g, members: updatedMembers } : g));
                 setSelectedSubjectDetail(prev => prev ? { ...prev, members: updatedMembers } : null);
                 if (isDemoMode) {
-                    if (currentGroup.isDemoCreated) {
-                        saveDemoSandboxItem('academicGroups', { ...currentGroup, members: updatedMembers });
-                        try {
-                            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'demo_academicGroups', currentGroup.id), { members: updatedMembers });
-                        } catch (e) {}
-                    }
+                    saveDemoSandboxItem('academicGroups', { ...currentGroup, members: updatedMembers });
                     showMessage("Estudiante inscrito en la materia (Modo Demo).");
                     return;
                 }
@@ -7358,13 +7781,12 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                 onClick={() => confirmAction(`¿Eliminar la materia "${g.name}"? Esta acción borrará permanentemente la materia, todos sus foros, tareas, publicaciones y archivos asociados.`, async () => {
                                                     if (isDemoMode || g.isDemoCreated || String(g.id).startsWith('demo')) {
                                                         removeDemoSandboxItem('academicGroups', g.id);
+                                                        removeDemoSandboxItem('chatGroups', `acad_${g.id}`);
                                                         setAcademicGroups(prev => prev.filter(item => item.id !== g.id));
+                                                        setChatGroups(prev => prev.filter(cg => cg.id !== `acad_${g.id}` && cg.academicGroupId !== g.id));
                                                         setTasks(prev => prev.filter(t => t.targetGroupId !== g.id && t.targetGroupId !== `acad_${g.id}`));
                                                         if (selectedGroupForFeed?.id === g.id) setSelectedGroupForFeed(null);
                                                         if (selectedSubjectDetail?.id === g.id) setSelectedSubjectDetail(null);
-                                                        if (g.isDemoCreated) {
-                                                            try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'demo_academicGroups', g.id)); } catch (e) {}
-                                                        }
                                                         showMessage(`Materia "${g.name}" eliminada en Modo Demo.`);
                                                         return;
                                                     }
@@ -7459,10 +7881,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                         const updated = [...(g.inviteCodes || []), { code, expiresAt }];
                                                         setAcademicGroups(prev => prev.map(item => item.id === g.id ? { ...item, inviteCodes: updated } : item));
                                                         if (isDemoMode || g.isDemoCreated || String(g.id).startsWith('demo')) {
-                                                            if (g.isDemoCreated) {
-                                                                saveDemoSandboxItem('academicGroups', { ...g, inviteCodes: updated });
-                                                                try { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'demo_academicGroups', g.id), { inviteCodes: updated }); } catch (e) {}
-                                                            }
+                                                            saveDemoSandboxItem('academicGroups', { ...g, inviteCodes: updated });
                                                             showMessage(`Código ${code} generado en Modo Demo.`);
                                                             return;
                                                         }
@@ -7495,10 +7914,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                                             const updated = (g.inviteCodes || []).filter((_, i) => i !== idx); 
                                                                             setAcademicGroups(prev => prev.map(item => item.id === g.id ? { ...item, inviteCodes: updated } : item));
                                                                             if (isDemoMode || g.isDemoCreated || String(g.id).startsWith('demo')) {
-                                                                                if (g.isDemoCreated) {
-                                                                                    saveDemoSandboxItem('academicGroups', { ...g, inviteCodes: updated });
-                                                                                    try { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'demo_academicGroups', g.id), { inviteCodes: updated }); } catch (e) {}
-                                                                                }
+                                                                                saveDemoSandboxItem('academicGroups', { ...g, inviteCodes: updated });
                                                                                 showMessage('Código eliminado en Modo Demo');
                                                                                 return;
                                                                             }
@@ -7537,10 +7953,12 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                         const pass = e.target.password.value;
                         if (!u || !fn || !email || !pass) return;
                         if (isDemoMode) {
+                            const newStudent = { fullName: fn, email: email, role: 'student', createdAt: Date.now(), isDemoCreated: true };
                             setUserMappings(prev => ({
                                 ...prev,
-                                [u]: { fullName: fn, email: email, role: 'student', createdAt: Date.now(), isDemoCreated: true }
+                                [u]: newStudent
                             }));
+                            saveDemoSandboxItem('userMappings', { id: u, ...newStudent });
                             e.target.reset();
                             setShowRegisterStudentForm(false);
                             showMessage("Estudiante de prueba añadido en Modo Demo (solo en tu sesión).");
@@ -7706,9 +8124,11 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                             type="button"
                                             onClick={() => confirmAction(`¿Eliminar a "${data.fullName}" (@${userKey}) del sistema? Su enlace de perfil será eliminado permanentemente.`, async () => {
                                                 if (isDemoMode) {
+                                                    removeDemoSandboxItem('userMappings', userKey);
                                                     setUserMappings(prev => {
                                                         const next = { ...prev };
                                                         delete next[userKey];
+                                                        userMappingsRef.current = next;
                                                         return next;
                                                     });
                                                     showMessage("Estudiante removido de la vista (Modo Demo).");
@@ -8206,12 +8626,9 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                     setAcademicGroups(prev => {
                                                         const next = prev.map(g => g.id === groupCoverModal.group.id ? { ...g, ...updates } : g);
                                                         const updated = next.find(g => g.id === groupCoverModal.group.id);
-                                                        if (updated && updated.isDemoCreated) saveDemoSandboxItem('academicGroups', updated);
+                                                        if (updated) saveDemoSandboxItem('academicGroups', updated);
                                                         return next;
                                                     });
-                                                    if (groupCoverModal.group?.isDemoCreated) {
-                                                        try { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'demo_academicGroups', groupCoverModal.group.id), updates); } catch (e) {}
-                                                    }
                                                     setSelectedGroupForFeed(prev => ({
                                                         ...prev,
                                                         ...updates
@@ -10187,9 +10604,6 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                                 setGrades(prev => prev.filter(g => g.evaluationId !== ev.id));
                                                                 removeDemoSandboxItem('evaluations', ev.id);
                                                                 if (viewingResultsFor?.id === ev.id) setViewingResultsFor(null);
-                                                                try {
-                                                                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'demo_evaluations', ev.id));
-                                                                } catch (e) {}
                                                                 showMessage("Evaluación eliminada del Modo Demo.");
                                                                 return;
                                                             }
@@ -10236,7 +10650,10 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                        {isDemoMode && (
                                                            <button
                                                                type="button"
-                                                               onClick={() => setGrades(prev => prev.filter(g => g.evaluationId !== ev.id))}
+                                                               onClick={() => {
+                                                                   grades.filter(g => g.evaluationId === ev.id).forEach(g => removeDemoSandboxItem('grades', g.id));
+                                                                   setGrades(prev => prev.filter(g => g.evaluationId !== ev.id));
+                                                               }}
                                                                className="w-full py-1.5 px-3 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-600 dark:text-amber-300 font-bold text-xs transition-colors cursor-pointer"
                                                            >
                                                                Volver a probar (Modo Demo)
@@ -10265,7 +10682,10 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                         {isDemoMode && (
                                                             <button
                                                                 type="button"
-                                                                onClick={() => setGrades(prev => prev.filter(g => g.evaluationId !== ev.id))}
+                                                                onClick={() => {
+                                                                    grades.filter(g => g.evaluationId === ev.id).forEach(g => removeDemoSandboxItem('grades', g.id));
+                                                                    setGrades(prev => prev.filter(g => g.evaluationId !== ev.id));
+                                                                }}
                                                                 className="w-full mt-2 py-1.5 px-3 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-600 dark:text-amber-300 font-bold text-xs transition-colors cursor-pointer"
                                                             >
                                                                 Volver a intentar prueba (Modo Demo)
@@ -10353,7 +10773,9 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
 
               const toggleSuggestionRead = async (s) => {
                   if (isDemoMode) {
-                      setSuggestions(prev => prev.map(item => item.id === s.id ? { ...item, read: !s.read } : item));
+                      const updated = { ...s, read: !s.read };
+                      setSuggestions(prev => prev.map(item => item.id === s.id ? updated : item));
+                      saveDemoSandboxItem('suggestions', updated);
                       return;
                   }
                   try {
@@ -10367,7 +10789,11 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
 
               const markAllSuggestionsAsRead = async () => {
                   if (isDemoMode) {
-                      setSuggestions(prev => prev.map(s => ({ ...s, read: true })));
+                      setSuggestions(prev => prev.map(s => {
+                          const updated = { ...s, read: true };
+                          saveDemoSandboxItem('suggestions', updated);
+                          return updated;
+                      }));
                       showMessage("Todas las sugerencias han sido marcadas como revisadas (Modo Demo).");
                       return;
                   }
@@ -10626,111 +11052,113 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
 
                                                        <button
                                                            type="button"
-                                                           onClick={() => confirmAction('¿Eliminar esta sugerencia permanentemente?', () => {
-                                                               if (isDemoMode) {
-                                                                   setSuggestions(prev => prev.filter(item => item.id !== s.id));
-                                                                   showMessage("Sugerencia eliminada (Modo Demo).");
-                                                                   return;
-                                                               }
-                                                               return deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'suggestions', s.id));
-                                                           })}
-                                                           className="p-2 rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
-                                                           title="Eliminar sugerencia"
-                                                       >
-                                                           <Trash2 size={15} />
-                                                       </button>
-                                                   </div>
-                                               </div>
-
-                                               {/* Cuerpo del mensaje limpio */}
-                                               <div className={`mt-3.5 p-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed ${
-                                                   isDarkMode ? 'bg-gray-900/60 text-gray-200 border border-gray-800' : 'bg-white/90 text-gray-800 border border-gray-100'
-                                               }`}
-                                               >
-                                                   {cleanText}
-                                               </div>
-                                           </div>
-                                       );
-                                   })
-                              )}
-                          </div>
-                      )}
-
-                      {/* Contenido de Negatividad */}
-                      {inboxTab === 'alerts' && (
-                          <div className="space-y-3">
-                              {filteredAlerts.length === 0 ? (
-                                  <div className="py-12 px-4 text-center space-y-2 rounded-3xl border border-dashed border-gray-200 dark:border-gray-800">
-                                      <div className="w-12 h-12 rounded-2xl bg-green-50 dark:bg-green-950/40 text-green-500 flex items-center justify-center mx-auto mb-2">
-                                          <CheckCircle2 size={24} />
-                                      </div>
-                                      <p className="text-sm font-bold text-gray-700 dark:text-gray-300">Sin reportes de negatividad</p>
-                                      <p className="text-xs text-gray-500 max-w-sm mx-auto">
-                                          No se han registrado comentarios con tono negativo o censurado en la plataforma.
-                                      </p>
-                                  </div>
-                              ) : (
-                                  filteredAlerts.map(a => (
-                                      <div
-                                          key={a.id}
-                                          className={`p-4 sm:p-5 rounded-3xl border transition-all relative group overflow-hidden ${
-                                              isDarkMode ? 'bg-red-950/20 border-red-800/60' : 'bg-red-50/50 border-red-200'
-                                          }`}
-                                      >
-                                          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                                              <div className="flex items-center gap-3 min-w-0">
-                                                  {(() => {
-                                                       const alertStudentPhoto = a.studentPhoto || (a.studentId ? userMappings?.[a.studentId]?.profilePicUrl : null) || Object.values(userMappings || {}).find(u => u.fullName?.toLowerCase() === a.studentName?.toLowerCase())?.profilePicUrl;
-                                                       return (
-                                                           <div className="w-10 h-10 rounded-2xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-2xs overflow-hidden border border-red-400/40">
-                                                               {alertStudentPhoto ? (
-                                                                   <img src={alertStudentPhoto} alt={a.studentName || 'Estudiante'} className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; }} />
-                                                               ) : (
-                                                                   <AlertTriangle size={20} />
-                                                               )}
-                                                           </div>
-                                                       );
-                                                   })()}
-                                                  <div className="min-w-0">
-                                                      <div className="flex items-center gap-2 flex-wrap">
-                                                          <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100 truncate">
-                                                              {a.studentName || 'Estudiante'}
-                                                          </h4>
-                                                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/15 text-red-600 dark:text-red-400">
-                                                              Negatividad detectada
-                                                          </span>
-                                                      </div>
-                                                      <p className="text-[11px] text-gray-500 mt-0.5">
-                                                          {a.createdAt ? formatDateTime12H(a.createdAt) : '-'}
-                                                      </p>
+                                                          onClick={() => confirmAction('¿Eliminar esta sugerencia permanentemente?', () => {
+                                                              if (isDemoMode) {
+                                                                  setSuggestions(prev => prev.filter(item => item.id !== s.id));
+                                                                  removeDemoSandboxItem('suggestions', s.id);
+                                                                  showMessage("Sugerencia eliminada (Modo Demo).");
+                                                                  return;
+                                                              }
+                                                              return deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'suggestions', s.id));
+                                                          })}
+                                                          className="p-2 rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                                                          title="Eliminar sugerencia"
+                                                      >
+                                                          <Trash2 size={15} />
+                                                      </button>
                                                   </div>
                                               </div>
 
-                                              <div className="flex items-center gap-1.5 self-end sm:self-auto shrink-0">
-                                                  <button
-                                                      type="button"
-                                                      onClick={() => setRevealedItems(prev => ({ ...prev, [a.id]: !prev[a.id] }))}
-                                                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                                                          revealedItems[a.id]
-                                                              ? 'bg-gray-800 text-white dark:bg-gray-200 dark:text-gray-900'
-                                                              : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700'
-                                                      }`}
-                                                      title={revealedItems[a.id] ? "Ocultar contenido" : "Revelar contenido original"}
-                                                  >
-                                                      {revealedItems[a.id] ? <EyeOff size={14} /> : <Eye size={14} />}
-                                                      <span>{revealedItems[a.id] ? 'Ocultar texto' : 'Ver original'}</span>
-                                                  </button>
+                                              {/* Cuerpo del mensaje limpio */}
+                                              <div className={`mt-3.5 p-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed ${
+                                                  isDarkMode ? 'bg-gray-900/60 text-gray-200 border border-gray-800' : 'bg-white/90 text-gray-800 border border-gray-100'
+                                              }`}
+                                              >
+                                                  {cleanText}
+                                              </div>
+                                          </div>
+                                      );
+                                  })
+                             )}
+                         </div>
+                     )}
 
-                                                  <button
-                                                      type="button"
-                                                      onClick={() => confirmAction('¿Borrar esta alerta?', () => {
-                                                          if (isDemoMode) {
-                                                              setAlerts(prev => prev.filter(item => item.id !== a.id));
-                                                              showMessage("Alerta eliminada (Modo Demo).");
-                                                              return;
-                                                          }
-                                                          return deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'alerts', a.id));
-                                                      })}
+                     {/* Contenido de Negatividad */}
+                     {inboxTab === 'alerts' && (
+                         <div className="space-y-3">
+                             {filteredAlerts.length === 0 ? (
+                                 <div className="py-12 px-4 text-center space-y-2 rounded-3xl border border-dashed border-gray-200 dark:border-gray-800">
+                                     <div className="w-12 h-12 rounded-2xl bg-green-50 dark:bg-green-950/40 text-green-500 flex items-center justify-center mx-auto mb-2">
+                                         <CheckCircle2 size={24} />
+                                     </div>
+                                     <p className="text-sm font-bold text-gray-700 dark:text-gray-300">Sin reportes de negatividad</p>
+                                     <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                                         No se han registrado comentarios con tono negativo o censurado en la plataforma.
+                                     </p>
+                                 </div>
+                             ) : (
+                                 filteredAlerts.map(a => (
+                                     <div
+                                         key={a.id}
+                                         className={`p-4 sm:p-5 rounded-3xl border transition-all relative group overflow-hidden ${
+                                             isDarkMode ? 'bg-red-950/20 border-red-800/60' : 'bg-red-50/50 border-red-200'
+                                         }`}
+                                     >
+                                         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                                             <div className="flex items-center gap-3 min-w-0">
+                                                 {(() => {
+                                                      const alertStudentPhoto = a.studentPhoto || (a.studentId ? userMappings?.[a.studentId]?.profilePicUrl : null) || Object.values(userMappings || {}).find(u => u.fullName?.toLowerCase() === a.studentName?.toLowerCase())?.profilePicUrl;
+                                                      return (
+                                                          <div className="w-10 h-10 rounded-2xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-2xs overflow-hidden border border-red-400/40">
+                                                              {alertStudentPhoto ? (
+                                                                  <img src={alertStudentPhoto} alt={a.studentName || 'Estudiante'} className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; }} />
+                                                              ) : (
+                                                                  <AlertTriangle size={20} />
+                                                              )}
+                                                          </div>
+                                                      );
+                                                  })()}
+                                                 <div className="min-w-0">
+                                                     <div className="flex items-center gap-2 flex-wrap">
+                                                         <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100 truncate">
+                                                             {a.studentName || 'Estudiante'}
+                                                         </h4>
+                                                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/15 text-red-600 dark:text-red-400">
+                                                             Negatividad detectada
+                                                         </span>
+                                                     </div>
+                                                     <p className="text-[11px] text-gray-500 mt-0.5">
+                                                         {a.createdAt ? formatDateTime12H(a.createdAt) : '-'}
+                                                     </p>
+                                                 </div>
+                                             </div>
+
+                                             <div className="flex items-center gap-1.5 self-end sm:self-auto shrink-0">
+                                                 <button
+                                                     type="button"
+                                                     onClick={() => setRevealedItems(prev => ({ ...prev, [a.id]: !prev[a.id] }))}
+                                                     className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                                                         revealedItems[a.id]
+                                                             ? 'bg-gray-800 text-white dark:bg-gray-200 dark:text-gray-900'
+                                                             : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700'
+                                                     }`}
+                                                     title={revealedItems[a.id] ? "Ocultar contenido" : "Revelar contenido original"}
+                                                 >
+                                                     {revealedItems[a.id] ? <EyeOff size={14} /> : <Eye size={14} />}
+                                                     <span>{revealedItems[a.id] ? 'Ocultar texto' : 'Ver original'}</span>
+                                                 </button>
+
+                                                 <button
+                                                     type="button"
+                                                     onClick={() => confirmAction('¿Borrar esta alerta?', () => {
+                                                         if (isDemoMode) {
+                                                             setAlerts(prev => prev.filter(item => item.id !== a.id));
+                                                             removeDemoSandboxItem('alerts', a.id);
+                                                             showMessage("Alerta eliminada (Modo Demo).");
+                                                             return;
+                                                         }
+                                                         return deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'alerts', a.id));
+                                                     })}
                                                       className="p-2 rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-100 dark:hover:bg-red-950/60 transition-colors"
                                                       title="Eliminar alerta"
                                                   >
@@ -11219,6 +11647,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
               <PublicOvaViewer
                 ovaId={publicOvaId}
                 isDarkMode={isDarkMode}
+                isDemoMode={isDemoMode}
                 onBackToPortal={() => {
                   setPublicOvaId(null);
                   try {
@@ -11782,6 +12211,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                   activeTab={activeTab}
                   onChangeTab={changeTab}
                   onExitDemo={handleExitDemo}
+                  onResetDemo={handleResetDemo}
                   isDarkMode={isDarkMode}
                   glassCard={glassCard}
                   role={role}
@@ -12409,8 +12839,10 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                   <button 
                                       type="button"
                                       onClick={async () => {
-                                          const botUserKey = isCamiloTeacher(myChatId) ? 'camilodocente' : (user?.uid || myChatId || 'teacher');
-                                          await deleteDoc(doc(db, 'artifacts', appId, 'users', botUserKey, 'teacherBot', 'history')).catch(()=>{});
+                                          if (!isDemoMode) {
+                                              const botUserKey = isCamiloTeacher(myChatId) ? 'camilodocente' : (user?.uid || myChatId || 'teacher');
+                                              await deleteDoc(doc(db, 'artifacts', appId, 'users', botUserKey, 'teacherBot', 'history')).catch(()=>{});
+                                          }
                                           setTeacherBotHistory([]);
                                           showMessage("Sesión del asistente reiniciada.");
                                       }} 
@@ -12576,6 +13008,12 @@ Bot:`;
                                                       const t = tasks.find(t => (t.title || '').toLowerCase().includes(parsed.params.title.toLowerCase()));
                                                       if (t) {
                                                           confirmAction(`¿Eliminar la tarea "${t.title}"?`, async () => {
+                                                              if (isDemoMode || String(t.id).startsWith('demo')) {
+                                                                  removeDemoSandboxItem('tasks', t.id);
+                                                                  setTasks(prev => prev.filter(item => item.id !== t.id));
+                                                                  setPinnedTasks(prev => prev.filter(item => item.id !== t.id));
+                                                                  return;
+                                                              }
                                                               await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', t.id));
                                                           });
                                                           cleanReply = `Tarea "${t.title}" eliminada.`;
@@ -12601,7 +13039,11 @@ Bot:`;
                                                   if (parsed.params?.title) {
                                                       const ev = evaluations.find(e => (e.title || '').toLowerCase().includes(parsed.params.title.toLowerCase()));
                                                       if (ev) {
-                                                          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'evaluations', ev.id), { isArchived: !ev.isArchived });
+                                                          if (isDemoMode || String(ev.id).startsWith('demo')) {
+                                                              await toggleArchiveEvaluation(ev.id, ev.isArchived);
+                                                          } else {
+                                                              await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'evaluations', ev.id), { isArchived: !ev.isArchived });
+                                                          }
                                                           cleanReply = `Evaluación "${ev.title}" ${ev.isArchived ? 'restaurada' : 'archivada'}.`;
                                                       }
                                                   }
@@ -12664,9 +13106,15 @@ Bot:`;
                                               // Chat
                                               case 'create_group':
                                                   if (parsed.params?.name) {
-                                                      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'chatGroups'), {
-                                                          name: parsed.params.name, members: [myChatId], createdBy: myChatId, teacherId: myChatId, createdAt: Date.now()
-                                                      });
+                                                      if (isDemoMode) {
+                                                          const newGrp = { id: `demo-chatgrp-${Date.now()}`, name: parsed.params.name, members: [myChatId], createdBy: myChatId, teacherId: myChatId, createdAt: Date.now(), isDemoCreated: true };
+                                                          saveDemoSandboxItem('chatGroups', newGrp);
+                                                          setChatGroups(prev => [...prev, newGrp]);
+                                                      } else {
+                                                          await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'chatGroups'), {
+                                                              name: parsed.params.name, members: [myChatId], createdBy: myChatId, teacherId: myChatId, createdAt: Date.now()
+                                                          });
+                                                      }
                                                       cleanReply = `Grupo "${parsed.params.name}" creado.`;
                                                   }
                                                   break;
@@ -12697,8 +13145,10 @@ Bot:`;
 
                                   const finalHistory = [...newHistory, { role: 'bot', text: cleanReply, time: botTime }];
                                   setTeacherBotHistory(finalHistory);
-                                  const botUserKey = isCamiloTeacher(myChatId) ? 'camilodocente' : (user?.uid || myChatId || 'teacher');
-                                  setDoc(doc(db, 'artifacts', appId, 'users', botUserKey, 'teacherBot', 'history'), { messages: finalHistory }).catch(e => console.warn("Historial local guardado:", e));
+                                  if (!isDemoMode) {
+                                      const botUserKey = isCamiloTeacher(myChatId) ? 'camilodocente' : (user?.uid || myChatId || 'teacher');
+                                      setDoc(doc(db, 'artifacts', appId, 'users', botUserKey, 'teacherBot', 'history'), { messages: finalHistory }).catch(e => console.warn("Historial local guardado:", e));
+                                  }
                               } catch (err) {
                                    console.error("Teacher bot error:", err);
                                    let errorText = "Ocurrió un error al procesar su solicitud. Por favor, intente de nuevo.";
@@ -12710,8 +13160,10 @@ Bot:`;
                                    }
                                    const finalHistory = [...newHistory, { role: 'bot', text: errorText }];
                                    setTeacherBotHistory(finalHistory);
-                                   const botUserKey = isCamiloTeacher(myChatId) ? 'camilodocente' : (user?.uid || myChatId || 'teacher');
-                                   setDoc(doc(db, 'artifacts', appId, 'users', botUserKey, 'teacherBot', 'history'), { messages: finalHistory }).catch(()=>{});
+                                   if (!isDemoMode) {
+                                       const botUserKey = isCamiloTeacher(myChatId) ? 'camilodocente' : (user?.uid || myChatId || 'teacher');
+                                       setDoc(doc(db, 'artifacts', appId, 'users', botUserKey, 'teacherBot', 'history'), { messages: finalHistory }).catch(()=>{});
+                                   }
                               } finally {
                                   setIsTeacherBotLoading(false);
                               }
@@ -14025,7 +14477,7 @@ Bot:`;
                                                   value={chatAppInput} 
                                               onChange={(e) => {
                                                   setChatAppInput(e.target.value);
-                                                  if (!activeChat) return;
+                                                  if (!activeChat || isDemoMode) return;
                                                   const typingRef = doc(db, 'artifacts', appId, 'public', 'data', 'typing', activeChat.id);
                                                   setDoc(typingRef, { [myChatId]: true }, { merge: true }).catch(() => {});
                                                   clearTimeout(typingTimeout.current);
@@ -14249,6 +14701,7 @@ Bot:`;
                       myChatId={myChatId}
                       myName={myDisplayName}
                       isDarkMode={isDarkMode}
+                      isDemoMode={isDemoMode}
                       showMessage={showMessage}
                       userMappings={userMappings}
                       onClose={() => setActiveCall(null)}
@@ -14901,13 +15354,13 @@ Bot:`;
                                                   return uk.toLowerCase() === cleanM || (ud?.uid && ud.uid.toLowerCase() === cleanM) || (ud?.email && (ud.email.toLowerCase() === cleanM || ud.email.split('@')[0].toLowerCase() === cleanM));
                                               });
                                               if (!foundKey) {
-                                                  foundKey = Object.keys(FALLBACK_MAP || {}).find(fk => {
-                                                      const fd = FALLBACK_MAP[fk];
+                                                  foundKey = Object.keys(activeFallbackMap || {}).find(fk => {
+                                                      const fd = activeFallbackMap[fk];
                                                       return fk.toLowerCase() === cleanM || (fd?.email && (fd.email.toLowerCase() === cleanM || fd.email.split('@')[0].toLowerCase() === cleanM));
                                                   });
                                               }
                                               const finalKey = foundKey || cleanM;
-                                              const uData = userMappings[finalKey] || FALLBACK_MAP[finalKey] || { fullName: finalKey, email: '' };
+                                              const uData = userMappings[finalKey] || activeFallbackMap[finalKey] || { fullName: finalKey, email: '' };
                                               if (uData.role === 'teacher' || (uData.fullName && (uData.fullName.toLowerCase().includes('gina marcela') || isCamiloTeacher(uData.fullName)))) return;
                                               if (!uniqueGroupMembersMap.has(finalKey)) {
                                                   uniqueGroupMembersMap.set(finalKey, uData);
@@ -15069,7 +15522,7 @@ Bot:`;
                                               if (!m) return;
                                               const cleanM = String(m).toLowerCase().replace('@', '').trim();
                                               enrolledIds.add(cleanM);
-                                              const ud = userMappings[cleanM] || FALLBACK_MAP[cleanM];
+                                              const ud = userMappings[cleanM] || activeFallbackMap[cleanM];
                                               if (ud?.uid) enrolledIds.add(ud.uid.toLowerCase().trim());
                                               if (ud?.email) {
                                                   enrolledIds.add(ud.email.toLowerCase().trim());
@@ -15106,7 +15559,7 @@ Bot:`;
                                           };
 
                                           Object.entries(userMappings || {}).forEach(([k, d]) => checkAndAdd(k, d));
-                                          Object.entries(FALLBACK_MAP || {}).forEach(([k, d]) => checkAndAdd(k, d));
+                                          Object.entries(activeFallbackMap || {}).forEach(([k, d]) => checkAndAdd(k, d));
 
                                           const query = (groupMembersModal.search || '').toLowerCase().trim();
                                           const norm = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -15296,6 +15749,12 @@ Bot:`;
                                                       <button onClick={() => {
                                                           if(!editIAText.trim()) return;
                                                           const newList = teacherBotInfoList.map(i => i.id === item.id ? { ...i, text: editIAText.trim() } : i);
+                                                          if (isDemoMode) {
+                                                              setTeacherBotInfoList(newList);
+                                                              setEditingIAId(null);
+                                                              showMessage("Conocimiento actualizado (Modo Demo).");
+                                                              return;
+                                                          }
                                                           setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', botDocId), { infoList: newList }).then(() => { setTeacherBotInfoList(newList); setEditingIAId(null); }).catch(err => { console.error(err); showMessage("Error al guardar."); });
                                                       }} className="text-white bg-green-600 hover:bg-green-700 transition-colors p-1.5 rounded-lg" title="Guardar"><CheckLine size={16}/></button>
                                                   </div>
@@ -15308,6 +15767,11 @@ Bot:`;
                                                       <button onClick={() => {
                                                           confirmAction("¿Seguro que desea borrar este conocimiento?", () => {
                                                               const newList = teacherBotInfoList.filter(i => i.id !== item.id);
+                                                              if (isDemoMode) {
+                                                                  setTeacherBotInfoList(newList);
+                                                                  showMessage("Conocimiento eliminado (Modo Demo).");
+                                                                  return;
+                                                              }
                                                               setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', botDocId), { infoList: newList }).then(() => setTeacherBotInfoList(newList)).catch(err => { console.error(err); showMessage("Error al eliminar."); });
                                                           });
                                                       }} className="text-red-500 hover:text-red-700 transition-colors bg-red-100 p-1.5 rounded-lg" title="Eliminar"><Trash2 size={14}/></button>
@@ -15325,6 +15789,12 @@ Bot:`;
                                       if(!newIAKnowledge.trim()) return;
                                       const botDocId = isCamiloTeacher(myChatId) ? 'teacherBot_camilodocente' : 'teacherBot';
                                       const newList = [...teacherBotInfoList, { id: Date.now().toString(), text: newIAKnowledge.trim() }];
+                                      if (isDemoMode) {
+                                          setTeacherBotInfoList(newList);
+                                          setNewIAKnowledge("");
+                                          showMessage("Conocimiento añadido (Modo Demo).");
+                                          return;
+                                      }
                                       setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', botDocId), { infoList: newList }).then(() => { setTeacherBotInfoList(newList); setNewIAKnowledge(""); }).catch(err => { console.error(err); showMessage("Error al guardar."); });
                                   }} className={`${redButton} h-auto px-4 !bg-purple-600 hover:!bg-purple-700`}><Plus size={18}/></button>
                               </div>

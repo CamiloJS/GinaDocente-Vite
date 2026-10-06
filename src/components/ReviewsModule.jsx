@@ -1170,20 +1170,15 @@ Devuelve ÚNICAMENTE un array JSON plano sin \`\`\`json ni texto extra:
         ...(isDemoMode ? { isDemoCreated: true, expiresAt: now + DEMO_TTL_MS } : {})
       };
 
-      const targetCollectionName = isDemoMode ? 'demo_reviews' : 'reviews';
-      try {
-        const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', targetCollectionName), newDoc);
-        newDoc.id = docRef.id;
-      } catch (fireErr) {
-        if (!isDemoMode) throw fireErr;
-        newDoc.id = `demo_review_${now}`;
-      }
-
       if (isDemoMode) {
+        newDoc.id = `demo_review_${now}`;
         saveDemoSandboxItem('reviews', newDoc);
         if (typeof setReviews === 'function') {
           setReviews(prev => [newDoc, ...(prev || []).filter(r => String(r.id) !== String(newDoc.id))]);
         }
+      } else {
+        const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'reviews'), newDoc);
+        newDoc.id = docRef.id;
       }
 
       setTopic("");
@@ -1213,12 +1208,7 @@ Devuelve ÚNICAMENTE un array JSON plano sin \`\`\`json ni texto extra:
         if (typeof setReviews === 'function') {
           setReviews(prev => (prev || []).map(r => String(r.id) === String(updatedPres.id) ? merged : r));
         }
-        if (updatedPres.isDemoCreated) {
-          saveDemoSandboxItem('reviews', merged);
-          try {
-            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'demo_reviews', updatedPres.id), updates);
-          } catch (e) {}
-        }
+        saveDemoSandboxItem('reviews', merged);
       } else {
         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reviews', updatedPres.id), updates);
       }
@@ -1240,11 +1230,6 @@ Devuelve ÚNICAMENTE un array JSON plano sin \`\`\`json ni texto extra:
           removeDemoSandboxItem('reviews', id);
           if (typeof setReviews === 'function') {
             setReviews(prev => (prev || []).filter(r => String(r.id) !== String(id)));
-          }
-          if (targetReview?.isDemoCreated) {
-            try {
-              await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'demo_reviews', id));
-            } catch (e) {}
           }
           showMessage("Presentación eliminada del entorno Demo.");
           if (activePresentation?.id === id) setActivePresentation(null);

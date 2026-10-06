@@ -5,6 +5,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, HelpCircle, Lightbulb, Target, Award, RotateCcw } from './Icons.jsx';
 import { auth, db, appId, doc, updateDoc } from '../firebase/config.js';
+import { isDemoSessionActive } from '../utils/helpers.js';
 import {
   puedeMostrarFeedback,
   describirPregunta,
@@ -114,7 +115,7 @@ export default function FeedbackIAEvaluacion({
         return;
       }
       try {
-        if (grado.id && !String(grado.id).startsWith('demo-')) {
+        if (!isDemoSessionActive() && !grado.isDemoCreated && grado.id && !String(grado.id).startsWith('demo')) {
           await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'grades', grado.id), {
             feedbackIA: r.feedback,
             minijuegosIA: r.minijuegos || [],

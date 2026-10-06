@@ -14,11 +14,12 @@ import {
   Lightbulb,
   GraduationCap,
   Shield,
-  Clock
+  Clock,
+  RotateCcw
 } from './Icons.jsx';
 import { DEMO_GUIDE_TOUR, DEMO_TAB_INFO, DEMO_TEACHER_TAB_INFO, DEMO_SUBJECT_NAME } from '../utils/demoData.js';
 
-export function DemoModeBanner({ activeTab, onChangeTab, onExitDemo, role = 'student', onSwitchDemoRole, isDarkMode, glassCard }) {
+export function DemoModeBanner({ activeTab, onChangeTab, onExitDemo, onResetDemo, role = 'student', onSwitchDemoRole, isDarkMode, glassCard }) {
   const [showTourModal, setShowTourModal] = useState(false);
   const [selectedTourStep, setSelectedTourStep] = useState(0);
 
@@ -64,17 +65,15 @@ export function DemoModeBanner({ activeTab, onChangeTab, onExitDemo, role = 'stu
                 <span className="font-bold bg-white/15 px-2 py-0.5 rounded-full text-[10px] text-white border border-white/20">
                   Materia: {DEMO_SUBJECT_NAME}
                 </span>
-                {isTeacherDemo && (
-                  <span className="font-bold bg-emerald-400/20 text-emerald-200 border border-emerald-300/40 px-2 py-0.5 rounded-full text-[10px] flex items-center gap-1">
-                    <Clock size={11} />
-                    <span>Creaciones aisladas • Se borran en 2 semanas</span>
-                  </span>
-                )}
+                <span className="font-bold bg-emerald-400/20 text-emerald-200 border border-emerald-300/40 px-2 py-0.5 rounded-full text-[10px] flex items-center gap-1">
+                  <Clock size={11} />
+                  <span>Entorno 100% aislado (Solo Demo)</span>
+                </span>
               </div>
               <p className="text-[11px] text-purple-100/95 truncate max-w-2xl mt-0.5">
                 {isTeacherDemo
-                  ? 'Puedes crear tareas, evaluaciones, diapositivas y temas de forma 100% aislada (duran máx. 2 semanas y se eliminan automáticamente).'
-                  : 'Explora publicaciones, evaluaciones de prueba, diapositivas y contenidos programáticos sin afectar datos reales.'}
+                  ? 'Crea tareas, evaluaciones, diapositivas, temas y chatea con alumnos de prueba de forma 100% aislada sin modificar datos reales.'
+                  : 'Explora publicaciones, resuelve evaluaciones, vota en encuestas y chatea en el entorno simulado sin afectar datos ni usuarios reales.'}
               </p>
             </div>
           </div>
@@ -120,6 +119,17 @@ export function DemoModeBanner({ activeTab, onChangeTab, onExitDemo, role = 'stu
               <HelpCircle size={14} className="text-purple-700" />
               <span>¿Cómo funciona?</span>
             </button>
+            {onResetDemo && (
+              <button
+                type="button"
+                onClick={onResetDemo}
+                className="py-1.5 px-3 rounded-xl bg-white/15 hover:bg-white/25 text-white font-bold border border-white/25 transition-colors flex items-center gap-1.5 cursor-pointer text-xs"
+                title="Restaurar los datos de demostración a su estado original"
+              >
+                <RotateCcw size={13} />
+                <span>Reiniciar Demo</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={onExitDemo}

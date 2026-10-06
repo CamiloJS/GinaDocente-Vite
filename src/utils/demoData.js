@@ -12,6 +12,9 @@ export const DEMO_ACADEMIC_GROUPS = [
     description: 'Curso demostrativo de Inglés Técnico Económico: lectura de indicadores macroeconómicos, comercio internacional, estados financieros, análisis de mercados y negociación en inglés.',
     emoji: 'BookOpen',
     coverPattern: 'doodle-1',
+    teacherId: 'teacher',
+    createdBy: 'teacher',
+    inviteCodes: [{ code: 'ECON26', expiresAt: null }],
     members: ['invitado', 'demo_guest', 'carlos_mendoza', 'laura_restrepo', 'mateo_gomez', 'valeria_castro'],
     createdAt: Date.now() - 1000 * 60 * 60 * 24 * 30
   }
@@ -32,9 +35,9 @@ export const DEMO_TASKS = [
     targetGroupName: DEMO_SUBJECT_NAME,
     targetGroupId: DEMO_SUBJECT_ID,
     reactions: {
-      user_1: { type: 'like', name: 'Carlos Mendoza', timestamp: Date.now() - 3600000 },
-      user_2: { type: 'love', name: 'Laura Restrepo', timestamp: Date.now() - 2400000 },
-      user_3: { type: 'celebrate', name: 'Mateo Gómez', timestamp: Date.now() - 1200000 },
+      carlos_mendoza: { type: 'like', name: 'Carlos Mendoza', timestamp: Date.now() - 3600000 },
+      laura_restrepo: { type: 'love', name: 'Laura Restrepo', timestamp: Date.now() - 2400000 },
+      mateo_gomez: { type: 'happy', name: 'Mateo Gómez', timestamp: Date.now() - 1200000 },
     },
     comments: [
       {
@@ -44,7 +47,7 @@ export const DEMO_TASKS = [
         userRole: 'student',
         text: 'Teacher, can we compare the Colombian CPI trend with the US Federal Reserve interest rate decisions in our paragraph?',
         timestamp: Date.now() - 1000 * 60 * 45,
-        reactions: { teacher_gina: { type: 'heart', name: 'GinaDocente' } }
+        reactions: { teacher: { emoji: '❤️', name: 'GinaDocente' } }
       },
       {
         id: 'demo-com-2',
@@ -67,14 +70,22 @@ export const DEMO_TASKS = [
     authorRole: 'teacher',
     targetGroupName: DEMO_SUBJECT_NAME,
     targetGroupId: DEMO_SUBJECT_ID,
+    poll: {
+      isMultipleChoice: false,
+      options: [
+        { id: 'opt_1', text: 'Global Supply Chains & International Trade Tariffs', voterIds: ['carlos_mendoza', 'laura_restrepo'] },
+        { id: 'opt_2', text: 'Central Bank Interest Rates & Inflation Control', voterIds: ['mateo_gomez'] },
+        { id: 'opt_3', text: 'Fintech, Digital Banking & Emerging Markets', voterIds: ['valeria_castro'] }
+      ]
+    },
     pollOptions: [
-      { text: 'Global Supply Chains & International Trade Tariffs', votes: 19, voters: ['user_1', 'user_2'] },
-      { text: 'Central Bank Interest Rates & Inflation Control', votes: 15, voters: ['user_3'] },
-      { text: 'Fintech, Digital Banking & Emerging Markets', votes: 12, voters: [] }
+      { text: 'Global Supply Chains & International Trade Tariffs', votes: 2, voters: ['carlos_mendoza', 'laura_restrepo'] },
+      { text: 'Central Bank Interest Rates & Inflation Control', votes: 1, voters: ['mateo_gomez'] },
+      { text: 'Fintech, Digital Banking & Emerging Markets', votes: 1, voters: ['valeria_castro'] }
     ],
     reactions: {
-      user_4: { type: 'like', name: 'Valeria Castro' },
-      user_5: { type: 'celebrate', name: 'Andrés Suárez' }
+      valeria_castro: { type: 'like', name: 'Valeria Castro' },
+      carlos_mendoza: { type: 'wow', name: 'Carlos Mendoza' }
     },
     comments: []
   },
@@ -89,13 +100,13 @@ export const DEMO_TASKS = [
     targetGroupName: DEMO_SUBJECT_NAME,
     targetGroupId: DEMO_SUBJECT_ID,
     reactions: {
-      user_6: { type: 'love', name: 'Sofía Ortiz' },
-      user_7: { type: 'like', name: 'David Peña' }
+      laura_restrepo: { type: 'love', name: 'Laura Restrepo' },
+      mateo_gomez: { type: 'like', name: 'Mateo Gómez' }
     },
     comments: [
       {
         id: 'demo-com-3',
-        author: 'David Peña',
+        author: 'Mateo Gómez',
         authorRole: 'student',
         userRole: 'student',
         text: 'The distinction between "Surge" and "Fluctuate" helped me a lot when describing the exchange rate graph!',
@@ -115,8 +126,8 @@ export const DEMO_TASKS = [
     targetGroupName: DEMO_SUBJECT_NAME,
     targetGroupId: DEMO_SUBJECT_ID,
     ratings: {
-      user_1: { score: 5, name: 'Carlos Mendoza' },
-      user_2: { score: 5, name: 'Laura Restrepo' }
+      carlos_mendoza: { score: 5, name: 'Carlos Mendoza' },
+      laura_restrepo: { score: 5, name: 'Laura Restrepo' }
     },
     comments: [
       {
@@ -126,7 +137,7 @@ export const DEMO_TASKS = [
         userRole: 'student',
         text: 'When the US dollar strengthens against the peso, coffee and flower exporters receive higher revenue in local currency; however, importing industrial machinery becomes significantly more expensive.',
         timestamp: Date.now() - 1000 * 60 * 60 * 36,
-        reactions: { user_2: { type: 'heart', name: 'Laura Restrepo' } }
+        reactions: { laura_restrepo: { emoji: '❤️', name: 'Laura Restrepo' } }
       }
     ]
   }
@@ -718,6 +729,633 @@ export const DEMO_TEACHER_TAB_INFO = {
 // Duración máxima de cualquier elemento creado en Modo Demo: 2 semanas (14 días)
 export const DEMO_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 export const DEMO_SANDBOX_STORAGE_KEY = 'englishTech_demoSandbox_v1';
+export const DEMO_CHAT_STORAGE_KEY = 'englishTech_demoChats_v1';
+const nowMs = Date.now();
+const dayMs = 24 * 60 * 60 * 1000;
+
+export const DEMO_USER_MAPPINGS = {
+  teacher: {
+    id: 'teacher',
+    username: 'GinaDocente',
+    name: 'La profe',
+    fullName: 'Gina Marcela Quintana Delgado',
+    email: 'demo.docente@unipamplona.edu.co',
+    role: 'teacher',
+    profilePicUrl: '/icono.png',
+    bio: 'Docente de Inglés Técnico Económico — Universidad de Pamplona (Entorno de Demostración Aislado).',
+    isDemoUser: true
+  },
+  invitado: {
+    id: 'invitado',
+    username: 'invitado',
+    name: 'Invitado Demo',
+    fullName: 'Estudiante Invitado (Demo)',
+    email: 'invitado.demo@unipamplona.edu.co',
+    role: 'student',
+    profilePicUrl: '',
+    bio: 'Explorando la plataforma English Tech en Modo Demostración.',
+    academicGroupId: DEMO_SUBJECT_ID,
+    isDemoUser: true
+  },
+  carlos_mendoza: {
+    id: 'carlos_mendoza',
+    username: 'carlos_mendoza',
+    name: 'Carlos Andrés Mendoza',
+    fullName: 'Carlos Andrés Mendoza',
+    email: 'carlos.mendoza.demo@unipamplona.edu.co',
+    role: 'student',
+    profilePicUrl: '',
+    bio: 'Estudiante de Economía VII Semestre • Interesado en Macroeconomía y Comercio Internacional.',
+    academicGroupId: DEMO_SUBJECT_ID,
+    isDemoUser: true
+  },
+  laura_restrepo: {
+    id: 'laura_restrepo',
+    username: 'laura_restrepo',
+    name: 'Laura Sofía Restrepo',
+    fullName: 'Laura Sofía Restrepo',
+    email: 'laura.restrepo.demo@unipamplona.edu.co',
+    role: 'student',
+    profilePicUrl: '',
+    bio: 'Economía y Finanzas • Analítica de mercados y política monetaria.',
+    academicGroupId: DEMO_SUBJECT_ID,
+    isDemoUser: true
+  },
+  mateo_gomez: {
+    id: 'mateo_gomez',
+    username: 'mateo_gomez',
+    name: 'Mateo Alejandro Gómez',
+    fullName: 'Mateo Alejandro Gómez',
+    email: 'mateo.gomez.demo@unipamplona.edu.co',
+    role: 'student',
+    profilePicUrl: '',
+    bio: 'Estudiante de Administración y Economía • Inglés Técnico.',
+    academicGroupId: DEMO_SUBJECT_ID,
+    isDemoUser: true
+  },
+  valeria_castro: {
+    id: 'valeria_castro',
+    username: 'valeria_castro',
+    name: 'Valeria Castro Duarte',
+    fullName: 'Valeria Castro Duarte',
+    email: 'valeria.castro.demo@unipamplona.edu.co',
+    role: 'student',
+    profilePicUrl: '',
+    bio: 'Estudiante de Economía • Comercio Exterior y Aranceles.',
+    academicGroupId: DEMO_SUBJECT_ID,
+    isDemoUser: true
+  }
+};
+
+export const DEMO_USER_PRESENCE = {
+  teacher: { status: 'online', isOnline: true, lastPing: nowMs, lastSeen: nowMs - 60 * 1000, updatedAt: nowMs - 60 * 1000 },
+  invitado: { status: 'online', isOnline: true, lastPing: nowMs, lastSeen: nowMs - 30 * 1000, updatedAt: nowMs - 30 * 1000 },
+  '@invitado': { status: 'online', isOnline: true, lastPing: nowMs, lastSeen: nowMs - 30 * 1000, updatedAt: nowMs - 30 * 1000 },
+  carlos_mendoza: { status: 'online', isOnline: true, lastPing: nowMs, lastSeen: nowMs - 2 * 60 * 1000, updatedAt: nowMs - 2 * 60 * 1000 },
+  laura_restrepo: { status: 'online', isOnline: true, lastPing: nowMs, lastSeen: nowMs - 4 * 60 * 1000, updatedAt: nowMs - 4 * 60 * 1000 },
+  mateo_gomez: { status: 'away', isOnline: false, lastPing: nowMs - 15 * 60 * 1000, lastSeen: nowMs - 15 * 60 * 1000, updatedAt: nowMs - 15 * 60 * 1000 },
+  valeria_castro: { status: 'online', isOnline: true, lastPing: nowMs, lastSeen: nowMs - 5 * 60 * 1000, updatedAt: nowMs - 5 * 60 * 1000 }
+};
+
+export const DEMO_CHAT_GROUPS = [
+  {
+    id: 'demo_chat_group_1',
+    name: 'Inglés Tecnico economico (Grupo A)',
+    description: 'Canal grupal de demostración para dudas sobre talleres, vocabulario financiero y presentaciones.',
+    members: ['teacher', 'invitado', '@invitado', 'carlos_mendoza', 'laura_restrepo', 'mateo_gomez', 'valeria_castro'],
+    admins: ['teacher'],
+    createdBy: 'teacher',
+    academicGroupId: DEMO_SUBJECT_ID,
+    createdAt: nowMs - 14 * dayMs,
+    isDemoGroup: true
+  },
+  {
+    id: 'demo_chat_group_2',
+    name: 'Seminario de Inglés para Negocios (Demo)',
+    description: 'Grupo de práctica conversacional y preparación de casos de estudio.',
+    members: ['teacher', 'invitado', '@invitado', 'carlos_mendoza', 'valeria_castro'],
+    admins: ['teacher'],
+    createdBy: 'teacher',
+    academicGroupId: DEMO_SUBJECT_ID,
+    createdAt: nowMs - 10 * dayMs,
+    isDemoGroup: true
+  }
+];
+
+const demoGroup1Messages = [
+  {
+    id: 'demo_msg_g1_1',
+    authorId: 'teacher',
+    author: 'La profe',
+    authorRole: 'teacher',
+    senderId: 'teacher',
+    senderName: 'La profe',
+    text: 'Welcome everyone to our Technical Economic English channel! Feel free to ask questions about Unit 1 & Unit 2 here. 📊🇬🇧',
+    createdAt: nowMs - 3 * 3600 * 1000,
+    timestamp: nowMs - 3 * 3600 * 1000,
+    status: 'read',
+    reactions: { carlos_mendoza: '👍', laura_restrepo: '👍', valeria_castro: '❤️' }
+  },
+  {
+    id: 'demo_msg_g1_2',
+    authorId: 'carlos_mendoza',
+    author: 'Carlos Andrés Mendoza',
+    authorRole: 'student',
+    senderId: 'carlos_mendoza',
+    senderName: 'Carlos Andrés Mendoza',
+    text: 'Good afternoon Teacher! For the inflation report, should we compare Headline Inflation or Core Inflation?',
+    createdAt: nowMs - 2 * 3600 * 1000,
+    timestamp: nowMs - 2 * 3600 * 1000,
+    status: 'read',
+    reactions: { teacher: '👍' }
+  },
+  {
+    id: 'demo_msg_g1_3',
+    authorId: 'teacher',
+    author: 'La profe',
+    authorRole: 'teacher',
+    senderId: 'teacher',
+    senderName: 'La profe',
+    text: 'Great question Carlos! Please mention both, and explain why central banks monitor Core Inflation closely.',
+    createdAt: nowMs - 90 * 60 * 1000,
+    timestamp: nowMs - 90 * 60 * 1000,
+    status: 'read',
+    reactions: { carlos_mendoza: '🔥', laura_restrepo: '🔥' }
+  }
+];
+
+const demoInvitadoTeacherMessages = [
+  {
+    id: 'demo_msg_dm_1',
+    authorId: 'teacher',
+    author: 'La profe',
+    authorRole: 'teacher',
+    senderId: 'teacher',
+    senderName: 'La profe',
+    text: '¡Hola! Bienvenido/a al chat demostrativo de English Tech. Este canal está 100% aislado para pruebas: puedes enviar mensajes, notas de voz, imágenes o iniciar una llamada de prueba sin contactar a usuarios reales.',
+    createdAt: nowMs - 45 * 60 * 1000,
+    timestamp: nowMs - 45 * 60 * 1000,
+    status: 'read',
+    reactions: { invitado: '❤️' }
+  }
+];
+
+const demoCarlosTeacherMessages = [
+  {
+    id: 'demo_msg_ct_1',
+    authorId: 'carlos_mendoza',
+    author: 'Carlos Andrés Mendoza',
+    authorRole: 'student',
+    senderId: 'carlos_mendoza',
+    senderName: 'Carlos Andrés Mendoza',
+    text: 'Hello Professor Gina, I already submitted the audio summary for the Supply & Demand case study.',
+    createdAt: nowMs - 25 * 60 * 1000,
+    timestamp: nowMs - 25 * 60 * 1000,
+    status: 'read',
+    reactions: { teacher: '👍' }
+  },
+  {
+    id: 'demo_msg_ct_2',
+    authorId: 'teacher',
+    author: 'La profe',
+    authorRole: 'teacher',
+    senderId: 'teacher',
+    senderName: 'La profe',
+    text: 'Thank you Carlos! Your pronunciation of macroeconomic terms was very clear.',
+    createdAt: nowMs - 20 * 60 * 1000,
+    timestamp: nowMs - 20 * 60 * 1000,
+    status: 'read',
+    reactions: {}
+  }
+];
+
+const demoLauraTeacherMessages = [
+  {
+    id: 'demo_msg_lt_1',
+    authorId: 'laura_restrepo',
+    author: 'Laura Sofía Restrepo',
+    authorRole: 'student',
+    senderId: 'laura_restrepo',
+    senderName: 'Laura Sofía Restrepo',
+    text: 'Teacher, could you check if my slide deck on Fiscal Policy downloaded properly?',
+    createdAt: nowMs - 50 * 60 * 1000,
+    timestamp: nowMs - 50 * 60 * 1000,
+    status: 'read',
+    reactions: {}
+  }
+];
+
+const demoMateoTeacherMessages = [
+  {
+    id: 'demo_msg_mt_1',
+    authorId: 'mateo_gomez',
+    author: 'Mateo Alejandro Gómez',
+    authorRole: 'student',
+    senderId: 'mateo_gomez',
+    senderName: 'Mateo Alejandro Gómez',
+    text: 'Good morning Professor! I finished reading the IMF report on emerging markets for Friday’s debate.',
+    createdAt: nowMs - 75 * 60 * 1000,
+    timestamp: nowMs - 75 * 60 * 1000,
+    status: 'read',
+    reactions: { teacher: '👏' }
+  }
+];
+
+const demoValeriaTeacherMessages = [
+  {
+    id: 'demo_msg_vt_1',
+    authorId: 'valeria_castro',
+    author: 'Valeria Castro Duarte',
+    authorRole: 'student',
+    senderId: 'valeria_castro',
+    senderName: 'Valeria Castro Duarte',
+    text: 'Hello Teacher! Thank you for the feedback on my Balance Sheet & Income Statement glossary.',
+    createdAt: nowMs - 110 * 60 * 1000,
+    timestamp: nowMs - 110 * 60 * 1000,
+    status: 'read',
+    reactions: { teacher: '❤️' }
+  }
+];
+
+export const DEMO_INITIAL_CHATS = {
+  'group_demo_chat_group_1': demoGroup1Messages,
+  [`acad_${DEMO_SUBJECT_ID}`]: demoGroup1Messages,
+  'group_demo_chat_group_2': [
+    {
+      id: 'demo_msg_g2_1',
+      authorId: 'teacher',
+      author: 'La profe',
+      authorRole: 'teacher',
+      senderId: 'teacher',
+      senderName: 'La profe',
+      text: 'Welcome to our Business English Seminar! Here we practice international trade negotiations and case studies.',
+      createdAt: nowMs - 4 * 3600 * 1000,
+      timestamp: nowMs - 4 * 3600 * 1000,
+      status: 'read',
+      reactions: { carlos_mendoza: '👍', valeria_castro: '🔥' }
+    }
+  ],
+  'dm_invitado_teacher': demoInvitadoTeacherMessages,
+  '@invitado_teacher': demoInvitadoTeacherMessages,
+  'dm_carlos_mendoza_teacher': demoCarlosTeacherMessages,
+  'carlos_mendoza_teacher': demoCarlosTeacherMessages,
+  'dm_laura_restrepo_teacher': demoLauraTeacherMessages,
+  'laura_restrepo_teacher': demoLauraTeacherMessages,
+  'dm_mateo_gomez_teacher': demoMateoTeacherMessages,
+  'dm_valeria_castro_teacher': demoValeriaTeacherMessages
+};
+
+export const DEMO_LAST_MESSAGES = {
+  'group_demo_chat_group_1': {
+    text: 'Great question Carlos! Please mention both, and explain why central banks monitor Core Inflation closely.',
+    createdAt: nowMs - 90 * 60 * 1000,
+    timestamp: nowMs - 90 * 60 * 1000,
+    lastStudentAt: nowMs - 2 * 3600 * 1000,
+    authorId: 'teacher',
+    author: 'La profe',
+    authorRole: 'teacher',
+    senderId: 'teacher',
+    senderName: 'La profe'
+  },
+  [`acad_${DEMO_SUBJECT_ID}`]: {
+    text: 'Great question Carlos! Please mention both, and explain why central banks monitor Core Inflation closely.',
+    createdAt: nowMs - 90 * 60 * 1000,
+    timestamp: nowMs - 90 * 60 * 1000,
+    lastStudentAt: nowMs - 2 * 3600 * 1000,
+    authorId: 'teacher',
+    author: 'La profe',
+    authorRole: 'teacher',
+    senderId: 'teacher',
+    senderName: 'La profe'
+  },
+  'group_demo_chat_group_2': {
+    text: 'Welcome to our Business English Seminar! Here we practice international trade negotiations and case studies.',
+    createdAt: nowMs - 4 * 3600 * 1000,
+    timestamp: nowMs - 4 * 3600 * 1000,
+    authorId: 'teacher',
+    author: 'La profe',
+    authorRole: 'teacher',
+    senderId: 'teacher',
+    senderName: 'La profe'
+  },
+  'dm_invitado_teacher': {
+    text: '¡Hola! Bienvenido/a al chat demostrativo de English Tech. Este canal está 100% aislado para pruebas.',
+    createdAt: nowMs - 45 * 60 * 1000,
+    timestamp: nowMs - 45 * 60 * 1000,
+    authorId: 'teacher',
+    author: 'La profe',
+    authorRole: 'teacher',
+    senderId: 'teacher',
+    senderName: 'La profe'
+  },
+  'dm_carlos_mendoza_teacher': {
+    text: 'Thank you Carlos! Your pronunciation of macroeconomic terms was very clear.',
+    createdAt: nowMs - 20 * 60 * 1000,
+    timestamp: nowMs - 20 * 60 * 1000,
+    lastStudentAt: nowMs - 25 * 60 * 1000,
+    authorId: 'teacher',
+    author: 'La profe',
+    authorRole: 'teacher',
+    senderId: 'teacher',
+    senderName: 'La profe'
+  },
+  'dm_laura_restrepo_teacher': {
+    text: 'Teacher, could you check if my slide deck on Fiscal Policy downloaded properly?',
+    createdAt: nowMs - 50 * 60 * 1000,
+    timestamp: nowMs - 50 * 60 * 1000,
+    lastStudentAt: nowMs - 50 * 60 * 1000,
+    authorId: 'laura_restrepo',
+    author: 'Laura Sofía Restrepo',
+    authorRole: 'student',
+    senderId: 'laura_restrepo',
+    senderName: 'Laura Sofía Restrepo'
+  },
+  'dm_mateo_gomez_teacher': {
+    text: 'Good morning Professor! I finished reading the IMF report on emerging markets for Friday’s debate.',
+    createdAt: nowMs - 75 * 60 * 1000,
+    timestamp: nowMs - 75 * 60 * 1000,
+    lastStudentAt: nowMs - 75 * 60 * 1000,
+    authorId: 'mateo_gomez',
+    author: 'Mateo Alejandro Gómez',
+    authorRole: 'student',
+    senderId: 'mateo_gomez',
+    senderName: 'Mateo Alejandro Gómez'
+  },
+  'dm_valeria_castro_teacher': {
+    text: 'Hello Teacher! Thank you for the feedback on my Balance Sheet & Income Statement glossary.',
+    createdAt: nowMs - 110 * 60 * 1000,
+    timestamp: nowMs - 110 * 60 * 1000,
+    lastStudentAt: nowMs - 110 * 60 * 1000,
+    authorId: 'valeria_castro',
+    author: 'Valeria Castro Duarte',
+    authorRole: 'student',
+    senderId: 'valeria_castro',
+    senderName: 'Valeria Castro Duarte'
+  }
+};
+
+export const DEMO_USER_POSTS = [
+  {
+    id: 'demo_post_1',
+    authorId: 'teacher',
+    author: 'La profe',
+    authorUsername: 'GinaDocente',
+    authorName: 'Gina Marcela Quintana Delgado',
+    authorRole: 'teacher',
+    text: '📊 "An investment in knowledge pays the best interest." — Benjamin Franklin.\nBienvenidos al espacio académico demostrativo de Inglés Técnico Económico.',
+    content: '📊 "An investment in knowledge pays the best interest." — Benjamin Franklin.\nBienvenidos al espacio académico demostrativo de Inglés Técnico Económico.',
+    createdAt: nowMs - 2 * dayMs,
+    timestamp: nowMs - 2 * dayMs,
+    reactions: { carlos_mendoza: '👍', laura_restrepo: '❤️', mateo_gomez: '🔥' },
+    comments: [
+      {
+        id: 'demo_post_c1',
+        author: 'Carlos Andrés Mendoza',
+        authorId: 'carlos_mendoza',
+        authorUsername: 'carlos_mendoza',
+        authorRole: 'student',
+        role: 'student',
+        text: 'Excellent quote Professor!',
+        createdAt: nowMs - 2 * dayMs + 3600000,
+        timestamp: nowMs - 2 * dayMs + 3600000
+      }
+    ],
+    isDemoPost: true
+  },
+  {
+    id: 'demo_post_2',
+    authorId: 'invitado',
+    author: 'Invitado (Demo)',
+    authorUsername: 'invitado',
+    authorName: 'Invitado Demo',
+    authorRole: 'student',
+    text: 'Practicing key vocabulary for Unit 2: Inflation, Purchasing Power, Interest Rates, and Monetary Policy! 📈🌎',
+    content: 'Practicing key vocabulary for Unit 2: Inflation, Purchasing Power, Interest Rates, and Monetary Policy! 📈🌎',
+    createdAt: nowMs - dayMs,
+    timestamp: nowMs - dayMs,
+    reactions: { teacher: '❤️', laura_restrepo: '👏' },
+    comments: [],
+    isDemoPost: true
+  }
+];
+
+export const DEMO_SUGGESTIONS = [
+  {
+    id: 'demo_sugg_1',
+    author: 'Carlos Andrés Mendoza (@carlos_mendoza)',
+    authorRole: 'student',
+    studentName: 'Carlos Andrés Mendoza (@carlos_mendoza)',
+    studentUsername: 'carlos_mendoza',
+    text: 'Sería excelente incluir un glosario descargable de términos del FMI y Banco Mundial para la Unidad 6.',
+    createdAt: nowMs - 2 * dayMs,
+    timestamp: nowMs - 2 * dayMs,
+    isDemoItem: true
+  },
+  {
+    id: 'demo_sugg_2',
+    author: 'Laura Sofía Restrepo (@laura_restrepo)',
+    authorRole: 'student',
+    studentName: 'Laura Sofía Restrepo (@laura_restrepo)',
+    studentUsername: 'laura_restrepo',
+    text: 'Me encantó la actividad de Listening con audio integrado en el examen de política monetaria.',
+    createdAt: nowMs - dayMs,
+    timestamp: nowMs - dayMs,
+    isDemoItem: true
+  }
+];
+
+export const DEMO_ALERTS = [
+  {
+    id: 'demo_alert_1',
+    type: 'demo_info',
+    author: 'Mateo Alejandro Gómez (Simulación Anti-Trampas)',
+    studentName: 'Mateo Alejandro Gómez (Simulación Anti-Trampas)',
+    studentUsername: 'mateo_gomez',
+    evaluationTitle: 'Quiz 1: Supply, Demand & Market Equilibrium',
+    context: 'Evaluación: Quiz 1 (Modo Estricto)',
+    text: 'Demostración de alerta preventiva por cambio de pestaña durante una evaluación en modo estricto.',
+    originalText: 'Intento de cambio de ventana detectado durante la pregunta 2 (Simulación de seguridad del Modo Demo).',
+    reason: 'Demostración de alerta preventiva por cambio de pestaña durante una evaluación en modo estricto.',
+    createdAt: nowMs - 4 * 3600 * 1000,
+    timestamp: nowMs - 4 * 3600 * 1000,
+    isDemoItem: true
+  }
+];
+
+export const DEMO_BOT_INFO_LIST = [
+  {
+    id: 'demo_bot_info_1',
+    text: 'El curso Inglés Técnico Económico evalúa vocabulario financiero, lectura de gráficas macroeconómicas y comprensión auditiva aplicada a negocios.',
+    createdAt: nowMs - 5 * dayMs,
+    timestamp: nowMs - 5 * dayMs
+  },
+  {
+    id: 'demo_bot_info_2',
+    text: 'Recuerda utilizar conectores académicos en los foros: "Furthermore", "Consequently", "On the other hand", "In terms of GDP growth".',
+    createdAt: nowMs - 3 * dayMs,
+    timestamp: nowMs - 3 * dayMs
+  }
+];
+
+export const DEMO_TEACHER_BOT_INFO_LIST = [
+  {
+    id: 'demo_tbot_info_1',
+    text: 'Priorizar ejemplos prácticos sobre inflación en América Latina, tasas de interés del Banco de la República y balanza comercial.',
+    createdAt: nowMs - 5 * dayMs,
+    timestamp: nowMs - 5 * dayMs
+  }
+];
+
+function normalizeDemoChatMessage(msg) {
+  if (!msg || typeof msg !== 'object') return msg;
+  const authorId = msg.authorId || msg.senderId || 'teacher';
+  const author = msg.author || msg.senderName || (authorId === 'teacher' ? 'La profe' : authorId);
+  const authorRole = msg.authorRole || (authorId === 'teacher' ? 'teacher' : 'student');
+  const createdAt = Number(msg.createdAt || msg.timestamp || Date.now());
+  let normalizedReactions = {};
+  if (msg.reactions && typeof msg.reactions === 'object') {
+    Object.entries(msg.reactions).forEach(([k, v]) => {
+      if (typeof v === 'string') {
+        normalizedReactions[k.replace(/^@/, '')] = v;
+      } else if (Array.isArray(v)) {
+        v.forEach((uid) => {
+          if (uid) normalizedReactions[String(uid).replace(/^@/, '')] = k;
+        });
+      }
+    });
+  }
+  return {
+    ...msg,
+    authorId: String(authorId).replace(/^@/, ''),
+    author,
+    authorRole,
+    createdAt,
+    timestamp: createdAt,
+    status: msg.status || 'read',
+    reactions: normalizedReactions
+  };
+}
+
+export function loadDemoChatMessages(chatId) {
+  if (!chatId) return [];
+  const base = (DEMO_INITIAL_CHATS[chatId] || []).map(normalizeDemoChatMessage);
+  if (typeof window === 'undefined') return base;
+  try {
+    const raw = window.localStorage.getItem(DEMO_CHAT_STORAGE_KEY);
+    if (!raw) return base;
+    const parsed = JSON.parse(raw);
+    if (parsed && Array.isArray(parsed[chatId])) {
+      return parsed[chatId].map(normalizeDemoChatMessage);
+    }
+    return base;
+  } catch {
+    return base;
+  }
+}
+
+export function saveDemoChatMessages(chatId, messages) {
+  if (!chatId || typeof window === 'undefined') return;
+  try {
+    const raw = window.localStorage.getItem(DEMO_CHAT_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    parsed[chatId] = Array.isArray(messages) ? messages.map(normalizeDemoChatMessage) : [];
+    window.localStorage.setItem(DEMO_CHAT_STORAGE_KEY, JSON.stringify(parsed));
+  } catch {
+    // Ignore localStorage quota errors
+  }
+}
+
+export function getDemoAutoReply(chatOrId, arg2 = 'student', arg3 = '') {
+  // Support both (chat, senderRole, userText) and (chatId, userText, senderRole)
+  let senderRole = 'student';
+  let userText = '';
+  if (arg2 === 'student' || arg2 === 'teacher') {
+    senderRole = arg2;
+    userText = String(arg3 || '');
+  } else if (arg3 === 'student' || arg3 === 'teacher') {
+    senderRole = arg3;
+    userText = String(arg2 || '');
+  } else {
+    userText = String(arg2 || '');
+  }
+
+  const chatId = typeof chatOrId === 'string' ? chatOrId : String(chatOrId?.id || '');
+  const isGroup =
+    chatOrId?.type === 'group' ||
+    chatId.startsWith('group_') ||
+    chatId.startsWith('acad_');
+  const clean = userText.toLowerCase();
+
+  if (isGroup) {
+    if (senderRole === 'teacher') {
+      const authorId = 'carlos_mendoza';
+      const author = 'Carlos Andrés Mendoza';
+      return {
+        author,
+        authorId,
+        authorRole: 'student',
+        senderId: authorId,
+        senderName: author,
+        text: 'Thank you Professor! We received your message in the demo group. Everyone is reviewing the economic material. 📊👍'
+      };
+    }
+    const authorId = 'teacher';
+    const author = 'La profe';
+    return {
+      author,
+      authorId,
+      authorRole: 'teacher',
+      senderId: authorId,
+      senderName: author,
+      text: 'Thanks for participating in the demo class group! Remember that this chat is 100% isolated in Demo Mode. 🌟'
+    };
+  }
+
+  // Direct Message (DM)
+  const knownStudents = ['carlos_mendoza', 'laura_restrepo', 'mateo_gomez', 'valeria_castro', 'invitado'];
+  const matchedStudentId = knownStudents.find((sid) => chatId.includes(sid));
+  const matchedStudent = matchedStudentId ? DEMO_USER_MAPPINGS[matchedStudentId] : null;
+
+  if (senderRole === 'teacher') {
+    const studentId = matchedStudent?.id || chatOrId?.username || 'carlos_mendoza';
+    const studentName = matchedStudent?.name || chatOrId?.name || 'Carlos Andrés Mendoza';
+    return {
+      author: studentName,
+      authorId: studentId,
+      authorRole: 'student',
+      senderId: studentId,
+      senderName: studentName,
+      text: clean.includes('?')
+        ? 'Yes Professor! I am working on the economic vocabulary workshop right now. Thank you for the feedback! (Respuesta simulada en Modo Demo)'
+        : 'Got it, Professor! Thank you very much for the update. 📚✅ (Respuesta simulada en Modo Demo)'
+    };
+  }
+
+  // Student sending DM to another student (not teacher)
+  if (!chatId.includes('teacher') && matchedStudent && matchedStudent.id !== 'invitado') {
+    return {
+      author: matchedStudent.name,
+      authorId: matchedStudent.id,
+      authorRole: 'student',
+      senderId: matchedStudent.id,
+      senderName: matchedStudent.name,
+      text: clean.includes('?')
+        ? 'Hey! Yes, let’s review the GDP and inflation slides together before the quiz. 📊 (Respuesta simulada de compañero en Modo Demo)'
+        : 'Awesome! See you in the Technical Economic English session! 👍 (Respuesta simulada en Modo Demo)'
+    };
+  }
+
+  return {
+    author: 'La profe',
+    authorId: 'teacher',
+    authorRole: 'teacher',
+    senderId: 'teacher',
+    senderName: 'La profe',
+    text: clean.includes('?')
+      ? 'Great question! For this unit on Technical Economic English, focus on the relationship between inflation, interest rates, and GDP growth. (Respuesta automática aislada en Modo Demo)'
+      : '¡Excelente aporte! Recuerda que este chat funciona en un entorno de demostración 100% aislado para que puedas probar mensajes, audios y reacciones con total seguridad.'
+  };
+}
 
 /**
  * Determina si un elemento creado en Modo Demo ha superado las 2 semanas de vida.
@@ -749,6 +1387,21 @@ export function getDemoRemainingDays(item, now = Date.now()) {
   return Math.max(1, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
 }
 
+export const DEMO_SANDBOX_CATEGORIES = [
+  'tasks',
+  'evaluations',
+  'syllabus',
+  'reviews',
+  'academicGroups',
+  'grades',
+  'ovas',
+  'userMappings',
+  'chatGroups',
+  'userPosts',
+  'suggestions',
+  'alerts'
+];
+
 /**
  * Carga el sandbox local del Modo Demo desde localStorage y purga automáticamente
  * cualquier elemento que haya cumplido más de 2 semanas (14 días).
@@ -761,6 +1414,12 @@ export function loadDemoSandbox(now = Date.now()) {
     reviews: [],
     academicGroups: [],
     grades: [],
+    ovas: [],
+    userMappings: [],
+    chatGroups: [],
+    userPosts: [],
+    suggestions: [],
+    alerts: [],
     deletedIds: []
   };
   if (typeof window === 'undefined') return empty;
@@ -769,10 +1428,9 @@ export function loadDemoSandbox(now = Date.now()) {
     if (!raw) return empty;
     const parsed = JSON.parse(raw);
     let mutated = false;
-    const keys = ['tasks', 'evaluations', 'syllabus', 'reviews', 'academicGroups', 'grades'];
     const result = { ...empty };
 
-    keys.forEach((k) => {
+    DEMO_SANDBOX_CATEGORIES.forEach((k) => {
       const list = Array.isArray(parsed?.[k]) ? parsed[k] : [];
       const valid = list.filter((item) => !isDemoItemExpired(item, now));
       if (valid.length !== list.length) mutated = true;
@@ -794,6 +1452,22 @@ export function loadDemoSandbox(now = Date.now()) {
     return result;
   } catch {
     return empty;
+  }
+}
+
+/**
+ * Limpia por completo el sandbox local y los chats temporales del Modo Demo,
+ * restaurando el entorno al estado base inicial.
+ */
+export function clearDemoSandbox() {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(DEMO_SANDBOX_STORAGE_KEY);
+    window.localStorage.removeItem(DEMO_CHAT_STORAGE_KEY);
+    window.localStorage.removeItem('englishTech_demo_ovas');
+    window.localStorage.removeItem('englishTech_demo_ovas_teacher');
+  } catch {
+    // Ignorar errores de localStorage
   }
 }
 
