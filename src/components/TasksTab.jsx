@@ -326,6 +326,16 @@ const TasksTab = React.memo(({
         });
     }, [visibleTasks, wallSearchTerm]);
 
+    // Publicaciones fijadas filtradas por término de búsqueda
+    const filteredPinnedTasks = React.useMemo(() => {
+        if (!wallSearchTerm.trim()) return visiblePinnedTasks;
+        const term = wallSearchTerm.trim().toLowerCase();
+        return visiblePinnedTasks.filter(t => {
+            const hay = (t.title || '') + ' ' + (t.description || '');
+            return hay.toLowerCase().includes(term);
+        });
+    }, [visiblePinnedTasks, wallSearchTerm]);
+
     // Publicaciones regulares listas para renderizar (excluyendo cualquier post fijado)
     const regularTasksToRender = React.useMemo(() => {
         const pinnedIdSet = new Set(visiblePinnedTasks.map(p => String(p.id || '').trim()).filter(Boolean));
@@ -1282,7 +1292,7 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
 
             {tasksLoading ? (
                 <div className="space-y-4">{[0,1,2].map(i => <SkeletonCard key={i} isDarkMode={isDarkMode} />)}</div>
-            ) : filteredTasks.length === 0 && wallSearchTerm.trim() ? (
+            ) : regularTasksToRender.length === 0 && filteredPinnedTasks.length === 0 && wallSearchTerm.trim() ? (
                 <div className="text-center py-8 text-sm text-gray-500 italic">
                     No se encontraron publicaciones que coincidan con "{wallSearchTerm}".
                 </div>
@@ -1295,9 +1305,9 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                 />
             ) : null}
             {/* Sección de publicaciones y tareas fijadas (Pinned Posts) */}
-            {visiblePinnedTasks.length > 0 && (
+            {filteredPinnedTasks.length > 0 && (
                 <div className="space-y-4 mb-5 transition-all duration-500 ease-out">
-                    {visiblePinnedTasks.map(task => (
+                    {filteredPinnedTasks.map(task => (
                         <div key={'pinned-' + task.id} className="transition-all duration-500 ease-out transform animate-in fade-in slide-in-from-top-4">
                             <TaskCard 
                                 task={{...task, type: task.type || 'task', isPinned: true}} 

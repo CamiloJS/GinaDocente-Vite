@@ -8,8 +8,6 @@ export const ImageCarousel = ({ images = [], onImageClick, isDarkMode, compact =
     ? images.filter(img => typeof img === 'string' && img.trim().length > 0)
     : (typeof images === 'string' && images.trim().length > 0 ? [images] : []);
 
-  if (validImages.length === 0) return null;
-
   const [currentIndex, setCurrentIndex] = useState(0);
   const scrollRef = useRef(null);
   const isSingle = validImages.length === 1;
@@ -19,6 +17,8 @@ export const ImageCarousel = ({ images = [], onImageClick, isDarkMode, compact =
       setCurrentIndex(Math.max(0, validImages.length - 1));
     }
   }, [validImages.length, currentIndex]);
+
+  if (validImages.length === 0) return null;
 
   const scrollToIndex = (index) => {
     if (index < 0 || index >= validImages.length) return;

@@ -331,27 +331,46 @@ export function narrarSegmentos(segmentos, opciones = {}) {
   try { voces = synth ? synth.getVoices() || [] : []; } catch (e) { voces = []; }
 
   // Cola de tareas: cada una se lee con voz del equipo (si es buena y del idioma) o con la nube.
+  // Se construye una vez que las voces del navegador estan disponibles (incluyendo carga asincrona via voiceschanged).
   const tareas = [];
-  segmentos.forEach((seg, indiceSegmento) => {
-    const voz = elegirMejorVoz(seg.idioma, voces);
-    const idiomaVoz = voz ? String(voz.lang || '').toLowerCase().replace('_', '-').slice(0, 2) : '';
-    const sirveLaVoz = !!synth && !!voz && esVozBuena(voz) && idiomaVoz === normalizarIdioma(seg.idioma);
-    if (sirveLaVoz) {
-      tareas.push({ tipo: 'voz', texto: seg.texto, voz, idioma: seg.idioma, indiceSegmento });
-    } else {
-      const trozos = trocearParaNube(seg.texto);
-      trozos.forEach((t, k) => tareas.push({ tipo: 'nube', texto: t, idioma: seg.idioma, indiceSegmento, primera: k === 0 }));
-    }
-  });
+  let tareasConstruidas = false;
+  const construirTareas = () => {
+    if (tareasConstruidas) return;
+    tareasConstruidas = true;
+    segmentos.forEach((seg, indiceSegmento) => {
+      const voz = elegirMejorVoz(seg.idioma, voces);
+      const idiomaVoz = voz ? String(voz.lang || '').toLowerCase().replace('_', '-').slice(0, 2) : '';
+      const sirveLaVoz = !!synth && !!voz && esVozBuena(voz) && idiomaVoz === normalizarIdioma(seg.idioma);
+      if (sirveLaVoz) {
+        tareas.push({ tipo: 'voz', texto: seg.texto, voz, idioma: seg.idioma, indiceSegmento });
+      } else {
+        const trozos = trocearParaNube(seg.texto);
+        trozos.forEach((t, k) => tareas.push({ tipo: 'nube', texto: t, idioma: seg.idioma, indiceSegmento, primera: k === 0 }));
+      }
+    });
+  };
 
   let i = 0;
   let ultimoSegmento = -1;
+  let finalizado = false;
+  let listenerVoces = null;
+  const limpiarListenerVoces = () => {
+    if (!listenerVoces) return;
+    try { if (synth && synth.removeEventListener) synth.removeEventListener('voiceschanged', listenerVoces); } catch (e) { /* nada */ }
+    listenerVoces = null;
+  };
   const fin = () => {
+    if (finalizado) return;
+    finalizado = true;
+    limpiarListenerVoces();
     if (controlador && reproduccionActual === controlador) reproduccionActual = null;
-    if (typeof onFin === 'function') onFin();
+    if (typeof onFin === 'function') {
+      try { onFin(); } catch (e) { /* nada */ }
+    }
   };
   const siguiente = () => {
     if (cancelado) return;
+    construirTareas();
     if (i >= tareas.length) { fin(); return; }
     const tarea = tareas[i];
     i += 1;
@@ -409,15 +428,19 @@ export function narrarSegmentos(segmentos, opciones = {}) {
   };
 
   if (voces.length > 0 || !synth) {
+    construirTareas();
     setTimeout(siguiente, 60);
   } else {
     let lanzado = false;
     const lanzar = () => {
       if (lanzado || cancelado) return;
       lanzado = true;
+      limpiarListenerVoces();
       try { voces = synth.getVoices() || []; } catch (e) { voces = []; }
+      construirTareas();
       setTimeout(siguiente, 60);
     };
+    listenerVoces = lanzar;
     try { if (synth.addEventListener) synth.addEventListener('voiceschanged', lanzar, { once: true }); } catch (e) { /* nada */ }
     setTimeout(lanzar, 700);
   }
@@ -425,9 +448,11 @@ export function narrarSegmentos(segmentos, opciones = {}) {
   controlador = {
     detener() {
       cancelado = true;
+      limpiarListenerVoces();
       try { if (synth) synth.cancel(); } catch (e) { /* nada */ }
       try { if (audioActual) { audioActual.pause(); audioActual.src = ''; } } catch (e) { /* nada */ }
       if (reproduccionActual === controlador) reproduccionActual = null;
+      fin();
     },
     get activo() { return !cancelado; },
   };

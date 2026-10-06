@@ -152,8 +152,42 @@ console.log("\n== Anti-eco: una sola reproduccion a la vez y sin disparos dobles
   await new Promise((r) => setTimeout(r, 400));
   chequear('un solo reintento por el servidor (sin eco)', audiosFalla.filter((u) => u.startsWith('/api/voz')).length === 1, audiosFalla);
   chequear('como ultimo respaldo usa la voz del equipo una vez', hablado.filter((t) => t === 'fallback').length === 1, hablado);
+
+  // Carga asincrona de voces (voiceschanged): si al inicio getVoices() devuelve [], al disparar voiceschanged usa la voz natural cargada
+  let vocesAsync = [];
+  let listenerVoices = null;
+  const habladoAsync = [];
+  const audiosAsync = [];
+  global.window.speechSynthesis = {
+    getVoices: () => vocesAsync,
+    addEventListener: (ev, cb) => { if (ev === 'voiceschanged') listenerVoices = cb; },
+    removeEventListener: (ev, cb) => { if (ev === 'voiceschanged' && listenerVoices === cb) listenerVoices = null; },
+    speak: (u) => { habladoAsync.push({ texto: u.text, voz: u.voice?.name }); setTimeout(() => { try { u.onend && u.onend(); } catch (e) { /* nada */ } }, 1); },
+    cancel: () => {},
+  };
+  global.window.Audio = class {
+    constructor(src) { this.src = src; audiosAsync.push(src); }
+    play() { setTimeout(() => { try { this.onended && this.onended(); } catch (e) { /* nada */ } }, 1); return Promise.resolve(); }
+    pause() {}
+  };
+  narrarSegmentos([{ idioma: 'en', texto: 'welcome back' }], {});
+  vocesAsync = [{ name: 'Microsoft Aria Online (Natural) - English (United States)', lang: 'en-US', localService: false }];
+  if (listenerVoices) listenerVoices();
+  await new Promise((r) => setTimeout(r, 200));
+  chequear('usa la voz natural cargada asincronamente en voiceschanged sin caer a nube', habladoAsync.length === 1 && habladoAsync[0].voz?.includes('Aria') && audiosAsync.length === 0, { habladoAsync, audiosAsync });
+
+  // Si una narracion es interrumpida por otra (o por detener()), dispara su onFin exactamente una vez para liberar el estado visual de la tarjeta anterior
+  let finLlamadasA = 0;
+  vocesAsync = [];
+  listenerVoices = null;
+  const ctrlA = narrarSegmentos([{ idioma: 'en', texto: 'post one' }], { onFin: () => { finLlamadasA += 1; } });
+  const ctrlB = narrarSegmentos([{ idioma: 'es', texto: 'post dos' }], {});
+  ctrlA.detener();
+  ctrlB.detener();
+  chequear('al iniciar otra narracion se invoca onFin de la anterior exactamente una vez y limpia listener', finLlamadasA === 1 && listenerVoices === null, { finLlamadasA, listenerVoices });
   delete global.window;
 }
 
 console.log(`\nRESULTADO: ${ok} OK, ${fallos} fallos\n`);
 process.exit(fallos ? 1 : 0);
+

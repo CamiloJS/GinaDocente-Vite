@@ -652,8 +652,17 @@ function App() {
       return true;
     }
   });
-  const [rawTasks, setTasks] = useState(() => initialIsDemo ? DEMO_TASKS : []);
+  const [rawTasks, setRawTasks] = useState(() => initialIsDemo ? DEMO_TASKS : []);
   const [rawPinnedTasks, setPinnedTasks] = useState(() => initialIsDemo ? DEMO_TASKS.filter(t => t.isPinned) : []);
+  const setTasks = useCallback((updater) => {
+    setRawTasks(prev => (typeof updater === 'function' ? updater(prev) : updater));
+    if (typeof updater === 'function') {
+      setPinnedTasks(prev => {
+        const next = updater(prev);
+        return Array.isArray(next) ? next.filter(t => t && t.isPinned) : prev;
+      });
+    }
+  }, []);
   const [tasksLoading, setTasksLoading] = useState(() => !initialIsDemo);
   const [taskLimit, setTaskLimit] = useState(20);
   const loadMoreTasks = () => setTaskLimit(prev => prev + 20);
@@ -1923,6 +1932,7 @@ function App() {
         if (updated) saveDemoSandboxItem('grades', updated);
         return next;
       });
+      setSelectedStudentGradeForReview(prev => (prev && prev.id === gradeId ? { ...prev, score: newScore } : prev));
       setEditingGrade({ id: null, score: '' });
       showMessage("Nota actualizada (Modo Demo).");
       return;
@@ -1930,6 +1940,7 @@ function App() {
     try {
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'grades', gradeId), { score: newScore });
       setGrades(prev => prev.map(g => g.id === gradeId ? { ...g, score: newScore } : g));
+      setSelectedStudentGradeForReview(prev => (prev && prev.id === gradeId ? { ...prev, score: newScore } : prev));
       setEditingGrade({ id: null, score: '' });
       showMessage("Nota actualizada.");
     } catch (err) {
@@ -1943,14 +1954,15 @@ function App() {
     setIsSavingFeedback(true);
     try {
       const feedbackClean = (reviewFeedbackText || '').trim();
-      if (isDemoMode || String(selectedStudentGradeForReview.id).startsWith('demo')) {
+      const targetId = selectedStudentGradeForReview.id;
+      if (isDemoMode || String(targetId).startsWith('demo')) {
         setSelectedStudentGradeForReview(prev => prev ? ({
           ...prev,
           teacherFeedback: feedbackClean
         }) : null);
         setGrades(prev => {
-          const next = prev.map(g => g.id === selectedStudentGradeForReview.id ? { ...g, teacherFeedback: feedbackClean } : g);
-          const updated = next.find(g => g.id === selectedStudentGradeForReview.id);
+          const next = prev.map(g => g.id === targetId ? { ...g, teacherFeedback: feedbackClean } : g);
+          const updated = next.find(g => g.id === targetId);
           if (updated) saveDemoSandboxItem('grades', updated);
           return next;
         });
@@ -1958,13 +1970,14 @@ function App() {
         setIsSavingFeedback(false);
         return;
       }
-      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'grades', selectedStudentGradeForReview.id), {
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'grades', targetId), {
         teacherFeedback: feedbackClean
       });
       setSelectedStudentGradeForReview(prev => prev ? ({
         ...prev,
         teacherFeedback: feedbackClean
       }) : null);
+      setGrades(prev => prev.map(g => g.id === targetId ? { ...g, teacherFeedback: feedbackClean } : g));
       showMessage("✅ Retroalimentación guardada para el estudiante.");
     } catch (err) {
       console.error(err);
@@ -2261,6 +2274,9 @@ function App() {
             try {
               const controller = new AbortController();
               const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+              if (auth && !auth.currentUser) {
+                try { await signInAnonymously(auth); } catch (e) { /* continuar */ }
+              }
               const tokenIA = auth?.currentUser ? await auth.currentUser.getIdToken().catch(() => null) : null;
               const res = await fetch('/api/gemini', { 
                 method: 'POST', 
@@ -3011,8 +3027,14 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
             setSyllabus(DEMO_SYLLABUS.slice().sort((a, b) => (Number(a.week) || 0) - (Number(b.week) || 0)));
             setReviews(DEMO_REVIEWS);
             setGrades([]);
+            setActiveTakingEval(null);
+            setViewingResultsFor(null);
+            setSelectedStudentGradeForReview(null);
             if (activeChat?.id) {
               setChatMessages(loadDemoChatMessages(activeChat.id));
+            }
+            if (typeof window !== 'undefined') {
+              try { window.dispatchEvent(new CustomEvent('englishTech:demoReset')); } catch (e) {}
             }
             showMessage('🔄 Entorno de demostración restaurado a su estado original.');
           };
@@ -3181,6 +3203,14 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
             const unsubscribe = onAuthStateChanged(auth, async (u) => {
                 setUser(u);
 
+                if (!u) {
+                  try {
+                    await signInAnonymously(auth);
+                  } catch (e) {
+                    console.warn('Anonymous auth note:', e);
+                  }
+                }
+
                 if (isInitialDemoLink() || isDemoMode) {
                     const demoRole = getInitialDemoRole();
                     setIsDemoMode(true);
@@ -3192,14 +3222,6 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
                     setAcademicGroups(mergeDemoItemsWithBase(DEMO_ACADEMIC_GROUPS, [], 'academicGroups'));
                     setAcademicGroupsLoaded(true);
                     return;
-                }
-                
-                if (!u) {
-                  try {
-                    await signInAnonymously(auth);
-                  } catch (e) {
-                    console.warn('Anonymous auth note:', e);
-                  }
                 }
                 
                 const rawSession = localStorage.getItem('englishTech_activeSession');
@@ -5215,7 +5237,7 @@ useEffect(() => {
                   if (q.type === 'listening' || q.type === 'dictation') {
                       if (!q.audioUrl) { firstError = `Pregunta ${i + 1}: Falta el audio de la pregunta.`; break; }
                   }
-                  if (q.type === 'multiple' || q.type === 'listening') {
+                  if (q.type === 'multiple' || q.type === 'listening' || (q.type === 'reading' && Array.isArray(q.options) && q.options.length >= 2)) {
                       if (!q.options || q.options.length < 2) {
                           firstError = `Pregunta ${i+1}: Mínimo 2 opciones.`;
                           break;
@@ -5235,6 +5257,8 @@ useEffect(() => {
                       const derechas = new Set(paresVal.map((p) => String(p.right || '').trim().toLowerCase()).filter(Boolean));
                       if (paresVal.length < 3 || paresVal.some((p) => !String(p.left || '').trim() || !String(p.right || '').trim())) { firstError = `Pregunta ${i + 1}: Completa al menos 3 parejas (izquierda y derecha).`; break; }
                       if (derechas.size !== paresVal.length) { firstError = `Pregunta ${i + 1}: Las respuestas de la derecha deben ser distintas entre si.`; break; }
+                  } else if (q.type === 'speaking') {
+                      // Calificación manual por audio; no requiere respuesta escrita esperada
                   } else {
                       if (!q.correctAnswer || !q.correctAnswer.trim()) {
                           firstError = `Pregunta ${i+1}: Escribe la respuesta esperada.`;
@@ -8948,7 +8972,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                           </div>
                                       )}
 
-                                      {q.type === 'multiple' || q.type === 'listening' ? (
+                                      {(q.type === 'multiple' || q.type === 'listening' || q.type === 'reading') && Array.isArray(q.options) && q.options.length >= 2 ? (
                                           <div className="space-y-2 pt-1 pl-8">
                                               {(q.options || []).map((opt, oIndex) => {
                                                   const isSelected = Array.isArray(studentAnswers[qIndex]) && studentAnswers[qIndex].includes(oIndex);
@@ -9169,7 +9193,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                           const qColTitle = `P${qIdx + 1}: ${rawQuestionText.length > 60 ? rawQuestionText.slice(0, 57) + '...' : rawQuestionText}`;
 
                           let parcialExcel = null;
-                          if ((q.type === 'multiple' || q.type === 'listening') && Array.isArray(q.options) && q.options.length >= 2) {
+                          if ((q.type === 'multiple' || q.type === 'listening' || q.type === 'reading') && Array.isArray(q.options) && q.options.length >= 2) {
                               const correctIndices = (q.options || []).map((opt, oIdx) => opt.isCorrect ? oIdx : null).filter(o => o !== null);
                               const ansArr = Array.isArray(qAns) ? qAns : [];
                               isCorrect = correctIndices.length > 0 && ansArr.length === correctIndices.length && correctIndices.every(i => ansArr.includes(i));
@@ -9236,7 +9260,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
 
                   const isQuestionAnsweredCorrectly = (q, qAns) => {
                       if (q.type === 'speaking') return false;
-                      if ((q.type === 'multiple' || q.type === 'listening') && Array.isArray(q.options) && q.options.length >= 2) {
+                      if ((q.type === 'multiple' || q.type === 'listening' || q.type === 'reading') && Array.isArray(q.options) && q.options.length >= 2) {
                           const correctIndices = (q.options || []).map((opt, oIdx) => opt?.isCorrect ? oIdx : null).filter(o => o !== null);
                           const ansArr = Array.isArray(qAns) ? qAns : [];
                           return correctIndices.length > 0 && ansArr.length === correctIndices.length && correctIndices.every(i => ansArr.includes(i));
@@ -9274,7 +9298,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                   const questionRows = questions.map((q, qIdx) => {
                       let correctAnswersText = '';
                       let optionsText = '';
-                      if ((q.type === 'multiple' || q.type === 'listening') && Array.isArray(q.options) && q.options.length >= 2) {
+                      if ((q.type === 'multiple' || q.type === 'listening' || q.type === 'reading') && Array.isArray(q.options) && q.options.length >= 2) {
                           optionsText = (q.options || []).map((opt, oIdx) => `${String.fromCharCode(65 + oIdx)}) ${opt.text}${opt.isCorrect ? ' [✔ CORRECTA]' : ''}`).join('  |  ');
                           correctAnswersText = (q.options || []).filter(o => o.isCorrect).map(o => o.text).join('; ');
                       } else if (q.type === 'order') {
@@ -9318,7 +9342,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                           let studentAnswerText = '';
                           let correctAnswerText = '';
 
-                          if ((q.type === 'multiple' || q.type === 'listening') && Array.isArray(q.options) && q.options.length >= 2) {
+                          if ((q.type === 'multiple' || q.type === 'listening' || q.type === 'reading') && Array.isArray(q.options) && q.options.length >= 2) {
                               const correctIndices = (q.options || []).map((opt, oIdx) => opt?.isCorrect ? oIdx : null).filter(o => o !== null);
                               const ansArr = Array.isArray(qAns) ? qAns : [];
                               studentAnswerText = ansArr.length > 0 ? ansArr.map(idx => q.options?.[idx]?.text || `Opción ${idx + 1}`).join('; ') : '(Sin respuesta)';
@@ -9485,7 +9509,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                           questions.forEach((q, qIdx) => {
                                               const qAns = grade.answers?.[qIdx];
                                               if (q.type === 'speaking') return;
-                                              if ((q.type === 'multiple' || q.type === 'listening') && Array.isArray(q.options) && q.options.length >= 2) {
+                                              if ((q.type === 'multiple' || q.type === 'listening' || q.type === 'reading') && Array.isArray(q.options) && q.options.length >= 2) {
                                                   const correctOpts = (q.options || []).map((opt, oIdx) => opt?.isCorrect ? oIdx : null).filter(o => o !== null);
                                                   const ansArr = Array.isArray(qAns) ? qAns : [];
                                                   if (correctOpts.length > 0 && ansArr.length === correctOpts.length && correctOpts.every(i => ansArr.includes(i))) correctCount++;
@@ -9705,7 +9729,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                           questions.forEach((q, qIdx) => {
                                               const qAns = selectedStudentGradeForReview.answers?.[qIdx];
                                               if (q.type === 'speaking') return;
-                                              if ((q.type === 'multiple' || q.type === 'listening') && Array.isArray(q.options) && q.options.length >= 2) {
+                                              if ((q.type === 'multiple' || q.type === 'listening' || q.type === 'reading') && Array.isArray(q.options) && q.options.length >= 2) {
                                                   const correctOpts = (q.options || []).map((opt, oIdx) => opt?.isCorrect ? oIdx : null).filter(o => o !== null);
                                                   const ansArr = Array.isArray(qAns) ? qAns : [];
                                                   if (correctOpts.length > 0 && ansArr.length === correctOpts.length && correctOpts.every(i => ansArr.includes(i))) studentCorrect++;
@@ -9781,7 +9805,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                               let esParcial = false;
                                               let detalleParcial = '';
 
-                                              if ((q.type === 'multiple' || q.type === 'listening') && Array.isArray(q.options) && q.options.length >= 2) {
+                                              if ((q.type === 'multiple' || q.type === 'listening' || q.type === 'reading') && Array.isArray(q.options) && q.options.length >= 2) {
                                                   const correctOpts = (q.options || []).map((opt, oIdx) => opt?.isCorrect ? oIdx : null).filter(o => o !== null);
                                                   const ansArr = Array.isArray(qAns) ? qAns : [];
                                                   isUnanswered = ansArr.length === 0;
@@ -9874,7 +9898,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                       )}
 
                                                       {/* Respuestas detalladas */}
-                                                      {((q.type === 'multiple' || q.type === 'listening') && Array.isArray(q.options) && q.options.length >= 2) ? (
+                                                      {((q.type === 'multiple' || q.type === 'listening' || q.type === 'reading') && Array.isArray(q.options) && q.options.length >= 2) ? (
                                                           <div className="space-y-1.5 pl-8">
                                                               {(q.options || []).map((opt, oIdx) => {
                                                                   const wasSelected = (Array.isArray(qAns) ? qAns : []).includes(oIdx);
@@ -10077,7 +10101,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                               evalGrades.forEach(g => {
                                                   const qAns = g.answers?.[qIdx];
                                                   if (q.type === 'speaking') return;
-                                                  if ((q.type === 'multiple' || q.type === 'listening') && Array.isArray(q.options) && q.options.length >= 2) {
+                                                  if ((q.type === 'multiple' || q.type === 'listening' || q.type === 'reading') && Array.isArray(q.options) && q.options.length >= 2) {
                                                       const correctOpts = (q.options || []).map((opt, oIdx) => opt?.isCorrect ? oIdx : null).filter(o => o !== null);
                                                       const ansArr = Array.isArray(qAns) ? qAns : [];
                                                       if (correctOpts.length > 0 && ansArr.length === correctOpts.length && correctOpts.every(i => ansArr.includes(i))) qCorrectCount++;
@@ -10129,7 +10153,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                           </div>
                                                       )}
 
-                                                      {((q.type === 'multiple' || q.type === 'listening') && Array.isArray(q.options) && q.options.length >= 2) ? (
+                                                      {((q.type === 'multiple' || q.type === 'listening' || q.type === 'reading') && Array.isArray(q.options) && q.options.length >= 2) ? (
                                                           <div className="space-y-1.5 pl-8">
                                                               {(q.options || []).map((opt, oIdx) => (
                                                                   <div 
@@ -10362,7 +10386,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                       {qIndex + 1}
                                                   </span>
                                                   <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 p-0.5 rounded-xl text-[11px] font-bold flex-wrap">
-                                                      <button type="button" onClick={() => { const newQ = [...evalFormData.questions]; const esVF = esVerdaderoFalso(newQ[qIndex]); newQ[qIndex] = { ...newQ[qIndex], type: 'multiple', options: (newQ[qIndex].options && newQ[qIndex].options.length >= 2 && !esVF) ? newQ[qIndex].options.map((o) => ({ ...o })) : [{ text: 'Verdadero', isCorrect: false }, { text: 'Falso', isCorrect: false }] }; setEvalFormData({ ...evalFormData, questions: newQ }); }} className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${q.type === 'multiple' && !esVerdaderoFalso(q) ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-xs' : 'text-gray-500'}`}>
+                                                      <button type="button" onClick={() => { const newQ = [...evalFormData.questions]; const esVF = esVerdaderoFalso(newQ[qIndex]); newQ[qIndex] = { ...newQ[qIndex], type: 'multiple', options: (newQ[qIndex].options && newQ[qIndex].options.length >= 2 && !esVF) ? newQ[qIndex].options.map((o) => ({ ...o })) : [{ text: '', isCorrect: false }, { text: '', isCorrect: false }] }; setEvalFormData({ ...evalFormData, questions: newQ }); }} className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${q.type === 'multiple' && !esVerdaderoFalso(q) ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-xs' : 'text-gray-500'}`}>
                                                           {'Selecci\u00f3n m\u00faltiple'}
                                                       </button>
                                                       <button type="button" onClick={() => { const newQ = [...evalFormData.questions]; newQ[qIndex] = { ...newQ[qIndex], type: 'multiple', options: [{ text: 'Verdadero', isCorrect: false }, { text: 'Falso', isCorrect: false }] }; setEvalFormData({ ...evalFormData, questions: newQ }); }} className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${esVerdaderoFalso(q) ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-xs' : 'text-gray-500'}`}>
@@ -10507,7 +10531,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                           )}
 
 
-                                          {(q.type === 'multiple' || q.type === 'listening') ? (
+                                          {(q.type === 'multiple' || q.type === 'listening' || (q.type === 'reading' && Array.isArray(q.options) && q.options.length >= 2)) ? (
                                               <div className="space-y-1.5 pl-4 sm:pl-7 border-l-2 border-blue-500/30">
                                                   <div className="flex flex-wrap items-center gap-2">
                                                       <span className="text-[11px] font-bold text-gray-500">{'Tipo de respuesta:'}</span>

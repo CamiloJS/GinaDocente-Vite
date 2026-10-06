@@ -85,6 +85,11 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
     const [showTranslated, setShowTranslated] = useState(false);
     const [hoverRating, setHoverRating] = useState(0);
 
+    useEffect(() => {
+        setTranslatedDescription(null);
+        setShowTranslated(false);
+    }, [task?.description]);
+
     const handleTranslateText = async (text) => {
         if (translatedDescription) {
             setShowTranslated(!showTranslated);
@@ -139,8 +144,6 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
         return () => window.removeEventListener('keydown', onKey);
     }, [showEmojiPicker, showAttachmentMenu]);
 
-    if (!task) return null;
-
     const isTask = task?.type === 'task';
     const isForum = task?.type === 'forum';
     const isPoll = task?.type === 'poll' || Boolean(task?.poll);
@@ -152,7 +155,7 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
 
     // Identificación de la entrega del estudiante actual
     const myDelivery = React.useMemo(() => {
-        if (!isTask || role === 'teacher') return null;
+        if (!task || !isTask || role === 'teacher') return null;
         const myName = (loggedInName || '').trim().toLowerCase();
         const myUid = (currentUser?.uid || '').trim().toLowerCase();
         const myUserKey = (currentUserId || '').trim().toLowerCase();
@@ -170,18 +173,18 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                    (myUserKey && (authorIdLower === myUserKey || authorUsernameLower === myUserKey)) ||
                    (myEmailPrefix && (authorUsernameLower === myEmailPrefix || authorLower === myEmailPrefix));
         });
-    }, [isTask, role, loggedInName, currentUserId, currentUser, task.comments]);
+    }, [task, isTask, role, loggedInName, currentUserId, currentUser]);
 
     const myDeliveryIsLate = React.useMemo(() => {
-        if (!myDelivery || !task.dueDate) return false;
+        if (!myDelivery || !task?.dueDate) return false;
         const parsedDue = new Date(`${task.dueDate}T${task.dueTime || '23:59'}`);
         if (isNaN(parsedDue.getTime()) || !myDelivery.createdAt) return false;
         return new Date(myDelivery.createdAt) > parsedDue;
-    }, [myDelivery, task.dueDate, task.dueTime]);
+    }, [myDelivery, task?.dueDate, task?.dueTime]);
 
     // Contador de entregas y pendientes por calificar para la docente
     const teacherDeliveryStats = React.useMemo(() => {
-        if (!isTask || role !== 'teacher') return { totalReceived: 0, pendingToGrade: 0 };
+        if (!task || !isTask || role !== 'teacher') return { totalReceived: 0, pendingToGrade: 0 };
         const studentComments = (task.comments || []).filter(c => {
             if (c.isDeleted) return false;
             const authorLower = (c.author || '').trim().toLowerCase();
@@ -205,17 +208,21 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
         const totalReceived = studentMap.size;
         const pendingToGrade = Array.from(studentMap.values()).filter(c => c.grade === undefined || c.grade === null || c.grade === '').length;
         return { totalReceived, pendingToGrade };
-    }, [isTask, role, task.comments]);
+    }, [task, isTask, role]);
+
+    const [isVoting, setIsVoting] = useState(false);
+    const [activeVotersOptionId, setActiveVotersOptionId] = useState(null);
+
+    if (!task) return null;
+
     const parsedDeadline = task.dueDate ? new Date(`${task.dueDate}T${task.dueTime || '23:59'}`) : null;
-        const deadline = parsedDeadline && !isNaN(parsedDeadline.getTime()) ? parsedDeadline : null;
+    const deadline = parsedDeadline && !isNaN(parsedDeadline.getTime()) ? parsedDeadline : null;
     const isExpired = deadline ? new Date() > deadline : false;
     const isAllowLate = Boolean(task.allowLate === true || task.allowLate === 'true' || task.allowLate === 1 || task.allowLate === '1');
     // Para encuestas, si expiró la fecha de cierre, se bloquea la votación
     const isLocked = isPoll ? isExpired : (isTask ? (isExpired && !isAllowLate) : (isExpired && !isAllowLate));
-    const [isVoting, setIsVoting] = useState(false);
-    const [activeVotersOptionId, setActiveVotersOptionId] = useState(null);
 
-    const isDemoTask = Boolean(isDemoMode || task?.isDemoCreated || (task?.id && String(task.id).startsWith('demo-')));
+    const isDemoTask = Boolean(isDemoMode || task?.isDemoCreated || (task?.id && (String(task.id).startsWith('demo-') || String(task.id).startsWith('demo_'))));
 
     const updateTaskDoc = async (updates) => {
         if (isDemoTask) {
@@ -332,6 +339,9 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                 result = await callGemini(prompt);
             }
             if (!result) {
+                if (auth && !auth.currentUser) {
+                    try { await signInAnonymously(auth); } catch (e) { /* continuar */ }
+                }
                 const tokenIA = auth?.currentUser ? await auth.currentUser.getIdToken().catch(() => null) : null;
                 const res = await fetch('/api/gemini', {
                     method: 'POST',
@@ -1280,7 +1290,7 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                                         <button onClick={handleSaveEditedTask} className="p-1 rounded-lg bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 hover:scale-110 transition-transform shadow-xs" title="Guardar cambios">
                                             <CheckLine size={16}/>
                                         </button>
-                                        <button onClick={() => { setIsEditingTask(false); setEditTaskData({title: task.title, description: task.description, dueDate: task.dueDate || '', dueTime: task.dueTime || '', allowLate: task.allowLate || false, geniallyUrl: task.geniallyUrl || '', hideDate: !!task.hideDate}); }} className="p-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-400 hover:text-red-500 hover:scale-110 transition-transform shadow-xs" title="Cancelar">
+                                        <button onClick={() => { setIsEditingTask(false); setIsEditingKahootQuestions(false); setEditedKahootQuestions([]); setEditTaskData({title: task.title, description: task.description, dueDate: task.dueDate || '', dueTime: task.dueTime || '', allowLate: task.allowLate || false, geniallyUrl: task.geniallyUrl || '', hideDate: !!task.hideDate}); }} className="p-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-400 hover:text-red-500 hover:scale-110 transition-transform shadow-xs" title="Cancelar">
                                             <XLine size={16}/>
                                         </button>
                                     </>

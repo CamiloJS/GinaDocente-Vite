@@ -23,10 +23,10 @@ export function getAppleEmojiUrl(emoji) {
 }
 
 export const AppleEmoji = ({ emoji, size = '1.25em', className = '', alt, style = {} }) => {
-  const [hasError, setHasError] = React.useState(false);
+  const [failedEmoji, setFailedEmoji] = React.useState(null);
   if (!emoji) return null;
   const hex = getUnifiedHex(emoji);
-  if (!hex || hasError) return <span>{emoji}</span>;
+  if (!hex || failedEmoji === emoji) return <span>{emoji}</span>;
 
   const url = `https://cdn.jsdelivr.net/npm/emoji-datasource-apple@15.0.1/img/apple/64/${hex}.png`;
   const sizeVal = typeof size === 'number' ? `${size}px` : size;
@@ -45,7 +45,7 @@ export const AppleEmoji = ({ emoji, size = '1.25em', className = '', alt, style 
         ...style
       }}
       loading="lazy"
-      onError={() => setHasError(true)}
+      onError={() => setFailedEmoji(emoji)}
     />
   );
 };

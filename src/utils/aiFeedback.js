@@ -54,7 +54,7 @@ export function describirPregunta(q, respuesta) {
   let acierto = false;
   let extra = {};
 
-  if (tipo === 'multiple' || tipo === 'listening') {
+  if ((tipo === 'multiple' || tipo === 'listening' || tipo === 'reading') && Array.isArray(q?.options) && q.options.length >= 2) {
     const opciones = (q.options || []).map((o, i) => `${String.fromCharCode(65 + i)}) ${limpio(o.text)}`);
     const correctas = (q.options || []).map((o, i) => (o.isCorrect ? i : -1)).filter((i) => i !== -1);
     const marcadas = Array.isArray(respuesta) ? respuesta : [];
@@ -186,7 +186,7 @@ export function armarMinijuegoPregunta(q, respuesta, explicacion = '', minijuego
       : [];
 
   let analisisOpciones = [];
-  if ((detalle.tipo === 'multiple' || detalle.tipo === 'listening') && Array.isArray(q?.options) && q.options.length >= 2) {
+  if ((detalle.tipo === 'multiple' || detalle.tipo === 'listening' || detalle.tipo === 'reading') && Array.isArray(q?.options) && q.options.length >= 2) {
     const marcadas = Array.isArray(respuesta) ? respuesta : [];
     analisisOpciones = q.options.map((opt, idx) => {
       const textoOpt = limpio(opt?.text, 140) || `Opción ${idx + 1}`;
@@ -360,7 +360,7 @@ export function armarMinijuegoPregunta(q, respuesta, explicacion = '', minijuego
           feedback: `¡Trampa detectada! Esa afirmación buscaba hacerte dudar: «${derFoco}» sí es la definición exacta de «${izqFoco}». ¡Intenta de nuevo!`,
         },
       ];
-    } else if ((detalle.tipo === 'multiple' || detalle.tipo === 'listening') && Array.isArray(q?.options) && q.options.length >= 2) {
+    } else if ((detalle.tipo === 'multiple' || detalle.tipo === 'listening' || detalle.tipo === 'reading') && Array.isArray(q?.options) && q.options.length >= 2) {
       const textosOpciones = q.options.map((o) => limpio(o?.text, 80).toLowerCase());
       const esVF = q.options.length === 2 && textosOpciones.includes('verdadero') && textosOpciones.includes('falso');
       const incorrectas = q.options.filter((o) => !o?.isCorrect).map((o) => limpio(o?.text, 100)).filter(Boolean);

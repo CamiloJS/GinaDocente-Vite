@@ -486,10 +486,12 @@ export default function TeacherToolsTab({
   const coinTimeoutRef = useRef(null);
   const isMountedRef = useRef(true);
 
-  // Sincronizar selección de grupo por defecto si academicGroups carga asíncronamente
+  // Sincronizar selección de grupo por defecto si academicGroups carga asíncronamente o cambia
   useEffect(() => {
-    if (!selectedPickerGroupId && academicGroups && academicGroups.length > 0) {
-      setSelectedPickerGroupId(academicGroups[0].id);
+    if (academicGroups && academicGroups.length > 0) {
+      if (!selectedPickerGroupId || !academicGroups.some(g => g.id === selectedPickerGroupId)) {
+        setSelectedPickerGroupId(academicGroups[0].id);
+      }
     }
   }, [academicGroups, selectedPickerGroupId]);
 
@@ -638,10 +640,12 @@ export default function TeacherToolsTab({
   const [groupCountValue, setGroupCountValue] = useState(3);
   const [generatedTeams, setGeneratedTeams] = useState([]);
 
-  // Sincronizar selección de grupo por defecto para el armador de equipos si carga asíncronamente
+  // Sincronizar selección de grupo por defecto para el armador de equipos si carga asíncronamente o cambia
   useEffect(() => {
-    if (!selectedTeamGroupId && academicGroups && academicGroups.length > 0) {
-      setSelectedTeamGroupId(academicGroups[0].id);
+    if (academicGroups && academicGroups.length > 0) {
+      if (!selectedTeamGroupId || !academicGroups.some(g => g.id === selectedTeamGroupId)) {
+        setSelectedTeamGroupId(academicGroups[0].id);
+      }
     }
   }, [academicGroups, selectedTeamGroupId]);
 

@@ -40,7 +40,7 @@ export const exportReviewToPresentation = async (review) => {
     const slide = pptx.addSlide();
     slide.background = { color: DARK_BG };
 
-    const isFirst = idx === 0 || s.layout === 'title';
+    const isFirst = s.layout ? s.layout === 'title' : idx === 0;
 
     if (isFirst) {
       // Portada limpia con tipografía destacada
@@ -200,11 +200,23 @@ export const SlidePresenterViewer = ({ presentation, onClose, onEdit, role, them
 
   const slides = presentation?.slides || [];
   const total = slides.length;
-  const currentSlide = slides[currentIdx] || {};
+  const safeIdx = total > 0 ? Math.min(currentIdx, total - 1) : 0;
+  const currentSlide = slides[safeIdx] || {};
   const displayTitle = presentation?.slides?.[0]?.title || presentation?.topic || 'Presentación';
 
   const isLight = themeMode === 'light';
   const isDim = themeMode === 'dim';
+
+  useEffect(() => {
+    setCurrentIdx(0);
+    setQuizSelection({});
+  }, [presentation?.id]);
+
+  useEffect(() => {
+    if (total > 0 && currentIdx >= total) {
+      setCurrentIdx(Math.max(0, total - 1));
+    }
+  }, [total, currentIdx]);
 
   const toggleNativeFullscreen = async () => {
     const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
@@ -334,14 +346,14 @@ export const SlidePresenterViewer = ({ presentation, onClose, onEdit, role, them
           {/* Barra Superior del Lienzo: Contador y Layout */}
           <div className="flex justify-between items-center text-xs font-bold shrink-0">
             <span className="px-2.5 py-1 rounded-lg bg-red-500/10 text-[#AD3333] dark:text-red-400 uppercase tracking-wider text-[10px] font-black">
-              {currentSlide.layout === 'title' ? 'Portada' : currentSlide.layout === 'quiz' ? 'Quiz Interactivo' : currentSlide.layout === 'bullets' ? 'Puntos Clave' : 'Conceptos'}
+              {(currentSlide.layout ? currentSlide.layout === 'title' : safeIdx === 0) ? 'Portada' : currentSlide.layout === 'quiz' ? 'Quiz Interactivo' : currentSlide.layout === 'bullets' ? 'Puntos Clave' : 'Conceptos'}
             </span>
-            <span className={`font-mono text-xs font-black ${textSecondary}`}>{currentIdx + 1} / {total}</span>
+            <span className={`font-mono text-xs font-black ${textSecondary}`}>{safeIdx + 1} / {total}</span>
           </div>
 
           {/* Contenido Dinámico con Tipografía Grande y Legible */}
           <div className="my-auto overflow-y-auto py-2 w-full">
-            {currentIdx === 0 || currentSlide.layout === 'title' ? (
+            {(currentSlide.layout ? currentSlide.layout === 'title' : safeIdx === 0) ? (
               /* Portada */
               <div className="text-center space-y-6 max-w-4xl mx-auto py-4">
                 <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-red-500/10 border border-red-500/20 text-[#AD3333] dark:text-red-300 text-xs font-extrabold uppercase tracking-widest">
@@ -370,7 +382,7 @@ export const SlidePresenterViewer = ({ presentation, onClose, onEdit, role, them
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2">
                   {(currentSlide.options || [{ text: currentSlide.answer || "Respuesta correcta", isCorrect: true, explanation: "¡Correcto!" }]).map((opt, oIdx) => {
-                    const sel = quizSelection[currentIdx];
+                    const sel = quizSelection[safeIdx];
                     let optStyle = cardItemBg;
                     if (sel !== undefined) {
                       if (opt.isCorrect) optStyle = "bg-emerald-500/20 border-emerald-500 text-emerald-700 dark:text-emerald-300 font-bold shadow-xs";
@@ -381,7 +393,7 @@ export const SlidePresenterViewer = ({ presentation, onClose, onEdit, role, them
                       <button
                         key={oIdx}
                         type="button"
-                        onClick={() => setQuizSelection(prev => ({ ...prev, [currentIdx]: oIdx }))}
+                        onClick={() => setQuizSelection(prev => ({ ...prev, [safeIdx]: oIdx }))}
                         className={`p-4 sm:p-5 rounded-2xl border text-left text-sm sm:text-base font-semibold flex items-center gap-3.5 transition-all duration-200 ${optStyle}`}
                       >
                         <span className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-mono font-black shrink-0 ${
@@ -396,11 +408,11 @@ export const SlidePresenterViewer = ({ presentation, onClose, onEdit, role, them
                 </div>
 
                 {/* Explicación si se seleccionó */}
-                {quizSelection[currentIdx] !== undefined && (
+                {quizSelection[safeIdx] !== undefined && (
                   <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs sm:text-sm font-medium animate-in fade-in flex items-start gap-1.5">
                     <Lightbulb size={16} className="text-amber-500 shrink-0 mt-0.5" />
                     <div>
-                      <strong>Explicación:</strong> {currentSlide.options?.[quizSelection[currentIdx]]?.explanation || '¡Revisa los conceptos anteriores para profundizar!'}
+                      <strong>Explicación:</strong> {currentSlide.options?.[quizSelection[safeIdx]]?.explanation || '¡Revisa los conceptos anteriores para profundizar!'}
                     </div>
                   </div>
                 )}
@@ -475,19 +487,19 @@ export const SlidePresenterViewer = ({ presentation, onClose, onEdit, role, them
         <button
           type="button"
           onClick={() => setCurrentIdx(prev => Math.max(prev - 1, 0))}
-          disabled={currentIdx === 0}
+          disabled={safeIdx === 0}
           className={`p-2.5 px-5 rounded-xl disabled:opacity-30 disabled:cursor-not-allowed font-bold text-xs flex items-center gap-1.5 transition-colors ${headerBtnBg}`}
         >
           <ChevronLeft size={16} />
           <span>Anterior</span>
         </button>
 
-        <span className={`text-xs font-mono font-black ${textSecondary}`}>{currentIdx + 1} / {total}</span>
+        <span className={`text-xs font-mono font-black ${textSecondary}`}>{safeIdx + 1} / {total}</span>
 
         <button
           type="button"
           onClick={() => setCurrentIdx(prev => Math.min(prev + 1, total - 1))}
-          disabled={currentIdx === total - 1}
+          disabled={safeIdx === total - 1}
           className="p-2.5 px-5 rounded-xl bg-[#AD3333] hover:bg-[#8a2828] disabled:opacity-30 disabled:cursor-not-allowed text-white font-bold text-xs flex items-center gap-1.5 transition-colors shadow-xs"
         >
           <span>Siguiente</span>
@@ -1053,6 +1065,9 @@ export const SlideEditorModal = ({ presentation, onClose, onSave, onProject, isD
                           type="button"
                           onClick={() => {
                             const newOpts = activeSlide.options.filter((_, i) => i !== oIdx);
+                            if (newOpts.length > 0 && !newOpts.some(o => o.isCorrect)) {
+                              newOpts[0] = { ...newOpts[0], isCorrect: true };
+                            }
                             handleSlideChange('options', newOpts);
                           }}
                           className="text-gray-400 hover:text-red-500"
@@ -1203,7 +1218,8 @@ Devuelve ÚNICAMENTE un array JSON plano sin \`\`\`json ni texto extra:
         slideCount: slidesList.length,
         topic: slidesList[0]?.title || updatedPres.topic || ''
       };
-      if (isDemoMode || updatedPres.isDemoCreated || String(updatedPres.id).startsWith('demo_')) {
+      const isDemoPres = isDemoMode || updatedPres.isDemoCreated || String(updatedPres.id).startsWith('demo_') || String(updatedPres.id).startsWith('demo-');
+      if (isDemoPres) {
         const merged = { ...updatedPres, ...updates };
         if (typeof setReviews === 'function') {
           setReviews(prev => (prev || []).map(r => String(r.id) === String(updatedPres.id) ? merged : r));
@@ -1226,7 +1242,8 @@ Devuelve ÚNICAMENTE un array JSON plano sin \`\`\`json ni texto extra:
     confirmAction("¿Eliminar esta presentación de diapositivas?", async () => {
       try {
         const targetReview = (reviews || []).find(r => String(r?.id) === String(id));
-        if (isDemoMode || targetReview?.isDemoCreated || String(id || '').startsWith('demo_')) {
+        const isDemoPres = isDemoMode || targetReview?.isDemoCreated || String(id || '').startsWith('demo_') || String(id || '').startsWith('demo-');
+        if (isDemoPres) {
           removeDemoSandboxItem('reviews', id);
           if (typeof setReviews === 'function') {
             setReviews(prev => (prev || []).filter(r => String(r.id) !== String(id)));
@@ -1254,7 +1271,7 @@ Devuelve ÚNICAMENTE un array JSON plano sin \`\`\`json ni texto extra:
   // Grupos visibles y filtrado por membresía
   const myEnrolledGroups = (academicGroups || []).filter(g => {
     if (!g) return false;
-    if (String(g.id || '').startsWith('demo_')) return true;
+    if (String(g.id || '').startsWith('demo_') || String(g.id || '').startsWith('demo-')) return true;
     const membersList = Array.isArray(g.members)
       ? g.members
       : (g.members && typeof g.members === 'object' ? Object.keys(g.members) : []);
@@ -1273,7 +1290,7 @@ Devuelve ÚNICAMENTE un array JSON plano sin \`\`\`json ni texto extra:
   const myEnrolledTeacherIds = new Set(myEnrolledGroups.map(g => getItemTeacherId(g)));
 
   const visibleReviews = role === 'teacher' ? (reviews || []) : (reviews || []).filter(r => {
-    if (String(r?.id || '').startsWith('demo-')) return true;
+    if (r?.isDemoCreated || String(r?.id || '').startsWith('demo-') || String(r?.id || '').startsWith('demo_')) return true;
     const rGrpId = String(r.targetGroupId || '').trim();
     const rGrpName = String(r.targetGroupName || '').toLowerCase().trim();
     const reviewTeacherId = getItemTeacherId(r);

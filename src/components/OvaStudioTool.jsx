@@ -138,7 +138,22 @@ export default function OvaStudioTool({
       }
     };
     fetchOvas();
-    return () => { isMounted = false; };
+    const handleDemoReset = () => {
+      if (!isMounted) return;
+      const seed = { ...goldenRatioTemplate, id: 'ova-golden-ratio-01', editPin: '1234' };
+      setOvas([seed]);
+      setSelectedOvaId(seed.id);
+      sendProjectToIframe(seed);
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('englishTech:demoReset', handleDemoReset);
+    }
+    return () => {
+      isMounted = false;
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('englishTech:demoReset', handleDemoReset);
+      }
+    };
   }, [firestoreDb, activeAppId, isDemoMode, ovaCollName, ovaStorageKey, activeTeacherId]);
 
   // Sync fullscreen state with document fullscreen changes (e.g. user presses Esc)

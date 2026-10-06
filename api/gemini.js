@@ -27,6 +27,11 @@ async function verificarUsuario(req) {
 
 function dentroDelLimite(uid) {
   const ahora = Date.now();
+  if (registro.size > 500) {
+    for (const [k, v] of registro.entries()) {
+      if (!v || ahora > v.reset) registro.delete(k);
+    }
+  }
   const reg = registro.get(uid);
   if (!reg || ahora > reg.reset) {
     registro.set(uid, { n: 1, reset: ahora + VENTANA_MS });
@@ -71,10 +76,11 @@ export default async function handler(req, res) {
 
   const payloadContents = contents || [{ parts: [{ text: promptText || '' }] }];
 
-  // Modelos de Gemini por orden de preferencia y compatibilidad
-  const geminiModels = model 
-    ? [model, 'gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-2.5-flash', 'gemini-2.0-flash']
-    : ['gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-2.5-flash', 'gemini-2.0-flash'];
+  // Modelos de Gemini por orden de preferencia y compatibilidad (deduplicados)
+  const defaultGeminiModels = ['gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-2.5-flash', 'gemini-2.0-flash'];
+  const geminiModels = model
+    ? [...new Set([model, ...defaultGeminiModels])]
+    : defaultGeminiModels;
 
   let lastStatus = 500;
   let isQuota = false;

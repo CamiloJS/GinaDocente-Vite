@@ -40,6 +40,12 @@ export default function PublicOvaViewer({
     }
   }, [isDemoMode]);
 
+  useEffect(() => {
+    if (isTeacher) {
+      setIsUnlocked(true);
+    }
+  }, [isTeacher]);
+
   // Sync fullscreen state with browser events
   useEffect(() => {
     const handleFsChange = () => {

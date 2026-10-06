@@ -160,7 +160,7 @@ export default function SimulacroEvaluacion({ evaluacion = {}, isDarkMode = fals
                   </div>
                 )}
 
-                {q.type === 'multiple' || q.type === 'listening' ? (
+                {(q.type === 'multiple' || q.type === 'listening' || q.type === 'reading') && Array.isArray(q.options) && q.options.length >= 2 ? (
                   <div className="space-y-2 pt-1 pl-8">
                       <p className="text-[11px] text-gray-500 font-medium">{permiteVariasRespuestas(q) ? 'Puedes marcar una o varias opciones.' : 'Marca solo una opción.'}</p>
                     {(q.options || []).map((opt, oIndex) => {

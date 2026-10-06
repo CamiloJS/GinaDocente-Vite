@@ -4,7 +4,7 @@
 // por pregunta para poner a prueba al estudiante sin dejarse confundir.
 import React, { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, HelpCircle, Lightbulb, Target, Award, RotateCcw } from './Icons.jsx';
-import { auth, db, appId, doc, updateDoc } from '../firebase/config.js';
+import { auth, db, appId, doc, updateDoc, signInAnonymously } from '../firebase/config.js';
 import { isDemoSessionActive } from '../utils/helpers.js';
 import { saveDemoSandboxItem } from '../utils/demoData.js';
 import {
@@ -27,6 +27,9 @@ async function llamarServicioFeedback(promptText, timeoutMs = 120000) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
+    if (auth && !auth.currentUser) {
+      try { await signInAnonymously(auth); } catch (e) { /* continuar */ }
+    }
     const token = auth?.currentUser ? await auth.currentUser.getIdToken().catch(() => null) : null;
     const res = await fetch('/api/gemini', {
       method: 'POST',

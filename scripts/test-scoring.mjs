@@ -95,6 +95,11 @@ chequear("dictado exacto -> 5.0", calculateScore({ questions: [dictado] }, { 0: 
 chequear("dictado tolera mayusculas y espacios", calculateScore({ questions: [dictado] }, { 0: "  The Cat  Is Black " }) === 5.0);
 chequear("dictado incorrecto -> 0.0", calculateScore({ questions: [dictado] }, { 0: "the dog is black" }) === 0.0);
 chequear("listening sin audio no rompe", calculateScore({ questions: [{ type: "listening", text: "x", options: [{ text: "a", isCorrect: true }, { text: "b", isCorrect: false }] }] }, { 0: [0] }) === 5.0);
+const readingOp = { type: "reading", text: "Segun el texto, elige", options: [{ text: "a", isCorrect: false }, { text: "b", isCorrect: true }] };
+const readingEscrito = { type: "reading", text: "Segun el texto, responde", correctAnswer: "inflation", acceptedAnswers: ["price rise"] };
+chequear("reading con opciones (bien) -> 5.0", calculateScore({ questions: [readingOp] }, { 0: [1] }) === 5.0);
+chequear("reading con opciones (mal) -> 0.0", calculateScore({ questions: [readingOp] }, { 0: [0] }) === 0.0);
+chequear("reading con respuesta escrita -> 5.0", calculateScore({ questions: [readingEscrito] }, { 0: "Price Rise" }) === 5.0);
 
 
 console.log("\n== Seleccion multiple: unica vs varias ==");

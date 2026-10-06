@@ -50,6 +50,12 @@ d = describirPregunta({ type: 'match', text: 'Une', pairs: [{ left: 'dog', right
 chequear("relacionar parcial", d.acierto === false && d.parcial === 1 && d.delEstudiante.includes('perro'));
 d = describirPregunta({ type: 'listening', text: 'Escucha', options: [{ text: 'a', isCorrect: true }, { text: 'b', isCorrect: false }] }, [0]);
 chequear("listening correcto", d.acierto === true && d.correcta === 'a');
+d = describirPregunta({ type: 'listening', text: 'Escucha y escribe', correctAnswer: 'hello', acceptedAnswers: ['hi'] }, 'HI');
+chequear("listening con respuesta escrita sin opciones", d.acierto === true && d.delEstudiante === 'HI');
+d = describirPregunta({ type: 'reading', text: 'Lee y elige', options: [{ text: 'op1', isCorrect: false }, { text: 'op2', isCorrect: true }] }, [1]);
+chequear("reading con opciones de seleccion multiple", d.acierto === true && d.correcta === 'op2' && d.delEstudiante === 'op2');
+const mjReadingOp = armarMinijuegoPregunta({ type: 'reading', text: 'Lee y elige', options: [{ text: 'op1', isCorrect: false }, { text: 'op2', isCorrect: true }] }, [0]);
+chequear("reading con opciones genera analisisOpciones por opcion", mjReadingOp.analisisOpciones.length === 2 && mjReadingOp.analisisOpciones[1].esCorrecta === true);
 d = describirPregunta({ type: 'dictation', text: 'Dictado', correctAnswer: 'the cat is black' }, 'the cat is black');
 chequear("dictado correcto", d.acierto === true);
 d = describirPregunta({ type: 'text', text: 'Traduce economic', correctAnswer: 'económico' }, 'economico.');
