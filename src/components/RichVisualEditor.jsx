@@ -4,6 +4,9 @@ import {
   Bold, Italic, Underline, Strikethrough, Highlighter, List, Quote, Heading
 } from './Icons.jsx';
 
+import { tagToHtml, htmlToTag } from '../utils/textFormat.js';
+export { tagToHtml, htmlToTag };
+
 const COLOR_PALETTE = [
   { name: 'Negro', hex: '#111827' },
   { name: 'Rojo', hex: '#ef4444' },
@@ -16,117 +19,6 @@ const COLOR_PALETTE = [
   { name: 'Cian', hex: '#06b6d4' },
   { name: 'Gris', hex: '#6b7280' },
 ];
-
-export const tagToHtml = (str) => {
-  if (!str) return '';
-  let html = String(str);
-  
-  // Headings
-  html = html.replace(/^### (.*$)/gim, '<h3 style="font-size: 1.15em; font-weight: 800; margin: 4px 0;">$1</h3>');
-  html = html.replace(/^## (.*$)/gim, '<h2 style="font-size: 1.25em; font-weight: 800; margin: 4px 0;">$1</h2>');
-  html = html.replace(/^# (.*$)/gim, '<h1 style="font-size: 1.35em; font-weight: 900; margin: 6px 0;">$1</h1>');
-  
-  // Quotes / Citations
-  html = html.replace(/^>\s*(.*$)/gim, '<blockquote style="border-left: 3px solid #8b5cf6; background: rgba(139, 92, 246, 0.08); padding: 4px 10px; margin: 4px 0; border-radius: 0 8px 8px 0; font-style: italic; color: #8b5cf6;">$1</blockquote>');
-  
-  // Lists
-  html = html.replace(/^[*-] (.*$)/gim, '<li>$1</li>');
-  
-  // Colors: [color=#hex]...[/color] or [color=red]...[/color]
-  const COLOR_MAP = {
-    negro: '#111827', black: '#111827',
-    rojo: '#ef4444', red: '#ef4444',
-    azul: '#3b82f6', blue: '#3b82f6',
-    verde: '#10b981', green: '#10b981',
-    morado: '#8b5cf6', purple: '#8b5cf6',
-    naranja: '#f97316', orange: '#f97316',
-    amarillo: '#eab308', yellow: '#eab308',
-    rosa: '#ec4899', pink: '#ec4899',
-    cian: '#06b6d4', cyan: '#06b6d4',
-    gris: '#6b7280', gray: '#6b7280'
-  };
-  
-  html = html.replace(/\[color=([#a-zA-Z0-9]+)\]([\s\S]*?)\[\/color\]/gi, (match, color, content) => {
-    const c = COLOR_MAP[color.toLowerCase()] || color;
-    return '<span style="color: ' + c + '; font-weight: inherit;">' + content + '</span>';
-  });
-  
-  // Highlight: ==text==
-  html = html.replace(/==([\s\S]*?)==/g, '<mark style="background-color: #fef08a; color: #854d0e; padding: 2px 4px; border-radius: 4px;">$1</mark>');
-  
-  // Bold: **text**
-  html = html.replace(/\*\*([\s\S]*?)\*\*/g, '<b>$1</b>');
-  
-  // Underline: <u>text</u>
-  html = html.replace(/<u>([\s\S]*?)<\/u>/gi, '<u>$1</u>');
-  
-  // Strike: ~~text~~
-  html = html.replace(/~~([\s\S]*?)~~/g, '<strike>$1</strike>');
-  
-  // Italic: *text*
-  html = html.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<i>$1</i>');
-  
-  // Newlines to <br> if not inside block tags
-  html = html.replace(/\n/g, '<br>');
-  
-  return html;
-};
-
-export const htmlToTag = (html) => {
-  if (!html) return '';
-  let str = String(html);
-  
-  // Convert <div><br></div> or <div> to newlines
-  str = str.replace(/<div><br\s*[\/]?>/gi, '\n');
-  str = str.replace(/<div>/gi, '\n');
-  str = str.replace(/<\/div>/gi, '');
-  str = str.replace(/<p>/gi, '');
-  str = str.replace(/<\/p>/gi, '\n');
-  str = str.replace(/<br\s*[\/]?>/gi, '\n');
-  
-  // Headings
-  str = str.replace(/<h[1-3][^>]*>(.*?)<\/h[1-3]>/gi, (m, c) => '### ' + c.replace(/<[^>]+>/g, '').trim() + '\n');
-  
-  // Blockquotes
-  str = str.replace(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/gi, (m, c) => '> ' + c.replace(/<[^>]+>/g, '').trim() + '\n');
-  
-  // List items
-  str = str.replace(/<li[^>]*>(.*?)<\/li>/gi, (m, c) => '- ' + c.replace(/<[^>]+>/g, '').trim() + '\n');
-  str = str.replace(/<\/?ul[^>]*>/gi, '');
-  str = str.replace(/<\/?ol[^>]*>/gi, '');
-  
-  // Colors from span styles or font tags
-  str = str.replace(/<span[^>]*style=["'][^"']*color:\s*([^;"']+)[^"']*["'][^>]*>([\s\S]*?)<\/span>/gi, '[color=$1]$2[/color]');
-  str = str.replace(/<font[^>]*color=["']([^"']+)["'][^>]*>([\s\S]*?)<\/font>/gi, '[color=$1]$2[/color]');
-  
-  // Highlights
-  str = str.replace(/<mark[^>]*>([\s\S]*?)<\/mark>/gi, '==$1==');
-  str = str.replace(/<span[^>]*style=["'][^"']*background(?:-color)?:\s*([^;"']+)[^"']*["'][^>]*>([\s\S]*?)<\/span>/gi, '==$2==');
-  
-  // Bold
-  str = str.replace(/<(?:b|strong)[^>]*>([\s\S]*?)<\/(?:b|strong)>/gi, '**$1**');
-  
-  // Underline
-  str = str.replace(/<u[^>]*>([\s\S]*?)<\/u>/gi, '<u>$1</u>');
-  
-  // Strike
-  str = str.replace(/<(?:strike|s|del)[^>]*>([\s\S]*?)<\/(?:strike|s|del)>/gi, '~~$1~~');
-  
-  // Italic
-  str = str.replace(/<(?:i|em)[^>]*>([\s\S]*?)<\/(?:i|em)>/gi, '*$1*');
-  
-  // Strip any remaining unwanted HTML tags except <u>
-  str = str.replace(/<(?!\/?u\b)[^>]+>/gi, '');
-  
-  // Decode HTML entities
-  str = str.replace(/&nbsp;/gi, ' ');
-  str = str.replace(/&amp;/gi, '&');
-  str = str.replace(/&lt;/gi, '<');
-  str = str.replace(/&gt;/gi, '>');
-  str = str.replace(/&quot;/gi, '"');
-  
-  return str.trim();
-};
 
 export const RichVisualEditor = ({
   value = '',
@@ -164,7 +56,7 @@ export const RichVisualEditor = ({
       
       const blockVal = String(document.queryCommandValue('formatBlock') || '').toLowerCase();
       const isHeading = blockVal.includes('h1') || blockVal.includes('h2') || blockVal.includes('h3');
-      const isQuote = blockVal.includes('blockquote');
+      let isQuote = blockVal.includes('blockquote');
 
       let isHighlight = false;
       let activeColor = null;
@@ -175,12 +67,13 @@ export const RichVisualEditor = ({
           if (node.nodeType === 1) {
             const tag = node.tagName.toLowerCase();
             if (tag === 'blockquote') {
-              // also quote flag
+              isQuote = true;
             }
-            if (tag === 'mark' || (node.style && node.style.backgroundColor)) {
+            const bg = node.style && node.style.backgroundColor ? String(node.style.backgroundColor).toLowerCase().trim() : '';
+            if (tag === 'mark' || (bg && bg !== 'transparent' && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'none' && bg !== 'initial' && bg !== 'inherit')) {
               isHighlight = true;
             }
-            if (node.style && node.style.color) {
+            if (tag !== 'mark' && tag !== 'blockquote' && node.style && node.style.color && !activeColor) {
               activeColor = node.style.color;
             }
           }
@@ -366,7 +259,27 @@ export const RichVisualEditor = ({
 
           <button
             type="button"
-            onMouseDown={(e) => { e.preventDefault(); execFormat('hiliteColor', isDarkMode ? '#854d0e' : '#fef08a'); }}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              if (activeFormats.highlight) {
+                const selection = window.getSelection();
+                if (selection && selection.rangeCount > 0 && editorRef.current) {
+                  let node = selection.anchorNode;
+                  while (node && node !== editorRef.current) {
+                    if (node.nodeType === 1 && node.tagName.toLowerCase() === 'mark') {
+                      const parent = node.parentNode;
+                      while (node.firstChild) parent.insertBefore(node.firstChild, node);
+                      parent.removeChild(node);
+                      break;
+                    }
+                    node = node.parentNode;
+                  }
+                }
+                execFormat('hiliteColor', 'transparent');
+              } else {
+                execFormat('hiliteColor', isDarkMode ? '#854d0e' : '#fef08a');
+              }
+            }}
             className={getButtonClass(activeFormats.highlight)}
             title="Resaltador"
           >

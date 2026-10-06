@@ -97,7 +97,9 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
     if (q.type === 'listening') return 'Comprensi\u00f3n auditiva';
     if (q.type === 'speaking') return 'Speaking';
     if (q.type === 'text') return TIPOS_ETIQUETAS.text;
-    const esVF = Array.isArray(q.options) && q.options.length === 2 && /^verdadero$/i.test(String(q.options[0]?.text || '').trim());
+    const esVF = Array.isArray(q.options) && q.options.length === 2 &&
+      /^verdadero$/i.test(String(q.options[0]?.text || '').trim()) &&
+      /^falso$/i.test(String(q.options[1]?.text || '').trim());
     return esVF ? TIPOS_ETIQUETAS.vf : TIPOS_ETIQUETAS.multiple;
   }
 

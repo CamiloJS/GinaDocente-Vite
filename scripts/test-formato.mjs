@@ -249,7 +249,58 @@ chequear(
   conectadosDesempate.map((u) => u.id)
 );
 
+import { containsBadWords } from "../api/filter.js";
+import { tagToHtml, htmlToTag } from "../src/utils/textFormat.js";
+
+console.log("\n== Regresiones corregidas: RichVisualEditor (tagToHtml/htmlToTag), subrayado y filtro de lenguaje ==");
+chequear(
+  "htmlToTag(tagToHtml('[color=#ef4444]texto rojo[/color]')) conserva el color cuando color: es la primera propiedad CSS",
+  htmlToTag(tagToHtml("[color=#ef4444]texto rojo[/color]")) === "[color=#ef4444]texto rojo[/color]",
+  htmlToTag(tagToHtml("[color=#ef4444]texto rojo[/color]"))
+);
+chequear(
+  "htmlToTag soporta span con background-color y color combinados",
+  htmlToTag('<span style="background-color: rgb(254, 240, 138); color: #ef4444;">combinado</span>') === "[color=#ef4444]==combinado==[/color]"
+);
+chequear(
+  "htmlToTag soporta spans anidados de color y resaltado",
+  htmlToTag('<span style="color: #3b82f6;"><span style="background-color: #fef08a;">anidado</span></span>') === "[color=#3b82f6]==anidado==[/color]"
+);
+chequear(
+  "htmlToTag ignora background-color transparent o rgba(0,0,0,0)",
+  htmlToTag('<span style="background-color: transparent; color: #10b981;">sin fondo</span>') === "[color=#10b981]sin fondo[/color]" &&
+  htmlToTag('<span style="background-color: rgba(0, 0, 0, 0);">texto limpio</span>') === "texto limpio"
+);
+chequear(
+  "htmlToTag(tagToHtml(...)) no duplica saltos de linea en encabezados, citas ni listas",
+  htmlToTag(tagToHtml("### Titulo\n> Cita\n- Item\nTexto final")) === "### Titulo\n> Cita\n- Item\nTexto final",
+  htmlToTag(tagToHtml("### Titulo\n> Cita\n- Item\nTexto final"))
+);
+chequear(
+  "normalizarMarcado conserva <u>subrayado</u> balanceado",
+  normalizarMarcado("Texto con <u>subrayado</u> importante") === "Texto con <u>subrayado</u> importante"
+);
+chequear(
+  "normalizarMarcado cierra y reabre <u> multilinea",
+  normalizarMarcado("<u>linea 1\nlinea 2</u>") === "<u>linea 1</u>\n<u>linea 2</u>"
+);
+chequear(
+  "normalizarMarcado elimina <u> huerfano sin cierre",
+  normalizarMarcado("Texto <u>sin cerrar") === "Texto sin cerrar"
+);
+chequear(
+  "normalizarMarcado no confunde background-color con color de texto",
+  !normalizarMarcado('<span style="background-color:#fef08a">texto</span>').includes("[color=")
+);
+chequear(
+  "containsBadWords detecta insultos seguidos de signos de exclamacion",
+  containsBadWords("¡Eres un idiota!") === true &&
+  containsBadWords("pendejo!!!") === true &&
+  containsBadWords("!d!0t4!") === true &&
+  containsBadWords("p3nd3j0!") === true &&
+  containsBadWords("¡Hola clase, bienvenidos!") === false
+);
+
 console.log(`\nRESULTADO: ${ok} OK, ${fallos} fallos\n`);
 process.exit(fallos ? 1 : 0);
-
 

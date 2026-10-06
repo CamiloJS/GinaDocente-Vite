@@ -21,17 +21,21 @@ export function puedeMostrarFeedback(ev, ahora = Date.now()) {
   return tieneRetroalimentacionInmediata(ev) || evaluacionVencida(ev, ahora);
 }
 
+function normalizarComparacion(v) {
+  return String(v == null ? '' : v)
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[.,!?;:¡¿"']/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 /** Resumen legible de una pregunta con la respuesta del estudiante y la correcta. */
 export function describirPregunta(q, respuesta) {
   const limpio = (v) => String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
-  const normalizarComparacion = (v) =>
-    limpio(v)
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[.,!?;:¡¿"']/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
   const tipo = q?.type || 'text';
   const enunciado = limpio(q?.text || q?.question || '').slice(0, 300);
 
@@ -220,7 +224,7 @@ export function armarMinijuegoPregunta(q, respuesta, explicacion = '', minijuego
       const izq = limpio(p?.left, 100);
       const der = limpio(p?.right, 100);
       const dada = limpio(elegidas[idx], 100);
-      const bien = Boolean(dada && dada.toLowerCase() === der.toLowerCase());
+      const bien = Boolean(dada && normalizarComparacion(dada) === normalizarComparacion(der));
       const razonIA = razonesIA[idx] || '';
       return {
         etiqueta: String(idx + 1),
@@ -324,14 +328,14 @@ export function armarMinijuegoPregunta(q, respuesta, explicacion = '', minijuego
       ];
     } else if (detalle.tipo === 'match' && Array.isArray(q?.pairs) && q.pairs.length > 0) {
       const elegidas = respuesta && typeof respuesta === 'object' ? respuesta : {};
-      const idxFallo = q.pairs.findIndex((p, i) => limpio(elegidas[i], 100).toLowerCase() !== limpio(p?.right, 100).toLowerCase());
+      const idxFallo = q.pairs.findIndex((p, i) => normalizarComparacion(elegidas[i]) !== normalizarComparacion(p?.right));
       const idxFoco = idxFallo >= 0 ? idxFallo : 0;
       const parFoco = q.pairs[idxFoco] || q.pairs[0];
       const izqFoco = limpio(parFoco?.left, 80) || 'el concepto';
       const derFoco = limpio(parFoco?.right, 100) || 'su definición correcta';
       const dadaFoco = limpio(elegidas[idxFoco], 100);
       const otroPar = q.pairs.find((_, i) => i !== idxFoco) || q.pairs[0];
-      const distractorDer = (dadaFoco && dadaFoco.toLowerCase() !== derFoco.toLowerCase())
+      const distractorDer = (dadaFoco && normalizarComparacion(dadaFoco) !== normalizarComparacion(derFoco))
         ? dadaFoco
         : (limpio(otroPar?.right, 100) || 'otra definición');
 

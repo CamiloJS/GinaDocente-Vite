@@ -517,11 +517,44 @@ export default function TeacherToolsTab({
   const [isSpinning, setIsSpinning] = useState(false);
   const [wheelRotation, setWheelRotation] = useState(0);
 
-  const getGroupStudentCount = (group) => {
-    if (!group?.members) return 0;
-    const list = Array.isArray(group.members) ? group.members : (typeof group.members === 'object' ? Object.keys(group.members) : []);
-    return list.filter(m => !isTeacherId(m)).length;
+  const resolveGroupStudents = (group) => {
+    if (!group?.members) return [];
+    const members = Array.isArray(group.members) ? group.members : (typeof group.members === 'object' ? Object.keys(group.members) : []);
+    const seen = new Set();
+    const result = [];
+    members.forEach(m => {
+      if (!m || isTeacherId(m)) return;
+      const cleanM = String(m).toLowerCase().replace('@', '').trim();
+      if (!cleanM || isTeacherId(cleanM)) return;
+      let foundKey = null;
+      if (userMappings?.[cleanM]) {
+        foundKey = cleanM;
+      } else if (userMappings?.[m]) {
+        foundKey = m;
+      } else {
+        foundKey = Object.keys(userMappings || {}).find(uk => {
+          const ud = userMappings[uk];
+          return uk.toLowerCase() === cleanM ||
+                 (ud?.uid && ud.uid.toLowerCase() === cleanM) ||
+                 (ud?.email && (ud.email.toLowerCase() === cleanM || ud.email.split('@')[0].toLowerCase() === cleanM));
+        });
+      }
+      const u = (foundKey ? userMappings?.[foundKey] : null) || {};
+      if (u.role === 'teacher') return;
+      const dedupeKey = (foundKey || u.uid || u.email || cleanM).toLowerCase().replace('@', '').trim();
+      if (!seen.has(dedupeKey)) {
+        seen.add(dedupeKey);
+        result.push({
+          id: foundKey || m,
+          name: u.fullName || u.name || m,
+          avatarUrl: u.profilePicUrl || null
+        });
+      }
+    });
+    return result;
   };
+
+  const getGroupStudentCount = (group) => resolveGroupStudents(group).length;
 
   const getActiveStudentList = () => {
     if (useCustomNames) {
@@ -533,24 +566,7 @@ export default function TeacherToolsTab({
     }
     const currentGrp = academicGroups.find(g => g.id === selectedPickerGroupId);
     if (!currentGrp) return [];
-    const members = Array.isArray(currentGrp.members) ? currentGrp.members : (currentGrp.members && typeof currentGrp.members === 'object' ? Object.keys(currentGrp.members) : []);
-    const seen = new Set();
-    const result = [];
-    members.filter(m => !isTeacherId(m)).forEach(m => {
-      const u = userMappings[m] || {};
-      const resolvedName = (u.fullName || u.name || m).trim().toLowerCase();
-      const resolvedKey = (u.uid || u.email || m).trim().toLowerCase().replace('@', '');
-      const dedupeKey = resolvedKey || resolvedName;
-      if (!seen.has(dedupeKey)) {
-        seen.add(dedupeKey);
-        result.push({
-          id: m,
-          name: u.fullName || u.name || m,
-          avatarUrl: u.profilePicUrl || null
-        });
-      }
-    });
-    return result;
+    return resolveGroupStudents(currentGrp);
   };
 
   const eligibleStudents = getActiveStudentList().filter(s => !excludedStudents.has(s.id));
@@ -651,30 +667,12 @@ export default function TeacherToolsTab({
 
   const handleGenerateTeams = () => {
     const currentGrp = academicGroups.find(g => g.id === selectedTeamGroupId);
-    const rawMembers = Array.isArray(currentGrp?.members) ? currentGrp.members : (currentGrp?.members && typeof currentGrp.members === 'object' ? Object.keys(currentGrp.members) : []);
-    const members = rawMembers.filter(m => !isTeacherId(m));
+    const students = resolveGroupStudents(currentGrp);
     
-    if (members.length === 0) {
+    if (students.length === 0) {
       showMessage('Este grupo no tiene estudiantes inscritos.');
       return;
     }
-
-    const seenStudentKeys = new Set();
-    const students = [];
-    members.forEach(m => {
-      const u = userMappings[m] || {};
-      const resolvedName = (u.fullName || u.name || m).trim().toLowerCase();
-      const resolvedKey = (u.uid || u.email || m).trim().toLowerCase().replace('@', '');
-      const dedupeKey = resolvedKey || resolvedName;
-      if (!seenStudentKeys.has(dedupeKey)) {
-        seenStudentKeys.add(dedupeKey);
-        students.push({
-          id: m,
-          name: u.fullName || u.name || m,
-          avatarUrl: u.profilePicUrl || null
-        });
-      }
-    });
 
     const shuffled = [...students];
     for (let i = shuffled.length - 1; i > 0; i--) {

@@ -1034,7 +1034,8 @@ function App() {
     const chatGroupId = `acad_${acadId}`;
 
     const currentAcadGroup = academicGroups.find(g => g.id === acadId);
-    const currentChatGroup = chatGroups.find(g => g.id === chatGroupId || g.id === groupId);
+    const currentChatGroup = chatGroups.find(g => g.id === chatGroupId || g.id === groupId || g.academicGroupId === acadId);
+    const targetChatDocId = currentChatGroup?.id || (currentAcadGroup ? chatGroupId : String(groupId));
     const ownerTeacherId = getItemTeacherId(currentAcadGroup || currentChatGroup || { teacherId: myChatId });
 
     const acadMembers = Array.isArray(currentAcadGroup?.members)
@@ -1057,11 +1058,13 @@ function App() {
     });
 
     // 1. Actualizar estado local inmediatamente para que desaparezca al instante en la UI
-    setAcademicGroups(prev => prev.map(g => g.id === acadId ? { ...g, members: updatedAcadMembers } : g));
-    setChatGroups(prev => prev.map(g => (g.id === chatGroupId || g.id === groupId) ? { ...g, members: updatedChatMembers } : g));
+    if (currentAcadGroup) {
+      setAcademicGroups(prev => prev.map(g => g.id === acadId ? { ...g, members: updatedAcadMembers } : g));
+    }
+    setChatGroups(prev => prev.map(g => (g.id === chatGroupId || g.id === groupId || g.id === targetChatDocId) ? { ...g, members: updatedChatMembers } : g));
     setSelectedSubjectDetail(prev => prev && prev.id === acadId ? { ...prev, members: updatedAcadMembers } : prev);
     setSelectedGroupForFeed(prev => prev && prev.id === acadId ? { ...prev, members: updatedAcadMembers } : prev);
-    setGroupMembersModal(prev => prev && prev.group && (prev.group.id === acadId || prev.group.id === chatGroupId) ? { ...prev, group: { ...prev.group, members: updatedAcadMembers } } : prev);
+    setGroupMembersModal(prev => prev && prev.group && (prev.group.id === acadId || prev.group.id === chatGroupId || prev.group.id === groupId) ? { ...prev, group: { ...prev.group, members: currentAcadGroup ? updatedAcadMembers : updatedChatMembers } } : prev);
 
     if (isDemoMode) {
       if (currentAcadGroup) saveDemoSandboxItem('academicGroups', { ...currentAcadGroup, members: updatedAcadMembers });
@@ -1071,10 +1074,12 @@ function App() {
 
     // 2. Persistir en Firestore
     try {
-      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', acadId), {
-        members: updatedAcadMembers
-      });
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', chatGroupId), {
+      if (currentAcadGroup) {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', acadId), {
+          members: updatedAcadMembers
+        });
+      }
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', targetChatDocId), {
         members: Array.from(new Set([ownerTeacherId, ...updatedChatMembers]))
       }, { merge: true });
     } catch (err) {
@@ -1088,9 +1093,12 @@ function App() {
     const chatGroupId = `acad_${acadId}`;
 
     const currentAcadGroup = academicGroups.find(g => g.id === acadId);
-    const currentMembers = Array.isArray(currentAcadGroup?.members)
-      ? currentAcadGroup.members
-      : (currentAcadGroup?.members && typeof currentAcadGroup.members === 'object' ? Object.keys(currentAcadGroup.members) : []);
+    const currentChatGroup = chatGroups.find(g => g.id === chatGroupId || g.id === groupId || g.academicGroupId === acadId);
+    const targetChatDocId = currentChatGroup?.id || (currentAcadGroup ? chatGroupId : String(groupId));
+    const baseSourceGroup = currentAcadGroup || currentChatGroup;
+    const currentMembers = Array.isArray(baseSourceGroup?.members)
+      ? baseSourceGroup.members
+      : (baseSourceGroup?.members && typeof baseSourceGroup.members === 'object' ? Object.keys(baseSourceGroup.members) : []);
 
     const studentIdentifiers = getAllIdentifiersForStudentKey(studentKey);
     const isAlreadyMember = currentMembers.some(m => {
@@ -1105,7 +1113,6 @@ function App() {
     }
 
     const updatedAcadMembers = Array.from(new Set([...currentMembers, studentKey]));
-    const currentChatGroup = chatGroups.find(g => g.id === chatGroupId || g.id === groupId);
     const ownerTeacherId = getItemTeacherId(currentAcadGroup || currentChatGroup || { teacherId: myChatId });
     const currentChatMembers = Array.isArray(currentChatGroup?.members)
       ? currentChatGroup.members
@@ -1113,11 +1120,13 @@ function App() {
     const updatedChatMembers = Array.from(new Set([ownerTeacherId, ...currentChatMembers, studentKey]));
 
     // 1. Actualizar estados locales inmediatamente
-    setAcademicGroups(prev => prev.map(g => g.id === acadId ? { ...g, members: updatedAcadMembers } : g));
-    setChatGroups(prev => prev.map(g => (g.id === chatGroupId || g.id === groupId) ? { ...g, members: updatedChatMembers } : g));
+    if (currentAcadGroup) {
+      setAcademicGroups(prev => prev.map(g => g.id === acadId ? { ...g, members: updatedAcadMembers } : g));
+    }
+    setChatGroups(prev => prev.map(g => (g.id === chatGroupId || g.id === groupId || g.id === targetChatDocId) ? { ...g, members: updatedChatMembers } : g));
     setSelectedSubjectDetail(prev => prev && prev.id === acadId ? { ...prev, members: updatedAcadMembers } : prev);
     setSelectedGroupForFeed(prev => prev && prev.id === acadId ? { ...prev, members: updatedAcadMembers } : prev);
-    setGroupMembersModal(prev => prev && prev.group && (prev.group.id === acadId || prev.group.id === chatGroupId) ? { ...prev, group: { ...prev.group, members: updatedAcadMembers } } : prev);
+    setGroupMembersModal(prev => prev && prev.group && (prev.group.id === acadId || prev.group.id === chatGroupId || prev.group.id === groupId) ? { ...prev, group: { ...prev.group, members: currentAcadGroup ? updatedAcadMembers : updatedChatMembers } } : prev);
 
     if (isDemoMode) {
       if (currentAcadGroup) saveDemoSandboxItem('academicGroups', { ...currentAcadGroup, members: updatedAcadMembers });
@@ -1128,10 +1137,12 @@ function App() {
 
     // 2. Persistir en Firestore
     try {
-      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', acadId), {
-        members: updatedAcadMembers
-      });
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', chatGroupId), {
+      if (currentAcadGroup) {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', acadId), {
+          members: updatedAcadMembers
+        });
+      }
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', targetChatDocId), {
         members: updatedChatMembers
       }, { merge: true });
       showMessage("Estudiante agregado al grupo con éxito.");
@@ -3770,6 +3781,8 @@ useEffect(() => {
               };
           }, []);
 
+          const rejectedCallIdsRef = useRef(new Set())
+
           // Listener de llamadas entrantes (Firestore) — fix multi-sesión y limpieza de llamadas fantasma
           useEffect(() => {
               if (!myChatId || isDemoMode) return
@@ -3790,6 +3803,7 @@ useEffect(() => {
                   }
                   if (currentActive) return
                   for (const d of snapshot.docs) {
+                      if (rejectedCallIdsRef.current.has(d.id)) continue
                       const call = d.data()
                       // Limpieza: doc sin datos o terminado -> borrar
                       if (!call) { try { deleteDoc(d.ref) } catch (e) {} continue }
@@ -3830,7 +3844,7 @@ useEffect(() => {
                               break
                           }
                       } else {
-                          const isMe = parts.some(p => p.id === myChatId || (myChatId === 'teacher' && p.id === 'teacher_gina') || (myChatId === 'camilodocente' && p.id === 'teacher_camilo'))
+                          const isMe = parts.some(p => !p?.rejected && (p.id === myChatId || (myChatId === 'teacher' && p.id === 'teacher_gina') || (myChatId === 'camilodocente' && p.id === 'teacher_camilo')))
                           const isInitiator = call.initiator === myChatId || (myChatId === 'teacher' && call.initiator === 'teacher_gina') || (myChatId === 'camilodocente' && call.initiator === 'teacher_camilo')
                           if (isMe && !isInitiator) {
                               setIncomingCall({
@@ -3889,15 +3903,32 @@ useEffect(() => {
           }
 
           // Rechazar llamada entrante
-          const rejectIncomingCall = () => {
+          const rejectIncomingCall = async () => {
               stopRingtone()
               if (!incomingCall) return
               const callIdToReject = incomingCall.callId
+              const wasGroup = !!incomingCall.isGroup
+              rejectedCallIdsRef.current.add(callIdToReject)
               setIncomingCall(null)
               if (isDemoMode) return
               const callRef = doc(db, 'artifacts', appId, 'public', 'data', 'calls', callIdToReject)
-              setDoc(callRef, { status: 'ended' }, { merge: true }).catch(() => {})
-              deleteDoc(callRef).catch(() => {})
+              if (wasGroup) {
+                  try {
+                      const snap = await getDoc(callRef)
+                      const data = snap.data()
+                      if (data && Array.isArray(data.participants)) {
+                          const newParts = data.participants.map(p =>
+                              (p && (p.id === myChatId || (myChatId === 'teacher' && p.id === 'teacher_gina') || (myChatId === 'camilodocente' && p.id === 'teacher_camilo')))
+                                  ? { ...p, joined: false, rejected: true }
+                                  : p
+                          )
+                          await updateDoc(callRef, { participants: newParts }).catch(() => {})
+                      }
+                  } catch (e) {}
+              } else {
+                  setDoc(callRef, { status: 'ended' }, { merge: true }).catch(() => {})
+                  deleteDoc(callRef).catch(() => {})
+              }
           }
 
           useEffect(() => {
@@ -4208,7 +4239,7 @@ useEffect(() => {
                           setLastMessages(prev => ({
                               ...prev,
                               [activeChat.id]: {
-                                  text: last?.isDeleted ? 'Mensaje eliminado' : (last?.text || (last?.imageUrl ? 'Imagen' : '')),
+                                  text: last?.isDeleted ? 'Mensaje eliminado' : (last?.text || (last?.imageUrl ? 'Imagen' : (last?.fileUrl ? 'Documento' : (last?.audioUrl ? 'Nota de voz' : '')))),
                                   author: (last?.author || 'Usuario').split(' ')[0],
                                   authorId: last?.authorId || '',
                                   authorRole: isTeacherId(last?.authorId) ? 'teacher' : 'student',
@@ -4260,7 +4291,7 @@ useEffect(() => {
                               ? (Number(last?.createdAt) || Number(prevLast?.lastStudentAt) || 0)
                               : (Number(prevLast?.lastStudentAt) || 0);
                           const nextLastPayload = {
-                              text: last?.isDeleted ? 'Mensaje eliminado' : (last?.text || (last?.imageUrl ? 'Imagen' : '')),
+                              text: last?.isDeleted ? 'Mensaje eliminado' : (last?.text || (last?.imageUrl ? 'Imagen' : (last?.fileUrl ? 'Documento' : (last?.audioUrl ? 'Nota de voz' : '')))),
                               author: (last?.author || 'Usuario').split(' ')[0],
                               authorId: last?.authorId || '',
                               authorRole: isTeacherId(last?.authorId) ? 'teacher' : 'student',
@@ -4367,19 +4398,31 @@ useEffect(() => {
               }
 
               const msgRef = doc(db, 'artifacts', appId, 'public', 'data', 'chats', activeChat.id, 'messages', editingAppMessageId);
+              const trimmedEdit = editAppMessageText.trim();
 
               try {
                   // Si la docente edita -> sin rastro
                   if (role === 'teacher') {
-                      await updateDoc(msgRef, { text: editAppMessageText.trim() });
+                      await updateDoc(msgRef, { text: trimmedEdit });
                   } else {
                       // Si el estudiante edita -> guarda historial para la docente
                       const history = originalMsg?.editHistory || [];
                       await updateDoc(msgRef, {
-                          text: editAppMessageText.trim(),
+                          text: trimmedEdit,
                           isEdited: true,
                           editHistory: [{ text: originalMsg?.text || '', date: Date.now() }, ...history]
                       });
+                  }
+                  const isLatestInChat = chatMessages.length > 0 && chatMessages[chatMessages.length - 1]?.id === editingAppMessageId;
+                  if (isLatestInChat) {
+                      setLastMessages(prev => prev?.[activeChat.id] ? ({
+                          ...prev,
+                          [activeChat.id]: {
+                              ...prev[activeChat.id],
+                              text: trimmedEdit
+                          }
+                      }) : prev);
+                      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'lastMessages', activeChat.id), { text: trimmedEdit }, { merge: true }).catch(() => {});
                   }
               } catch (err) {
                   console.error("Error al editar mensaje:", err);
@@ -4544,7 +4587,7 @@ useEffect(() => {
           };
 
           const handleLeaveGroup = async () => {
-              const group = chatGroups.find(g => `group_${g.id}` === activeChat.id || g.id === activeChat.id);
+              const group = chatGroups.find(g => g.id === activeChat.id || `group_${g.id}` === activeChat.id || `acad_${g.academicGroupId}` === activeChat.id || `acad_${g.id}` === activeChat.id);
               if (!group) return;
               const currentMembers = Array.isArray(group.members) ? group.members : (group.members && typeof group.members === 'object' ? Object.keys(group.members) : []);
               const newMembers = currentMembers.filter(id => id !== myChatId);
@@ -4557,6 +4600,10 @@ useEffect(() => {
                   return;
               }
               await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', group.id), { members: newMembers }, { merge: true });
+              if (group.academicGroupId || group.id.startsWith('acad_')) {
+                  const acadId = group.academicGroupId || group.id.replace('acad_', '');
+                  await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', acadId), { members: newMembers.filter(m => !isTeacherId(m)) }).catch(() => {});
+              }
               setActiveChat(null);
               showMessage("Abandonaste el grupo.");
           };
@@ -4975,7 +5022,7 @@ useEffect(() => {
 
           let targetIds = [];
           if (activeChat.type === 'group') {
-              const group = chatGroups.find(g => `group_${g.id}` === activeChat.id || g.id === activeChat.id);
+              const group = chatGroups.find(g => g.id === activeChat.id || `group_${g.id}` === activeChat.id || `acad_${g.academicGroupId}` === activeChat.id || `acad_${g.id}` === activeChat.id);
               if (group) {
                   const list = Array.isArray(group.members) ? group.members : (group.members && typeof group.members === 'object' ? Object.keys(group.members) : []);
                   targetIds = list.filter(id => id !== myChatId);
@@ -5570,7 +5617,15 @@ useEffect(() => {
         const post = userPosts.find(p => p.id === postId);
         if (!post) return;
         const rep = profileReplyingTo[postId];
-        const newComment = { id: Date.now().toString(), author: loggedInName, text: text.trim(), createdAt: Date.now(), replyTo: rep ? { id: rep.id, author: rep.author, text: rep.text } : null };
+        const newComment = {
+            id: Date.now().toString(),
+            author: loggedInName,
+            authorUsername: myChatId,
+            authorId: user?.uid || myChatId,
+            text: text.trim(),
+            createdAt: Date.now(),
+            replyTo: rep ? { id: rep.id, author: rep.author, text: rep.text } : null
+        };
         if (isDemoMode) {
             const updated = { ...post, comments: [...(post.comments || []), newComment] };
             setUserPosts(prev => prev.map(p => p.id === postId ? updated : p));
@@ -5694,11 +5749,17 @@ useEffect(() => {
         const presenceStatus = (!pData.isOnline || pData.status === 'offline') ? 'offline' : (pData.status || 'offline');
 
         const isTeacherProfile = isTeacherId(targetFilterId);
+        const cleanFilterIdLower = String(targetFilterId || '').toLowerCase().replace(/^@/, '');
         const myPosts = userPosts.filter(p => {
             if (isTeacherProfile) {
                 return getCanonicalTeacherId(p.authorUsername || p.authorId || p.authorName) === getCanonicalTeacherId(targetFilterId);
             }
-            return p.authorUsername === targetFilterId || (isMyProfile && ((p.authorId && p.authorId === user?.uid) || p.authorUsername === myChatId));
+            const pUserLower = String(p.authorUsername || '').toLowerCase().replace(/^@/, '');
+            return (
+                pUserLower === cleanFilterIdLower ||
+                (userData?.uid && p.authorId === userData.uid) ||
+                (isMyProfile && ((p.authorId && p.authorId === user?.uid) || pUserLower === String(myChatId || '').toLowerCase().replace(/^@/, '')))
+            );
         });
         
         return (
@@ -5978,7 +6039,7 @@ useEffect(() => {
                                                     type: 'post',
                                                     chatId: null,
                                                     itemId: post.id,
-                                                    authorName: post.author || post.authorUsername || 'Estudiante',
+                                                    authorName: post.authorName || post.author || post.authorUsername || profileName || 'Estudiante',
                                                     previewContent: post.title || post.text || 'Publicación',
                                                     grade: String(post.grade),
                                                     feedback: post.gradeFeedback || ''
@@ -6011,8 +6072,8 @@ useEffect(() => {
                                             <span>{r.count}</span>
                                         </span>
                                     ))}
-                                    {/* Botón para Calificar Publicación (Exclusivo Docente si aún no está calificada) */}
-                                    {role === 'teacher' && post.grade == null && (
+                                    {/* Botón para Calificar Publicación (Exclusivo Docente si aún no está calificada y es de estudiante) */}
+                                    {role === 'teacher' && !isTeacherProfile && !isTeacherId(post.authorUsername || post.authorId) && post.grade == null && (
                                         <button
                                             type="button"
                                             onClick={() => {
@@ -6021,7 +6082,7 @@ useEffect(() => {
                                                     type: 'post',
                                                     chatId: null,
                                                     itemId: post.id,
-                                                    authorName: post.author || post.authorUsername || 'Estudiante',
+                                                    authorName: post.authorName || post.author || post.authorUsername || profileName || 'Estudiante',
                                                     previewContent: post.title || post.text || 'Publicación',
                                                     grade: '',
                                                     feedback: ''
@@ -7266,7 +7327,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                 const now = Date.now();
                 const demoGroupPayload = {
                     name: newAcadGroupName.trim(),
-                    members: Array.from(new Set(['invitado', '@invitado', ...selectedAcadMembers])),
+                    members: Array.from(new Set(['invitado', ...selectedAcadMembers])),
                     emoji: newAcadGroupEmoji || 'BookOpen',
                     avatarUrl: newAcadGroupAvatarUrl.trim() || '',
                     coverPattern: 'doodle-1',
@@ -7432,8 +7493,9 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
 
         const enrolledStudents = Array.from(enrolledStudentsMap.entries()).filter(([uk, ud]) => {
             if (!evalSearchQuery.trim()) return true;
-            const term = evalSearchQuery.toLowerCase();
-            return uk.toLowerCase().includes(term) || (ud.fullName || '').toLowerCase().includes(term) || (ud.email || '').toLowerCase().includes(term);
+            const norm = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            const term = norm(evalSearchQuery);
+            return norm(uk).includes(term) || norm(ud.fullName).includes(term) || norm(ud.email).includes(term);
         });
 
         const enrolledKeysSet = new Set(Array.from(enrolledStudentsMap.keys()).map(k => k.toLowerCase()));
@@ -9315,6 +9377,18 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                           correctAnswersText = [q.correctAnswer, ...(Array.isArray(q.acceptedAnswers) ? q.acceptedAnswers : [])].filter(Boolean).join(' / ');
                       }
 
+                      const getQuestionTypeLabel = (question) => {
+                          if (esVerdaderoFalso(question)) return 'Verdadero / Falso';
+                          if (question.type === 'reading') return 'Comprensión Lectora (Reading)';
+                          if (question.type === 'multiple') return 'Selección Múltiple';
+                          if (question.type === 'order') return 'Ordenar la Oración';
+                          if (question.type === 'match') return 'Relacionar Columnas';
+                          if (question.type === 'listening') return 'Listening (Audio)';
+                          if (question.type === 'dictation') return 'Dictado';
+                          if (question.type === 'speaking') return 'Speaking';
+                          return 'Respuesta Escrita';
+                      };
+
                       let qCorrectCount = 0;
                       evalGrades.forEach(g => {
                           if (isQuestionAnsweredCorrectly(q, g.answers?.[qIdx])) qCorrectCount++;
@@ -9324,7 +9398,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                       return {
                           'N° Pregunta': qIdx + 1,
                           'Enunciado': q.text || q.question || '',
-                          'Tipo de Pregunta': (q.type === 'multiple' || (q.type === 'listening' && Array.isArray(q.options) && q.options.length >= 2)) ? 'Selección Múltiple' : 'Respuesta Escrita',
+                          'Tipo de Pregunta': getQuestionTypeLabel(q),
                           'Opciones Disponibles': optionsText,
                           'Respuesta(s) Correcta(s)': correctAnswersText,
                           'Estudiantes que Acertaron': qCorrectCount,
@@ -9364,11 +9438,29 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                               correctAnswerText = [q.correctAnswer, ...(Array.isArray(q.acceptedAnswers) ? q.acceptedAnswers : [])].filter(Boolean).join(' / ');
                           }
 
+                          const qTypeLabel = esVerdaderoFalso(q)
+                              ? 'Verdadero / Falso'
+                              : q.type === 'reading'
+                                  ? 'Comprensión Lectora (Reading)'
+                                  : q.type === 'multiple'
+                                      ? 'Selección Múltiple'
+                                      : q.type === 'order'
+                                          ? 'Ordenar la Oración'
+                                          : q.type === 'match'
+                                              ? 'Relacionar Columnas'
+                                              : q.type === 'listening'
+                                                  ? 'Listening (Audio)'
+                                                  : q.type === 'dictation'
+                                                      ? 'Dictado'
+                                                      : q.type === 'speaking'
+                                                          ? 'Speaking'
+                                                          : 'Escrita';
+
                           detailedFeedbackRows.push({
                               'Estudiante': g.studentName || 'Estudiante',
                               'N° Pregunta': qIdx + 1,
                               'Enunciado de la Pregunta': q.text || q.question || '',
-                              'Tipo': (q.type === 'multiple' || (q.type === 'listening' && Array.isArray(q.options) && q.options.length >= 2)) ? 'Selección Múltiple' : 'Escrita',
+                              'Tipo': qTypeLabel,
                               'Respuesta del Estudiante': studentAnswerText,
                               'Respuesta Correcta Esperada': correctAnswerText,
                               'Resultado': q.type === 'speaking' ? 'CALIFICACIÓN MANUAL' : (isCorrect ? 'CORRECTA' : (studentAnswerText === '(Sin respuesta)' ? 'SIN RESPONDER' : 'INCORRECTA')),
@@ -9849,7 +9941,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                                   {qIdx + 1}
                                                               </span>
                                                               <span className="text-[11px] font-bold text-gray-500 uppercase">
-                                                                  {q.type === 'multiple' ? 'Selección Múltiple' : 'Respuesta Escrita'}
+                                                                  {esVerdaderoFalso(q) ? 'Verdadero / Falso' : q.type === 'reading' ? 'Comprensión Lectora (Reading)' : q.type === 'multiple' ? 'Selección Múltiple' : q.type === 'order' ? 'Ordenar la Oración' : q.type === 'match' ? 'Relacionar Columnas' : q.type === 'listening' ? 'Listening (Audio)' : q.type === 'dictation' ? 'Dictado' : q.type === 'speaking' ? 'Speaking' : 'Respuesta Escrita'}
                                                               </span>
                                                           </div>
 
@@ -9876,12 +9968,27 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                           )}
                                                       </div>
 
+                                                      {q.type === 'reading' && q.passage && (
+                                                          <div className="pl-8 mb-3">
+                                                              <div className="p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-900/60 text-xs leading-relaxed whitespace-pre-wrap text-gray-700 dark:text-gray-300">
+                                                                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Texto de lectura</p>
+                                                                  {q.passage}
+                                                              </div>
+                                                          </div>
+                                                      )}
+
                                                       {/* Enunciado de la pregunta */}
                                                       <p className="text-xs sm:text-sm font-bold text-gray-900 dark:text-gray-100 mb-3 pl-8">
                                                           {q.text || q.question || 'Pregunta sin enunciado'}
                                                       </p>
                                                       {selectedStudentGradeForReview?.feedbackIA?.[qIdx] && (
                                                           <p className="text-[11px] text-blue-700 dark:text-blue-300 font-medium pl-8 mb-2">{'\ud83d\udcac '}{textoPlano(selectedStudentGradeForReview.feedbackIA[qIdx])}</p>
+                                                      )}
+
+                                                      {q.audioUrl && (
+                                                          <div className="pl-8 mb-3">
+                                                              <AudioPlayer src={q.audioUrl} title="" isDarkMode={isDarkMode} compact={true} />
+                                                          </div>
                                                       )}
 
                                                       {q.imageUrl && (
@@ -10007,7 +10114,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                                           Respuesta correcta esperada:
                                                                       </p>
                                                                       <p className="font-bold text-blue-900 dark:text-blue-100 text-xs sm:text-sm">
-                                                                          "{q.correctAnswer}"
+                                                                          "{[q.correctAnswer, ...(Array.isArray(q.acceptedAnswers) ? q.acceptedAnswers : [])].filter(Boolean).join(' / ')}"
                                                                       </p>
                                                                   </div>
                                                               )}
@@ -10128,7 +10235,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                                   {qIdx + 1}
                                                               </span>
                                                               <span className="text-[11px] font-bold text-gray-500 uppercase">
-                                                                  {(q.type === 'multiple' || (q.type === 'listening' && Array.isArray(q.options) && q.options.length >= 2)) ? 'Selección Múltiple' : 'Respuesta Escrita'}
+                                                                  {esVerdaderoFalso(q) ? 'Verdadero / Falso' : q.type === 'reading' ? 'Comprensión Lectora (Reading)' : q.type === 'multiple' ? 'Selección Múltiple' : q.type === 'order' ? 'Ordenar la Oración' : q.type === 'match' ? 'Relacionar Columnas' : q.type === 'listening' ? 'Listening (Audio)' : q.type === 'dictation' ? 'Dictado' : q.type === 'speaking' ? 'Speaking' : 'Respuesta Escrita'}
                                                               </span>
                                                           </div>
                                                           <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
@@ -10136,9 +10243,24 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                           </span>
                                                       </div>
 
+                                                      {q.type === 'reading' && q.passage && (
+                                                          <div className="pl-8 pt-1">
+                                                              <div className="p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-900/60 text-xs leading-relaxed whitespace-pre-wrap text-gray-700 dark:text-gray-300">
+                                                                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Texto de lectura</p>
+                                                                  {q.passage}
+                                                              </div>
+                                                          </div>
+                                                      )}
+
                                                       <p className="text-xs sm:text-sm font-bold text-gray-900 dark:text-gray-100 pl-8">
                                                           {q.text || q.question || 'Sin enunciado'}
                                                       </p>
+
+                                                      {q.audioUrl && (
+                                                          <div className="pl-8 pt-1">
+                                                              <AudioPlayer src={q.audioUrl} title="" isDarkMode={isDarkMode} compact={true} />
+                                                          </div>
+                                                      )}
 
                                                       {q.imageUrl && (
                                                           <div className="pl-8 pt-1">
@@ -10434,6 +10556,23 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                               </div>
                                           </div>
                                           
+                                          {(q.type === 'reading' || q.passage) && (
+                                              <div className="space-y-1">
+                                                  <label className="text-[11px] font-bold text-gray-500">Texto de lectura (Reading passage)</label>
+                                                  <textarea
+                                                      rows={3}
+                                                      value={q.passage || ''}
+                                                      onChange={(e) => {
+                                                          const newQ = [...evalFormData.questions];
+                                                          newQ[qIndex] = { ...newQ[qIndex], passage: e.target.value };
+                                                          setEvalFormData({ ...evalFormData, questions: newQ });
+                                                      }}
+                                                      placeholder="Texto o párrafo de lectura para esta pregunta..."
+                                                      className={`${glassInput} !py-2 text-xs font-medium resize-y`}
+                                                  />
+                                              </div>
+                                          )}
+
                                           <textarea 
                                               rows={2}
                                               value={q.text} 
@@ -13228,15 +13367,16 @@ Bot:`;
                                   let actionTaken = false;
                                   try {
                                       const parsed = JSON.parse(cleanReply);
-                                      if (parsed && parsed.action) {
+                                       if (parsed && parsed.action) {
+                                          let customReply = null;
                                           // Ejecutar la acción
                                           switch(parsed.action) {
                                               // Configuración
                                               case 'dark_on': setThemeMode('dim'); break;
                                               case 'dark_off': setThemeMode('light'); break;
                                               case 'lights_out': setThemeMode('lights_out'); break;
-                                              case 'sound_on': setSoundEnabled(true); try { localStorage.setItem('englishTech_sound', 'true'); } catch(e) {} break;
-                                              case 'sound_off': setSoundEnabled(false); try { localStorage.setItem('englishTech_sound', 'false'); } catch(e) {} break;
+                                              case 'sound_on': setSoundEnabled(true); soundEnabledRef.current = true; try { localStorage.setItem('englishTech_sound', 'true'); } catch(e) {} break;
+                                              case 'sound_off': setSoundEnabled(false); soundEnabledRef.current = false; try { localStorage.setItem('englishTech_sound', 'false'); } catch(e) {} break;
                                               case 'push_on': togglePushNotifications(); break;
                                               case 'push_off': setPushEnabled(false); try { localStorage.setItem('englishTech_push', 'false'); } catch(e) {} break;
                                               // Navegación
@@ -13260,7 +13400,7 @@ Bot:`;
                                                   }
                                                   break;
                                               case 'list_tasks':
-                                                  cleanReply = `Tienes ${tasks.length} tareas/publicaciones:\n${tasks.slice(0,10).map((t,i) => `${i+1}. "${t.title || 'Sin título'}" (${t.targetGroupName || 'Global'})`).join('\n')}`;
+                                                  customReply = `Tienes ${tasks.length} tareas/publicaciones:\n${tasks.slice(0,10).map((t,i) => `${i+1}. "${t.title || 'Sin título'}" (${t.targetGroupName || 'Global'})`).join('\n')}`;
                                                   break;
                                               case 'delete_task':
                                                   if (parsed.params?.title) {
@@ -13275,13 +13415,13 @@ Bot:`;
                                                               }
                                                               await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', t.id));
                                                           });
-                                                          cleanReply = `Tarea "${t.title}" eliminada.`;
-                                                      } else { cleanReply = 'No encontré una tarea con ese nombre.'; }
+                                                          customReply = `Tarea "${t.title}" eliminada.`;
+                                                      } else { customReply = 'No encontré una tarea con ese nombre.'; }
                                                   }
                                                   break;
                                               // Evaluaciones
                                               case 'list_evaluations':
-                                                  cleanReply = `Evaluaciones (${evaluations.length}):\n${evaluations.map((e,i) => `${i+1}. "${e.title || 'Sin título'}" (vence: ${e.dueDate || 'sin fecha'}, ${e.isArchived ? 'archivada' : 'activa'})`).join('\n')}`;
+                                                  customReply = `Evaluaciones (${evaluations.length}):\n${evaluations.map((e,i) => `${i+1}. "${e.title || 'Sin título'}" (vence: ${e.dueDate || 'sin fecha'}, ${e.isArchived ? 'archivada' : 'activa'})`).join('\n')}`;
                                                   break;
                                               case 'eval_stats':
                                                   if (parsed.params?.title) {
@@ -13290,8 +13430,8 @@ Bot:`;
                                                           const evGrades = grades.filter(g => g.evaluationId === ev.id);
                                                           const avg = evGrades.length > 0 ? (evGrades.reduce((s,g) => s + (Number(g.score)||0), 0) / evGrades.length).toFixed(1) : 'N/A';
                                                           const passed = evGrades.filter(g => (Number(g.score)||0) >= 3.0).length;
-                                                          cleanReply = `"${ev.title}": ${evGrades.length} presentados, promedio ${avg}/5.0, ${passed} aprobados.`;
-                                                      } else { cleanReply = 'No encontré esa evaluación.'; }
+                                                          customReply = `"${ev.title}": ${evGrades.length} presentados, promedio ${avg}/5.0, ${passed} aprobados.`;
+                                                      } else { customReply = 'No encontré esa evaluación.'; }
                                                   }
                                                   break;
                                               case 'archive_eval':
@@ -13303,13 +13443,13 @@ Bot:`;
                                                           } else {
                                                               await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'evaluations', ev.id), { isArchived: !ev.isArchived });
                                                           }
-                                                          cleanReply = `Evaluación "${ev.title}" ${ev.isArchived ? 'restaurada' : 'archivada'}.`;
+                                                          customReply = `Evaluación "${ev.title}" ${ev.isArchived ? 'restaurada' : 'archivada'}.`;
                                                       }
                                                   }
                                                   break;
                                               // Notas
                                               case 'grade_report':
-                                                  cleanReply = `Reporte de notas:\nPromedio general: ${avgGrade}/5.0\n${gradeDetails.join('\n')}`;
+                                                  customReply = `Reporte de notas:\nPromedio general: ${avgGrade}/5.0\n${gradeDetails.join('\n')}`;
                                                   break;
                                               case 'student_report':
                                                   if (parsed.params?.name) {
@@ -13317,32 +13457,32 @@ Bot:`;
                                                       if (studentGrades.length > 0) {
                                                           const sg = studentGrades.map(g => { const ev = evaluations.find(e => e.id === g.evaluationId); return `${ev?.title || 'Eval'}: ${Number(g.score||0).toFixed(1)}/5.0`; });
                                                           const avg = studentGrades.length > 0 ? (studentGrades.reduce((s,g) => s + (Number(g.score)||0), 0) / studentGrades.length).toFixed(1) : '0.0';
-                                                          cleanReply = `Notas de ${parsed.params.name}:\n${sg.join('\n')}\nPromedio: ${avg}/5.0`;
-                                                      } else { cleanReply = `No encontré notas para "${parsed.params.name}".`; }
+                                                          customReply = `Notas de ${parsed.params.name}:\n${sg.join('\n')}\nPromedio: ${avg}/5.0`;
+                                                      } else { customReply = `No encontré notas para "${parsed.params.name}".`; }
                                                   }
                                                   break;
                                               case 'top_students':
                                                   const sorted = Object.entries(gradesByStudent).map(([n,s]) => ({ name: n, avg: s.reduce((acc,v) => acc + (parseFloat(v.split(': ')[1]) || 0), 0) / (s.length || 1) })).sort((a,b) => b.avg - a.avg).slice(0,5);
-                                                  cleanReply = `Top 5 estudiantes:\n${sorted.map((s,i) => `${i+1}. ${s.name}: ${(Number(s.avg) || 0).toFixed(1)}/5.0`).join('\n')}`;
+                                                  customReply = `Top 5 estudiantes:\n${sorted.map((s,i) => `${i+1}. ${s.name}: ${(Number(s.avg) || 0).toFixed(1)}/5.0`).join('\n')}`;
                                                   break;
                                               case 'worst_students':
                                                   const sortedW = Object.entries(gradesByStudent).map(([n,s]) => ({ name: n, avg: s.reduce((acc,v) => acc + (parseFloat(v.split(': ')[1]) || 0), 0) / (s.length || 1) })).sort((a,b) => a.avg - b.avg).slice(0,5);
-                                                  cleanReply = `Estudiantes con menor rendimiento:\n${sortedW.map((s,i) => `${i+1}. ${s.name}: ${(Number(s.avg) || 0).toFixed(1)}/5.0`).join('\n')}`;
+                                                  customReply = `Estudiantes con menor rendimiento:\n${sortedW.map((s,i) => `${i+1}. ${s.name}: ${(Number(s.avg) || 0).toFixed(1)}/5.0`).join('\n')}`;
                                                   break;
                                               // Grupos
                                               case 'list_groups':
-                                                  cleanReply = `Grupos (${academicGroups.length}):\n${groupList.join('\n')}`;
+                                                  customReply = `Grupos (${academicGroups.length}):\n${groupList.join('\n')}`;
                                                   break;
                                               // Syllabus
                                               case 'syllabus_summary':
-                                                  cleanReply = `Syllabus (${syllabus.length} semanas):\n${weekList.join('\n')}`;
+                                                  customReply = `Syllabus (${syllabus.length} semanas):\n${weekList.join('\n')}`;
                                                   break;
                                               // Estudiantes
                                               case 'list_students':
-                                                  cleanReply = `Estudiantes (${studs.length}):\n${studs.slice(0,20).join('\n')}`;
+                                                  customReply = `Estudiantes (${studs.length}):\n${studs.slice(0,20).join('\n')}`;
                                                   break;
                                               case 'student_count':
-                                                  cleanReply = `Total de estudiantes: ${studs.length}`;
+                                                  customReply = `Total de estudiantes: ${studs.length}`;
                                                   break;
                                               // Generar contenido con IA
                                               case 'generate_activity':
@@ -13360,8 +13500,9 @@ Bot:`;
                                                           ? `Diseña un plan de clase de ${duration} minutos para ${topic} (nivel ${level}). Incluye: warm-up, presentation, practice, wrap-up. Máximo 200 palabras.`
                                                           : `Genera ${numQ} preguntas de opción múltiple sobre ${topic} (nivel ${level}). Formato: Pregunta / Opción A / Opción B / Opción C / Correcta. Máximo 150 palabras.`;
                                                       const genReply = await callGemini(genPrompt);
-                                                      cleanReply = genReply?.trim()?.replace(/\*\*/g, '').replace(/\*/g, '') || 'No pude generar el contenido.';
+                                                      customReply = genReply?.trim()?.replace(/\*\*/g, '').replace(/\*/g, '') || 'No pude generar el contenido.';
                                                   }
+                                                  break;
                                               // Chat
                                               case 'create_group':
                                                   if (parsed.params?.name) {
@@ -13374,11 +13515,11 @@ Bot:`;
                                                               name: parsed.params.name, members: [myChatId], createdBy: myChatId, teacherId: myChatId, createdAt: Date.now()
                                                           });
                                                       }
-                                                      cleanReply = `Grupo "${parsed.params.name}" creado.`;
+                                                      customReply = `Grupo "${parsed.params.name}" creado.`;
                                                   }
                                                   break;
                                           }
-                                          cleanReply = parsed.response || 'Acción ejecutada.';
+                                          cleanReply = customReply || parsed.response || 'Acción ejecutada.';
                                           actionTaken = true;
                                       }
                                   } catch (e) {
@@ -13392,9 +13533,9 @@ Bot:`;
                                       } else if (rl.match(/claro|light/) && rl.match(/activ|cambiar|poner/) && !rl.match(/oscuro|dark/)) {
                                           setThemeMode('light'); cleanReply = 'Tema claro activado.';
                                       } else if (rl.match(/sonido/) && rl.match(/desactiv|apag|silenc|off|mute/)) {
-                                          setSoundEnabled(false); try { localStorage.setItem('englishTech_sound', 'false'); } catch(ex) {} cleanReply = 'Sonidos desactivados.';
+                                          setSoundEnabled(false); soundEnabledRef.current = false; try { localStorage.setItem('englishTech_sound', 'false'); } catch(ex) {} cleanReply = 'Sonidos desactivados.';
                                       } else if (rl.match(/sonido/) && rl.match(/activ|encender|on/)) {
-                                          setSoundEnabled(true); try { localStorage.setItem('englishTech_sound', 'true'); } catch(ex) {} cleanReply = 'Sonidos activados.';
+                                          setSoundEnabled(true); soundEnabledRef.current = true; try { localStorage.setItem('englishTech_sound', 'true'); } catch(ex) {} cleanReply = 'Sonidos activados.';
                                       } else if (rl.match(/notif|push/) && rl.match(/desactiv|apag|off/)) {
                                           setPushEnabled(false); try { localStorage.setItem('englishTech_push', 'false'); } catch(ex) {} cleanReply = 'Notificaciones push desactivadas.';
                                       } else if (rl.match(/notif|push/) && rl.match(/activ|encender|on/)) {
@@ -13752,6 +13893,15 @@ Bot:`;
                                               </div>
                                               <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 ${isDarkMode ? 'border-gray-800' : 'border-white'} ${
                                                   (() => {
+                                                      if (activeChat.type === 'group') {
+                                                          const grp = chatGroups.find(g => g.id === activeChat.id || `group_${g.id}` === activeChat.id || `acad_${g.academicGroupId}` === activeChat.id || `acad_${g.id}` === activeChat.id);
+                                                          const members = Array.isArray(grp?.members) ? grp.members : (grp?.members && typeof grp.members === 'object' ? Object.keys(grp.members) : []);
+                                                          const others = members.filter(m => m !== myChatId);
+                                                          if (others.some(m => userPresence[m]?.status === 'online')) return 'bg-green-500';
+                                                          if (others.some(m => userPresence[m]?.status === 'away')) return 'bg-orange-400';
+                                                          if (others.some(m => userPresence[m]?.status === 'busy')) return 'bg-red-500';
+                                                          return 'bg-gray-400';
+                                                      }
                                                       const tId = getDmTargetUserId(activeChat, myChatId);
                                                       const pData = getUserPresenceData(tId, userPresence, userMappings);
                                                       const st = getPresenceStatus(pData);
@@ -15023,11 +15173,13 @@ Bot:`;
                     })}
                     academicGroups={role === 'teacher' ? academicGroups : academicGroups.filter(isStudentInGroup)}
                     evaluations={role === 'teacher' ? evaluations : evaluations.filter(ev => {
+                        if (ev.isArchived) return false;
+                        if (isDemoMode || String(ev.id || '').startsWith('demo-')) return true;
                         const enrolled = academicGroups.filter(isStudentInGroup);
                         const evGrpId = String(ev.targetGroupId || '').trim();
                         const evGrpName = String(ev.targetGroupName || '').toLowerCase().trim();
                         const evTeacherId = getItemTeacherId(ev);
-                        if ((!evGrpId || evGrpId === 'all') && (!evGrpName || evGrpName === 'global' || evGrpName === 'todos' || evGrpName === 'general')) return true;
+                        if ((!evGrpId || evGrpId === 'all') && (!evGrpName || evGrpName === 'global' || evGrpName === 'todos' || evGrpName === 'general' || evGrpName === 'todos los estudiantes' || evGrpName === 'todos los estudiantes (global)')) return true;
                         if (enrolled.length === 0) return false;
                         return enrolled.some(g => g.id === evGrpId || `acad_${g.id}` === evGrpId || (evGrpName && (g.name || '').toLowerCase().trim() === evGrpName && getItemTeacherId(g) === evTeacherId));
                     })}
@@ -15989,22 +16141,22 @@ Bot:`;
               {/* 👇 AQUÍ VA EL CEREBRO DEL BOT PARA EDWIN 👇 */}
                   {showIAKnowledgeModal && ReactDOM.createPortal(
                       <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                          <div className={`${glassCard} max-w-md w-full flex flex-col gap-4 relative bg-white`}>
+                          <div className={`${glassCard} max-w-md w-full flex flex-col gap-4 relative bg-white dark:bg-gray-900`}>
                               <button onClick={() => setShowIAKnowledgeModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-red-500"><X size={20}/></button>
-                              <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Sparkles className="text-purple-600"/> Cerebro del Asistente</h3>
-                              <p className="text-xs text-gray-500">Edwin, aquí puede escribir cómo funciona la página para que el Asistente se lo explique a {isCamiloTeacher(myChatId) ? 'el Profe Camilo' : 'la Profe Gina'}.</p>
+                              <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2"><Sparkles className="text-purple-600"/> Cerebro del Asistente</h3>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">Edwin, aquí puede escribir cómo funciona la página para que el Asistente se lo explique a {isCamiloTeacher(myChatId) ? 'el Profe Camilo' : 'la Profe Gina'}.</p>
                               
                               <div className="max-h-60 overflow-y-auto space-y-2 pr-2">
                                   {teacherBotInfoList.map(item => {
                                       const isEditing = editingIAId === item.id;
                                       const botDocId = isCamiloTeacher(myChatId) ? 'teacherBot_camilodocente' : 'teacherBot';
                                       return (
-                                      <div key={item.id} className="bg-gray-50 p-3 rounded-xl text-xs flex justify-between items-start gap-3 border border-gray-200 shadow-sm">
+                                      <div key={item.id} className="bg-gray-50 dark:bg-gray-800 p-3 rounded-xl text-xs flex justify-between items-start gap-3 border border-gray-200 dark:border-gray-700 shadow-sm">
                                           {isEditing ? (
                                               <div className="flex flex-col gap-2 w-full">
-                                                  <textarea value={editIAText} onChange={e => setEditIAText(e.target.value)} className={`${glassInput} h-24 text-xs resize-none bg-white`} autoFocus />
+                                                  <textarea value={editIAText} onChange={e => setEditIAText(e.target.value)} className={`${glassInput} h-24 text-xs resize-none bg-white dark:bg-gray-900`} autoFocus />
                                                   <div className="flex gap-3 justify-end">
-                                                      <button onClick={() => setEditingIAId(null)} className="text-gray-500 hover:text-red-500 transition-colors bg-gray-200 p-1.5 rounded-lg" title="Cancelar"><XLine size={16}/></button>
+                                                      <button onClick={() => setEditingIAId(null)} className="text-gray-500 hover:text-red-500 transition-colors bg-gray-200 dark:bg-gray-700 p-1.5 rounded-lg" title="Cancelar"><XLine size={16}/></button>
                                                       <button onClick={() => {
                                                           if(!editIAText.trim()) return;
                                                           const newList = teacherBotInfoList.map(i => i.id === item.id ? { ...i, text: editIAText.trim() } : i);
@@ -16020,9 +16172,9 @@ Bot:`;
                                               </div>
                                           ) : (
                                               <>
-                                                  <span className="flex-1 whitespace-pre-wrap leading-relaxed text-gray-700">{item.text}</span>
+                                                  <span className="flex-1 whitespace-pre-wrap leading-relaxed text-gray-700 dark:text-gray-200">{item.text}</span>
                                                   <div className="flex gap-2 shrink-0">
-                                                      <button onClick={() => {setEditingIAId(item.id); setEditIAText(item.text);}} className="text-blue-500 hover:text-blue-700 transition-colors bg-blue-100 p-1.5 rounded-lg" title="Editar"><Edit3 size={14}/></button>
+                                                      <button onClick={() => {setEditingIAId(item.id); setEditIAText(item.text);}} className="text-blue-500 hover:text-blue-700 transition-colors bg-blue-100 dark:bg-blue-900/40 p-1.5 rounded-lg" title="Editar"><Edit3 size={14}/></button>
                                                       <button onClick={() => {
                                                           confirmAction("¿Seguro que desea borrar este conocimiento?", () => {
                                                               const newList = teacherBotInfoList.filter(i => i.id !== item.id);
@@ -16033,7 +16185,7 @@ Bot:`;
                                                               }
                                                               setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', botDocId), { infoList: newList }).then(() => setTeacherBotInfoList(newList)).catch(err => { console.error(err); showMessage("Error al eliminar."); });
                                                           });
-                                                      }} className="text-red-500 hover:text-red-700 transition-colors bg-red-100 p-1.5 rounded-lg" title="Eliminar"><Trash2 size={14}/></button>
+                                                      }} className="text-red-500 hover:text-red-700 transition-colors bg-red-100 dark:bg-red-900/40 p-1.5 rounded-lg" title="Eliminar"><Trash2 size={14}/></button>
                                                   </div>
                                               </>
                                           )}
@@ -16042,7 +16194,7 @@ Bot:`;
                                   {teacherBotInfoList.length === 0 && <p className="text-xs text-gray-400 italic text-center py-4">No hay conocimientos guardados aún.</p>}
                               </div>
 
-                              <div className="flex gap-2 pt-2 border-t border-gray-100">
+                              <div className="flex gap-2 pt-2 border-t border-gray-100 dark:border-gray-800">
                                   <textarea value={newIAKnowledge} onChange={e => setNewIAKnowledge(e.target.value)} placeholder="Añadir nuevo conocimiento a la IA..." className={`${glassInput} h-14 text-xs resize-none`} />
                                   <button onClick={() => {
                                       if(!newIAKnowledge.trim()) return;

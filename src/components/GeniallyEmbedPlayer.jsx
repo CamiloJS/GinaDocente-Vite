@@ -5,9 +5,9 @@ import { Sparkles, Maximize2, Minimize2, Globe, RotateCcw, X, Loader2 } from './
 export const extractGeniallyUrl = (input) => {
   if (!input) return '';
   const str = String(input).trim();
-  const iframeMatch = str.match(/src=["'](https?:\/\/[^"']*genial\.ly[^"']*)["']/i);
+  const iframeMatch = str.match(/src=["'](https?:\/\/[^"']*(?:genial\.ly|genially\.com)[^"']*)["']/i);
   if (iframeMatch) return iframeMatch[1];
-  const urlMatch = str.match(/(https?:\/\/[^\s"'<>]*genial\.ly[^\s"'<>]*)/i);
+  const urlMatch = str.match(/(https?:\/\/[^\s"'<>]*(?:genial\.ly|genially\.com)[^\s"'<>]*)/i);
   if (urlMatch) return urlMatch[1];
   return str.startsWith('http') ? str : 'https://' + str;
 };

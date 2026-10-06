@@ -15,20 +15,22 @@ const BAD_WORDS = [
   'mamaguevo', 'mamabicho', 'comemierda',
 ]
 
-function normalize(text) {
-  let t = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-  const leetMap = { '4': 'a', '@': 'a', '3': 'e', '1': 'i', '!': 'i', '0': 'o', '5': 's', '7': 't', '8': 'b', '$': 's' }
-  t = t.replace(/[4@31!0578$]/g, (m) => leetMap[m] || m)
-  return t
+const LEET_MAP = { '4': 'a', '@': 'a', '3': 'e', '1': 'i', '!': 'i', '0': 'o', '5': 's', '7': 't', '8': 'b', '$': 's' }
+
+function applyLeet(str) {
+  return str.replace(/[4@31!0578$]/g, (m) => LEET_MAP[m] || m)
 }
 
-function containsBadWords(text) {
-  const normalizedText = normalize(text || '')
+export function containsBadWords(text) {
+  if (!text || typeof text !== 'string') return false
+  const plainText = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  const leetText = applyLeet(plainText)
+  const leetTrimmed = applyLeet(plainText.replace(/[!@$]+(?=\s|$|[.,?;:)!?])/g, ' '))
   return BAD_WORDS.some((word) => {
     const normalizedWord = word.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     const regexStr = normalizedWord.split('').map((char) => `${char}+`).join('')
     const regex = new RegExp(`\\b${regexStr}\\b`, 'i')
-    return regex.test(normalizedText)
+    return regex.test(plainText) || regex.test(leetText) || regex.test(leetTrimmed)
   })
 }
 

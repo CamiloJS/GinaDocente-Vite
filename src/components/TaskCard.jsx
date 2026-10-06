@@ -161,7 +161,7 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
         const myUserKey = (currentUserId || '').trim().toLowerCase();
         const myEmailPrefix = (currentUser?.email ? currentUser.email.split('@')[0] : '').trim().toLowerCase();
 
-        return (task.comments || []).find(c => {
+        const myComments = (task.comments || []).filter(c => {
             if (c.isDeleted) return false;
             const authorLower = (c.author || '').trim().toLowerCase();
             const authorIdLower = (c.authorId || '').trim().toLowerCase();
@@ -173,6 +173,7 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                    (myUserKey && (authorIdLower === myUserKey || authorUsernameLower === myUserKey)) ||
                    (myEmailPrefix && (authorUsernameLower === myEmailPrefix || authorLower === myEmailPrefix));
         });
+        return myComments.slice().reverse().find(c => c.grade !== undefined && c.grade !== null && c.grade !== '') || myComments[myComments.length - 1] || null;
     }, [task, isTask, role, loggedInName, currentUserId, currentUser]);
 
     const myDeliveryIsLate = React.useMemo(() => {
@@ -562,8 +563,9 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
         const cleanTaskGrp = String(task.targetGroupId || task.targetGroup || '').replace(/^acad_/i, '').trim().toLowerCase();
         const isGlobalTask = !cleanTaskGrp || cleanTaskGrp === 'all' || cleanTaskGrp === 'global';
 
+        const taskOwnerId = getItemTeacherId(task);
         const matchingGroups = isGlobalTask
-            ? (academicGroups || [])
+            ? (academicGroups || []).filter(g => isDemoMode || getItemTeacherId(g) === taskOwnerId)
             : (academicGroups || []).filter(g => {
                 const gId = String(g?.id || '').replace(/^acad_/i, '').trim().toLowerCase();
                 const gName = String(g?.name || '').trim().toLowerCase();
@@ -596,19 +598,53 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                     allStudentsMap[data.fullName.trim()] = {
                         name: data.fullName.trim(),
                         username: username,
+                        uid: data.uid || '',
                         email: data.email || ''
                     };
                 }
             }
         });
 
+        const isTeacherComment = (c) => {
+            if (!c || c.isDeleted) return true;
+            if (c.authorRole === 'teacher' || c.userRole === 'teacher' || c.role === 'teacher') return true;
+            const authStr = String(c.author || '').trim();
+            if (!authStr) return true;
+            if (authStr === TEACHER_NAME || authStr === SECOND_TEACHER_NAME || authStr === 'Profesora' || authStr === 'Profesor' || authStr === 'La profe') return true;
+            if (isTeacherId(authStr) || isTeacherId(c.authorUsername) || isTeacherId(c.authorId)) return true;
+            return false;
+        };
+
+        const normalizePersonKey = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+        const doesCommentMatchStudent = (c, st) => {
+            if (!c || !st || isTeacherComment(c)) return false;
+            const cAuthor = normalizePersonKey(c.author);
+            const stName = normalizePersonKey(st.name);
+            if (cAuthor && stName && cAuthor === stName) return true;
+            const cUser = String(c.authorUsername || c.authorId || '').toLowerCase().replace('@', '').trim();
+            const stUser = String(st.username || '').toLowerCase().replace('@', '').trim();
+            const stUid = String(st.uid || '').toLowerCase().trim();
+            if (cUser && ((stUser && cUser === stUser) || (stUid && cUser === stUid))) return true;
+            const partsC = splitNameFirstAndLast(c.author || '');
+            const partsSt = splitNameFirstAndLast(st.name || '');
+            const firstC = normalizePersonKey(partsC.first).split(/\s+/)[0];
+            const firstSt = normalizePersonKey(partsSt.first).split(/\s+/)[0];
+            const lastC = normalizePersonKey(partsC.last).split(/\s+/)[0];
+            const lastSt = normalizePersonKey(partsSt.last).split(/\s+/)[0];
+            if (firstC && firstSt && lastC && lastSt && firstC === firstSt && lastC === lastSt) return true;
+            return false;
+        };
+
         // Incluir a cualquier estudiante que haya hecho entrega en los comentarios
         (task.comments || []).forEach(c => {
-            if (c.author && c.author !== TEACHER_NAME && c.author !== SECOND_TEACHER_NAME && !isTeacherId(c.authorId) && c.author !== 'Profesora' && c.author !== 'Profesor' && c.author !== 'La profe' && !c.isDeleted) {
-                if (!allStudentsMap[c.author.trim()]) {
+            if (!isTeacherComment(c)) {
+                const alreadyMatched = Object.values(allStudentsMap).some(st => doesCommentMatchStudent(c, st));
+                if (!alreadyMatched && !allStudentsMap[c.author.trim()]) {
                     allStudentsMap[c.author.trim()] = {
                         name: c.author.trim(),
-                        username: '',
+                        username: c.authorUsername || c.authorId || '',
+                        uid: c.authorId || '',
                         email: ''
                     };
                 }
@@ -638,8 +674,8 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
             const parts = splitNameFirstAndLast(st.name);
             const displayName = parts.last ? `${parts.last}, ${parts.first}` : parts.first;
 
-            const studentComments = (task.comments || []).filter(c => c.author?.trim() === st.name && !c.isDeleted);
-            const lastSubmission = studentComments.length > 0 ? studentComments[studentComments.length - 1] : null;
+            const studentComments = (task.comments || []).filter(c => doesCommentMatchStudent(c, st));
+            const lastSubmission = studentComments.slice().reverse().find(c => c.grade !== undefined && c.grade !== null && c.grade !== '') || (studentComments.length > 0 ? studentComments[studentComments.length - 1] : null);
 
             let estadoEntrega = 'Sin entrega';
             let fechaEntrega = '-';
@@ -2422,7 +2458,17 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                                                     </div>
                                                 )}
                                                 {c.text && <div className={`text-xs leading-relaxed ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>{<LinkifyText text={c.text} />}</div>}
-                                                {c.imageUrl && <img src={c.imageUrl} loading="lazy" decoding="async" alt="Adjunto" onClick={() => setLocalFullScreenImage(c.imageUrl)} className="w-24 h-24 rounded-xl border object-cover shadow-xs cursor-pointer hover:opacity-80 transition-opacity" onError={(e) => e.target.style.display = 'none'} />}
+                                                {(() => {
+                                                    const imgs = Array.isArray(c.imageUrls) && c.imageUrls.length > 0 ? c.imageUrls : (c.imageUrl ? [c.imageUrl] : []);
+                                                    if (imgs.length === 0) return null;
+                                                    return (
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {imgs.map((imgSrc, imgIdx) => (
+                                                                <img key={imgIdx} src={imgSrc} loading="lazy" decoding="async" alt={`Adjunto ${imgIdx + 1}`} onClick={() => setLocalFullScreenImage(imgSrc)} className="w-24 h-24 rounded-xl border object-cover shadow-xs cursor-pointer hover:opacity-80 transition-opacity" onError={(e) => { e.target.style.display = 'none'; }} />
+                                                            ))}
+                                                        </div>
+                                                    );
+                                                })()}
                                                 {c.audioUrl && <div className="mt-1"><AudioPlayer src={c.audioUrl} title="" isDarkMode={isDarkMode} compact={true} /></div>}
                                                 {c.fileUrl && (
                                                     <div className="flex items-center gap-2 flex-wrap mt-1">
@@ -2689,7 +2735,12 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                             };
 
                             const displayedRoots = (filterOnlyUngraded && role === 'teacher' && isTask)
-                                ? roots.filter(r => !r.isDeleted && (r.authorRole !== 'teacher' && !isTeacherId(r.authorId)) && (r.grade === undefined || r.grade === null || r.grade === ''))
+                                ? roots.filter(r => {
+                                    if (r.isDeleted) return false;
+                                    const authorLower = (r.author || '').trim().toLowerCase();
+                                    const isTeacherAuthor = r.authorRole === 'teacher' || r.role === 'teacher' || isTeacherId(r.authorId) || isTeacherId(r.authorUsername) || isTeacherId(authorLower) || (r.author && (r.author.trim() === TEACHER_NAME || r.author.trim() === SECOND_TEACHER_NAME)) || authorLower === 'profesora' || authorLower === 'profesor' || authorLower === 'la profe' || authorLower === 'el profe' || authorLower === 'docente gina' || authorLower === 'profesora gina' || authorLower === 'docente camilo' || authorLower === 'profesor camilo';
+                                    return !isTeacherAuthor && (r.grade === undefined || r.grade === null || r.grade === '');
+                                })
                                 : roots;
 
                             if (displayedRoots.length === 0) {
@@ -2833,7 +2884,7 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                               {/* Botón de acción con texto dinámico según tipo */}
                               <button 
                                   type="submit" 
-                                  disabled={isProcessing || (!commentText.trim() && !commentImageUrl && !commentFileUrl && !audioCom && !commentTitle.trim())} 
+                                  disabled={isProcessing || (!commentText.trim() && !(commentImageUrls?.length > 0 || commentImageUrl) && !commentFileUrl && !audioCom && !commentTitle.trim())} 
                                   className={`py-2 px-3.5 rounded-xl shadow-xs transition-all disabled:opacity-50 flex items-center justify-center gap-1.5 font-bold text-xs shrink-0 text-white ${
                                       isForum 
                                           ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20' 

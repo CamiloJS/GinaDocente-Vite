@@ -220,14 +220,16 @@ export const uploadRawFileToStorage = async (file, folderName) => {
 
 export const containsBadWords = (text) => {
   if (!text || typeof text !== 'string') return false;
-  let normalizedText = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-  const leetMap = { '4': 'a', '@': 'a', '3': 'e', '1': 'i', '!': 'i', '0': 'o', '5': 's', '7': 't', '8': 'b', '$': 's' }
-  normalizedText = normalizedText.replace(/[4@31!0578$]/g, (m) => leetMap[m] || m)
+  const plainText = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const leetMap = { '4': 'a', '@': 'a', '3': 'e', '1': 'i', '!': 'i', '0': 'o', '5': 's', '7': 't', '8': 'b', '$': 's' };
+  const applyLeet = (s) => s.replace(/[4@31!0578$]/g, (m) => leetMap[m] || m);
+  const leetText = applyLeet(plainText);
+  const leetTrimmed = applyLeet(plainText.replace(/[!@$]+(?=\s|$|[.,?;:)!?])/g, ' '));
   return BAD_WORDS.some((word) => {
     const normalizedWord = word.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     const regexStr = normalizedWord.split('').map((char) => `${char}+`).join('')
     const regex = new RegExp(`\\b${regexStr}\\b`, 'i')
-    return regex.test(normalizedText)
+    return regex.test(plainText) || regex.test(leetText) || regex.test(leetTrimmed)
   })
 }
 

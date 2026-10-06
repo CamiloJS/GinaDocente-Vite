@@ -344,9 +344,9 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
     setCallState('calling')
     setCallError(null)
     const callRef = doc(db, ...callsBase(callId))
-    callDocRef.current = callRef
     try {
       const pc = await createPC()
+      callDocRef.current = callRef
       peerRef.current = pc
       attachRemoteStream(pc, 'main')
       const offer = await pc.createOffer()
@@ -519,10 +519,10 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
     setCallState(isInitiator ? 'calling' : 'joining')
     setCallError(null)
     const callRef = doc(db, ...callsBase(callId))
-    callDocRef.current = callRef
 
     try {
       const stream = await getStream()
+      callDocRef.current = callRef
       monitorStream(stream, myChatId)
 
       // 1. Si soy iniciador, registrar doc principal de llamada
@@ -590,6 +590,7 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
     } catch (err) {
       console.error('Error starting group mesh call:', err)
       setCallError('Error al iniciar la llamada grupal')
+      setCallState('idle')
     }
   }
 
@@ -639,8 +640,10 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
   }
 
   // ---------- Ciclo de vida ----------
+  const endingRef = useRef(false)
   useEffect(() => {
     if (!activeCall || !callId) return
+    endingRef.current = false
     if (isDemoMode) {
       setCallState('calling')
       setCallError(null)
@@ -693,6 +696,8 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
   }
 
   const endCall = async () => {
+    if (endingRef.current) return
+    endingRef.current = true
     playHangupSound()
     const wasGroup = isGroup
     const wasInitiator = isInitiator
@@ -721,6 +726,7 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
               const snap = await getDoc(callRefToClean).catch(() => null)
               const parts = normalizeParticipants(snap?.data()?.participants || liveParticipants || activeCall?.participants)
               const idx = parts.findIndex(p => p.id === leavingId)
+              const hadJoined = idx >= 0 && parts[idx]?.joined === true
               if (idx >= 0) {
                 // CRÍTICO: escribir array COMPLETO (dot-notation destruye id/name)
                 const newParts = parts.map((p, i) => (i === idx ? { ...p, joined: false } : p))
@@ -730,15 +736,17 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
               await deleteDoc(doc(db, ...callsBase(callId), 'participantIce', leavingId)).catch(() => {})
               await deleteDoc(doc(db, ...callsBase(callId), 'offers', leavingId)).catch(() => {})
               await deleteDoc(doc(db, ...callsBase(callId), 'speaking', leavingId)).catch(() => {})
-              // Verificar si todos se fueron — solo entonces borrar doc grupal
-              const snapAfter = await getDoc(callRefToClean).catch(() => null)
-              const afterParts = normalizeParticipants(snapAfter?.data()?.participants)
-              const anyJoinedAfter = afterParts.some(p => p.joined)
-              if (!anyJoinedAfter) {
-                // Si nadie queda conectado, limpiar call doc para todos
-                await setDoc(callRefToClean, { status: 'ended' }, { merge: true }).catch(() => {})
-                // No borrar inmediatamente, dejar que los otros detecten ended; el último que queda lo borra tras delay
-                setTimeout(() => deleteDoc(callRefToClean).catch(() => {}), 1500)
+              // Verificar si todos se fueron — solo si este participante había entrado realmente a la llamada
+              if (hadJoined) {
+                const snapAfter = await getDoc(callRefToClean).catch(() => null)
+                const afterParts = normalizeParticipants(snapAfter?.data()?.participants)
+                const anyJoinedAfter = afterParts.some(p => p.joined)
+                if (!anyJoinedAfter) {
+                  // Si nadie queda conectado, limpiar call doc para todos
+                  await setDoc(callRefToClean, { status: 'ended' }, { merge: true }).catch(() => {})
+                  // No borrar inmediatamente, dejar que los otros detecten ended; el último que queda lo borra tras delay
+                  setTimeout(() => deleteDoc(callRefToClean).catch(() => {}), 1500)
+                }
               }
             } catch (e) {}
           } else {
@@ -756,6 +764,7 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
       }
     } catch (e) {}
     if (isMountedRef.current) {
+      setCallError(null)
       setCallState('idle')
       setIsMuted(false)
       setSpeakingMap({})
@@ -790,7 +799,7 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
     setIsMuted(prev => !prev)
   }
 
-  if (callState === 'idle') return null
+  if (callState === 'idle' && !callError) return null
 
   const displayName = isInitiator ? otherName : (activeCall.callerName || otherName)
 
@@ -835,7 +844,7 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
                   return true
                 })
                 return remote.map(p => {
-                  const displayName = p.name || userMappings[p.id]?.fullName || p.id || '?'
+                  const displayName = p.name || userMappings?.[p.id]?.fullName || p.id || '?'
                   const isJoined = p.joined === true
                   const isSpeaking = !!speakingMap[p.id] && isJoined
                   return (
@@ -855,10 +864,10 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
               {!isInitiator && activeCall.callerName && !normalizeParticipants(activeCall.participants).some(p => p.id === (activeCall.initiatorId || '')) && (
                 <div className={`flex flex-col items-center gap-2 p-3 md:p-4 rounded-2xl border-2 transition-all ${speakingMap[activeCall.initiatorId || 'main'] && callState === 'connected' ? 'border-green-400 bg-green-500/15 shadow-lg' : 'border-white/10 bg-white/5'}`}>
                   <div className={`relative w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full flex items-center justify-center text-white font-bold shadow-lg ${speakingMap[activeCall.initiatorId || 'main'] && callState === 'connected' ? 'bg-green-500 ring-4 ring-green-400 ring-offset-2 ring-offset-gray-900 scale-105' : 'bg-teal-600'}`}>
-                    <span className="text-lg md:text-xl">{(activeCall.callerName || userMappings[activeCall.initiatorId]?.fullName || '?').charAt(0).toUpperCase()}</span>
+                    <span className="text-lg md:text-xl">{(activeCall.callerName || userMappings?.[activeCall.initiatorId]?.fullName || '?').charAt(0).toUpperCase()}</span>
                     {speakingMap[activeCall.initiatorId || 'main'] && callState === 'connected' && <><span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-green-400 rounded-full border-2 border-white dark:border-gray-900 animate-ping"></span><span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-green-400 rounded-full border-2 border-white dark:border-gray-900"></span></>}
                   </div>
-                  <span className={`text-xs font-bold truncate max-w-full ${speakingMap[activeCall.initiatorId || 'main'] && callState === 'connected' ? 'text-green-400' : isDarkMode ? 'text-white' : 'text-gray-900'}`}>{activeCall.callerName || userMappings[activeCall.initiatorId]?.fullName || 'Docente'}</span>
+                  <span className={`text-xs font-bold truncate max-w-full ${speakingMap[activeCall.initiatorId || 'main'] && callState === 'connected' ? 'text-green-400' : isDarkMode ? 'text-white' : 'text-gray-900'}`}>{activeCall.callerName || userMappings?.[activeCall.initiatorId]?.fullName || 'Docente'}</span>
                   <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${speakingMap[activeCall.initiatorId || 'main'] && callState === 'connected' ? 'bg-green-500 text-white animate-pulse' : 'bg-gray-700 text-gray-300'}`}>{speakingMap[activeCall.initiatorId || 'main'] && callState === 'connected' ? 'Hablando...' : 'Conectado'}</span>
                 </div>
               )}
@@ -885,18 +894,22 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
           {/* Info */}
           <div>
             <h3 className={`text-lg sm:text-xl font-bold truncate ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-              {callState === 'calling' || callState === 'joining'
-                ? (isGroup ? `Llamando a ${displayName}...` : `Llamando a ${displayName}...`)
-                : callState === 'connected'
-                  ? `En llamada con ${displayName}`
-                  : `${displayName} te está llamando...`}
+              {callError
+                ? 'Llamada no disponible'
+                : callState === 'calling' || callState === 'joining'
+                  ? (isGroup ? `Llamando a ${displayName}...` : `Llamando a ${displayName}...`)
+                  : callState === 'connected'
+                    ? `En llamada con ${displayName}`
+                    : `${displayName} te está llamando...`}
             </h3>
             <p className={`text-sm mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-              {callState === 'connected'
-                ? (isGroup ? `${(normalizeParticipants(liveParticipants || activeCall.participants).filter(p=>p.joined).length+1)} en la llamada • ${formatDuration(callDuration)}` : formatDuration(callDuration))
-                : callState === 'calling' ? 'Esperando respuesta...'
-                : callState === 'joining' ? 'Uniéndose a la llamada...'
-                : 'Llamada entrante'}
+              {callError
+                ? 'Verifica los permisos de micrófono e intenta de nuevo'
+                : callState === 'connected'
+                  ? (isGroup ? `${(normalizeParticipants(liveParticipants || activeCall.participants).filter(p=>p.joined).length+1)} en la llamada • ${formatDuration(callDuration)}` : formatDuration(callDuration))
+                  : callState === 'calling' ? 'Esperando respuesta...'
+                  : callState === 'joining' ? 'Uniéndose a la llamada...'
+                  : 'Llamada entrante'}
             </p>
             {isGroup && callState === 'connected' && (
               <p className={`text-[11px] mt-1 font-medium ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
