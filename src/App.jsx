@@ -3501,8 +3501,21 @@ useEffect(() => {
     let deferredTasks = null;
     const flushDeferredTasks = () => {
         if (deferredTasks) {
-            setTasks(deferredTasks);
+            const snapshotToFlush = deferredTasks;
             deferredTasks = null;
+            setTasks(prev => {
+                if (!Array.isArray(prev) || prev.length === 0) return snapshotToFlush;
+                const prevMap = new Map(prev.map(t => [String(t?.id), t]));
+                return snapshotToFlush.map(item => {
+                    const existing = prevMap.get(String(item?.id));
+                    const existingTs = Number(existing?.kahoot?.updatedAt) || 0;
+                    const incomingTs = Number(item?.kahoot?.updatedAt) || 0;
+                    if (existing && existingTs > incomingTs) {
+                        return { ...item, kahoot: existing.kahoot };
+                    }
+                    return item;
+                });
+            });
         }
     };
     window.addEventListener('kahoot-live-modal-closed', flushDeferredTasks);
@@ -3534,8 +3547,21 @@ useEffect(() => {
     let deferredPinned = null;
     const flushDeferredPinned = () => {
         if (deferredPinned) {
-            setPinnedTasks(deferredPinned);
+            const snapshotToFlush = deferredPinned;
             deferredPinned = null;
+            setPinnedTasks(prev => {
+                if (!Array.isArray(prev) || prev.length === 0) return snapshotToFlush;
+                const prevMap = new Map(prev.map(t => [String(t?.id), t]));
+                return snapshotToFlush.map(item => {
+                    const existing = prevMap.get(String(item?.id));
+                    const existingTs = Number(existing?.kahoot?.updatedAt) || 0;
+                    const incomingTs = Number(item?.kahoot?.updatedAt) || 0;
+                    if (existing && existingTs > incomingTs) {
+                        return { ...item, kahoot: existing.kahoot };
+                    }
+                    return item;
+                });
+            });
         }
     };
     window.addEventListener('kahoot-live-modal-closed', flushDeferredPinned);

@@ -19,6 +19,7 @@ import {
   construirPromptKahootIA,
   parsearKahootIA,
   generarKahootConIA,
+  reconcileKahootParticipantsAfterEdit,
   KAHOOT_MAX_QUESTIONS,
   KAHOOT_AI_BATCH_SIZE
 } from '../src/utils/kahootEngine.js';
@@ -589,6 +590,223 @@ check(
     modalSrc.includes('isCriticalTransition') &&
     appSrc.includes('__KAHOOT_LIVE_MODAL_OPEN__') &&
     appSrc.includes('kahoot-live-modal-closed')
+);
+
+// 16. Casos borde adicionales: multi-select con 1 correcta, reconciliación tras edición, alias IA y palíndromos en puzzle
+const multiSingleCorrectQ = normalizeKahootQuestion(
+  {
+    type: 'quiz',
+    text: 'Select the correct option',
+    allowMultiple: true,
+    options: [
+      { text: 'Correct', isCorrect: true },
+      { text: 'Wrong 1', isCorrect: false },
+      { text: 'Wrong 2', isCorrect: false },
+      { text: 'Wrong 3', isCorrect: false }
+    ]
+  },
+  0
+);
+check(
+  'evaluateKahootAnswer rechaza seleccion de multiples opciones cuando allowMultiple=true pero solo 1 opcion es correcta',
+  evaluateKahootAnswer(multiSingleCorrectQ, { optionIndex: 0, optionIndices: [0, 1, 2, 3] }) === false &&
+    evaluateKahootAnswer(multiSingleCorrectQ, { optionIndex: 0, optionIndices: [0] }) === true
+);
+
+const palindromePuzzleQ = normalizeKahootQuestion(
+  {
+    type: 'puzzle',
+    text: 'Order palindrome sequence',
+    pasos: ['A', 'B', 'A']
+  },
+  0
+);
+const failingBot = { id: 'bot_fail', skill: 0, minDelayMs: 2000, maxDelayMs: 3000 };
+const failingPuzzleAns = buildSimulatedBotAnswer(failingBot, palindromePuzzleQ, 0);
+check(
+  'buildSimulatedBotAnswer desordena secuencias palindromicas cuando el bot falla y evalua isCorrect=false',
+  failingPuzzleAns.isCorrect === false &&
+    evaluateKahootAnswer(palindromePuzzleQ, failingPuzzleAns) === false
+);
+
+const parsedMixedAi = parsearKahootIA(
+  JSON.stringify({
+    questions: [
+      { type: 'type_answer', text: 'Incomplete type answer', correctAnswer: '' },
+      { type: 'puzzle', text: 'Incomplete puzzle', puzzleItems: ['One', 'Two'] },
+      { type: 'type_answer', text: 'Alias type answer', respuestaCorrecta: 'went', respuestasAceptadas: ['went'] },
+      { type: 'puzzle', text: 'Alias puzzle', secuencia: ['First', 'Second', 'Third'] }
+    ]
+  }),
+  20
+);
+check(
+  'parsearKahootIA descarta preguntas incompletas de IA y normaliza alias respuestaCorrecta/secuencia',
+  parsedMixedAi.ok === true &&
+    parsedMixedAi.questions.length === 2 &&
+    parsedMixedAi.questions[0].type === 'type_answer' &&
+    parsedMixedAi.questions[0].correctAnswer === 'went' &&
+    parsedMixedAi.questions[1].type === 'puzzle' &&
+    parsedMixedAi.questions[1].puzzleItems.length === 3
+);
+
+const editedQuestions = [
+  normalizeKahootQuestion(
+    {
+      type: 'quiz',
+      text: 'Updated Q1 (now option 1 is correct with x2 points)',
+      timeLimit: 20,
+      pointsMultiplier: 2,
+      options: [
+        { text: 'Old correct', isCorrect: false },
+        { text: 'New correct', isCorrect: true }
+      ]
+    },
+    0
+  )
+];
+const reconciledMap = reconcileKahootParticipantsAfterEdit(
+  {
+    p1: {
+      id: 'p1',
+      nickname: 'Ana',
+      score: 800,
+      streak: 1,
+      correctCount: 2,
+      answers: {
+        0: { optionIndex: 1, optionIndices: [1], isCorrect: false, pointsEarned: 0, timeMs: 2000 },
+        1: { optionIndex: 0, optionIndices: [0], isCorrect: true, pointsEarned: 800, timeMs: 3000 }
+      }
+    },
+    p2: {
+      id: 'p2',
+      nickname: 'Luis',
+      score: 1500,
+      streak: 2,
+      correctCount: 5,
+      answers: {}
+    }
+  },
+  editedQuestions
+);
+check(
+  'reconcileKahootParticipantsAfterEdit recalcula puntajes/aciertos al cambiar la respuesta correcta y poda preguntas eliminadas',
+  reconciledMap.p1.correctCount === 1 &&
+    reconciledMap.p1.score > 1000 &&
+    reconciledMap.p1.answers['0'].isCorrect === true &&
+    reconciledMap.p1.answers['1'] === undefined &&
+    reconciledMap.p2.correctCount === 1
+);
+
+const builderSrc = fs.readFileSync(new URL('../src/components/KahootBuilder.jsx', import.meta.url), 'utf8');
+const taskCardSrc = fs.readFileSync(new URL('../src/components/TaskCard.jsx', import.meta.url), 'utf8');
+check(
+  'KahootBuilder evita text-gray-900 sobre fondo amarillo en Modo Oscuro e incluye todos los formatos de IA',
+  builderSrc.includes('bg-amber-400 text-gray-950') &&
+    !builderSrc.includes('bg-amber-400 text-gray-900') &&
+    builderSrc.includes('solo_type_answer') &&
+    builderSrc.includes('solo_puzzle')
+);
+check(
+  'TaskCard reconcilia participantes y acota currentQuestionIndex al editar preguntas de un Kahoot',
+  taskCardSrc.includes('reconcileKahootParticipantsAfterEdit')
+);
+
+// Verificar que un docente practicando en modo solitario (isSoloPracticePlayer: true) sí aparece en el leaderboard
+const soloTeacherLb = buildKahootLeaderboard(
+  {
+    bot_sofia: { id: 'bot_sofia', nickname: 'Sofía', score: 900, correctCount: 1, answers: { 0: { isCorrect: true, timeMs: 3000 } } },
+    teacher_gina: {
+      id: 'teacher_gina',
+      nickname: 'Gina Docente',
+      score: 980,
+      correctCount: 1,
+      isSoloPracticePlayer: true,
+      answers: { 0: { isCorrect: true, timeMs: 1500, pointsEarned: 980 } }
+    },
+    host_ghost: { id: 'host_ghost', nickname: 'Host', isHost: true, score: 0 }
+  },
+  0
+);
+check(
+  'buildKahootLeaderboard incluye al docente cuando está en práctica individual (isSoloPracticePlayer) pero excluye anfitriones isHost',
+  soloTeacherLb.totalParticipants === 2 &&
+    soloTeacherLb.leaderboard[0].id === 'teacher_gina' &&
+    soloTeacherLb.leaderboard[0].rank === 1 &&
+    !soloTeacherLb.leaderboard.some((p) => p.id === 'host_ghost')
+);
+
+// Verificar que reconcileKahootParticipantsAfterEdit empareja por questionId al reordenar o eliminar preguntas y valida límites de opciones
+const reorderedQuestions = [
+  normalizeKahootQuestion(
+    {
+      id: 'q_second',
+      type: 'quiz',
+      text: 'Question originally at index 1, now moved to index 0 (2 options)',
+      timeLimit: 20,
+      pointsMultiplier: 1,
+      options: [
+        { id: 'opt_a', text: 'Correct A', isCorrect: true },
+        { id: 'opt_b', text: 'Wrong B', isCorrect: false }
+      ]
+    },
+    0
+  ),
+  normalizeKahootQuestion(
+    {
+      id: 'q_first',
+      type: 'quiz',
+      text: 'Question originally at index 0, now moved to index 1 (reduced to 2 options)',
+      timeLimit: 20,
+      pointsMultiplier: 1,
+      options: [
+        { id: 'opt_1', text: 'Option 1', isCorrect: true },
+        { id: 'opt_2', text: 'Option 2', isCorrect: false }
+      ]
+    },
+    1
+  )
+];
+const reconciledReordered = reconcileKahootParticipantsAfterEdit(
+  {
+    student1: {
+      id: 'student1',
+      nickname: 'Mateo',
+      score: 900,
+      streak: 1,
+      correctCount: 1,
+      answers: {
+        0: { questionId: 'q_first', questionIndex: 0, optionIndex: 3, optionIndices: [3], isCorrect: false, timeMs: 2500 },
+        1: { questionId: 'q_second', questionIndex: 1, optionIndex: 0, optionIndices: [0], isCorrect: true, timeMs: 2000 }
+      }
+    }
+  },
+  reorderedQuestions
+);
+check(
+  'reconcileKahootParticipantsAfterEdit empareja respuestas por questionId tras reordenar preguntas y descarta opciones fuera de rango eliminadas',
+  reconciledReordered.student1.correctCount === 1 &&
+    reconciledReordered.student1.answers['0']?.questionId === 'q_second' &&
+    reconciledReordered.student1.answers['0']?.isCorrect === true &&
+    reconciledReordered.student1.answers['1'] === undefined
+);
+
+const botAnsWithId = buildSimulatedBotAnswer(
+  { id: 'bot_1', skill: 1 },
+  reorderedQuestions[0],
+  0
+);
+check(
+  'buildSimulatedBotAnswer incluye questionId de la pregunta',
+  botAnsWithId.questionId === 'q_second' && botAnsWithId.isCorrect === true
+);
+
+const liveModalSrc = fs.readFileSync(new URL('../src/components/KahootLiveModal.jsx', import.meta.url), 'utf8');
+check(
+  'KahootLiveModal estabiliza updateKahootState con taskPropRef, incluye isSoloPracticePlayer y restaura modo solo al volver del repaso',
+  liveModalSrc.includes('taskPropRef.current') &&
+    liveModalSrc.includes('isSoloPracticePlayer: true') &&
+    liveModalSrc.includes('if (soloState.active)')
 );
 
 console.log(`\nRESULTADO KAHOOT: ${okCount} OK, ${failCount} fallos\n`);

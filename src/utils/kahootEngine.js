@@ -296,7 +296,9 @@ export function normalizeKahootQuestion(raw, index = 0, normOptions = {}) {
     const acceptedAnswers = rawAcc.map((s) => limpiarTextoPlano(s, 150)).filter(Boolean).slice(0, 6);
     const correctAnswer = cleanFn(
       raw.correctAnswer ??
+        raw.respuestaCorrecta ??
         raw.respuesta ??
+        raw.answer ??
         acceptedAnswers[0] ??
         (Array.isArray(raw.options) ? raw.options.find((o) => o?.isCorrect)?.text : '') ??
         '',
@@ -328,11 +330,19 @@ export function normalizeKahootQuestion(raw, index = 0, normOptions = {}) {
   if (type === 'puzzle') {
     const rawItems = Array.isArray(raw.puzzleItems) && raw.puzzleItems.length > 0
       ? raw.puzzleItems
-      : Array.isArray(raw.words) && raw.words.length > 0
-        ? raw.words
-        : Array.isArray(raw.options)
-          ? raw.options.map((o) => (typeof o === 'string' ? o : (o?.text ?? o?.texto)))
-          : [];
+      : Array.isArray(raw.items) && raw.items.length > 0
+        ? raw.items
+        : Array.isArray(raw.steps) && raw.steps.length > 0
+          ? raw.steps
+          : Array.isArray(raw.pasos) && raw.pasos.length > 0
+            ? raw.pasos
+            : Array.isArray(raw.secuencia) && raw.secuencia.length > 0
+              ? raw.secuencia
+              : Array.isArray(raw.words) && raw.words.length > 0
+                ? raw.words
+                : Array.isArray(raw.options)
+                  ? raw.options.map((o) => (typeof o === 'string' ? o : (o?.text ?? o?.texto)))
+                  : [];
 
     let puzzleItems;
     if (preserveDraft) {
@@ -574,19 +584,20 @@ export function evaluateKahootAnswer(question, submission) {
       .map((o, idx) => (o?.isCorrect ? idx : -1))
       .filter((idx) => idx >= 0);
 
-    if (question.allowMultiple && correctIndices.length > 1) {
+    if ((question.allowMultiple && correctIndices.length > 0) || selectedSet.size > 1) {
       if (selectedSet.size !== correctIndices.length) return false;
       return correctIndices.every((idx) => selectedSet.has(idx));
     }
 
-    const firstIdx = submission.optionIndices[0];
+    const firstIdx = Number(submission.optionIndices[0]);
+    if (Number.isNaN(firstIdx) || firstIdx < 0 || firstIdx >= options.length) return false;
     return Boolean(options[firstIdx]?.isCorrect);
   }
 
   if (Array.isArray(submission.optionIds) && submission.optionIds.length > 0) {
     const selectedIdSet = new Set(submission.optionIds.map(String));
     const correctIds = options.filter((o) => o?.isCorrect).map((o) => String(o.id));
-    if (question.allowMultiple && correctIds.length > 1) {
+    if ((question.allowMultiple && correctIds.length > 0) || selectedIdSet.size > 1) {
       if (selectedIdSet.size !== correctIds.length) return false;
       return correctIds.every((id) => selectedIdSet.has(id));
     }
@@ -670,13 +681,15 @@ export function buildKahootLeaderboard(participantsMap = {}, currentQuestionInde
       p &&
       typeof p === 'object' &&
       (p.nickname || p.realName || p.id) &&
-      !p.isTeacherHost &&
-      p.role !== 'teacher' &&
-      p.id !== 'teacher' &&
-      p.id !== 'teacher_gina' &&
-      p.id !== 'teacher_camilo' &&
-      String(p.nickname || '').trim() !== 'Docente Host' &&
-      String(p.realName || '').trim() !== 'Docente Host'
+      (p.isSoloPracticePlayer ||
+        (!p.isTeacherHost &&
+          !p.isHost &&
+          p.role !== 'teacher' &&
+          p.id !== 'teacher' &&
+          p.id !== 'teacher_gina' &&
+          p.id !== 'teacher_camilo' &&
+          String(p.nickname || '').trim() !== 'Docente Host' &&
+          String(p.realName || '').trim() !== 'Docente Host'))
   );
 
   const getAnswerForQ = (player, qIdx) => {
@@ -753,41 +766,200 @@ export function buildKahootLeaderboard(participantsMap = {}, currentQuestionInde
 }
 
 /**
+ * Reconcilia los participantes y recalcula sus respuestas/puntajes cuando el docente
+ * edita las preguntas de un Kahoot que ya tenía participantes o ya había sido jugado.
+ */
+export function reconcileKahootParticipantsAfterEdit(participantsMap = {}, normalizedQuestions = []) {
+  if (!participantsMap || typeof participantsMap !== 'object') return {};
+  const qList = Array.isArray(normalizedQuestions) ? normalizedQuestions : [];
+  const maxQ = qList.length;
+  const reconciled = {};
+
+  const isAnswerCompatibleWithType = (q, ans) => {
+    if (!q || !ans || typeof ans !== 'object') return false;
+    if (q.type === 'type_answer') {
+      return typeof ans.textAnswer === 'string' || typeof ans.text === 'string';
+    }
+    if (q.type === 'puzzle') {
+      return Array.isArray(ans.puzzleOrder) || Array.isArray(ans.orderedIds);
+    }
+    const opts = (Array.isArray(q.options) ? q.options : []).filter(
+      (o) => String(o?.text || '').trim().length > 0
+    );
+    const optsLen = opts.length;
+    if (optsLen === 0) return false;
+    if (Array.isArray(ans.optionIndices) && ans.optionIndices.length > 0) {
+      return ans.optionIndices.every((idx) => {
+        const n = Number(idx);
+        return !Number.isNaN(n) && n >= 0 && n < optsLen;
+      });
+    }
+    if (ans.optionIndex !== undefined && ans.optionIndex !== null) {
+      const n = Number(ans.optionIndex);
+      return !Number.isNaN(n) && n >= 0 && n < optsLen;
+    }
+    if (Array.isArray(ans.optionIds) && ans.optionIds.length > 0) {
+      const validIdSet = new Set(opts.map((o) => String(o?.id)));
+      return ans.optionIds.every((id) => validIdSet.has(String(id)));
+    }
+    if (ans.optionId !== undefined && ans.optionId !== null) {
+      return opts.some((o) => String(o?.id) === String(ans.optionId));
+    }
+    return false;
+  };
+
+  Object.entries(participantsMap).forEach(([key, player]) => {
+    if (!player || typeof player !== 'object') return;
+    const rawAnswers = player.answers && typeof player.answers === 'object' ? player.answers : {};
+    const answerKeys = Object.keys(rawAnswers);
+
+    if (answerKeys.length === 0) {
+      const safeLastAnswer =
+        player.lastAnswer &&
+        Number(player.lastAnswer.questionIndex) >= 0 &&
+        Number(player.lastAnswer.questionIndex) < maxQ
+          ? player.lastAnswer
+          : null;
+      reconciled[key] = {
+        ...player,
+        correctCount: Math.min(Number(player.correctCount) || 0, maxQ),
+        lastAnswer: safeLastAnswer,
+      };
+      return;
+    }
+
+    let runningScore = 0;
+    let runningStreak = 0;
+    let runningCorrect = 0;
+    let runningTimeMs = 0;
+    let latestAnswerRecord = null;
+    const nextAnswers = {};
+    const allRawAnswerEntries = Object.values(rawAnswers).filter(
+      (a) => a && typeof a === 'object'
+    );
+
+    for (let qIdx = 0; qIdx < maxQ; qIdx++) {
+      const q = qList[qIdx];
+      let prevAns = null;
+      if (q?.id) {
+        prevAns = allRawAnswerEntries.find(
+          (a) => a.questionId && String(a.questionId) === String(q.id)
+        );
+      }
+      if (!prevAns) {
+        const candidateByIndex = rawAnswers[String(qIdx)];
+        if (
+          candidateByIndex &&
+          (!candidateByIndex.questionId || !q?.id || String(candidateByIndex.questionId) === String(q.id))
+        ) {
+          prevAns = candidateByIndex;
+        }
+      }
+      if (!prevAns || !isAnswerCompatibleWithType(q, prevAns)) continue;
+
+      const isCorrect = evaluateKahootAnswer(q, prevAns);
+      const timeMs = Number(prevAns.timeMs) || 1000;
+      const scoreCalc = calculateKahootPoints({
+        isCorrect,
+        timeMs,
+        timeLimitSec: q.timeLimit || 20,
+        pointsMultiplier: q.pointsMultiplier ?? 1,
+        currentStreak: runningStreak,
+      });
+
+      const updatedAns = {
+        ...prevAns,
+        ...(q?.id ? { questionId: q.id } : {}),
+        questionIndex: qIdx,
+        isCorrect,
+        pointsEarned: scoreCalc.pointsEarned,
+        streakBonus: scoreCalc.streakBonus,
+        timeMs,
+      };
+
+      nextAnswers[String(qIdx)] = updatedAns;
+      runningScore += scoreCalc.pointsEarned;
+      runningStreak = scoreCalc.newStreak;
+      runningCorrect += isCorrect ? 1 : 0;
+      runningTimeMs += timeMs;
+      latestAnswerRecord = updatedAns;
+    }
+
+    reconciled[key] = {
+      ...player,
+      score: runningScore,
+      streak: runningStreak,
+      correctCount: runningCorrect,
+      totalTimeMs: runningTimeMs,
+      answers: nextAnswers,
+      lastAnswer: latestAnswerRecord,
+    };
+  });
+
+  return reconciled;
+}
+
+/**
  * Genera una respuesta simulada para un compañero virtual en Modo Demo
  */
 export function buildSimulatedBotAnswer(bot, question, questionIndex) {
-  const isCorrectRoll = Math.random() <= (bot.skill || 0.8);
+  const rawSkill = Number(bot?.skill);
+  const skill = Number.isFinite(rawSkill) ? Math.max(0, Math.min(1, rawSkill)) : 0.8;
+  const isCorrectRoll = Math.random() < skill;
   const timeLimitMs = (Number(question?.timeLimit) || 20) * 1000;
   const minDelay = Math.min(bot.minDelayMs || 1800, timeLimitMs * 0.4);
   const maxDelay = Math.min(bot.maxDelayMs || 7000, timeLimitMs * 0.85);
   const timeMs = Math.round(minDelay + Math.random() * Math.max(500, maxDelay - minDelay));
+  const qIdField = question?.id ? { questionId: question.id } : {};
 
   if (question.type === 'type_answer') {
     const textAnswer = isCorrectRoll ? question.correctAnswer : 'not sure';
-    return {
+    const sub = {
+      ...qIdField,
       questionIndex,
       textAnswer,
       optionIndex: isCorrectRoll ? 0 : 1,
-      isCorrect: isCorrectRoll,
       timeMs,
+    };
+    return {
+      ...sub,
+      isCorrect: evaluateKahootAnswer(question, sub),
     };
   }
 
   if (question.type === 'puzzle') {
-    const items = [...(question.puzzleItems || [])];
-    const puzzleOrder = isCorrectRoll ? items : [...items].reverse();
-    return {
+    const items = [...(question.puzzleItems || [])].filter(Boolean);
+    let puzzleOrder = items;
+    if (!isCorrectRoll && items.length >= 2) {
+      puzzleOrder = [...items].reverse();
+      if (evaluateKahootAnswer(question, { puzzleOrder })) {
+        const swapped = [...items];
+        const first = swapped.shift();
+        swapped.push(first);
+        puzzleOrder = swapped;
+      }
+    }
+    const sub = {
+      ...qIdField,
       questionIndex,
       puzzleOrder,
       optionIndex: isCorrectRoll ? 0 : 1,
-      isCorrect: isCorrectRoll,
       timeMs,
+    };
+    return {
+      ...sub,
+      isCorrect: evaluateKahootAnswer(question, sub),
     };
   }
 
   const opts = Array.isArray(question.options) ? question.options : [];
-  const correctIndices = opts.map((o, idx) => (o?.isCorrect ? idx : -1)).filter((i) => i >= 0);
-  const wrongIndices = opts.map((o, idx) => (!o?.isCorrect ? idx : -1)).filter((i) => i >= 0);
+  const hasAnyNonEmpty = opts.some((o) => String(o?.text || '').trim().length > 0);
+  const correctIndices = opts
+    .map((o, idx) => (o?.isCorrect && (!hasAnyNonEmpty || String(o?.text || '').trim()) ? idx : -1))
+    .filter((i) => i >= 0);
+  const wrongIndices = opts
+    .map((o, idx) => (!o?.isCorrect && (!hasAnyNonEmpty || String(o?.text || '').trim()) ? idx : -1))
+    .filter((i) => i >= 0);
 
   let chosenIdx = 0;
   if (isCorrectRoll && correctIndices.length > 0) {
@@ -796,12 +968,21 @@ export function buildSimulatedBotAnswer(bot, question, questionIndex) {
     chosenIdx = wrongIndices[Math.floor(Math.random() * wrongIndices.length)];
   }
 
-  return {
+  const optionIndices = question.allowMultiple && isCorrectRoll && correctIndices.length > 0
+    ? correctIndices
+    : [chosenIdx];
+
+  const sub = {
+    ...qIdField,
     questionIndex,
     optionIndex: chosenIdx,
-    optionIndices: question.allowMultiple && isCorrectRoll ? correctIndices : [chosenIdx],
-    isCorrect: Boolean(opts[chosenIdx]?.isCorrect),
+    optionIndices,
     timeMs,
+  };
+
+  return {
+    ...sub,
+    isCorrect: evaluateKahootAnswer(question, sub),
   };
 }
 
@@ -941,13 +1122,17 @@ export function parsearKahootIA(rawText, defaultTimeLimit = 20, startIndex = 0) 
       globalIdx
     );
     if (!q.text) return;
+    if (q.type === 'type_answer' && !String(q.correctAnswer || '').trim()) return;
+    if (q.type === 'puzzle' && (q.puzzleItems || []).filter((x) => String(x || '').trim()).length < 3) return;
+    const nonEmptyOpts = (q.options || []).filter((o) => String(o.text || '').trim().length > 0);
+    if ((q.type === 'quiz' || q.type === 'truefalse') && nonEmptyOpts.length < 2) return;
+
     const clave = q.text.toLowerCase().slice(0, 80);
     if (vistos.has(clave)) return;
     vistos.add(clave);
 
     // Si es quiz y la opción correcta siempre vino en índice 0, rotamos de forma determinista según globalIdx
     // solo entre las opciones con texto para mantener las opciones vacías opcionales al final.
-    const nonEmptyOpts = (q.options || []).filter((o) => String(o.text || '').trim().length > 0);
     const emptyOpts = (q.options || []).filter((o) => String(o.text || '').trim().length === 0);
     if (q.type === 'quiz' && nonEmptyOpts.length >= 2) {
       const firstCorrect = nonEmptyOpts[0]?.isCorrect && !nonEmptyOpts.slice(1).some((o) => o.isCorrect);

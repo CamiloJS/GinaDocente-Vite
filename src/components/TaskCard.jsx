@@ -19,7 +19,7 @@ import CustomVideoPlayer, { isDirectVideoUrl } from './CustomVideoPlayer.jsx'
 import GeniallyEmbedPlayer, { extractGeniallyUrl } from './GeniallyEmbedPlayer.jsx'
 import KahootLiveModal from './KahootLiveModal.jsx'
 import KahootBuilder from './KahootBuilder.jsx'
-import { validateKahootConfig, buildKahootLeaderboard } from '../utils/kahootEngine.js'
+import { validateKahootConfig, buildKahootLeaderboard, reconcileKahootParticipantsAfterEdit } from '../utils/kahootEngine.js'
 import { useVoiceRecorder } from '../utils/useVoiceRecorder.js'
 import { auth, signInAnonymously, doc, setDoc, updateDoc, deleteDoc } from '../firebase/config.js'
 import { runTransaction } from 'firebase/firestore'
@@ -221,12 +221,18 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
         if (isDemoTask) {
             const nextTask = { ...task, ...updates };
             if (typeof setTasks === 'function') {
-                setTasks(prev => (prev || []).map(t => String(t.id) === String(task.id) ? nextTask : t));
+                setTasks(prev => (prev || []).map(t => String(t.id) === String(task.id) ? { ...t, ...updates } : t));
             }
             saveDemoSandboxItem('tasks', nextTask);
             return;
         }
+        if (!auth?.currentUser) {
+            try { await signInAnonymously(auth); } catch { /* continuar */ }
+        }
         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), updates);
+        if (typeof setTasks === 'function') {
+            setTasks(prev => (prev || []).map(t => String(t.id) === String(task.id) ? { ...t, ...updates } : t));
+        }
     };
 
     const handleVote = async (optionId) => {
@@ -863,8 +869,37 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                 hideDate: Boolean(editTaskData.hideDate)
             };
             if (task.type !== 'post' && task.type !== 'kahoot') { updates.dueDate = editTaskData.dueDate; updates.dueTime = editTaskData.dueTime; updates.allowLate = editTaskData.allowLate; }
+            if (isKahoot && isEditingKahootQuestions) {
+                const validation = validateKahootConfig(editedKahootQuestions);
+                if (!validation.valid) {
+                    return showMessage(`⚠️ ${validation.error}`);
+                }
+                const currentKahoot = task.kahoot || {};
+                const reconciledParticipants = reconcileKahootParticipantsAfterEdit(
+                    currentKahoot.participants || {},
+                    validation.normalizedQuestions
+                );
+                const clampedQIdx = Math.max(
+                    0,
+                    Math.min(
+                        Number(currentKahoot.currentQuestionIndex) || 0,
+                        Math.max(0, validation.normalizedQuestions.length - 1)
+                    )
+                );
+                updates.kahoot = {
+                    ...currentKahoot,
+                    questions: validation.normalizedQuestions,
+                    participants: reconciledParticipants,
+                    currentQuestionIndex: clampedQIdx,
+                    musicEnabled: currentKahoot.musicEnabled !== false,
+                    allowNicknameChange: currentKahoot.allowNicknameChange !== false,
+                    updatedAt: Date.now()
+                };
+            }
             await updateTaskDoc(updates);
-            setIsEditingTask(false); showMessage("Publicación actualizada.");
+            setIsEditingTask(false);
+            if (isEditingKahootQuestions) setIsEditingKahootQuestions(false);
+            showMessage("Publicación actualizada.");
         } catch (error) { showMessage("Hubo un error al actualizar."); }
     };
 
@@ -1772,8 +1807,8 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                                     <KahootBuilder
                                         questions={editedKahootQuestions}
                                         setQuestions={setEditedKahootQuestions}
-                                        taskTitle={task.title}
-                                        taskDesc={task.description}
+                                        taskTitle={isEditingTask ? editTaskData.title : task.title}
+                                        taskDesc={isEditingTask ? editTaskData.description : task.description}
                                         callGemini={callGemini}
                                         showMessage={showMessage}
                                         isDarkMode={isDarkMode}
@@ -1790,21 +1825,45 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                                         <button
                                             type="button"
                                             onClick={async () => {
+                                                if (isEditingTask && !editTaskData.title.trim()) {
+                                                    return showMessage("El título no puede estar vacío.");
+                                                }
                                                 const validation = validateKahootConfig(editedKahootQuestions);
                                                 if (!validation.valid) {
                                                     return showMessage(`⚠️ ${validation.error}`);
                                                 }
                                                 try {
-                                                    await updateTaskDoc({
+                                                    const reconciledParticipants = reconcileKahootParticipantsAfterEdit(
+                                                        kahoot.participants || {},
+                                                        validation.normalizedQuestions
+                                                    );
+                                                    const clampedQIdx = Math.max(
+                                                        0,
+                                                        Math.min(
+                                                            Number(kahoot.currentQuestionIndex) || 0,
+                                                            Math.max(0, validation.normalizedQuestions.length - 1)
+                                                        )
+                                                    );
+                                                    const updates = {
                                                         kahoot: {
                                                             ...kahoot,
                                                             questions: validation.normalizedQuestions,
-                                                            musicEnabled: true,
-                                                            allowNicknameChange: true,
+                                                            participants: reconciledParticipants,
+                                                            currentQuestionIndex: clampedQIdx,
+                                                            musicEnabled: kahoot.musicEnabled !== false,
+                                                            allowNicknameChange: kahoot.allowNicknameChange !== false,
                                                             updatedAt: Date.now()
                                                         }
-                                                    });
+                                                    };
+                                                    if (isEditingTask) {
+                                                        updates.title = editTaskData.title.trim();
+                                                        updates.description = editTaskData.description.trim();
+                                                        updates.geniallyUrl = editTaskData.geniallyUrl ? extractGeniallyUrl(editTaskData.geniallyUrl.trim()) : '';
+                                                        updates.hideDate = Boolean(editTaskData.hideDate);
+                                                    }
+                                                    await updateTaskDoc(updates);
                                                     setIsEditingKahootQuestions(false);
+                                                    if (isEditingTask) setIsEditingTask(false);
                                                     showMessage("Cambios guardados.");
                                                 } catch (err) {
                                                     showMessage("No se pudieron guardar los cambios.");

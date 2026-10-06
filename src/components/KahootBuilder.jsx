@@ -188,12 +188,14 @@ const KahootBuilder = ({
       showMessage?.('Escribe el tema del Kahoot en el campo de IA o en el título de la actividad.');
       return;
     }
+    const safeAiCount = Math.max(1, Math.min(KAHOOT_MAX_QUESTIONS, Number(aiCount) || 6));
+    setAiCount(safeAiCount);
     setIsGeneratingAi(true);
     try {
       const res = await generarKahootConIA(
         {
           tema: effectiveTopic,
-          total: aiCount,
+          total: safeAiCount,
           dificultad: aiDifficulty,
           idioma: aiLanguage,
           mezcla: aiMix,
@@ -367,7 +369,20 @@ const KahootBuilder = ({
                 min={1}
                 max={KAHOOT_MAX_QUESTIONS}
                 value={aiCount}
-                onChange={(e) => setAiCount(Math.max(1, Math.min(KAHOOT_MAX_QUESTIONS, Number(e.target.value) || 1)))}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === '') {
+                    setAiCount('');
+                    return;
+                  }
+                  const num = parseInt(val, 10);
+                  if (!Number.isNaN(num)) {
+                    setAiCount(Math.max(1, Math.min(KAHOOT_MAX_QUESTIONS, num)));
+                  }
+                }}
+                onBlur={() => {
+                  setAiCount((prev) => Math.max(1, Math.min(KAHOOT_MAX_QUESTIONS, Number(prev) || 6)));
+                }}
                 className="w-full py-1.5 px-2.5 text-xs font-bold rounded-xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100"
               />
             </div>
@@ -385,6 +400,8 @@ const KahootBuilder = ({
                 <option value="completo">Todos los tipos</option>
                 <option value="solo_quiz">Solo Quiz</option>
                 <option value="solo_vf">Solo V/F</option>
+                <option value="solo_type_answer">Solo Respuesta corta</option>
+                <option value="solo_puzzle">Solo Puzzle</option>
               </select>
             </div>
 
@@ -498,7 +515,7 @@ const KahootBuilder = ({
                 <div className="flex items-center gap-1 leading-none">
                   <span>{typeInfo.shortLabel}</span>
                   {norm.pointsMultiplier === 2 && (
-                    <span className="text-[9px] px-1 py-0.2 rounded bg-amber-400 text-gray-900 font-black">
+                    <span className="text-[9px] px-1 py-0.2 rounded bg-amber-400 text-gray-950 font-black">
                       x2
                     </span>
                   )}
@@ -788,10 +805,13 @@ const KahootBuilder = ({
                   <button
                     type="button"
                     onClick={() => {
-                      const firstCorrectIdx = Math.max(
-                        0,
-                        currentQ.options.findIndex((o) => o.isCorrect)
+                      const nonEmptyCorrectIdx = currentQ.options.findIndex(
+                        (o) => o.isCorrect && String(o.text || '').trim()
                       );
+                      const firstCorrectIdx =
+                        nonEmptyCorrectIdx >= 0
+                          ? nonEmptyCorrectIdx
+                          : Math.max(0, currentQ.options.findIndex((o) => o.isCorrect));
                       updateQuestionAt(safeIdx, {
                         allowMultiple: false,
                         options: currentQ.options.map((o, i) => ({

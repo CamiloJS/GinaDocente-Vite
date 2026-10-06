@@ -217,7 +217,20 @@ const KahootLiveModal = ({
   const questions = useMemo(() => {
     try {
       const parsed = JSON.parse(questionsSignature);
-      return Array.isArray(parsed) ? parsed.map((q, i) => normalizeKahootQuestion(q, i)) : [];
+      return Array.isArray(parsed)
+        ? parsed.map((q, i) => {
+            const norm = normalizeKahootQuestion(q, i);
+            if (norm.type === 'quiz' || norm.type === 'truefalse') {
+              const nonEmpty = (norm.options || []).filter(
+                (o) => String(o?.text || '').trim().length > 0
+              );
+              if (nonEmpty.length >= 2) {
+                return { ...norm, options: nonEmpty };
+              }
+            }
+            return norm;
+          })
+        : [];
     } catch {
       return [];
     }
@@ -250,13 +263,14 @@ const KahootLiveModal = ({
   const [nicknameDraft, setNicknameDraft] = useState(myNickname);
 
   useEffect(() => {
-    if (existingMe?.nickname) {
-      setMyNickname(existingMe.nickname);
-    }
+    const nextName =
+      existingMe?.nickname || loggedInName || (role === 'teacher' ? 'Docente Host' : 'Estudiante');
+    setMyNickname(nextName);
+    setNicknameDraft(nextName);
     if (existingMe?.avatar) {
       setMyAvatar(existingMe.avatar);
     }
-  }, [existingMe?.nickname, existingMe?.avatar]);
+  }, [existingMe?.nickname, existingMe?.avatar, loggedInName, role, task?.id]);
 
   // Selección temporal para preguntas multi-opción, respuesta corta o puzzle
   const [selectedMultiIndices, setSelectedMultiIndices] = useState([]);
@@ -337,11 +351,14 @@ const KahootLiveModal = ({
     remainingSecondsRef.current = activeDuration;
   }
   const gongTriggeredForRoundRef = useRef('');
+  const submittingRoundRef = useRef('');
+  const taskPropRef = useRef(task);
+  taskPropRef.current = task;
 
   // Función auxiliar para actualizar el objeto kahoot en Firestore o en el Sandbox Demo
   const updateKahootState = useCallback(
     async (partialKahootUpdates, dotNotationUpdates = null) => {
-      const currentTask = liveTaskRef.current || task;
+      const currentTask = liveTaskRef.current || taskPropRef.current;
       if (!currentTask) return;
 
       const nowTs = Date.now();
@@ -395,14 +412,14 @@ const KahootLiveModal = ({
         console.warn('Error actualizando estado de Kahoot:', err);
       }
     },
-    [task, isDemoTask, db, appId, syncTaskToParent]
+    [isDemoTask, db, appId, syncTaskToParent]
   );
 
   // Auto-registrar participante al entrar a la sala en vivo (si es estudiante o bots en Modo Demo)
   const hasAutoJoinedRef = useRef(false);
   useEffect(() => {
     hasAutoJoinedRef.current = false;
-  }, [isOpen, task?.id]);
+  }, [isOpen, task?.id, role, safePlayerId]);
 
   useEffect(() => {
     if (!isOpen || viewMode !== 'live') return;
@@ -542,6 +559,46 @@ const KahootLiveModal = ({
     [kahoot.participants, activeQIndex]
   );
 
+  // Clasificación mostrada en pantalla (en modo práctica 'solo' incorpora el puntaje de práctica actual del usuario)
+  const displayLeaderboard = useMemo(() => {
+    if (viewMode !== 'solo') return leaderboard;
+    const soloNickname =
+      myNickname === 'Docente Host' && loggedInName ? loggedInName : myNickname || 'Participante';
+    const mergedParticipants = {
+      ...(kahoot.participants || {}),
+      [safePlayerId]: {
+        ...(kahoot.participants?.[safePlayerId] || {}),
+        id: safePlayerId,
+        realName: loggedInName || soloNickname,
+        nickname: soloNickname,
+        avatar: myAvatar,
+        score: soloState.score,
+        streak: soloState.streak,
+        correctCount: soloState.correctCount,
+        lastAnswer: soloState.answers[String(activeQIndex)] || null,
+        answers: soloState.answers,
+        isSoloPracticePlayer: true,
+        isTeacherHost: false,
+        isHost: false,
+        role: 'student',
+      },
+    };
+    return buildKahootLeaderboard(mergedParticipants, activeQIndex).leaderboard;
+  }, [
+    viewMode,
+    leaderboard,
+    kahoot.participants,
+    safePlayerId,
+    loggedInName,
+    myNickname,
+    myAvatar,
+    soloState.score,
+    soloState.streak,
+    soloState.correctCount,
+    soloState.answers,
+    activeQIndex,
+  ]);
+
   const myParticipantData = kahoot.participants?.[safePlayerId];
   const myLiveAnswer =
     viewMode === 'solo'
@@ -583,11 +640,11 @@ const KahootLiveModal = ({
         const partsMap = liveTaskRef.current?.kahoot?.participants || {};
         let latestId = '';
         let latestTs = -1;
-        Object.values(partsMap).forEach((p) => {
+        Object.entries(partsMap).forEach(([pid, p]) => {
           const ansTs = Number(p?.answers?.[String(activeQIndex)]?.answeredAt) || 0;
           if (ansTs > latestTs) {
             latestTs = ansTs;
-            latestId = p.id;
+            latestId = p?.id || pid;
           }
         });
         isLatestResponderOnAllAnswered = Boolean(latestId && latestId === safePlayerId);
@@ -705,9 +762,43 @@ const KahootLiveModal = ({
       return undefined;
     }
 
+    const botsToSimulate = [...DEMO_KAHOOT_BOTS];
+    if (isDemoTask && role === 'teacher') {
+      const knownBotIds = new Set(DEMO_KAHOOT_BOTS.map((b) => b.id));
+      Object.values(liveTaskRef.current?.kahoot?.participants || {}).forEach((p, idx) => {
+        if (
+          p &&
+          p.id &&
+          !knownBotIds.has(p.id) &&
+          p.id !== safePlayerId &&
+          !p.isTeacherHost &&
+          !p.isHost &&
+          p.role !== 'teacher' &&
+          p.id !== 'teacher' &&
+          p.id !== 'teacher_gina' &&
+          p.id !== 'teacher_camilo' &&
+          String(p.nickname || '').trim() !== 'Docente Host' &&
+          String(p.realName || '').trim() !== 'Docente Host'
+        ) {
+          botsToSimulate.push({
+            id: p.id,
+            realName: p.realName || p.nickname || 'Estudiante',
+            nickname: p.nickname || p.realName || 'Estudiante',
+            avatar: p.avatar || '🦊',
+            skill: 0.8,
+            minDelayMs: 2100 + idx * 350,
+            maxDelayMs: 5600 + idx * 450,
+          });
+        }
+      });
+    }
+
+    const roundStartTs = roundLocalStartMapRef.current[currentRoundKey] || Date.now();
+    const elapsedRoundMs = Math.max(0, Date.now() - roundStartTs);
     const timers = [];
-    DEMO_KAHOOT_BOTS.forEach((bot) => {
+    botsToSimulate.forEach((bot) => {
       const botAns = buildSimulatedBotAnswer(bot, currentQuestion, activeQIndex);
+      const delayMs = Math.max(150, botAns.timeMs - elapsedRoundMs);
       const t = setTimeout(() => {
         const latestKahoot = liveTaskRef.current?.kahoot || {};
         if (latestKahoot.phase !== 'question' || Number(latestKahoot.currentQuestionIndex) !== activeQIndex) {
@@ -725,6 +816,7 @@ const KahootLiveModal = ({
           score: 0,
           streak: 0,
           correctCount: 0,
+          totalTimeMs: 0,
           isSimulatedBot: true,
           answers: {},
         };
@@ -743,6 +835,7 @@ const KahootLiveModal = ({
         const answerRecord = {
           ...botAns,
           pointsEarned: scoreCalc.pointsEarned,
+          streakBonus: scoreCalc.streakBonus,
           answeredAt: Date.now(),
         };
 
@@ -751,6 +844,7 @@ const KahootLiveModal = ({
           score: (Number(botData.score) || 0) + scoreCalc.pointsEarned,
           streak: scoreCalc.newStreak,
           correctCount: (Number(botData.correctCount) || 0) + (botAns.isCorrect ? 1 : 0),
+          totalTimeMs: (Number(botData.totalTimeMs) || 0) + (Number(botAns.timeMs) || 0),
           lastAnswer: answerRecord,
           answers: {
             ...(botData.answers || {}),
@@ -767,7 +861,7 @@ const KahootLiveModal = ({
           },
           { [`kahoot.participants.${bot.id}`]: updatedBot }
         );
-      }, botAns.timeMs);
+      }, delayMs);
 
       timers.push(t);
     });
@@ -780,14 +874,19 @@ const KahootLiveModal = ({
     canControlGame,
     hasSimulatedBotsInRoom,
     isDemoTask,
+    role,
+    safePlayerId,
     viewMode,
     activePhase,
     activeQIndex,
+    currentRoundKey,
     currentQuestion,
     updateKahootState,
   ]);
 
   // Control automático de música ambiental (Lobby, Tensión, Revelación y Podio)
+  const lastPlayedRevealRoundRef = useRef('');
+  const lastPlayedPodiumKeyRef = useRef('');
   useEffect(() => {
     if (!isOpen || viewMode === 'review' || soundMuted) {
       stopKahootMusic();
@@ -801,24 +900,29 @@ const KahootLiveModal = ({
       startTensionMusic(() => remainingSecondsRef.current);
     } else if (activePhase === 'revealed') {
       stopKahootMusic();
-      if (myLiveAnswer) {
+      if (myLiveAnswer && lastPlayedRevealRoundRef.current !== currentRoundKey) {
         revealSoundTimer = setTimeout(() => {
-          if (!soundMutedRef.current) {
+          if (!soundMutedRef.current && lastPlayedRevealRoundRef.current !== currentRoundKey) {
+            lastPlayedRevealRoundRef.current = currentRoundKey;
             playRevealResultSound(Boolean(myLiveAnswer.isCorrect));
           }
         }, 550);
       }
     } else if (activePhase === 'podium') {
       stopKahootMusic();
-      playPodiumFanfare();
-      try {
-        confetti({
-          particleCount: 110,
-          spread: 80,
-          origin: { y: 0.6 },
-        });
-      } catch {
-        // Ignorar si canvas-confetti falla en entorno sin canvas
+      const podiumKey = `${viewMode}_${kahoot.finishedAt || soloState.startedAt || 'podium'}`;
+      if (lastPlayedPodiumKeyRef.current !== podiumKey) {
+        lastPlayedPodiumKeyRef.current = podiumKey;
+        playPodiumFanfare();
+        try {
+          confetti({
+            particleCount: 110,
+            spread: 80,
+            origin: { y: 0.6 },
+          });
+        } catch {
+          // Ignorar si canvas-confetti falla en entorno sin canvas
+        }
       }
     }
 
@@ -826,7 +930,7 @@ const KahootLiveModal = ({
       if (revealSoundTimer) clearTimeout(revealSoundTimer);
       stopKahootMusic();
     };
-  }, [isOpen, viewMode, activePhase, activeQIndex, soundMuted]);
+  }, [isOpen, viewMode, activePhase, activeQIndex, currentRoundKey, soundMuted, myLiveAnswer, kahoot.finishedAt, soloState.startedAt]);
 
   // Limpiar audio y temporizadores al desmontar
   useEffect(() => () => {
@@ -839,13 +943,14 @@ const KahootLiveModal = ({
 
   // Enviar respuesta del participante
   const handleSubmitAnswer = async (submissionPayload) => {
-    if (!currentQuestion || myLiveAnswer || activePhase !== 'question') return;
+    const roundKey = `${viewMode}_${activeQIndex}_${activeStartedAt}`;
+    if (!currentQuestion || myLiveAnswer || activePhase !== 'question' || submittingRoundRef.current === roundKey) return;
+    submittingRoundRef.current = roundKey;
 
     if (!soundMutedRef.current) {
       playAnswerSelectSound();
     }
 
-    const roundKey = `${viewMode}_${activeQIndex}_${activeStartedAt}`;
     const startTs =
       viewMode === 'solo'
         ? activeStartedAt > 0
@@ -866,6 +971,7 @@ const KahootLiveModal = ({
 
       const answerObj = {
         ...submissionPayload,
+        ...(currentQuestion.id ? { questionId: currentQuestion.id } : {}),
         questionIndex: activeQIndex,
         isCorrect,
         pointsEarned: scoreCalc.pointsEarned,
@@ -902,6 +1008,7 @@ const KahootLiveModal = ({
       score: 0,
       streak: 0,
       correctCount: 0,
+      totalTimeMs: 0,
       joinedAt: Date.now(),
       answers: {},
     };
@@ -916,6 +1023,7 @@ const KahootLiveModal = ({
 
     const answerObj = {
       ...submissionPayload,
+      ...(currentQuestion.id ? { questionId: currentQuestion.id } : {}),
       questionIndex: activeQIndex,
       isCorrect,
       pointsEarned: scoreCalc.pointsEarned,
@@ -931,6 +1039,7 @@ const KahootLiveModal = ({
       score: (Number(me.score) || 0) + scoreCalc.pointsEarned,
       streak: scoreCalc.newStreak,
       correctCount: (Number(me.correctCount) || 0) + (isCorrect ? 1 : 0),
+      totalTimeMs: (Number(me.totalTimeMs) || 0) + elapsedMs,
       lastAnswer: answerObj,
       answers: {
         ...(me.answers || {}),
@@ -985,6 +1094,9 @@ const KahootLiveModal = ({
     const now = Date.now();
     const dur = Number(targetQ.timeLimit) || 20;
     const nextRoundKey = `live_${indexToStart}_${now}`;
+    gongTriggeredForRoundRef.current = '';
+    submittingRoundRef.current = '';
+    setGongBannerVisible(false);
     setLocalRevealedRoundKey('');
     roundLocalStartMapRef.current[nextRoundKey] = now;
     setTimerState({ roundKey: nextRoundKey, seconds: dur });
@@ -1036,6 +1148,9 @@ const KahootLiveModal = ({
         const nextIdx = soloState.qIndex + 1;
         const dur = Number(questions[nextIdx]?.timeLimit) || 20;
         const now = Date.now();
+        gongTriggeredForRoundRef.current = '';
+        submittingRoundRef.current = '';
+        setGongBannerVisible(false);
         setLocalRevealedRoundKey('');
         setTimerState({ roundKey: `solo_${nextIdx}_${now}`, seconds: dur });
         remainingSecondsRef.current = dur;
@@ -1070,7 +1185,11 @@ const KahootLiveModal = ({
   };
 
   const handleRestartLiveGame = async () => {
+    gongTriggeredForRoundRef.current = '';
+    submittingRoundRef.current = '';
+    setGongBannerVisible(false);
     setLocalRevealedRoundKey('');
+    setSoloState((prev) => ({ ...prev, active: false }));
     const resetParts = {};
     const dotUpdates = {
       'kahoot.status': 'lobby',
@@ -1133,6 +1252,10 @@ const KahootLiveModal = ({
   const startSoloPractice = () => {
     const firstDur = Number(questions[0]?.timeLimit) || 20;
     const now = Date.now();
+    gongTriggeredForRoundRef.current = '';
+    submittingRoundRef.current = '';
+    setGongBannerVisible(false);
+    setLocalRevealedRoundKey('');
     setTimerState({ roundKey: `solo_0_${now}`, seconds: firstDur });
     remainingSecondsRef.current = firstDur;
     setSoloState({
@@ -1308,7 +1431,19 @@ const KahootLiveModal = ({
           {/* Conmutador entre Sala en Vivo y Guía de Repaso */}
           <button
             type="button"
-            onClick={() => setViewMode(viewMode === 'review' ? 'live' : 'review')}
+            onClick={() => {
+              if (viewMode === 'review') {
+                if (soloState.active) {
+                  setViewMode('solo');
+                } else if (kahoot.status === 'finished' && !canControlGame) {
+                  startSoloPractice();
+                } else {
+                  setViewMode('live');
+                }
+              } else {
+                setViewMode('review');
+              }
+            }}
             className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
           >
             <BookOpen size={14} />
@@ -1765,7 +1900,7 @@ const KahootLiveModal = ({
 
                   {viewMode === 'live' && (
                     <div className="px-3 py-1.5 rounded-xl bg-white/15 border border-white/20 text-xs font-extrabold">
-                      {answeredCount} / {Math.max(1, totalParticipants)} resp.
+                      {answeredCount} / {totalParticipants} resp.
                     </div>
                   )}
 
@@ -1825,7 +1960,7 @@ const KahootLiveModal = ({
                     </div>
                     <div className="text-left">
                       <h4 className="font-black text-sm sm:text-base text-white">
-                        Respuestas recibidas: {answeredCount} de {Math.max(1, totalParticipants)}
+                        Respuestas recibidas: {answeredCount} de {totalParticipants}
                       </h4>
                       <p className="text-xs text-purple-200/85">
                         Los estudiantes están seleccionando su opción desde sus dispositivos. Las opciones se revelarán al finalizar la ronda.
@@ -2141,7 +2276,7 @@ const KahootLiveModal = ({
                       Ronda finalizada • Respuestas reveladas
                     </h4>
                     <p className="text-xs text-purple-200">
-                      {answeredCount} de {Math.max(1, totalParticipants)} participantes respondieron esta pregunta
+                      {answeredCount} de {totalParticipants} participantes respondieron esta pregunta
                     </p>
                   </div>
                 </div>
@@ -2275,7 +2410,7 @@ const KahootLiveModal = ({
                   <div className="flex items-center justify-between">
                     <h4 className="font-black text-sm sm:text-base flex items-center gap-2">
                       <Trophy size={17} className="text-amber-400" />
-                      <span>Posiciones ({leaderboard.length})</span>
+                      <span>Posiciones ({displayLeaderboard.length})</span>
                     </h4>
                     <span className="text-xs font-bold text-purple-200">
                       {activeQIndex + 1}/{questions.length}
@@ -2283,7 +2418,7 @@ const KahootLiveModal = ({
                   </div>
 
                   <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                    {leaderboard.map((player) => {
+                    {displayLeaderboard.map((player) => {
                       const isMe = player.id === safePlayerId;
                       return (
                         <div
@@ -2371,6 +2506,17 @@ const KahootLiveModal = ({
                   : liveTask.title}
               </h2>
             </div>
+
+            {viewMode === 'solo' && (
+              <div className="max-w-md mx-auto p-6 rounded-3xl bg-gradient-to-b from-amber-400/30 via-purple-600/25 to-indigo-900/30 border-2 border-amber-300/70 space-y-2.5 shadow-2xl">
+                <div className="text-4xl">{myAvatar || '🦊'}</div>
+                <div className="text-2xl sm:text-3xl font-black text-white">{soloState.score} pts</div>
+                <div className="text-sm font-extrabold text-amber-200">
+                  {soloState.correctCount} de {questions.length} respuestas correctas (
+                  {Math.round((soloState.correctCount / Math.max(1, questions.length)) * 100)}%)
+                </div>
+              </div>
+            )}
 
             {/* Podio 1°, 2° y 3° lugar */}
             {viewMode === 'live' && leaderboard.length > 0 && (
