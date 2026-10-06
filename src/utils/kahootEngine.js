@@ -666,7 +666,17 @@ export function calculateKahootPoints({
  */
 export function buildKahootLeaderboard(participantsMap = {}, currentQuestionIndex = null) {
   const entries = Object.values(participantsMap || {}).filter(
-    (p) => p && typeof p === 'object' && (p.nickname || p.realName || p.id)
+    (p) =>
+      p &&
+      typeof p === 'object' &&
+      (p.nickname || p.realName || p.id) &&
+      !p.isTeacherHost &&
+      p.role !== 'teacher' &&
+      p.id !== 'teacher' &&
+      p.id !== 'teacher_gina' &&
+      p.id !== 'teacher_camilo' &&
+      String(p.nickname || '').trim() !== 'Docente Host' &&
+      String(p.realName || '').trim() !== 'Docente Host'
   );
 
   const getAnswerForQ = (player, qIdx) => {

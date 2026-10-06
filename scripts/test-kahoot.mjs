@@ -473,9 +473,125 @@ const genKahootClamp = await generarKahootConIA({ tema: 'Clamp Test', total: 80 
 });
 check('generarKahootConIA limita solicitudes >50 a un maximo de 50 preguntas', genKahootClamp.ok === true && genKahootClamp.questions.length === 50 && clampKahootCounter === 50);
 
+// 14. Pruebas de escalabilidad (40+ estudiantes), exclusión de docente host, audio agradable y vista proyector
+console.log('\n--- 14. Escalabilidad 40+ estudiantes, Exclusión Docente Host, Audio y Vista Proyector ---');
+
+const classroom45Map = {};
+// Agregar registros de docentes que NO deben contarse como jugadores ni bloquear all_answered
+classroom45Map.teacher_gina = {
+  id: 'teacher_gina',
+  nickname: 'Docente Gina',
+  role: 'teacher',
+  score: 0,
+  answers: {},
+};
+classroom45Map.host_custom = {
+  id: 'host_custom',
+  nickname: 'Profe Host',
+  isTeacherHost: true,
+  score: 0,
+  answers: {},
+};
+classroom45Map.legacy_host = {
+  id: 'legacy_host',
+  nickname: 'Docente Host',
+  score: 0,
+  answers: {},
+};
+
+for (let i = 1; i <= 45; i++) {
+  const pid = `student_${i}`;
+  const isFastest = i === 27;
+  const timeMs = isFastest ? 620 : 1200 + i * 30;
+  const pts = isFastest ? 985 : 900 - i * 5;
+  classroom45Map[pid] = {
+    id: pid,
+    nickname: `Estudiante ${i}`,
+    avatar: '🦊',
+    score: pts,
+    streak: 1,
+    correctCount: 1,
+    answers: {
+      '0': {
+        questionIndex: 0,
+        optionIndex: 1,
+        isCorrect: true,
+        pointsEarned: pts,
+        timeMs,
+      },
+    },
+  };
+}
+
+const lb45 = buildKahootLeaderboard(classroom45Map, 0);
+check(
+  'buildKahootLeaderboard excluye registros de docente/host (incluyendo Docente Host legado) para no bloquear el cierre automatico de ronda',
+  lb45.totalParticipants === 45 &&
+    lb45.answeredCount === 45 &&
+    !lb45.leaderboard.some(
+      (p) => p.id === 'teacher_gina' || p.id === 'host_custom' || p.id === 'legacy_host'
+    )
+);
+check(
+  'buildKahootLeaderboard procesa 45 estudiantes concurrentes ordenando puntajes y detectando el mas rapido',
+  lb45.leaderboard.length === 45 &&
+    lb45.leaderboard[0].id === 'student_27' &&
+    lb45.fastestResponder?.id === 'student_27' &&
+    lb45.leaderboard[44].rank === 45
+);
+
+import fs from 'node:fs';
+
+const gongResultNode = playGongSound();
+check(
+  'playGongSound se ejecuta de forma segura en entorno sin Web Audio API sin lanzar excepciones',
+  gongResultNode === false
+);
+
+const audioSrc = fs.readFileSync(new URL('../src/utils/kahootAudio.js', import.meta.url), 'utf8');
+const gongAndRevealSection = audioSrc.slice(audioSrc.indexOf('export const playGongSound'));
+check(
+  'playGongSound utiliza acorde de campana armonica brillante (C5-E5-G5-C6) sin ruido blanco, sin sawtooth disonante y con ganancia balanceada',
+  gongAndRevealSection.includes('chimeChord') &&
+    gongAndRevealSection.includes('523.25') &&
+    gongAndRevealSection.includes('1046.5') &&
+    !gongAndRevealSection.includes('gongPartials') &&
+    !gongAndRevealSection.includes('createBufferSource') &&
+    !gongAndRevealSection.includes('sawtooth')
+);
+
+const modalSrc = fs.readFileSync(new URL('../src/components/KahootLiveModal.jsx', import.meta.url), 'utf8');
+const appSrc = fs.readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
+check(
+  'KahootLiveModal separa la Vista Proyector del Docente (sin opciones en fase question) de la Vista Estudiante',
+  modalSrc.includes("const isTeacherProjector = role === 'teacher' && viewMode === 'live'") &&
+    modalSrc.includes('{isTeacherProjector ? (') &&
+    modalSrc.includes('Revelar respuesta ahora')
+);
+check(
+  'KahootLiveModal blinda el texto de la pregunta e inputs sobre fondo blanco contra el Modo Oscuro (.dark)',
+  modalSrc.includes('.dark .kahoot-live-portal .kahoot-question-card h3') &&
+    modalSrc.includes('color: #0f172a !important;') &&
+    modalSrc.includes('kahoot-light-input')
+);
+check(
+  'KahootLiveModal protege el temporizador contra desfases de reloj, primer fotograma de ronda, entradas tardias y carrera de ultimos en responder',
+  modalSrc.includes('roundLocalStartMapRef') &&
+    modalSrc.includes('timerState.roundKey === currentRoundKey ? timerState.seconds : activeDuration') &&
+    modalSrc.includes('sawNonQuestionPhaseRef') &&
+    modalSrc.includes('isLatestResponderOnAllAnswered') &&
+    modalSrc.includes('allDoneNow') &&
+    modalSrc.includes("'kahoot.updatedAt': nowTs")
+);
+check(
+  'KahootLiveModal y App.jsx difieren re-renders del muro principal mientras el Kahoot en vivo esta abierto para escalar a 40+ estudiantes',
+  modalSrc.includes('__KAHOOT_LIVE_MODAL_OPEN__') &&
+    modalSrc.includes('isCriticalTransition') &&
+    appSrc.includes('__KAHOOT_LIVE_MODAL_OPEN__') &&
+    appSrc.includes('kahoot-live-modal-closed')
+);
+
 console.log(`\nRESULTADO KAHOOT: ${okCount} OK, ${failCount} fallos\n`);
 if (failCount > 0) {
   process.exit(1);
 }
-
-

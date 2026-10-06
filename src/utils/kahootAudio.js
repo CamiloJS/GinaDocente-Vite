@@ -218,7 +218,7 @@ export const startTensionMusic = (getRemainingSeconds) => {
 };
 
 /**
- * Sonido de GONG / PLATILLO (Crash Cymbal + Gong Resonante)
+ * Sonido de CAMPANA DE CONCURSO (Game-Show Chime Brillante y Agradable)
  * Se dispara automáticamente cuando todos los participantes han respondido o cuando el reloj llega a 0.
  */
 export const playGongSound = () => {
@@ -229,71 +229,39 @@ export const playGongSound = () => {
 
     const now = ctx.currentTime;
 
-    // 1. Cuerpo profundo del Gong (frecuencias inarmónicas metálicas con modulación FM)
-    const gongPartials = [
-      { freq: 118, gain: 0.34, decay: 2.6, type: 'sine' },
-      { freq: 179, gain: 0.22, decay: 2.3, type: 'triangle' },
-      { freq: 263, gain: 0.16, decay: 1.9, type: 'sine' },
-      { freq: 374, gain: 0.12, decay: 1.6, type: 'sine' },
-      { freq: 512, gain: 0.09, decay: 1.4, type: 'triangle' },
-      { freq: 688, gain: 0.06, decay: 1.1, type: 'sine' },
-      { freq: 942, gain: 0.04, decay: 0.9, type: 'sine' },
+    // 1. Primer toque cristalino de anuncio (G5 + armónico suave G6)
+    const leadNotes = [
+      { freq: 783.99, gain: 0.12, start: 0, decay: 0.35, type: 'sine' },
+      { freq: 1567.98, gain: 0.04, start: 0, decay: 0.25, type: 'triangle' },
     ];
 
-    gongPartials.forEach((p) => {
+    // 2. Acorde de campana mayor luminoso y cálido de cierre de ronda (C5 - E5 - G5 - C6 - E6)
+    // Ganancia total balanceada (< 0.56) para evitar saturación/clipping en cualquier dispositivo
+    const chimeChord = [
+      { freq: 523.25, gain: 0.11, start: 0.09, decay: 0.65, type: 'triangle' },
+      { freq: 659.25, gain: 0.1, start: 0.09, decay: 0.6, type: 'sine' },
+      { freq: 783.99, gain: 0.1, start: 0.09, decay: 0.6, type: 'sine' },
+      { freq: 1046.5, gain: 0.12, start: 0.09, decay: 0.72, type: 'sine' },
+      { freq: 1318.51, gain: 0.05, start: 0.1, decay: 0.52, type: 'sine' },
+    ];
+
+    [...leadNotes, ...chimeChord].forEach((n) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.type = p.type;
-      // Ligero pitch bend inicial característico del golpe de mazo en el gong
-      osc.frequency.setValueAtTime(p.freq * 1.04, now);
-      osc.frequency.exponentialRampToValueAtTime(p.freq * 0.985, now + 0.18);
-      osc.frequency.exponentialRampToValueAtTime(p.freq, now + p.decay);
+      const startTime = now + n.start;
 
-      gain.gain.setValueAtTime(0.001, now);
-      gain.gain.linearRampToValueAtTime(p.gain, now + 0.015);
-      gain.gain.exponentialRampToValueAtTime(0.0008, now + p.decay);
+      osc.type = n.type;
+      osc.frequency.setValueAtTime(n.freq, startTime);
+
+      gain.gain.setValueAtTime(0.0001, startTime);
+      gain.gain.linearRampToValueAtTime(n.gain, startTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0008, startTime + n.decay);
 
       osc.connect(gain);
       gain.connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + p.decay + 0.05);
+      osc.start(startTime);
+      osc.stop(startTime + n.decay + 0.04);
     });
-
-    // 2. Brillo metálico del Platillo / Crash Cymbal (ruido blanco filtrado con cola brillante)
-    const bufferSize = Math.floor(ctx.sampleRate * 1.8);
-    const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const output = noiseBuffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      // Modulación de amplitud rápida para textura de bronce vibrando
-      const shimmer = 1 + 0.25 * Math.sin(i * 0.015);
-      output[i] = (Math.random() * 2 - 1) * shimmer;
-    }
-
-    const whiteNoise = ctx.createBufferSource();
-    whiteNoise.buffer = noiseBuffer;
-
-    const bandpass = ctx.createBiquadFilter();
-    bandpass.type = 'bandpass';
-    bandpass.frequency.setValueAtTime(3600, now);
-    bandpass.Q.setValueAtTime(0.7, now);
-
-    const highpass = ctx.createBiquadFilter();
-    highpass.type = 'highpass';
-    highpass.frequency.setValueAtTime(1400, now);
-
-    const cymbalGain = ctx.createGain();
-    cymbalGain.gain.setValueAtTime(0.001, now);
-    cymbalGain.gain.linearRampToValueAtTime(0.28, now + 0.008);
-    cymbalGain.gain.exponentialRampToValueAtTime(0.06, now + 0.35);
-    cymbalGain.gain.exponentialRampToValueAtTime(0.0008, now + 1.75);
-
-    whiteNoise.connect(bandpass);
-    bandpass.connect(highpass);
-    highpass.connect(cymbalGain);
-    cymbalGain.connect(ctx.destination);
-
-    whiteNoise.start(now);
-    whiteNoise.stop(now + 1.8);
 
     return true;
   } catch {
@@ -341,7 +309,7 @@ export const playRevealResultSound = (isCorrect) => {
         osc.type = 'triangle';
         const start = now + idx * 0.07;
         osc.frequency.setValueAtTime(freq, start);
-        gain.gain.setValueAtTime(0.2, start);
+        gain.gain.setValueAtTime(0.18, start);
         gain.gain.exponentialRampToValueAtTime(0.001, start + 0.32);
         osc.connect(gain);
         gain.connect(ctx.destination);
@@ -349,19 +317,20 @@ export const playRevealResultSound = (isCorrect) => {
         osc.stop(start + 0.35);
       });
     } else {
-      const notes = [311.13, 233.08];
+      // Dos notas descendentes suaves (G4 -> E4) con onda triangular para no chocar con la campana
+      const notes = [392.0, 329.63];
       notes.forEach((freq, idx) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        osc.type = 'sawtooth';
+        osc.type = 'triangle';
         const start = now + idx * 0.14;
         osc.frequency.setValueAtTime(freq, start);
         gain.gain.setValueAtTime(0.12, start);
-        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.22);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.24);
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start(start);
-        osc.stop(start + 0.25);
+        osc.stop(start + 0.26);
       });
     }
   } catch {

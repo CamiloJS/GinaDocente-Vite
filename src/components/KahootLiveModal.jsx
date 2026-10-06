@@ -83,19 +83,58 @@ const KahootLiveModal = ({
 
   const [liveTask, setLiveTask] = useState(task);
   const liveTaskRef = useRef(task);
+  const lastSyncedStatusRef = useRef(task?.kahoot?.status);
+
+  const syncTaskToParent = useCallback(
+    (taskToSync) => {
+      const target = taskToSync || liveTaskRef.current;
+      if (!target || typeof setTasks !== 'function') return;
+      setTasks((prev) =>
+        (prev || []).map((t) => (String(t.id) === String(target.id) ? target : t))
+      );
+    },
+    [setTasks]
+  );
+
   useEffect(() => {
     if (!task) return;
     const cur = liveTaskRef.current;
     const isDifferentTask = !cur || String(cur.id) !== String(task.id);
+    if (isDifferentTask) {
+      setLiveTask(task);
+      liveTaskRef.current = task;
+      lastSyncedStatusRef.current = task.kahoot?.status;
+      return;
+    }
+    // Mientras el modal está abierto en vivo contra Firestore, onSnapshot directo es la fuente de verdad
+    // para evitar que props retrasados del padre reviertan respuestas o cambios de fase en tiempo real.
+    if (isOpen && !isDemoTask) return;
+
     const incomingUpdated = Number(task.kahoot?.updatedAt || 0);
     const currentUpdated = Number(cur?.kahoot?.updatedAt || 0);
-    if (isDifferentTask || incomingUpdated > currentUpdated) {
+    if (incomingUpdated >= currentUpdated) {
       setLiveTask(task);
       liveTaskRef.current = task;
     }
-  }, [task]);
+  }, [task, isOpen, isDemoTask]);
+
+  // Pausar re-renders del muro principal (App.jsx) mientras el Kahoot está en pantalla completa
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    if (isOpen && !isDemoTask) {
+      window.__KAHOOT_LIVE_MODAL_OPEN__ = true;
+      return () => {
+        window.__KAHOOT_LIVE_MODAL_OPEN__ = false;
+        window.dispatchEvent(new CustomEvent('kahoot-live-modal-closed'));
+      };
+    }
+    window.__KAHOOT_LIVE_MODAL_OPEN__ = false;
+    return undefined;
+  }, [isOpen, isDemoTask]);
 
   // Suscripción en tiempo real al documento de la tarea cuando el Kahoot está abierto (solo fuera de Modo Demo)
+  const snapshotThrottleTimerRef = useRef(null);
+  const lastSnapshotRenderTsRef = useRef(0);
   useEffect(() => {
     if (!isOpen || isDemoTask || !db || !appId || !task?.id) return undefined;
     const ref = doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id);
@@ -104,12 +143,56 @@ const KahootLiveModal = ({
       (snap) => {
         if (snap.exists()) {
           const fresh = { id: snap.id, ...snap.data() };
+          const prevKahoot = liveTaskRef.current?.kahoot || {};
+          const nextKahoot = fresh.kahoot || {};
+          const prevStatus = lastSyncedStatusRef.current;
+          const nextStatus = nextKahoot.status;
+
           liveTaskRef.current = fresh;
-          setLiveTask(fresh);
-          if (typeof setTasks === 'function') {
-            setTasks((prev) =>
-              (prev || []).map((t) => (String(t.id) === String(fresh.id) ? fresh : t))
-            );
+
+          const activeIdx = Number(nextKahoot.currentQuestionIndex) || 0;
+          const prevMyEntry = prevKahoot.participants?.[safePlayerId];
+          const nextMyEntry = nextKahoot.participants?.[safePlayerId];
+          const prevMyAns = prevMyEntry?.answers?.[String(activeIdx)];
+          const nextMyAns = nextMyEntry?.answers?.[String(activeIdx)];
+          const { totalParticipants: snapTotal, answeredCount: snapAnswered } =
+            buildKahootLeaderboard(nextKahoot.participants || {}, activeIdx);
+          const allAnsweredNow = snapTotal > 0 && snapAnswered >= snapTotal;
+
+          // Transiciones críticas (cambio de pregunta, fase, estado, propia respuesta o 100% respondido) se renderizan en 0ms
+          const isCriticalTransition =
+            prevKahoot.status !== nextKahoot.status ||
+            prevKahoot.phase !== nextKahoot.phase ||
+            prevKahoot.currentQuestionIndex !== nextKahoot.currentQuestionIndex ||
+            prevKahoot.questionStartedAt !== nextKahoot.questionStartedAt ||
+            Boolean(prevMyEntry) !== Boolean(nextMyEntry) ||
+            prevMyAns?.answeredAt !== nextMyAns?.answeredAt ||
+            allAnsweredNow;
+
+          const nowMs = Date.now();
+          if (isCriticalTransition || nowMs - lastSnapshotRenderTsRef.current >= 120) {
+            if (snapshotThrottleTimerRef.current) {
+              clearTimeout(snapshotThrottleTimerRef.current);
+              snapshotThrottleTimerRef.current = null;
+            }
+            lastSnapshotRenderTsRef.current = nowMs;
+            setLiveTask(fresh);
+          } else if (!snapshotThrottleTimerRef.current) {
+            const waitMs = Math.max(16, 120 - (nowMs - lastSnapshotRenderTsRef.current));
+            snapshotThrottleTimerRef.current = setTimeout(() => {
+              snapshotThrottleTimerRef.current = null;
+              lastSnapshotRenderTsRef.current = Date.now();
+              if (liveTaskRef.current) {
+                setLiveTask(liveTaskRef.current);
+              }
+            }, waitMs);
+          }
+
+          // Solo propagar a App.jsx si cambió el status general ('lobby' -> 'live' -> 'finished')
+          // para evitar re-renderizar toda la aplicación en cada respuesta de 40+ estudiantes.
+          if (prevStatus !== nextStatus) {
+            lastSyncedStatusRef.current = nextStatus;
+            syncTaskToParent(fresh);
           }
         }
       },
@@ -117,8 +200,14 @@ const KahootLiveModal = ({
         console.warn('Kahoot live snapshot warning:', err);
       }
     );
-    return () => unsub();
-  }, [isOpen, isDemoTask, db, appId, task?.id, setTasks]);
+    return () => {
+      if (snapshotThrottleTimerRef.current) {
+        clearTimeout(snapshotThrottleTimerRef.current);
+        snapshotThrottleTimerRef.current = null;
+      }
+      unsub();
+    };
+  }, [isOpen, isDemoTask, db, appId, task?.id, safePlayerId, syncTaskToParent]);
 
   const kahoot = useMemo(() => liveTask?.kahoot || {}, [liveTask]);
   const questionsSignature = useMemo(
@@ -140,6 +229,9 @@ const KahootLiveModal = ({
     if (kahoot.status === 'finished' && !canControlGame) return 'solo';
     return 'live';
   });
+
+  // El docente en modo 'live' actúa como pantalla proyectada (sin mostrar opciones seleccionables durante la pregunta)
+  const isTeacherProjector = role === 'teacher' && viewMode === 'live';
 
   // Estado de sonido y edición de apodo
   const [soundMuted, setSoundMuted] = useState(false);
@@ -187,17 +279,63 @@ const KahootLiveModal = ({
     };
   });
 
-  const activePhase = viewMode === 'solo' ? soloState.phase : (kahoot.phase || 'lobby');
+  const rawPhase = viewMode === 'solo' ? soloState.phase : (kahoot.phase || 'lobby');
   const activeQIndex = viewMode === 'solo'
     ? soloState.qIndex
     : Math.max(0, Math.min(Number(kahoot.currentQuestionIndex) || 0, Math.max(0, questions.length - 1)));
   const currentQuestion = questions[activeQIndex] || questions[0] || null;
   const activeStartedAt = viewMode === 'solo' ? soloState.startedAt : (Number(kahoot.questionStartedAt) || 0);
   const activeDuration = Number(currentQuestion?.timeLimit || kahoot.questionDuration || 20);
+  const currentRoundKey = `${viewMode}_${activeQIndex}_${activeStartedAt}`;
 
-  // Reloj sincronizado en tiempo real (en segundos con 1 decimal para barra fluida)
-  const [remainingSeconds, setRemainingSeconds] = useState(activeDuration);
+  // Permite transición local instantánea a 'revealed' cuando todos responden o el reloj llega a 0
+  const [localRevealedRoundKey, setLocalRevealedRoundKey] = useState('');
+  const activePhase =
+    rawPhase === 'question' && localRevealedRoundKey === currentRoundKey ? 'revealed' : rawPhase;
+
+  // Mapa de tiempos de llegada locales por ronda para eliminar desfases de reloj entre dispositivos,
+  // ajustando de forma justa si un estudiante abre el modal a mitad de una pregunta ya iniciada.
+  const sawNonQuestionPhaseRef = useRef(rawPhase !== 'question');
+  if (rawPhase !== 'question') {
+    sawNonQuestionPhaseRef.current = true;
+  }
+  const roundLocalStartMapRef = useRef({});
+  if (rawPhase === 'question' && !roundLocalStartMapRef.current[currentRoundKey]) {
+    const nowLocal = Date.now();
+    if (sawNonQuestionPhaseRef.current || viewMode === 'solo' || activeStartedAt <= 0) {
+      roundLocalStartMapRef.current[currentRoundKey] = nowLocal;
+    } else {
+      // El estudiante abrió el modal cuando la pregunta ya estaba en curso:
+      // estimar tiempo transcurrido usando respuestas previas de la ronda o marca del servidor acotada
+      const peerAnswers = Object.values(kahoot.participants || {})
+        .map((p) => p?.answers?.[String(activeQIndex)])
+        .filter(Boolean);
+      const maxPeerTimeMs = peerAnswers.reduce(
+        (max, a) => Math.max(max, Number(a?.timeMs) || 0),
+        0
+      );
+      const rawServerElapsedMs = Math.max(0, nowLocal - activeStartedAt);
+      const maxInitialOffsetMs = Math.max(0, (activeDuration - 5) * 1000);
+      const estimatedElapsedMs =
+        maxPeerTimeMs > 0 || (rawServerElapsedMs > 2500 && rawServerElapsedMs < activeDuration * 1000)
+          ? Math.min(maxInitialOffsetMs, Math.max(maxPeerTimeMs, rawServerElapsedMs))
+          : 0;
+      roundLocalStartMapRef.current[currentRoundKey] = nowLocal - estimatedElapsedMs;
+    }
+  }
+
+  // Reloj sincronizado en tiempo real atado a currentRoundKey para que el primer fotograma de cada
+  // nueva pregunta muestre siempre activeDuration (evitando destellos de 0s o imagen sin desenfoque)
+  const [timerState, setTimerState] = useState(() => ({
+    roundKey: currentRoundKey,
+    seconds: activeDuration,
+  }));
+  const remainingSeconds =
+    timerState.roundKey === currentRoundKey ? timerState.seconds : activeDuration;
   const remainingSecondsRef = useRef(activeDuration);
+  if (timerState.roundKey !== currentRoundKey) {
+    remainingSecondsRef.current = activeDuration;
+  }
   const gongTriggeredForRoundRef = useRef('');
 
   // Función auxiliar para actualizar el objeto kahoot en Firestore o en el Sandbox Demo
@@ -221,10 +359,10 @@ const KahootLiveModal = ({
       const nextTask = { ...currentTask, kahoot: nextKahoot };
       liveTaskRef.current = nextTask;
       setLiveTask(nextTask);
-      if (typeof setTasks === 'function') {
-        setTasks((prev) =>
-          (prev || []).map((t) => (String(t.id) === String(nextTask.id) ? nextTask : t))
-        );
+
+      if (isDemoTask || partialKahootUpdates?.status) {
+        lastSyncedStatusRef.current = nextKahoot.status;
+        syncTaskToParent(nextTask);
       }
 
       if (isDemoTask) {
@@ -242,9 +380,12 @@ const KahootLiveModal = ({
         }
         const taskRef = doc(db, 'artifacts', appId, 'public', 'data', 'tasks', currentTask.id);
         if (dotNotationUpdates) {
-          await updateDoc(taskRef, dotNotationUpdates);
+          await updateDoc(taskRef, {
+            ...dotNotationUpdates,
+            'kahoot.updatedAt': nowTs,
+          });
         } else {
-          const dotPayload = {};
+          const dotPayload = { 'kahoot.updatedAt': nowTs };
           Object.entries(partialKahootUpdates || {}).forEach(([k, v]) => {
             dotPayload[`kahoot.${k}`] = v;
           });
@@ -254,10 +395,10 @@ const KahootLiveModal = ({
         console.warn('Error actualizando estado de Kahoot:', err);
       }
     },
-    [task, isDemoTask, db, appId, setTasks]
+    [task, isDemoTask, db, appId, syncTaskToParent]
   );
 
-  // Auto-registrar participante al entrar a la sala en vivo (si es estudiante o si está en Modo Demo)
+  // Auto-registrar participante al entrar a la sala en vivo (si es estudiante o bots en Modo Demo)
   const hasAutoJoinedRef = useRef(false);
   useEffect(() => {
     hasAutoJoinedRef.current = false;
@@ -269,51 +410,55 @@ const KahootLiveModal = ({
     hasAutoJoinedRef.current = true;
 
     const currentParticipants = { ...(liveTaskRef.current?.kahoot?.participants || {}) };
-    const existing = currentParticipants[safePlayerId];
+    const nextParticipants = { ...currentParticipants };
+    const dotUpdates = {};
+    let needsUpdate = false;
 
-    // Si es estudiante o estamos en Modo Demo, lo unimos automáticamente a la lista de participantes
-    if (role !== 'teacher' || isDemoTask) {
-      const playerEntry = existing || {
-        id: safePlayerId,
-        realName: loggedInName || 'Estudiante',
-        nickname: myNickname || loggedInName || 'Estudiante',
-        avatar: myAvatar || '🦊',
-        score: 0,
-        streak: 0,
-        correctCount: 0,
-        joinedAt: Date.now(),
-        answers: {},
-      };
-
-      const nextParticipants = {
-        ...currentParticipants,
-        [safePlayerId]: playerEntry,
-      };
-
-      // En Modo Demo, aseguramos que también estén los compañeros simulados listos en el Lobby
-      if (isDemoTask) {
-        DEMO_KAHOOT_BOTS.forEach((bot) => {
-          if (!nextParticipants[bot.id]) {
-            nextParticipants[bot.id] = {
-              id: bot.id,
-              realName: bot.realName,
-              nickname: bot.nickname,
-              avatar: bot.avatar,
-              score: 0,
-              streak: 0,
-              correctCount: 0,
-              joinedAt: Date.now(),
-              isSimulatedBot: true,
-              answers: {},
-            };
-          }
-        });
+    // Solo los estudiantes se registran como jugadores activos; el docente actúa como proyectista/anfitrión
+    if (role !== 'teacher') {
+      if (!currentParticipants[safePlayerId]) {
+        const playerEntry = {
+          id: safePlayerId,
+          realName: loggedInName || 'Estudiante',
+          nickname: myNickname || loggedInName || 'Estudiante',
+          avatar: myAvatar || '🦊',
+          score: 0,
+          streak: 0,
+          correctCount: 0,
+          joinedAt: Date.now(),
+          answers: {},
+        };
+        nextParticipants[safePlayerId] = playerEntry;
+        dotUpdates[`kahoot.participants.${safePlayerId}`] = playerEntry;
+        needsUpdate = true;
       }
+    }
 
-      updateKahootState(
-        { participants: nextParticipants },
-        { [`kahoot.participants.${safePlayerId}`]: playerEntry }
-      );
+    // En Modo Demo, aseguramos que también estén los compañeros simulados listos en el Lobby
+    if (isDemoTask) {
+      DEMO_KAHOOT_BOTS.forEach((bot) => {
+        if (!nextParticipants[bot.id]) {
+          const botEntry = {
+            id: bot.id,
+            realName: bot.realName,
+            nickname: bot.nickname,
+            avatar: bot.avatar,
+            score: 0,
+            streak: 0,
+            correctCount: 0,
+            joinedAt: Date.now(),
+            isSimulatedBot: true,
+            answers: {},
+          };
+          nextParticipants[bot.id] = botEntry;
+          dotUpdates[`kahoot.participants.${bot.id}`] = botEntry;
+          needsUpdate = true;
+        }
+      });
+    }
+
+    if (needsUpdate) {
+      updateKahootState({ participants: nextParticipants }, dotUpdates);
     }
   }, [isOpen, viewMode, role, isDemoTask, safePlayerId, loggedInName, myNickname, myAvatar, updateKahootState]);
 
@@ -332,6 +477,11 @@ const KahootLiveModal = ({
     setMyAvatar(newAvatar);
     setNicknameDraft(clean);
     setIsEditingNickname(false);
+
+    if (role === 'teacher') {
+      showMessage?.(`✨ Perfil de anfitrión actualizado a "${newAvatar} ${clean}"`);
+      return;
+    }
 
     const currentParticipants = { ...(liveTaskRef.current?.kahoot?.participants || {}) };
     const existing = currentParticipants[safePlayerId] || {
@@ -404,12 +554,13 @@ const KahootLiveModal = ({
   const gongBannerTimerRef = useRef(null);
   const soloSubmitTimerRef = useRef(null);
 
-  // Disparador del Gong y transición cuando todos terminan o el tiempo se agota
+  // Disparador de campana de fin de ronda y transición instantánea cuando todos terminan o el tiempo se agota
   const triggerRoundEndWithGong = useCallback(
     (reason = 'all_answered') => {
       const roundKey = `${viewMode}_${activeQIndex}_${activeStartedAt}`;
       if (gongTriggeredForRoundRef.current === roundKey) return;
       gongTriggeredForRoundRef.current = roundKey;
+      setLocalRevealedRoundKey(roundKey);
 
       stopKahootMusic();
       if (!soundMutedRef.current) {
@@ -424,8 +575,34 @@ const KahootLiveModal = ({
         return;
       }
 
-      // Actualizar estado a 'revealed' si soy el docente, o en Modo Demo, o si el tiempo expiró
-      if (role === 'teacher' || isDemoTask || reason === 'timeout' || reason === 'all_answered') {
+      // Si los dos últimos estudiantes respondieron casi al mismo milisegundo y ninguno vio 40/40 en su envío local,
+      // determinamos quién tuvo el answeredAt más reciente para que exactamente 1 estudiante persista 'revealed'
+      // incluso si la pestaña del docente está en segundo plano.
+      let isLatestResponderOnAllAnswered = false;
+      if (reason === 'all_answered' && role !== 'teacher') {
+        const partsMap = liveTaskRef.current?.kahoot?.participants || {};
+        let latestId = '';
+        let latestTs = -1;
+        Object.values(partsMap).forEach((p) => {
+          const ansTs = Number(p?.answers?.[String(activeQIndex)]?.answeredAt) || 0;
+          if (ansTs > latestTs) {
+            latestTs = ansTs;
+            latestId = p.id;
+          }
+        });
+        isLatestResponderOnAllAnswered = Boolean(latestId && latestId === safePlayerId);
+      }
+
+      // Evitar tormenta de escrituras de 40+ clientes simultáneos al expirar el reloj:
+      // El docente/anfitrión (o el último estudiante en responder) persiste 'revealed' en Firestore.
+      const shouldPersistPhase =
+        role === 'teacher' ||
+        isDemoTask ||
+        reason === 'teacher_skip' ||
+        reason === 'last_student_answered' ||
+        isLatestResponderOnAllAnswered;
+
+      if (shouldPersistPhase && liveTaskRef.current?.kahoot?.phase !== 'revealed') {
         updateKahootState(
           {
             phase: 'revealed',
@@ -438,10 +615,10 @@ const KahootLiveModal = ({
         );
       }
     },
-    [viewMode, activeQIndex, activeStartedAt, role, isDemoTask, updateKahootState]
+    [viewMode, activeQIndex, activeStartedAt, role, isDemoTask, safePlayerId, updateKahootState]
   );
 
-  // Detectar transición remota de 'question' -> 'revealed' vía Firestore onSnapshot para que el Gong suene en TODOS los dispositivos conectados
+  // Detectar transición remota de 'question' -> 'revealed' vía Firestore onSnapshot para que la campana suene en TODOS los dispositivos conectados
   const prevPhaseRef = useRef(activePhase);
   useEffect(() => {
     const wasQuestion = prevPhaseRef.current === 'question';
@@ -452,6 +629,7 @@ const KahootLiveModal = ({
       const roundKey = `${viewMode}_${activeQIndex}_${activeStartedAt}`;
       if (gongTriggeredForRoundRef.current !== roundKey) {
         gongTriggeredForRoundRef.current = roundKey;
+        setLocalRevealedRoundKey(roundKey);
         stopKahootMusic();
         if (!soundMutedRef.current) {
           playGongSound();
@@ -463,18 +641,27 @@ const KahootLiveModal = ({
     }
   }, [isOpen, viewMode, activePhase, activeQIndex, activeStartedAt]);
 
-  // Control del temporizador en vivo
+  // Control del temporizador en vivo inmune a desfases de reloj entre dispositivos
   useEffect(() => {
     if (!isOpen || activePhase !== 'question') return undefined;
 
-    const startTs = activeStartedAt > 0 ? activeStartedAt : Date.now();
+    const roundKey = `${viewMode}_${activeQIndex}_${activeStartedAt}`;
+    if (!roundLocalStartMapRef.current[roundKey]) {
+      roundLocalStartMapRef.current[roundKey] = Date.now();
+    }
+    const localStartTs =
+      viewMode === 'solo'
+        ? activeStartedAt > 0
+          ? activeStartedAt
+          : Date.now()
+        : roundLocalStartMapRef.current[roundKey];
     const durationSec = Math.max(5, activeDuration);
 
     const tickTimer = () => {
-      const elapsedSec = (Date.now() - startTs) / 1000;
+      const elapsedSec = Math.max(0, (Date.now() - localStartTs) / 1000);
       const rem = Math.max(0, durationSec - elapsedSec);
       remainingSecondsRef.current = rem;
-      setRemainingSeconds(rem);
+      setTimerState({ roundKey, seconds: rem });
 
       if (rem <= 0) {
         triggerRoundEndWithGong('timeout');
@@ -482,20 +669,16 @@ const KahootLiveModal = ({
     };
 
     tickTimer();
-    const interval = setInterval(tickTimer, 150);
+    const interval = setInterval(tickTimer, 100);
     return () => clearInterval(interval);
-  }, [isOpen, activePhase, activeStartedAt, activeDuration, triggerRoundEndWithGong]);
+  }, [isOpen, viewMode, activePhase, activeQIndex, activeStartedAt, activeDuration, triggerRoundEndWithGong]);
 
-  // Si todos los participantes conectados ya respondieron en vivo, sonar el Gong de inmediato
+  // Si todos los participantes conectados ya respondieron en vivo, revelar de inmediato sin demora
   useEffect(() => {
     if (!isOpen || viewMode !== 'live' || activePhase !== 'question') return;
     if (totalParticipants > 0 && answeredCount >= totalParticipants) {
-      const timer = setTimeout(() => {
-        triggerRoundEndWithGong('all_answered');
-      }, 350);
-      return () => clearTimeout(timer);
+      triggerRoundEndWithGong('all_answered');
     }
-    return undefined;
   }, [isOpen, viewMode, activePhase, totalParticipants, answeredCount, triggerRoundEndWithGong]);
 
   // Simulación automática de respuestas de compañeros de prueba (en Modo Demo o cuando el docente activó bots de prueba)
@@ -623,7 +806,7 @@ const KahootLiveModal = ({
           if (!soundMutedRef.current) {
             playRevealResultSound(Boolean(myLiveAnswer.isCorrect));
           }
-        }, 450);
+        }, 550);
       }
     } else if (activePhase === 'podium') {
       stopKahootMusic();
@@ -662,7 +845,13 @@ const KahootLiveModal = ({
       playAnswerSelectSound();
     }
 
-    const startTs = activeStartedAt > 0 ? activeStartedAt : Date.now() - 2000;
+    const roundKey = `${viewMode}_${activeQIndex}_${activeStartedAt}`;
+    const startTs =
+      viewMode === 'solo'
+        ? activeStartedAt > 0
+          ? activeStartedAt
+          : Date.now() - 1000
+        : roundLocalStartMapRef.current[roundKey] || Date.now() - 1000;
     const elapsedMs = Math.max(200, Date.now() - startTs);
     const isCorrect = evaluateKahootAnswer(currentQuestion, submissionPayload);
 
@@ -696,11 +885,11 @@ const KahootLiveModal = ({
         },
       }));
 
-      // En modo práctica individual, tras responder todos (uno mismo), suena el Gong inmediatamente
+      // En modo práctica individual, tras responder uno mismo, suena la campana inmediatamente
       if (soloSubmitTimerRef.current) clearTimeout(soloSubmitTimerRef.current);
       soloSubmitTimerRef.current = setTimeout(() => {
         triggerRoundEndWithGong('all_answered');
-      }, 350);
+      }, 200);
       return;
     }
 
@@ -749,15 +938,44 @@ const KahootLiveModal = ({
       },
     };
 
-    await updateKahootState(
-      {
-        participants: {
-          ...currentParts,
-          [safePlayerId]: updatedMe,
-        },
-      },
-      { [`kahoot.participants.${safePlayerId}`]: updatedMe }
-    );
+    const nextParts = {
+      ...currentParts,
+      [safePlayerId]: updatedMe,
+    };
+
+    // Si con esta respuesta ya respondieron todos los participantes, transicionar a 'revealed' en la misma escritura atómica
+    const { totalParticipants: afterTotal, answeredCount: afterAnswered } =
+      buildKahootLeaderboard(nextParts, activeQIndex);
+    const allDoneNow = afterTotal > 0 && afterAnswered >= afterTotal;
+
+    const partialPayload = {
+      participants: nextParts,
+      ...(allDoneNow ? { phase: 'revealed', lastEndReason: 'all_answered' } : {}),
+    };
+    const dotPayload = {
+      [`kahoot.participants.${safePlayerId}`]: updatedMe,
+      ...(allDoneNow
+        ? {
+            'kahoot.phase': 'revealed',
+            'kahoot.lastEndReason': 'all_answered',
+          }
+        : {}),
+    };
+
+    if (allDoneNow) {
+      const roundKeyNow = `${viewMode}_${activeQIndex}_${activeStartedAt}`;
+      gongTriggeredForRoundRef.current = roundKeyNow;
+      setLocalRevealedRoundKey(roundKeyNow);
+      stopKahootMusic();
+      if (!soundMutedRef.current) {
+        playGongSound();
+      }
+      setGongBannerVisible(true);
+      if (gongBannerTimerRef.current) clearTimeout(gongBannerTimerRef.current);
+      gongBannerTimerRef.current = setTimeout(() => setGongBannerVisible(false), 2600);
+    }
+
+    await updateKahootState(partialPayload, dotPayload);
   };
 
   // Controles de Anfitrión (Docente o Modo Demo)
@@ -766,7 +984,10 @@ const KahootLiveModal = ({
     if (!targetQ) return;
     const now = Date.now();
     const dur = Number(targetQ.timeLimit) || 20;
-    setRemainingSeconds(dur);
+    const nextRoundKey = `live_${indexToStart}_${now}`;
+    setLocalRevealedRoundKey('');
+    roundLocalStartMapRef.current[nextRoundKey] = now;
+    setTimerState({ roundKey: nextRoundKey, seconds: dur });
     remainingSecondsRef.current = dur;
 
     const partialUpdates = {
@@ -784,13 +1005,13 @@ const KahootLiveModal = ({
       'kahoot.questionDuration': dur,
     };
 
-    // Al iniciar la Pregunta 1 (indexToStart === 0), reiniciar puntajes previos de la sala para empezar desde cero
+    // Al iniciar la Pregunta 1 (indexToStart === 0), reiniciar puntajes previos de la sala sin sobrescribir el mapa entero
     if (indexToStart === 0) {
       const cleanParticipants = {};
       Object.entries(liveTaskRef.current?.kahoot?.participants || kahoot.participants || {}).forEach(
         ([k, p]) => {
           if (!p) return;
-          cleanParticipants[k] = {
+          const resetEntry = {
             ...p,
             score: 0,
             streak: 0,
@@ -799,10 +1020,11 @@ const KahootLiveModal = ({
             lastAnswer: null,
             answers: {},
           };
+          cleanParticipants[k] = resetEntry;
+          dotUpdates[`kahoot.participants.${k}`] = resetEntry;
         }
       );
       partialUpdates.participants = cleanParticipants;
-      dotUpdates['kahoot.participants'] = cleanParticipants;
     }
 
     await updateKahootState(partialUpdates, dotUpdates);
@@ -813,13 +1035,15 @@ const KahootLiveModal = ({
       if (soloState.qIndex + 1 < questions.length) {
         const nextIdx = soloState.qIndex + 1;
         const dur = Number(questions[nextIdx]?.timeLimit) || 20;
-        setRemainingSeconds(dur);
+        const now = Date.now();
+        setLocalRevealedRoundKey('');
+        setTimerState({ roundKey: `solo_${nextIdx}_${now}`, seconds: dur });
         remainingSecondsRef.current = dur;
         setSoloState((prev) => ({
           ...prev,
           qIndex: nextIdx,
           phase: 'question',
-          startedAt: Date.now(),
+          startedAt: now,
         }));
       } else {
         setSoloState((prev) => ({ ...prev, phase: 'podium' }));
@@ -846,16 +1070,27 @@ const KahootLiveModal = ({
   };
 
   const handleRestartLiveGame = async () => {
+    setLocalRevealedRoundKey('');
     const resetParts = {};
+    const dotUpdates = {
+      'kahoot.status': 'lobby',
+      'kahoot.phase': 'lobby',
+      'kahoot.currentQuestionIndex': 0,
+      'kahoot.questionStartedAt': 0,
+    };
     Object.entries(kahoot.participants || {}).forEach(([k, p]) => {
-      resetParts[k] = {
+      if (!p) return;
+      const resetEntry = {
         ...p,
         score: 0,
         streak: 0,
         correctCount: 0,
+        totalTimeMs: 0,
         lastAnswer: null,
         answers: {},
       };
+      resetParts[k] = resetEntry;
+      dotUpdates[`kahoot.participants.${k}`] = resetEntry;
     });
 
     setViewMode('live');
@@ -867,13 +1102,7 @@ const KahootLiveModal = ({
         questionStartedAt: 0,
         participants: resetParts,
       },
-      {
-        'kahoot.status': 'lobby',
-        'kahoot.phase': 'lobby',
-        'kahoot.currentQuestionIndex': 0,
-        'kahoot.questionStartedAt': 0,
-        'kahoot.participants': resetParts,
-      }
+      dotUpdates
     );
     showMessage?.('🔄 Sala reiniciada y lista para jugar en vivo.');
   };
@@ -903,13 +1132,14 @@ const KahootLiveModal = ({
 
   const startSoloPractice = () => {
     const firstDur = Number(questions[0]?.timeLimit) || 20;
-    setRemainingSeconds(firstDur);
+    const now = Date.now();
+    setTimerState({ roundKey: `solo_0_${now}`, seconds: firstDur });
     remainingSecondsRef.current = firstDur;
     setSoloState({
       active: true,
       qIndex: 0,
       phase: 'question',
-      startedAt: Date.now(),
+      startedAt: now,
       score: 0,
       streak: 0,
       correctCount: 0,
@@ -927,7 +1157,34 @@ const KahootLiveModal = ({
       : 0;
 
   return createPortal(
-    <div className="fixed inset-0 z-[999999] bg-gradient-to-br from-[#1F0657] via-[#39127A] to-[#130338] text-white flex flex-col overflow-hidden select-none animate-in fade-in duration-200">
+    <div className="kahoot-live-portal fixed inset-0 z-[999999] bg-gradient-to-br from-[#1F0657] via-[#39127A] to-[#130338] text-white flex flex-col overflow-hidden select-none animate-in fade-in duration-200">
+      <style>{`
+        .kahoot-live-portal .kahoot-question-card,
+        .dark .kahoot-live-portal .kahoot-question-card {
+          background-color: #ffffff !important;
+          color: #0f172a !important;
+        }
+        .kahoot-live-portal .kahoot-question-card h3,
+        .dark .kahoot-live-portal .kahoot-question-card h3,
+        .kahoot-live-portal .kahoot-question-card p,
+        .dark .kahoot-live-portal .kahoot-question-card p,
+        .kahoot-live-portal .kahoot-question-card span,
+        .dark .kahoot-live-portal .kahoot-question-card span {
+          color: #0f172a !important;
+          -webkit-text-fill-color: #0f172a !important;
+        }
+        .kahoot-live-portal input.kahoot-light-input,
+        .dark .kahoot-live-portal input.kahoot-light-input {
+          background-color: #ffffff !important;
+          color: #0f172a !important;
+          -webkit-text-fill-color: #0f172a !important;
+        }
+        .kahoot-live-portal input.kahoot-light-input::placeholder,
+        .dark .kahoot-live-portal input.kahoot-light-input::placeholder {
+          color: #64748b !important;
+          -webkit-text-fill-color: #64748b !important;
+        }
+      `}</style>
       {/* Fondo decorativo geométrico estilo Kahoot */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-15">
         <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-purple-400 blur-3xl" />
@@ -1080,6 +1337,7 @@ const KahootLiveModal = ({
             type="button"
             onClick={() => {
               stopKahootMusic();
+              syncTaskToParent();
               onClose();
             }}
             className="px-3 py-1.5 rounded-xl bg-red-500/80 hover:bg-red-600 text-white text-xs font-black flex items-center gap-1 transition-all cursor-pointer shadow-sm"
@@ -1307,8 +1565,8 @@ const KahootLiveModal = ({
                 {liveTask.title}
               </h1>
 
-              <div className="inline-flex flex-col sm:flex-row items-center gap-3 bg-white text-gray-950 px-6 py-3.5 rounded-2xl shadow-xl">
-                <span className="text-xs font-black uppercase tracking-wider text-gray-500">
+              <div className="inline-flex flex-col sm:flex-row items-center gap-3 bg-white text-[#0f172a] px-6 py-3.5 rounded-2xl shadow-xl">
+                <span className="text-xs font-black uppercase tracking-wider text-[#475569]">
                   PIN:
                 </span>
                 <span className="text-3xl sm:text-4xl font-black tracking-widest text-[#46178F]">
@@ -1317,50 +1575,52 @@ const KahootLiveModal = ({
               </div>
 
               {/* Editor directo de Nombre / Apodo para el participante */}
-              <div className="max-w-md mx-auto pt-2">
-                <div className="p-4 rounded-2xl bg-black/30 border border-white/15 space-y-3">
-                  <label className="block text-xs font-extrabold text-purple-200">
-                    Tu nombre o apodo
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl select-none">{myAvatar}</span>
-                    <input
-                      type="text"
-                      value={nicknameDraft}
-                      maxLength={28}
-                      onChange={(e) => setNicknameDraft(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleSaveNickname(nicknameDraft, myAvatar);
-                      }}
-                      placeholder="Escribe tu apodo..."
-                      className="flex-1 py-2.5 px-3.5 rounded-xl bg-white/15 border border-white/25 text-sm font-black text-white placeholder:text-purple-300/60 outline-none focus:border-amber-400"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleSaveNickname(nicknameDraft, myAvatar)}
-                      className="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-gray-950 font-black text-xs transition-all cursor-pointer shrink-0 shadow-md"
-                    >
-                      Guardar
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-center gap-1.5 flex-wrap pt-1">
-                    {KAHOOT_AVATARS.slice(0, 10).map((av) => (
+              {role !== 'teacher' && (
+                <div className="max-w-md mx-auto pt-2">
+                  <div className="p-4 rounded-2xl bg-black/30 border border-white/15 space-y-3">
+                    <label className="block text-xs font-extrabold text-purple-200">
+                      Tu nombre o apodo
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl select-none">{myAvatar}</span>
+                      <input
+                        type="text"
+                        value={nicknameDraft}
+                        maxLength={28}
+                        onChange={(e) => setNicknameDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveNickname(nicknameDraft, myAvatar);
+                        }}
+                        placeholder="Escribe tu apodo..."
+                        className="flex-1 py-2.5 px-3.5 rounded-xl bg-white/15 border border-white/25 text-sm font-black text-white placeholder:text-purple-300/60 outline-none focus:border-amber-400"
+                      />
                       <button
-                        key={av}
                         type="button"
-                        onClick={() => handleSaveNickname(nicknameDraft || myNickname, av)}
-                        className={`w-8 h-8 rounded-xl text-base flex items-center justify-center transition-all cursor-pointer ${
-                          myAvatar === av
-                            ? 'bg-amber-400 text-gray-950 scale-110 shadow-md'
-                            : 'bg-white/10 hover:bg-white/20'
-                        }`}
+                        onClick={() => handleSaveNickname(nicknameDraft, myAvatar)}
+                        className="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-gray-950 font-black text-xs transition-all cursor-pointer shrink-0 shadow-md"
                       >
-                        {av}
+                        Guardar
                       </button>
-                    ))}
+                    </div>
+                    <div className="flex items-center justify-center gap-1.5 flex-wrap pt-1">
+                      {KAHOOT_AVATARS.slice(0, 10).map((av) => (
+                        <button
+                          key={av}
+                          type="button"
+                          onClick={() => handleSaveNickname(nicknameDraft || myNickname, av)}
+                          className={`w-8 h-8 rounded-xl text-base flex items-center justify-center transition-all cursor-pointer ${
+                            myAvatar === av
+                              ? 'bg-amber-400 text-gray-950 scale-110 shadow-md'
+                              : 'bg-white/10 hover:bg-white/20'
+                          }`}
+                        >
+                          {av}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Lista de Participantes Conectados en Vivo */}
@@ -1390,7 +1650,7 @@ const KahootLiveModal = ({
                   Esperando participantes...
                 </div>
               ) : (
-                <div className="flex flex-wrap gap-2.5 justify-center py-2">
+                <div className="flex flex-wrap gap-2.5 justify-center py-2 max-h-60 overflow-y-auto px-1">
                   {leaderboard.map((player) => {
                     const isMe = player.id === safePlayerId;
                     return (
@@ -1418,14 +1678,25 @@ const KahootLiveModal = ({
               {/* Botón de Inicio de Partida */}
               <div className="pt-3 flex flex-col sm:flex-row items-center justify-center gap-3">
                 {canControlGame ? (
-                  <button
-                    type="button"
-                    onClick={() => handleStartLiveQuestion(0)}
-                    className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-400 via-green-500 to-teal-500 hover:from-emerald-500 hover:to-teal-600 text-gray-950 font-black text-base flex items-center justify-center gap-2.5 shadow-xl shadow-emerald-500/25 transition-all hover:scale-105 cursor-pointer"
-                  >
-                    <Play size={18} />
-                    <span>Iniciar Kahoot</span>
-                  </button>
+                  <div className="flex flex-wrap items-center justify-center gap-3 w-full sm:w-auto">
+                    <button
+                      type="button"
+                      onClick={() => handleStartLiveQuestion(0)}
+                      className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-400 via-green-500 to-teal-500 hover:from-emerald-500 hover:to-teal-600 text-gray-950 font-black text-base flex items-center justify-center gap-2.5 shadow-xl shadow-emerald-500/25 transition-all hover:scale-105 cursor-pointer"
+                    >
+                      <Play size={18} />
+                      <span>Iniciar Kahoot</span>
+                    </button>
+                    {role === 'teacher' && (
+                      <button
+                        type="button"
+                        onClick={startSoloPractice}
+                        className="px-4 py-3.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white text-xs font-extrabold border border-white/20 cursor-pointer"
+                      >
+                        Practicar individualmente
+                      </button>
+                    )}
+                  </div>
                 ) : (
                   <div className="flex flex-col sm:flex-row items-center gap-3">
                     <div className="px-5 py-3 rounded-2xl bg-white/10 border border-white/15 text-xs sm:text-sm font-bold text-purple-100 flex items-center gap-2">
@@ -1446,7 +1717,7 @@ const KahootLiveModal = ({
           </div>
         ) : activePhase === 'question' && currentQuestion ? (
           /* =====================================================================
-              MODO 3: PREGUNTA ACTIVA EN VIVO (Opciones en lista vertical + Reloj + Música de Tensión)
+              MODO 3: PREGUNTA ACTIVA EN VIVO (Vista Proyector Docente vs Vista Estudiante)
              ===================================================================== */
           <div className="max-w-3xl w-full mx-auto flex-1 flex flex-col justify-between gap-4 py-1 animate-in fade-in">
             {/* Barra de progreso de tiempo sincronizada */}
@@ -1463,7 +1734,7 @@ const KahootLiveModal = ({
               </div>
 
               <div className="flex items-center justify-between gap-2 text-xs font-black">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="px-3 py-1 rounded-xl bg-white/15 border border-white/20">
                     Pregunta {activeQIndex + 1} de {questions.length}
                   </span>
@@ -1512,14 +1783,20 @@ const KahootLiveModal = ({
               </div>
             </div>
 
-            {/* Tarjeta del Enunciado e Imagen de la Pregunta */}
-            <div className="p-5 sm:p-6 rounded-3xl bg-white text-gray-950 shadow-2xl text-center space-y-4 border-4 border-purple-300/40">
-              <h3 className="text-lg sm:text-2xl font-black leading-snug text-gray-900">
+            {/* Tarjeta del Enunciado e Imagen de la Pregunta (blindada contra Modo Oscuro) */}
+            <div
+              className="kahoot-question-card p-6 sm:p-8 rounded-3xl bg-white text-[#0f172a] shadow-2xl text-center space-y-4 border-4 border-purple-300/40"
+              style={{ backgroundColor: '#ffffff', color: '#0f172a' }}
+            >
+              <h3
+                className="text-lg sm:text-3xl font-black leading-snug text-[#0f172a]"
+                style={{ color: '#0f172a' }}
+              >
                 {currentQuestion.text}
               </h3>
 
               {currentQuestion.imageUrl && (
-                <div className="flex justify-center overflow-hidden rounded-2xl bg-gray-100 border border-gray-200 max-h-56">
+                <div className="flex justify-center overflow-hidden rounded-2xl bg-gray-100 border border-gray-200 max-h-64">
                   <img
                     src={currentQuestion.imageUrl}
                     alt="Imagen de la pregunta"
@@ -1527,207 +1804,284 @@ const KahootLiveModal = ({
                       filter: blurPx > 0 ? `blur(${blurPx}px)` : 'none',
                       transition: 'filter 300ms linear',
                     }}
-                    className="max-h-56 object-contain"
+                    className="max-h-64 object-contain"
                   />
                 </div>
               )}
             </div>
 
-            {/* Estado de espera si el estudiante ya respondió */}
-            {myLiveAnswer && (
-              <div className="p-3.5 rounded-2xl bg-emerald-500/25 border-2 border-emerald-400 text-center animate-in zoom-in-95">
-                <div className="text-sm sm:text-base font-black text-emerald-200 flex items-center justify-center gap-2">
-                  <CheckCircle2 size={18} />
-                  <span>
-                    Respuesta enviada ({(myLiveAnswer.timeMs / 1000).toFixed(1)}s)
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* OPCIONES EN LISTA VERTICAL (DE ARRIBA HACIA ABAJO) CON TEXTO COMPLETO */}
-            {(currentQuestion.type === 'quiz' || currentQuestion.type === 'truefalse') && (
-              <div className="flex flex-col gap-3 w-full">
-                {(currentQuestion.options || []).map((opt, oIdx) => {
-                  const color = KAHOOT_COLORS[oIdx % KAHOOT_COLORS.length];
-                  const isMultiSelected = selectedMultiIndices.includes(oIdx);
-                  const isLockedSelection =
-                    myLiveAnswer &&
-                    (myLiveAnswer.optionIndex === oIdx ||
-                      (Array.isArray(myLiveAnswer.optionIndices) &&
-                        myLiveAnswer.optionIndices.includes(oIdx)));
-
-                  return (
-                    <button
-                      key={opt.id || oIdx}
-                      type="button"
-                      disabled={Boolean(myLiveAnswer)}
-                      onClick={() => {
-                        if (currentQuestion.allowMultiple) {
-                          setSelectedMultiIndices((prev) =>
-                            prev.includes(oIdx)
-                              ? prev.filter((i) => i !== oIdx)
-                              : [...prev, oIdx]
-                          );
-                        } else {
-                          handleSubmitAnswer({ optionIndex: oIdx, optionIndices: [oIdx] });
-                        }
-                      }}
-                      className={`w-full p-4 sm:p-4.5 rounded-2xl border-b-4 text-left font-black transition-all flex items-center justify-between gap-3.5 shadow-lg ${
-                        color.bgClass
-                      } ${
-                        myLiveAnswer
-                          ? isLockedSelection
-                            ? 'ring-4 ring-white scale-[1.01]'
-                            : 'opacity-45 cursor-not-allowed'
-                          : isMultiSelected
-                            ? 'ring-4 ring-white scale-[1.01]'
-                            : 'hover:scale-[1.01] active:scale-[0.99] cursor-pointer'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3.5 min-w-0 flex-1">
-                        <span className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-black/20 text-white font-black text-lg sm:text-xl flex items-center justify-center shrink-0 shadow-inner">
-                          {color.symbol}
-                        </span>
-                        <span className="text-sm sm:text-lg text-white leading-snug break-words">
-                          {opt.text}
-                        </span>
-                      </div>
-
-                      {(isMultiSelected || isLockedSelection) && (
-                        <span className="px-3 py-1 rounded-xl bg-white text-gray-950 text-xs font-black shrink-0 flex items-center gap-1">
-                          <CheckCircle2 size={14} /> Elegida
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-
-                {currentQuestion.allowMultiple && !myLiveAnswer && (
-                  <button
-                    type="button"
-                    disabled={selectedMultiIndices.length === 0}
-                    onClick={() =>
-                      handleSubmitAnswer({
-                        optionIndex: selectedMultiIndices[0],
-                        optionIndices: selectedMultiIndices,
-                      })
-                    }
-                    className="mt-1 w-full py-3.5 rounded-2xl bg-emerald-400 hover:bg-emerald-300 disabled:opacity-40 text-gray-950 font-black text-sm shadow-xl cursor-pointer transition-all"
-                  >
-                    Confirmar ({selectedMultiIndices.length})
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* Entrada para Respuesta Corta (Type Answer) */}
-            {currentQuestion.type === 'type_answer' && (
-              myLiveAnswer ? (
-                <div className="p-4 rounded-2xl bg-white/10 border border-white/20 text-center">
-                  <span className="text-xs font-bold text-purple-200 block mb-1">
-                    Tu respuesta:
-                  </span>
-                  <span className="text-base sm:text-lg font-black text-white">
-                    “{myLiveAnswer.textAnswer || ''}”
-                  </span>
-                </div>
-              ) : (
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (!typedAnswerText.trim()) return;
-                    handleSubmitAnswer({ textAnswer: typedAnswerText.trim() });
-                  }}
-                  className="flex flex-col sm:flex-row gap-3 w-full"
-                >
-                  <input
-                    type="text"
-                    value={typedAnswerText}
-                    onChange={(e) => setTypedAnswerText(e.target.value)}
-                    placeholder="Escribe tu respuesta aquí..."
-                    className="flex-1 py-4 px-5 rounded-2xl bg-white text-gray-950 font-black text-base outline-none ring-4 ring-purple-400/40 focus:ring-amber-400"
-                    autoFocus
-                  />
-                  <button
-                    type="submit"
-                    disabled={!typedAnswerText.trim()}
-                    className="px-8 py-4 rounded-2xl bg-emerald-400 hover:bg-emerald-300 disabled:opacity-40 text-gray-950 font-black text-base shadow-xl cursor-pointer"
-                  >
-                    Enviar
-                  </button>
-                </form>
-              )
-            )}
-
-            {/* Entrada para Puzzle (Ordenar secuencia en lista vertical) */}
-            {currentQuestion.type === 'puzzle' && (
-              <div className="space-y-2.5 w-full">
-                <p className="text-xs font-bold text-center text-purple-200">
-                  {myLiveAnswer
-                    ? 'Orden enviado:'
-                    : 'Ordena las opciones con las flechas ↑ ↓:'}
-                </p>
-                {(myLiveAnswer?.puzzleOrder || puzzleOrderDraft).map((item, idx) => {
-                  const color = KAHOOT_COLORS[idx % KAHOOT_COLORS.length];
-                  return (
-                    <div
-                      key={`${idx}_${item}`}
-                      className={`p-3.5 rounded-2xl border-b-4 ${color.bgClass} flex items-center justify-between gap-3 shadow-md ${
-                        myLiveAnswer ? 'opacity-90' : ''
-                      }`}
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="w-8 h-8 rounded-xl bg-black/25 font-black text-sm flex items-center justify-center shrink-0">
-                          {idx + 1}°
-                        </span>
-                        <span className="font-black text-sm sm:text-base text-white break-words">
-                          {item}
-                        </span>
-                      </div>
-                      {!myLiveAnswer && (
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button
-                            type="button"
-                            disabled={idx === 0}
-                            onClick={() => {
-                              const copy = [...puzzleOrderDraft];
-                              const [moved] = copy.splice(idx, 1);
-                              copy.splice(idx - 1, 0, moved);
-                              setPuzzleOrderDraft(copy);
-                            }}
-                            className="p-2 rounded-xl bg-black/25 hover:bg-black/40 disabled:opacity-30 text-white cursor-pointer"
-                          >
-                            <ArrowUp size={15} />
-                          </button>
-                          <button
-                            type="button"
-                            disabled={idx === puzzleOrderDraft.length - 1}
-                            onClick={() => {
-                              const copy = [...puzzleOrderDraft];
-                              const [moved] = copy.splice(idx, 1);
-                              copy.splice(idx + 1, 0, moved);
-                              setPuzzleOrderDraft(copy);
-                            }}
-                            className="p-2 rounded-xl bg-black/25 hover:bg-black/40 disabled:opacity-30 text-white cursor-pointer"
-                          >
-                            <ArrowDown size={15} />
-                          </button>
-                        </div>
-                      )}
+            {isTeacherProjector ? (
+              /* =================================================================
+                 VISTA PROYECTOR DEL DOCENTE:
+                 Solo muestra el enunciado, reloj y panel de respuestas recibidas
+                 en tiempo real. Las opciones y la respuesta correcta se revelan
+                 únicamente al finalizar la ronda (activePhase === 'revealed').
+                 ================================================================= */
+              <div className="p-5 sm:p-6 rounded-3xl bg-white/10 backdrop-blur-md border border-white/20 space-y-4 shadow-xl">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-400 text-gray-950 font-black text-xl flex items-center justify-center shadow-md shrink-0">
+                      {answeredCount}
                     </div>
-                  );
-                })}
-                {!myLiveAnswer && (
+                    <div className="text-left">
+                      <h4 className="font-black text-sm sm:text-base text-white">
+                        Respuestas recibidas: {answeredCount} de {Math.max(1, totalParticipants)}
+                      </h4>
+                      <p className="text-xs text-purple-200/85">
+                        Los estudiantes están seleccionando su opción desde sus dispositivos. Las opciones se revelarán al finalizar la ronda.
+                      </p>
+                    </div>
+                  </div>
+
                   <button
                     type="button"
-                    onClick={() => handleSubmitAnswer({ puzzleOrder: puzzleOrderDraft })}
-                    className="w-full py-3.5 rounded-2xl bg-emerald-400 hover:bg-emerald-300 text-gray-950 font-black text-sm shadow-xl cursor-pointer"
+                    onClick={() => triggerRoundEndWithGong('teacher_skip')}
+                    className="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-gray-950 font-black text-xs sm:text-sm cursor-pointer shadow-lg shrink-0 transition-transform hover:scale-102"
                   >
-                    Confirmar orden
+                    Revelar respuesta ahora
                   </button>
+                </div>
+
+                {/* Barra de progreso de respuestas recibidas */}
+                <div className="w-full h-3 rounded-full bg-black/30 overflow-hidden p-0.5">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-amber-400 via-emerald-400 to-teal-400 transition-all duration-200"
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        Math.round((answeredCount / Math.max(1, totalParticipants)) * 100)
+                      )}%`,
+                    }}
+                  />
+                </div>
+
+                {/* Avatares de estudiantes que ya respondieron (sin revelar qué opción eligieron) */}
+                {answeredCount > 0 ? (
+                  <div className="flex flex-wrap gap-2 justify-center max-h-36 overflow-y-auto pt-1 px-1">
+                    {leaderboard
+                      .filter((p) => Boolean(p.currentQuestionAnswer))
+                      .map((player) => (
+                        <span
+                          key={player.id}
+                          className="px-3 py-1.5 rounded-xl bg-emerald-500/25 border border-emerald-400/40 text-xs font-extrabold text-emerald-100 flex items-center gap-1.5 animate-in zoom-in-95"
+                        >
+                          <span>{player.avatar || '🦊'}</span>
+                          <span className="max-w-[130px] truncate">{player.displayName}</span>
+                          <CheckCircle2 size={13} className="text-emerald-300 shrink-0" />
+                        </span>
+                      ))}
+                  </div>
+                ) : (
+                  <div className="py-3 text-center text-xs font-bold text-purple-200/75 italic">
+                    Esperando las primeras respuestas de la clase...
+                  </div>
                 )}
               </div>
+            ) : (
+              /* =================================================================
+                 VISTA DEL ESTUDIANTE / PRÁCTICA:
+                 Muestra el enunciado de la pregunta y todas las opciones
+                 interactivas en lista vertical.
+                 ================================================================= */
+              <>
+                {/* Estado de espera si el estudiante ya respondió */}
+                {myLiveAnswer && (
+                  <div className="p-3.5 rounded-2xl bg-emerald-500/25 border-2 border-emerald-400 text-center animate-in zoom-in-95">
+                    <div className="text-sm sm:text-base font-black text-emerald-200 flex items-center justify-center gap-2">
+                      <CheckCircle2 size={18} />
+                      <span>
+                        Respuesta enviada ({(myLiveAnswer.timeMs / 1000).toFixed(1)}s)
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* OPCIONES EN LISTA VERTICAL (DE ARRIBA HACIA ABAJO) CON TEXTO COMPLETO */}
+                {(currentQuestion.type === 'quiz' || currentQuestion.type === 'truefalse') && (
+                  <div className="flex flex-col gap-3 w-full">
+                    {(currentQuestion.options || []).map((opt, oIdx) => {
+                      const color = KAHOOT_COLORS[oIdx % KAHOOT_COLORS.length];
+                      const isMultiSelected = selectedMultiIndices.includes(oIdx);
+                      const isLockedSelection =
+                        myLiveAnswer &&
+                        (myLiveAnswer.optionIndex === oIdx ||
+                          (Array.isArray(myLiveAnswer.optionIndices) &&
+                            myLiveAnswer.optionIndices.includes(oIdx)));
+
+                      return (
+                        <button
+                          key={opt.id || oIdx}
+                          type="button"
+                          disabled={Boolean(myLiveAnswer)}
+                          onClick={() => {
+                            if (currentQuestion.allowMultiple) {
+                              setSelectedMultiIndices((prev) =>
+                                prev.includes(oIdx)
+                                  ? prev.filter((i) => i !== oIdx)
+                                  : [...prev, oIdx]
+                              );
+                            } else {
+                              handleSubmitAnswer({ optionIndex: oIdx, optionIndices: [oIdx] });
+                            }
+                          }}
+                          className={`w-full p-4 sm:p-4.5 rounded-2xl border-b-4 text-left font-black transition-all flex items-center justify-between gap-3.5 shadow-lg ${
+                            color.bgClass
+                          } ${
+                            myLiveAnswer
+                              ? isLockedSelection
+                                ? 'ring-4 ring-white scale-[1.01]'
+                                : 'opacity-45 cursor-not-allowed'
+                              : isMultiSelected
+                                ? 'ring-4 ring-white scale-[1.01]'
+                                : 'hover:scale-[1.01] active:scale-[0.99] cursor-pointer'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                            <span className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-black/20 text-white font-black text-lg sm:text-xl flex items-center justify-center shrink-0 shadow-inner">
+                              {color.symbol}
+                            </span>
+                            <span className="text-sm sm:text-lg text-white leading-snug break-words">
+                              {opt.text}
+                            </span>
+                          </div>
+
+                          {(isMultiSelected || isLockedSelection) && (
+                            <span className="px-3 py-1 rounded-xl bg-white text-gray-950 text-xs font-black shrink-0 flex items-center gap-1">
+                              <CheckCircle2 size={14} /> Elegida
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+
+                    {currentQuestion.allowMultiple && !myLiveAnswer && (
+                      <button
+                        type="button"
+                        disabled={selectedMultiIndices.length === 0}
+                        onClick={() =>
+                          handleSubmitAnswer({
+                            optionIndex: selectedMultiIndices[0],
+                            optionIndices: selectedMultiIndices,
+                          })
+                        }
+                        className="mt-1 w-full py-3.5 rounded-2xl bg-emerald-400 hover:bg-emerald-300 disabled:opacity-40 text-gray-950 font-black text-sm shadow-xl cursor-pointer transition-all"
+                      >
+                        Confirmar ({selectedMultiIndices.length})
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Entrada para Respuesta Corta (Type Answer) */}
+                {currentQuestion.type === 'type_answer' && (
+                  myLiveAnswer ? (
+                    <div className="p-4 rounded-2xl bg-white/10 border border-white/20 text-center">
+                      <span className="text-xs font-bold text-purple-200 block mb-1">
+                        Tu respuesta:
+                      </span>
+                      <span className="text-base sm:text-lg font-black text-white">
+                        “{myLiveAnswer.textAnswer || ''}”
+                      </span>
+                    </div>
+                  ) : (
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (!typedAnswerText.trim()) return;
+                        handleSubmitAnswer({ textAnswer: typedAnswerText.trim() });
+                      }}
+                      className="flex flex-col sm:flex-row gap-3 w-full"
+                    >
+                      <input
+                        type="text"
+                        value={typedAnswerText}
+                        onChange={(e) => setTypedAnswerText(e.target.value)}
+                        placeholder="Escribe tu respuesta aquí..."
+                        style={{ backgroundColor: '#ffffff', color: '#0f172a' }}
+                        className="kahoot-light-input flex-1 py-4 px-5 rounded-2xl bg-white text-[#0f172a] font-black text-base outline-none ring-4 ring-purple-400/40 focus:ring-amber-400"
+                        autoFocus
+                      />
+                      <button
+                        type="submit"
+                        disabled={!typedAnswerText.trim()}
+                        className="px-8 py-4 rounded-2xl bg-emerald-400 hover:bg-emerald-300 disabled:opacity-40 text-gray-950 font-black text-base shadow-xl cursor-pointer"
+                      >
+                        Enviar
+                      </button>
+                    </form>
+                  )
+                )}
+
+                {/* Entrada para Puzzle (Ordenar secuencia en lista vertical) */}
+                {currentQuestion.type === 'puzzle' && (
+                  <div className="space-y-2.5 w-full">
+                    <p className="text-xs font-bold text-center text-purple-200">
+                      {myLiveAnswer
+                        ? 'Orden enviado:'
+                        : 'Ordena las opciones con las flechas ↑ ↓:'}
+                    </p>
+                    {(myLiveAnswer?.puzzleOrder || puzzleOrderDraft).map((item, idx) => {
+                      const color = KAHOOT_COLORS[idx % KAHOOT_COLORS.length];
+                      return (
+                        <div
+                          key={`${idx}_${item}`}
+                          className={`p-3.5 rounded-2xl border-b-4 ${color.bgClass} flex items-center justify-between gap-3 shadow-md ${
+                            myLiveAnswer ? 'opacity-90' : ''
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className="w-8 h-8 rounded-xl bg-black/25 font-black text-sm flex items-center justify-center shrink-0">
+                              {idx + 1}°
+                            </span>
+                            <span className="font-black text-sm sm:text-base text-white break-words">
+                              {item}
+                            </span>
+                          </div>
+                          {!myLiveAnswer && (
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                type="button"
+                                disabled={idx === 0}
+                                onClick={() => {
+                                  const copy = [...puzzleOrderDraft];
+                                  const [moved] = copy.splice(idx, 1);
+                                  copy.splice(idx - 1, 0, moved);
+                                  setPuzzleOrderDraft(copy);
+                                }}
+                                className="p-2 rounded-xl bg-black/25 hover:bg-black/40 disabled:opacity-30 text-white cursor-pointer"
+                              >
+                                <ArrowUp size={15} />
+                              </button>
+                              <button
+                                type="button"
+                                disabled={idx === puzzleOrderDraft.length - 1}
+                                onClick={() => {
+                                  const copy = [...puzzleOrderDraft];
+                                  const [moved] = copy.splice(idx, 1);
+                                  copy.splice(idx + 1, 0, moved);
+                                  setPuzzleOrderDraft(copy);
+                                }}
+                                className="p-2 rounded-xl bg-black/25 hover:bg-black/40 disabled:opacity-30 text-white cursor-pointer"
+                              >
+                                <ArrowDown size={15} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {!myLiveAnswer && (
+                      <button
+                        type="button"
+                        onClick={() => handleSubmitAnswer({ puzzleOrder: puzzleOrderDraft })}
+                        className="w-full py-3.5 rounded-2xl bg-emerald-400 hover:bg-emerald-300 text-gray-950 font-black text-sm shadow-xl cursor-pointer"
+                      >
+                        Confirmar orden
+                      </button>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
         ) : activePhase === 'revealed' && currentQuestion ? (
@@ -1735,7 +2089,7 @@ const KahootLiveModal = ({
               MODO 4: REVELACIÓN DE RESPUESTA, MÁS RÁPIDO Y TABLA DE POSICIONES
              ===================================================================== */
           <div className="max-w-4xl w-full mx-auto space-y-5 py-2 animate-in fade-in">
-            {/* Banner personal de acierto / fallo */}
+            {/* Banner personal de acierto / fallo o resumen de anfitrión */}
             {myLiveAnswer ? (
               <div
                 className={`p-4 sm:p-5 rounded-3xl border-2 flex flex-wrap items-center justify-between gap-3 shadow-xl ${
@@ -1776,6 +2130,36 @@ const KahootLiveModal = ({
                   </span>
                 </div>
               </div>
+            ) : isTeacherProjector ? (
+              <div className="p-4 sm:p-5 rounded-3xl bg-white/10 border border-white/20 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-400 text-gray-950 font-black flex items-center justify-center shrink-0">
+                    <CheckCircle2 size={20} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm sm:text-base font-black text-white">
+                      Ronda finalizada • Respuestas reveladas
+                    </h4>
+                    <p className="text-xs text-purple-200">
+                      {answeredCount} de {Math.max(1, totalParticipants)} participantes respondieron esta pregunta
+                    </p>
+                  </div>
+                </div>
+                {canControlGame && (
+                  <button
+                    type="button"
+                    onClick={handleNextStep}
+                    className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-amber-400 to-yellow-300 hover:from-amber-300 hover:to-yellow-200 text-gray-950 font-black text-xs sm:text-sm flex items-center gap-1.5 shadow-lg cursor-pointer"
+                  >
+                    <span>
+                      {activeQIndex + 1 < questions.length
+                        ? `Siguiente pregunta (${activeQIndex + 2}/${questions.length})`
+                        : 'Ver podio final'}
+                    </span>
+                    <ChevronRight size={16} />
+                  </button>
+                )}
+              </div>
             ) : (
               <div className="p-4 rounded-3xl bg-white/10 border border-white/20 text-center text-sm font-bold text-purple-200">
                 Tiempo finalizado.
@@ -1812,8 +2196,8 @@ const KahootLiveModal = ({
                   <div className="flex flex-col gap-2">
                     {(currentQuestion.options || []).map((opt, oIdx) => {
                       const color = KAHOOT_COLORS[oIdx % KAHOOT_COLORS.length];
-                      const votesForOpt = Object.values(kahoot.participants || {}).filter((p) => {
-                        const ans = p?.answers?.[String(activeQIndex)];
+                      const votesForOpt = leaderboard.filter((p) => {
+                        const ans = p?.currentQuestionAnswer;
                         if (!ans) return false;
                         return (
                           ans.optionIndex === oIdx ||
@@ -1885,21 +2269,21 @@ const KahootLiveModal = ({
                 )}
               </div>
 
-              {/* Columna Derecha: Tabla de posiciones acumulada */}
+              {/* Columna Derecha: Tabla de posiciones acumulada (escalable para 40+ participantes) */}
               <div className="p-5 rounded-3xl bg-white/10 backdrop-blur-md border border-white/15 space-y-3 flex flex-col justify-between">
                 <div className="space-y-2.5">
                   <div className="flex items-center justify-between">
                     <h4 className="font-black text-sm sm:text-base flex items-center gap-2">
                       <Trophy size={17} className="text-amber-400" />
-                      <span>Posiciones</span>
+                      <span>Posiciones ({leaderboard.length})</span>
                     </h4>
                     <span className="text-xs font-bold text-purple-200">
                       {activeQIndex + 1}/{questions.length}
                     </span>
                   </div>
 
-                  <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                    {leaderboard.slice(0, 8).map((player) => {
+                  <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                    {leaderboard.map((player) => {
                       const isMe = player.id === safePlayerId;
                       return (
                         <div

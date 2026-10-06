@@ -3498,30 +3498,64 @@ useEffect(() => {
 // 2. PESTAÑA: ASIGNACIONES (Muro de clase)
 useEffect(() => {
     if (!hasEntered || !myChatId || isDemoMode) return;
+    let deferredTasks = null;
+    const flushDeferredTasks = () => {
+        if (deferredTasks) {
+            setTasks(deferredTasks);
+            deferredTasks = null;
+        }
+    };
+    window.addEventListener('kahoot-live-modal-closed', flushDeferredTasks);
     const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'tasks'), orderBy('createdAt', 'desc'), limit(taskLimit));
     const uTasks = onSnapshot(q, s => { 
-        setTasks(s.docs.map(d => ({ id: d.id, ...d.data() }))); 
+        const nextList = s.docs.map(d => ({ id: d.id, ...d.data() }));
+        if (typeof window !== 'undefined' && window.__KAHOOT_LIVE_MODAL_OPEN__) {
+            deferredTasks = nextList;
+        } else {
+            deferredTasks = null;
+            setTasks(nextList); 
+        }
         setTasksLoading(false); 
     }, err => {
         console.error('Error cargando tareas:', err);
         setTasksLoading(false);
     });
     const fallbackTimer = setTimeout(() => setTasksLoading(false), 3500);
-    return () => { uTasks(); clearTimeout(fallbackTimer); };
+    return () => {
+        window.removeEventListener('kahoot-live-modal-closed', flushDeferredTasks);
+        uTasks();
+        clearTimeout(fallbackTimer);
+    };
 }, [hasEntered, myChatId, taskLimit, isDemoMode]);
 
 // 2b. POSTS FIJADOS (independiente de la paginación)
 useEffect(() => {
     if (!hasEntered || !myChatId || isDemoMode || (activeTab !== 'tasks' && activeTab !== 'groups')) return;
+    let deferredPinned = null;
+    const flushDeferredPinned = () => {
+        if (deferredPinned) {
+            setPinnedTasks(deferredPinned);
+            deferredPinned = null;
+        }
+    };
+    window.addEventListener('kahoot-live-modal-closed', flushDeferredPinned);
     const qPinned = query(collection(db, 'artifacts', appId, 'public', 'data', 'tasks'), where('isPinned', '==', true));
     const uPinned = onSnapshot(qPinned, s => {
         const pinnedList = s.docs.map(d => ({ id: d.id, ...d.data() }));
         pinnedList.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-        setPinnedTasks(pinnedList);
+        if (typeof window !== 'undefined' && window.__KAHOOT_LIVE_MODAL_OPEN__) {
+            deferredPinned = pinnedList;
+        } else {
+            deferredPinned = null;
+            setPinnedTasks(pinnedList);
+        }
     }, err => {
         console.error('Error cargando posts fijados:', err);
     });
-    return () => uPinned();
+    return () => {
+        window.removeEventListener('kahoot-live-modal-closed', flushDeferredPinned);
+        uPinned();
+    };
 }, [hasEntered, myChatId, activeTab, isDemoMode]);
 
 // 3. PESTAÑA: PERFIL (Muro de Pinterest)
