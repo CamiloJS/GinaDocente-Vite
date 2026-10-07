@@ -21,7 +21,7 @@ import {
   buildKahootLeaderboard,
   buildPublicKahootUrl,
 } from '../utils/kahootEngine.js';
-import { containsBadWords } from '../utils/helpers.js';
+import { containsBadWords, checkBadWordsAsync } from '../utils/helpers.js';
 import {
   auth,
   signInAnonymously,
@@ -31,7 +31,7 @@ import {
   doc,
   updateDoc,
 } from '../firebase/config.js';
-import { DEMO_TASKS, loadDemoSandbox, saveDemoSandboxItem } from '../utils/demoData.js';
+import { DEMO_TASKS, loadDemoSandbox, saveDemoSandboxItem, isDemoItemExpired } from '../utils/demoData.js';
 import KahootLiveModal from './KahootLiveModal.jsx';
 
 const GUEST_ID_STORAGE_KEY = 'englishTech_kahootGuestId';
@@ -203,11 +203,20 @@ const PublicKahootViewer = ({
       }
     });
 
+    const deletedTaskIds = new Set();
     try {
       const sandbox = loadDemoSandbox();
+      const deletedList = Array.isArray(sandbox?.deletedIds?.tasks) ? sandbox.deletedIds.tasks : [];
+      deletedList.forEach((id) => deletedTaskIds.add(String(id)));
       const sandboxTasks = Array.isArray(sandbox?.tasks) ? sandbox.tasks : [];
       sandboxTasks.forEach((t) => {
-        if (t?.id && (t.type === 'kahoot' || t.kahoot) && !mapById.has(String(t.id))) {
+        if (
+          t?.id &&
+          !deletedTaskIds.has(String(t.id)) &&
+          !isDemoItemExpired(t) &&
+          (t.type === 'kahoot' || t.kahoot) &&
+          !mapById.has(String(t.id))
+        ) {
           mapById.set(String(t.id), t);
         }
       });
@@ -216,13 +225,18 @@ const PublicKahootViewer = ({
     }
 
     (DEMO_TASKS || []).forEach((t) => {
-      if (t?.id && (t.type === 'kahoot' || t.kahoot) && !mapById.has(String(t.id))) {
+      if (
+        t?.id &&
+        !deletedTaskIds.has(String(t.id)) &&
+        (t.type === 'kahoot' || t.kahoot) &&
+        !mapById.has(String(t.id))
+      ) {
         mapById.set(String(t.id), t);
       }
     });
 
     return Array.from(mapById.values());
-  }, [firestoreKahoots]);
+  }, [firestoreKahoots, activeKahootTask]);
 
   const liveKahootRooms = useMemo(() => {
     const sourceList = isDemoMode ? allAvailableKahoots : firestoreKahoots;
@@ -244,7 +258,8 @@ const PublicKahootViewer = ({
   }, []);
 
   const handleJoinKahoot = async (customTask = null) => {
-    const cleanPin = String(customTask?.kahoot?.pin || pinInput || '')
+    const validCustomTask = customTask && typeof customTask === 'object' && customTask.kahoot ? customTask : null;
+    const cleanPin = String(validCustomTask?.kahoot?.pin || pinInput || '')
       .replace(/\D/g, '')
       .trim();
     const cleanName = String(nickname || '').trim();
@@ -259,7 +274,7 @@ const PublicKahootViewer = ({
       return;
     }
 
-    if (containsBadWords(cleanName)) {
+    if (containsBadWords(cleanName) || await checkBadWordsAsync(cleanName)) {
       showMessage('⚠️ Por favor usa un nombre o apodo respetuoso.');
       return;
     }
@@ -274,7 +289,7 @@ const PublicKahootViewer = ({
     setJoiningRoom(true);
     try {
       let targetTask =
-        customTask ||
+        validCustomTask ||
         allAvailableKahoots.find(
           (t) => String(t?.kahoot?.pin || '').replace(/\D/g, '') === cleanPin
         );
@@ -647,8 +662,14 @@ const PublicKahootViewer = ({
           loggedInName={nickname.trim() || 'Invitado'}
           initialAvatar={avatar}
           onProfileChange={({ nickname: nextNick, avatar: nextAv }) => {
-            if (nextNick) setNickname(nextNick);
-            if (nextAv) setAvatar(nextAv);
+            if (nextNick) {
+              setNickname(nextNick);
+              try { localStorage.setItem(GUEST_NAME_STORAGE_KEY, nextNick); } catch { /* ignore */ }
+            }
+            if (nextAv) {
+              setAvatar(nextAv);
+              try { localStorage.setItem(GUEST_AVATAR_STORAGE_KEY, nextAv); } catch { /* ignore */ }
+            }
           }}
           isDemoMode={Boolean(
             isDemoMode ||

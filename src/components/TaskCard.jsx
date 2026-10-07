@@ -951,6 +951,10 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
 
     const saveEditedComment = async () => {
         if (!editCommentText.trim()) return;
+        if (await checkBadWordsAsync(editCommentText)) {
+            showMessage("Comentario bloqueado: Lenguaje inapropiado.");
+            return;
+        }
         const currentComments = task.comments || [];
         const updatedComments = currentComments.map((c, i) => {
             const cid = c.id || `old-${i}`;
@@ -979,32 +983,42 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
             const docFiles = files.filter(f => !f.type.startsWith('image/'));
 
             if (imageFiles.length > 0) {
-                const currentTotal = commentImageUrls.length;
+                const baseImages = (Array.isArray(commentImageUrls) && commentImageUrls.length > 0)
+                    ? commentImageUrls
+                    : (commentImageUrl ? [commentImageUrl] : []);
+                const currentTotal = baseImages.length;
                 const remainingSlots = Math.max(0, 4 - currentTotal);
-                if (imageFiles.length > remainingSlots && currentTotal > 0) {
-                    showMessage(`Máximo 4 imágenes. Se añadirán ${remainingSlots} imagen(es).`);
-                } else if (imageFiles.length > 4) {
+                if (remainingSlots <= 0) {
                     showMessage("Puedes subir hasta un máximo de 4 imágenes.");
-                }
-                const filesToUpload = imageFiles.slice(0, remainingSlots > 0 ? remainingSlots : 4);
-                const uploadedUrls = [];
-
-                for (const file of filesToUpload) {
-                    if (file.type !== 'image/gif') {
-                        const compressed = await compressImage(file, 1200, 1200, 0.75);
-                        const firebaseURL = await uploadImageToStorage(compressed, 'comments');
-                        uploadedUrls.push(firebaseURL);
-                    } else {
-                        const firebaseURL = await uploadRawFileToStorage(file, 'comments');
-                        uploadedUrls.push(firebaseURL);
+                } else {
+                    if (imageFiles.length > remainingSlots && currentTotal > 0) {
+                        showMessage(`Máximo 4 imágenes. Se añadirán ${remainingSlots} imagen(es).`);
+                    } else if (imageFiles.length > 4) {
+                        showMessage("Puedes subir hasta un máximo de 4 imágenes.");
                     }
-                }
+                    const filesToUpload = imageFiles.slice(0, remainingSlots);
+                    const uploadedUrls = [];
 
-                setCommentImageUrls(prev => {
-                    const combined = [...prev, ...uploadedUrls].slice(0, 4);
-                    setCommentImageUrl(combined[0] || '');
-                    return combined;
-                });
+                    for (const file of filesToUpload) {
+                        if (file.type !== 'image/gif') {
+                            const compressed = await compressImage(file, 1200, 1200, 0.75);
+                            const firebaseURL = await uploadImageToStorage(compressed, 'comments');
+                            if (firebaseURL) uploadedUrls.push(firebaseURL);
+                        } else {
+                            const firebaseURL = await uploadRawFileToStorage(file, 'comments');
+                            if (firebaseURL) uploadedUrls.push(firebaseURL);
+                        }
+                    }
+
+                    setCommentImageUrls(prev => {
+                        const prevBase = (Array.isArray(prev) && prev.length > 0)
+                            ? prev
+                            : (commentImageUrl ? [commentImageUrl] : []);
+                        const combined = [...prevBase, ...uploadedUrls].slice(0, 4);
+                        setCommentImageUrl(combined[0] || '');
+                        return combined;
+                    });
+                }
             }
 
             if (docFiles.length > 0) {
@@ -1032,7 +1046,7 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
         }
         setIsProcessing(true);
         try {
-            if (hasText && await checkBadWordsAsync(commentText)) { 
+            if ((hasText && await checkBadWordsAsync(commentText)) || (hasTitle && await checkBadWordsAsync(commentTitle))) { 
                 showMessage("Comentario bloqueado: Lenguaje inapropiado."); 
                 return; 
             }
@@ -2925,7 +2939,17 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                                               <ImageIcon size={15} /> Subir foto
                                               <input type="file" multiple accept="image/*" className="hidden" onChange={(e) => { handleLocalFileUpload(e); setShowAttachmentMenu(false); }} />
                                           </label>
-                                          <button type="button" onClick={() => { window.openGifPicker?.((url) => setCommentImageUrl(url)); setShowAttachmentMenu(false); }} className="flex items-center gap-2 px-2.5 py-2 rounded-xl text-xs font-bold hover:bg-gray-100 dark:hover:bg-gray-700 text-left">
+                                          <button type="button" onClick={() => {
+                                              window.openGifPicker?.((url) => {
+                                                  setCommentImageUrls(prev => {
+                                                      const base = (Array.isArray(prev) && prev.length > 0) ? prev : (commentImageUrl ? [commentImageUrl] : []);
+                                                      const next = [...base, url].slice(0, 4);
+                                                      setCommentImageUrl(next[0] || url);
+                                                      return next;
+                                                  });
+                                              });
+                                              setShowAttachmentMenu(false);
+                                          }} className="flex items-center gap-2 px-2.5 py-2 rounded-xl text-xs font-bold hover:bg-gray-100 dark:hover:bg-gray-700 text-left">
                                               <span className="font-black border border-current px-1 rounded text-[8px]">GIF</span> GIF
                                           </button>
                                           <label className="flex items-center gap-2 px-2.5 py-2 rounded-xl text-xs font-bold hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-left">
@@ -3008,7 +3032,7 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                                         <input 
                                             value={commentImageUrl} onChange={e => {
                                                 setCommentImageUrl(e.target.value);
-                                                if (e.target.value) setCommentImageUrls([e.target.value]);
+                                                setCommentImageUrls(e.target.value ? [e.target.value] : []);
                                             }} 
                                             placeholder="URL directa de imagen (.jpg, .png, etc.)..." 
                                             className="w-full rounded-xl px-3 py-2 text-xs border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" 
@@ -3036,10 +3060,10 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                                                     </button>
                                                 </div>
                                             ))}
-                                            {(commentImageUrls ? commentImageUrls.length : 1) < 4 && (
+                                            {(commentImageUrls && commentImageUrls.length > 0 ? commentImageUrls.length : (commentImageUrl ? 1 : 0)) < 4 && (
                                                 <label className="h-16 w-16 border border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-500 rounded-xl flex flex-col items-center justify-center gap-0.5 cursor-pointer text-gray-400 hover:text-blue-500 transition-colors" title="Añadir otra imagen (máximo 4)">
                                                     <Plus size={16} />
-                                                    <span className="text-[9px] font-bold">{(commentImageUrls ? commentImageUrls.length : 1)}/4</span>
+                                                    <span className="text-[9px] font-bold">{(commentImageUrls && commentImageUrls.length > 0 ? commentImageUrls.length : (commentImageUrl ? 1 : 0))}/4</span>
                                                     <input type="file" multiple accept="image/*" className="hidden" onChange={handleLocalFileUpload} />
                                                 </label>
                                             )}

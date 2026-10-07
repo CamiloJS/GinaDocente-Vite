@@ -10,11 +10,13 @@ export const useVoiceRecorder = (folderName = 'audio', showMessage = () => {}) =
   const recorderRef = React.useRef(null)
   const streamRef = React.useRef(null)
   const isMountedRef = React.useRef(true)
+  const sessionIdRef = React.useRef(0)
 
   React.useEffect(() => {
     isMountedRef.current = true
     return () => {
       isMountedRef.current = false
+      sessionIdRef.current += 1
       if (recorderRef.current && recorderRef.current.state !== 'inactive') {
         try { recorderRef.current.onstop = null; recorderRef.current.stop(); } catch (e) {}
       }
@@ -36,8 +38,13 @@ export const useVoiceRecorder = (folderName = 'audio', showMessage = () => {}) =
       showMessage('Tu navegador no permite la grabación de audio.');
       return;
     }
+    const currentSession = ++sessionIdRef.current;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      if (!isMountedRef.current || currentSession !== sessionIdRef.current) {
+        try { stream.getTracks().forEach(t => t.stop()); } catch (e) {}
+        return;
+      }
       streamRef.current = stream
 
       let options = {}
@@ -69,6 +76,7 @@ export const useVoiceRecorder = (folderName = 'audio', showMessage = () => {}) =
       mediaRecorder.onstop = async () => {
         cleanupStream();
         if (isMountedRef.current) setIsRecording(false)
+        if (!isMountedRef.current || currentSession !== sessionIdRef.current) return;
         const totalBytes = chunks.reduce((acc, c) => acc + (c.size || 0), 0);
         if (chunks.length === 0 || totalBytes < 400) {
           showMessage('Grabación demasiado corta');
@@ -88,15 +96,15 @@ export const useVoiceRecorder = (folderName = 'audio', showMessage = () => {}) =
             file.name = `nota-${Date.now()}.${ext}`;
           }
           const url = await uploadRawFileToStorage(file, folderName)
-          if (isMountedRef.current) {
+          if (isMountedRef.current && currentSession === sessionIdRef.current) {
             setAudioUrl(url)
             showMessage('Audio listo para enviar')
           }
         } catch (err) {
           console.error(err)
-          if (isMountedRef.current) showMessage('Hubo un error al subir el audio.')
+          if (isMountedRef.current && currentSession === sessionIdRef.current) showMessage('Hubo un error al subir el audio.')
         } finally {
-          if (isMountedRef.current) setIsUploading(false)
+          if (isMountedRef.current && currentSession === sessionIdRef.current) setIsUploading(false)
         }
       }
 
@@ -105,8 +113,10 @@ export const useVoiceRecorder = (folderName = 'audio', showMessage = () => {}) =
       showMessage('Grabando audio...')
     } catch (err) {
       console.error(err)
-      showMessage('No se pudo acceder al micrófono. Permite el acceso.')
-      if (isMountedRef.current) setIsRecording(false)
+      if (isMountedRef.current && currentSession === sessionIdRef.current) {
+        showMessage('No se pudo acceder al micrófono. Permite el acceso.')
+        setIsRecording(false)
+      }
     }
   }
 
@@ -119,6 +129,7 @@ export const useVoiceRecorder = (folderName = 'audio', showMessage = () => {}) =
   }
 
   const cancelRecording = () => {
+    sessionIdRef.current += 1
     setAudioUrl('')
     setIsRecording(false)
     setIsUploading(false)

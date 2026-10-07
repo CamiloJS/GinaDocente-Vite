@@ -571,13 +571,18 @@ const TasksTab = React.memo(({
                             </div>
 
                             {/* Previsualización de adjuntos multimedia */}
-                            {(showImageInput || showVideoInput || showGeniallyInput || postImageUrl || postVideoUrl || postGeniallyUrl || postFileUrl || audioPub) && (
+                            {(showImageInput || showVideoInput || showGeniallyInput || (Array.isArray(postImageUrls) && postImageUrls.length > 0) || postImageUrl || postVideoUrl || postGeniallyUrl || postFileUrl || audioPub) && (
                                 <div className="pt-3 border-t border-gray-200 dark:border-gray-700 space-y-2 animate-in fade-in">
                                     {showImageInput && (
                                         <div className="flex gap-2 items-center">
                                             <input 
                                                 value={postImageUrl} 
-                                                onChange={(e) => setPostImageUrl(e.target.value)} 
+                                                onChange={(e) => {
+                                                    setPostImageUrl(e.target.value);
+                                                    if (typeof setPostImageUrls === 'function') {
+                                                        setPostImageUrls(e.target.value ? [e.target.value] : []);
+                                                    }
+                                                }} 
                                                 placeholder="Pega el enlace directo de la imagen o GIF..." 
                                                 className="flex-1 py-2 px-3 text-xs rounded-xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500" 
                                             />
@@ -823,7 +828,21 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                                 <ImageIcon size={16} /> Subir imagen
                                                 <input type="file" multiple accept="image/*" className="hidden" onChange={(e) => { handlePostLocalFileUpload(e); setShowPostAttachmentMenu(false); }} />
                                             </label>
-                                            <button type="button" onClick={() => { window.openGifPicker?.((url) => setPostImageUrl(url)); setShowPostAttachmentMenu(false); }} className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-colors w-full text-left text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                            <button type="button" onClick={() => {
+                                                window.openGifPicker?.((url) => {
+                                                    if (typeof setPostImageUrls === 'function') {
+                                                        setPostImageUrls(prev => {
+                                                            const base = (Array.isArray(prev) && prev.length > 0) ? prev : (postImageUrl ? [postImageUrl] : []);
+                                                            const next = [...base, url].slice(0, 4);
+                                                            setPostImageUrl(next[0] || url);
+                                                            return next;
+                                                        });
+                                                    } else {
+                                                        setPostImageUrl(url);
+                                                    }
+                                                });
+                                                setShowPostAttachmentMenu(false);
+                                            }} className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-colors w-full text-left text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
                                                 <span className="font-black border border-current px-1 rounded text-[9px] flex items-center justify-center h-4">GIF</span> Insertar GIF
                                             </button>
                                             <label className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold cursor-pointer transition-colors text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">

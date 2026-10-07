@@ -67,7 +67,7 @@ const playAlarmSound = () => {
   } catch (e) {}
 };
 
-// Coin flip whoosh & landing sound
+// Coin flip whoosh sound
 const playCoinSound = () => {
   try {
     const ctx = getAudioContext();
@@ -85,11 +85,6 @@ const playCoinSound = () => {
       osc.start(ctx.currentTime + i * 0.08);
       osc.stop(ctx.currentTime + i * 0.08 + 0.07);
     }
-    
-    setTimeout(() => {
-      playTone(1760, 'triangle', 0.4, 0.35);
-      setTimeout(() => playTone(2637, 'sine', 0.5, 0.25), 80);
-    }, 1200);
   } catch (e) {}
 };
 
@@ -753,6 +748,7 @@ export default function TeacherToolsTab({
     if (coinTimeoutRef.current) clearTimeout(coinTimeoutRef.current);
     coinTimeoutRef.current = setTimeout(() => {
       if (!isMountedRef.current) return;
+      playTone(1760, 'triangle', 0.4, 0.35);
       setCoinSide(outcome);
       setIsFlipping(false);
       setCoinHistory(prev => [outcome, ...prev].slice(0, 15));
@@ -1367,7 +1363,11 @@ export default function TeacherToolsTab({
                 <input
                   type="checkbox"
                   checked={useCustomNames}
-                  onChange={(e) => setUseCustomNames(e.target.checked)}
+                  onChange={(e) => {
+                    setUseCustomNames(e.target.checked);
+                    setExcludedStudents(new Set());
+                    setPickedWinner(null);
+                  }}
                   className="rounded text-purple-600 focus:ring-purple-500"
                 />
                 Lista manual

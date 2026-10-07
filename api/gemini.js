@@ -135,16 +135,17 @@ export default async function handler(req, res) {
     if (contents && Array.isArray(contents)) {
       contents.forEach(item => {
         const role = (item.role === 'model' || item.role === 'assistant') ? 'assistant' : 'user';
-        const text = (item.parts || []).map(p => p.text || '').join('\n');
+        const text = (item.parts || []).map(p => p?.text || '').join('\n').trim();
         if (text) groqMessages.push({ role, content: text });
       });
-    } else {
-      groqMessages.push({ role: 'user', content: promptText || '' });
+    }
+    if (groqMessages.length === 0 && promptText && String(promptText).trim()) {
+      groqMessages.push({ role: 'user', content: String(promptText).trim() });
     }
 
     const groqModels = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'groq/compound-mini', 'qwen/qwen3.6-27b'];
 
-    for (const groqModel of groqModels) {
+    for (const groqModel of (groqMessages.length > 0 ? groqModels : [])) {
       try {
         const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
@@ -185,6 +186,9 @@ export default async function handler(req, res) {
         }
 
         lastStatus = groqRes.status;
+        if (groqRes.status === 429) {
+          isQuota = true;
+        }
       } catch (groqErr) {
         console.warn(`[Groq Fallback] Error con ${groqModel}:`, groqErr.message);
       }

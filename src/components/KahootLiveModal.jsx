@@ -57,7 +57,7 @@ import {
   playRevealResultSound,
   playPodiumFanfare,
 } from '../utils/kahootAudio.js';
-import { containsBadWords } from '../utils/helpers.js';
+import { containsBadWords, checkBadWordsAsync } from '../utils/helpers.js';
 import { auth, signInAnonymously, doc, onSnapshot, updateDoc } from '../firebase/config.js';
 import { saveDemoSandboxItem } from '../utils/demoData.js';
 
@@ -523,7 +523,7 @@ const KahootLiveModal = ({
       showMessage?.('Escribe un nombre o apodo válido.');
       return;
     }
-    if (containsBadWords(clean)) {
+    if (containsBadWords(clean) || await checkBadWordsAsync(clean)) {
       showMessage?.('Por favor elige un nombre apropiado para la clase.');
       return;
     }

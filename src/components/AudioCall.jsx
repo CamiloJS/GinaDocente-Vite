@@ -98,6 +98,7 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
 
   const addUnsub = (fn) => unsubsRef.current.push(fn)
 
+  const endingRef = useRef(false)
   // ---------- Utilidades de Audio y Micrófono con Cancelación de Ruido ----------
   const getStream = async () => {
     if (localStreamRef.current) return localStreamRef.current
@@ -126,6 +127,10 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
       stream = await navigator.mediaDevices.getUserMedia(constraints)
     } catch (eOverconstrained) {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+    }
+    if (endingRef.current || !isMountedRef.current) {
+      try { stream.getTracks().forEach(t => { try { t.stop() } catch (e) {} }) } catch (e) {}
+      throw new Error("Llamada cancelada.")
     }
     localStreamRef.current = stream
     return stream
@@ -200,6 +205,7 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
   const monitorStream = useCallback((stream, peerId) => {
     try {
       if (!stream || !stream.getAudioTracks().length) return
+      if (analysersRef.current.has(peerId)) return
       const Ctx = window.AudioContext || window.webkitAudioContext
       if (!Ctx) return
       const ctx = new Ctx()
@@ -393,6 +399,7 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
         }
       }))
     } catch (err) {
+      if (endingRef.current || !isMountedRef.current) return
       console.error('Error starting DM call:', err)
       setCallError('No se pudo iniciar la llamada')
       setCallState('idle')
@@ -588,6 +595,7 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
       })
 
     } catch (err) {
+      if (endingRef.current || !isMountedRef.current) return
       console.error('Error starting group mesh call:', err)
       setCallError('Error al iniciar la llamada grupal')
       setCallState('idle')
@@ -633,6 +641,7 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
         if (!d || d.status === 'ended') endCall()
       }))
     } catch (err) {
+      if (endingRef.current || !isMountedRef.current) return
       console.error('Error answering DM call:', err)
       setCallError('Error al contestar la llamada')
       setCallState('idle')
@@ -640,7 +649,6 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
   }
 
   // ---------- Ciclo de vida ----------
-  const endingRef = useRef(false)
   useEffect(() => {
     if (!activeCall || !callId) return
     endingRef.current = false

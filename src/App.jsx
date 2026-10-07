@@ -206,17 +206,19 @@ function App() {
         profileId = sessionStorage.getItem('englishTech_viewingProfileId') || null;
       }
 
-      if (raw.startsWith('ova/') || raw.startsWith('ova')) {
+      if (mainTab === 'ova' || raw.startsWith('ova=')) {
         if (raw.startsWith('ova/')) {
-          ovaId = safeDecodeURIComponent(raw.replace('ova/', '').split('?')[0].trim());
+          ovaId = safeDecodeURIComponent(raw.replace('ova/', '').split('?')[0].trim()) || 'ova-golden-ratio-01';
+        } else if (raw.startsWith('ova=')) {
+          ovaId = safeDecodeURIComponent(raw.replace('ova=', '').split('&')[0].trim()) || 'ova-golden-ratio-01';
         } else if (raw.includes('?')) {
           const hashParams = new URLSearchParams(raw.split('?')[1] || '');
-          ovaId = safeDecodeURIComponent(hashParams.get('id') || hashParams.get('ova') || '');
-        } else if (mainTab === 'ova') {
+          ovaId = safeDecodeURIComponent(hashParams.get('id') || hashParams.get('ova') || '') || 'ova-golden-ratio-01';
+        } else {
           ovaId = 'ova-golden-ratio-01';
         }
       }
-      if (!ovaId) {
+      if (!ovaId && !raw) {
         try {
           const searchParams = new URLSearchParams(window.location.search);
           if (searchParams.get('ova')) {
@@ -2097,13 +2099,17 @@ function App() {
         setPublicKahootPin('');
 
         if (hash === 'chat') {
+          setPublicOvaId(null);
           setIsChatAppOpen(true);
         } else {
           setIsChatAppOpen(false);
-          if (hash.startsWith('ova/') || hash.startsWith('ova')) {
+          const mainTab = hash.split('/')[0].split('?')[0];
+          if (mainTab === 'ova' || hash.startsWith('ova=')) {
             let oid = null;
             if (hash.startsWith('ova/')) {
               oid = safeDecodeURIComponent(hash.replace('ova/', '').split('?')[0].trim());
+            } else if (hash.startsWith('ova=')) {
+              oid = safeDecodeURIComponent(hash.replace('ova=', '').split('&')[0].trim());
             } else if (hash.includes('?')) {
               const params = new URLSearchParams(hash.split('?')[1] || '');
               oid = safeDecodeURIComponent(params.get('id') || params.get('ova') || '');
@@ -2113,17 +2119,18 @@ function App() {
             setPublicOvaId(oid || 'ova-golden-ratio-01');
             return;
           } else {
-            try {
-              const searchParams = new URLSearchParams(window.location.search);
-              if (searchParams.get('ova')) {
-                setPublicOvaId(safeDecodeURIComponent(searchParams.get('ova')));
-                return;
-              }
-            } catch (e) {}
+            if (!hash) {
+              try {
+                const searchParams = new URLSearchParams(window.location.search);
+                if (searchParams.get('ova')) {
+                  setPublicOvaId(safeDecodeURIComponent(searchParams.get('ova')));
+                  return;
+                }
+              } catch (e) {}
+            }
             setPublicOvaId(null);
           }
 
-          const mainTab = hash.split('/')[0].split('?')[0];
           if (mainTab === 'profile') {
             setActiveTab('profile');
             let pid = null;
@@ -3073,8 +3080,13 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
 
           useEffect(() => {
             const handleHashDemo = () => {
-              if (isInitialDemoLink()) {
+              const hashLower = (typeof window !== 'undefined' && window.location.hash ? window.location.hash : '').toLowerCase();
+              const isExplicitDemoHash = hashLower.includes('demo') || hashLower.includes('invitado');
+              if (isExplicitDemoHash && isInitialDemoLink()) {
                 const demoRole = getInitialDemoRole();
+                setPublicOvaId(null);
+                setPublicKahootActive(false);
+                setPublicKahootPin('');
                 setIsDemoMode(true);
                 setHasEntered(true);
                 setRole(demoRole);
@@ -5223,7 +5235,9 @@ useEffect(() => {
         const docFiles = files.filter(f => !f.type.startsWith('image/'));
 
         if (imageFiles.length > 0) {
-            const currentList = Array.isArray(postImageUrlsRef.current) ? postImageUrlsRef.current : [];
+            const currentList = (Array.isArray(postImageUrlsRef.current) && postImageUrlsRef.current.length > 0)
+                ? postImageUrlsRef.current
+                : (postImageUrl ? [postImageUrl] : []);
             const remainingSlots = Math.max(0, 4 - currentList.length);
             
             if (remainingSlots <= 0) {
@@ -5252,7 +5266,9 @@ useEffect(() => {
 
             if (uploadedUrls.length > 0) {
                 setPostImageUrls(prev => {
-                    const prevList = Array.isArray(prev) ? prev : [];
+                    const prevList = (Array.isArray(prev) && prev.length > 0)
+                        ? prev
+                        : (postImageUrl ? [postImageUrl] : []);
                     const combined = [...prevList, ...uploadedUrls].slice(0, 4);
                     setPostImageUrl(combined[0] || '');
                     return combined;

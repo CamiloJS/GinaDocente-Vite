@@ -1295,19 +1295,21 @@ export function parseKahootUrlInfo(hash = '', search = '') {
     };
   }
 
-  try {
-    const params = new URLSearchParams(String(search || ''));
-    if (params.has('kahoot')) {
-      const val = String(params.get('kahoot') || '').trim();
-      const pinParam = String(params.get('pin') || '').trim();
-      const digits = (val.replace(/\D/g, '').length >= 4 ? val : pinParam).replace(/\D/g, '').slice(0, 6);
-      return {
-        isKahootRoute: true,
-        pin: digits,
-      };
+  if (!cleanHash) {
+    try {
+      const params = new URLSearchParams(String(search || ''));
+      if (params.has('kahoot')) {
+        const val = String(params.get('kahoot') || '').trim();
+        const pinParam = String(params.get('pin') || '').trim();
+        const digits = (val.replace(/\D/g, '').length >= 4 ? val : pinParam).replace(/\D/g, '').slice(0, 6);
+        return {
+          isKahootRoute: true,
+          pin: digits,
+        };
+      }
+    } catch {
+      // ignore malformed query
     }
-  } catch {
-    // ignore malformed query
   }
 
   return {

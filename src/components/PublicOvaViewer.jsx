@@ -6,6 +6,7 @@ import {
 } from './Icons.jsx';
 import goldenRatioTemplate from '../templates/goldenRatioOva.json';
 import { db, appId, auth, signInAnonymously, doc, getDoc, setDoc } from '../firebase/config.js';
+import { isDemoItemExpired } from '../utils/demoData.js';
 
 export default function PublicOvaViewer({
   ovaId = null,
@@ -96,7 +97,12 @@ export default function PublicOvaViewer({
   useEffect(() => {
     let isMounted = true;
     const loadOva = async () => {
+      initialSrcRef.current = isTeacher
+        ? `/ova-studio/index.html?mode=editor&locked=false&theme=${isDarkMode ? 'dark' : 'light'}`
+        : `/ova-studio/index.html?mode=viewer&locked=true&theme=${isDarkMode ? 'dark' : 'light'}`;
       setLoading(true);
+      setIsIframeReady(false);
+      setIsUnlocked(Boolean(isTeacher));
       try {
         let loaded = null;
 
@@ -123,13 +129,18 @@ export default function PublicOvaViewer({
             keysToCheck.forEach(k => {
               try {
                 const parsed = JSON.parse(localStorage.getItem(k) || '[]');
-                if (Array.isArray(parsed)) combined.push(...parsed);
+                if (Array.isArray(parsed)) {
+                  const validItems = isDemoMode
+                    ? parsed.filter(item => item && !isDemoItemExpired(item))
+                    : parsed.filter(Boolean);
+                  combined.push(...validItems);
+                }
               } catch (e) {}
             });
             if (combined.length > 0) {
               combined.sort((a, b) => (Number(b?.updatedAt) || 0) - (Number(a?.updatedAt) || 0));
               if (ovaId) {
-                loaded = combined.find(o => o.id === ovaId) || combined[0];
+                loaded = combined.find(o => o.id === ovaId) || (ovaId === 'ova-golden-ratio-01' ? null : combined[0]);
               } else {
                 loaded = combined[0];
               }
@@ -228,12 +239,12 @@ export default function PublicOvaViewer({
         setOvaData(updatedProject);
         try {
           const storageKeys = isDemoMode
-            ? ['englishTech_demo_ovas', 'englishTech_demo_ovas_teacher']
+            ? ['englishTech_demo_ovas', 'englishTech_demo_ovas_teacher', 'englishTech_demo_ovas_camilodocente']
             : ['englishTech_ovas', 'englishTech_ovas_camilodocente'];
           storageKeys.forEach(storageKey => {
             const cachedList = JSON.parse(localStorage.getItem(storageKey) || '[]');
             const idx = cachedList.findIndex(o => o.id === updatedProject.id);
-            if (idx >= 0 || storageKey === storageKeys[0]) {
+            if (idx >= 0 || isDemoMode || storageKey === storageKeys[0]) {
               const next = idx >= 0
                 ? cachedList.map((o, i) => i === idx ? updatedProject : o)
                 : [updatedProject, ...cachedList];

@@ -29,6 +29,7 @@ export const RichVisualEditor = ({
   className = ''
 }) => {
   const editorRef = useRef(null);
+  const colorPickerRef = useRef(null);
   const isInternalChangeRef = useRef(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [isEmpty, setIsEmpty] = useState(!value);
@@ -43,6 +44,21 @@ export const RichVisualEditor = ({
     highlight: false,
     color: null
   });
+
+  useEffect(() => {
+    if (!showColorPicker) return;
+    const handleOutsideClick = (e) => {
+      if (colorPickerRef.current && !colorPickerRef.current.contains(e.target)) {
+        setShowColorPicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('touchstart', handleOutsideClick);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('touchstart', handleOutsideClick);
+    };
+  }, [showColorPicker]);
 
   // Check which formatting options are currently active at cursor / selection
   const updateActiveFormats = useCallback(() => {
@@ -289,7 +305,7 @@ export const RichVisualEditor = ({
           <div className="h-4 w-[1px] bg-gray-300 dark:bg-gray-700 mx-0.5" />
 
           {/* Selector de Paleta de Colores Circular (Sin texto, con Negro incluido) */}
-          <div className="relative">
+          <div className="relative" ref={colorPickerRef}>
             <button
               type="button"
               onMouseDown={(e) => { e.preventDefault(); setShowColorPicker(prev => !prev); }}

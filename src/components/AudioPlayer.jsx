@@ -22,6 +22,11 @@ export const AudioPlayer = ({
   const rates = [0.8, 1, 1.25, 1.5, 2]
 
   useEffect(() => {
+    setIsPlaying(false)
+    setCurrentTime(0)
+    setDuration(0)
+    durationRef.current = 0
+    setIsLoaded(false)
     const audio = audioRef.current
     if (!audio) return
 

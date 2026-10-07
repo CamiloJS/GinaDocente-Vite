@@ -35,6 +35,13 @@ const CustomVideoPlayer = ({ src, url, videoId: propVideoId, title = "Video de l
   const [isLoading, setIsLoading] = useState(false);
   const controlsTimeoutRef = useRef(null);
 
+  useEffect(() => {
+    setIsPlaying(false);
+    setCurrentTime(0);
+    setDuration(0);
+    setIsLoading(false);
+  }, [videoSource]);
+
   // Formato de tiempo MM:SS
   const formatTime = (timeInSeconds) => {
     if (timeInSeconds === null || timeInSeconds === undefined || isNaN(timeInSeconds) || !isFinite(timeInSeconds) || timeInSeconds < 0) return '0:00';

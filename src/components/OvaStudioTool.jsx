@@ -59,6 +59,7 @@ export default function OvaStudioTool({
 
   const iframeRef = useRef(null);
   const containerRef = useRef(null);
+  const initialSrcRef = useRef(`/ova-studio/index.html?theme=${isDarkMode ? 'dark' : 'light'}`);
 
   const currentOva = useMemo(() => {
     return ovas.find(o => o.id === selectedOvaId) || ovas[0] || null;
@@ -86,6 +87,11 @@ export default function OvaStudioTool({
                   .filter(item => item.id === 'ova-golden-ratio-01' || getItemTeacherId(item) === activeTeacherId);
                 if (valid.length > 0) {
                   setOvas(valid);
+                  const activeItem = valid.find(o => o.id === selectedOvaId) || valid[0];
+                  if (activeItem) {
+                    setSelectedOvaId(activeItem.id);
+                    sendProjectToIframe(activeItem);
+                  }
                   return;
                 }
               }
@@ -93,6 +99,8 @@ export default function OvaStudioTool({
           } catch (e) {}
           const seed = { ...goldenRatioTemplate, id: 'ova-golden-ratio-01', editPin: '1234' };
           setOvas([seed]);
+          setSelectedOvaId(seed.id);
+          sendProjectToIframe(seed);
           return;
         }
         if (!firestoreDb || !activeAppId) return;
@@ -437,7 +445,8 @@ export default function OvaStudioTool({
 
   // Copy public share link
   const handleCopyPublicLink = (overrideId = null) => {
-    const targetId = overrideId || currentOva?.id;
+    const validOverride = typeof overrideId === 'string' && overrideId.trim() ? overrideId.trim() : null;
+    const targetId = validOverride || currentOva?.id;
     if (!targetId) return;
     const base = window.location.origin + window.location.pathname;
     const shareUrl = `${base}#ova?id=${encodeURIComponent(targetId)}`;
@@ -608,7 +617,7 @@ export default function OvaStudioTool({
 
           {/* Share Link button */}
           <button
-            onClick={handleCopyPublicLink}
+            onClick={() => handleCopyPublicLink()}
             className="flex items-center gap-1 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-xs transition shrink-0"
             title="Copiar enlace público para compartir con estudiantes"
           >
@@ -659,7 +668,7 @@ export default function OvaStudioTool({
       }`}>
         <iframe
           ref={iframeRef}
-          src={`/ova-studio/index.html?theme=${isDarkMode ? 'dark' : 'light'}`}
+          src={initialSrcRef.current}
           className="w-full h-full border-0"
           title="EnglishTech OVA Studio"
           allow="clipboard-read; clipboard-write; fullscreen"

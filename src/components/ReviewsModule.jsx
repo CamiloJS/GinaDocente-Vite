@@ -14,6 +14,15 @@ import EmptyState from './EmptyState.jsx'
 import { doc, addDoc, collection, deleteDoc, updateDoc } from '../firebase/config.js'
 import { DEMO_TTL_MS, saveDemoSandboxItem, removeDemoSandboxItem } from '../utils/demoData.js'
 
+export const resolveSlideLayout = (slide, idx = 1) => {
+  if (!slide) return 'cards';
+  if (slide.layout) return slide.layout;
+  if (idx === 0 && !slide.cards && !slide.bullets && !slide.options && slide.type !== 'quiz') return 'title';
+  if (slide.type === 'quiz' || Array.isArray(slide.options)) return 'quiz';
+  if (Array.isArray(slide.bullets)) return 'bullets';
+  return 'cards';
+};
+
 // =========================================================================
 // 1. GENERADOR NATIVO DE ARCHIVOS MICROSOFT POWERPOINT (.PPTX)
 // =========================================================================
@@ -40,9 +49,9 @@ export const exportReviewToPresentation = async (review) => {
     const slide = pptx.addSlide();
     slide.background = { color: DARK_BG };
 
-    const isFirst = s.layout ? s.layout === 'title' : idx === 0;
+    const slideLayout = resolveSlideLayout(s, idx);
 
-    if (isFirst) {
+    if (slideLayout === 'title') {
       // Portada limpia con tipografía destacada
       slide.addText(s.title || displayTitle, {
         x: 0.8, y: 1.6, w: 11.5, h: 2.4,
@@ -55,7 +64,7 @@ export const exportReviewToPresentation = async (review) => {
         fontSize: 20, fontFace: 'Arial', color: TEXT_MUTED, align: 'left'
       });
 
-    } else if (s.layout === 'quiz' || s.type === 'quiz') {
+    } else if (slideLayout === 'quiz') {
       // Diapositiva de Quiz
       slide.addText(`SLIDE ${idx + 1} • QUIZ`, {
         x: 0.8, y: 0.6, w: 11.5, h: 0.3,
@@ -102,7 +111,7 @@ export const exportReviewToPresentation = async (review) => {
         });
       });
 
-    } else if (s.layout === 'bullets' || s.bullets) {
+    } else if (slideLayout === 'bullets') {
       // Diapositiva de Puntos Clave
       slide.addText(`SLIDE ${idx + 1}`, {
         x: 0.8, y: 0.6, w: 11.5, h: 0.3,
@@ -232,10 +241,14 @@ export const SlidePresenterViewer = ({ presentation, onClose, onEdit, role, them
 
   useEffect(() => {
     const handleFsChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      setIsFullscreen(!!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement));
     };
     document.addEventListener('fullscreenchange', handleFsChange);
-    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+    document.addEventListener('webkitfullscreenchange', handleFsChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFsChange);
+      document.removeEventListener('webkitfullscreenchange', handleFsChange);
+    };
   }, []);
 
   useEffect(() => {
@@ -346,14 +359,14 @@ export const SlidePresenterViewer = ({ presentation, onClose, onEdit, role, them
           {/* Barra Superior del Lienzo: Contador y Layout */}
           <div className="flex justify-between items-center text-xs font-bold shrink-0">
             <span className="px-2.5 py-1 rounded-lg bg-red-500/10 text-[#AD3333] dark:text-red-400 uppercase tracking-wider text-[10px] font-black">
-              {(currentSlide.layout ? currentSlide.layout === 'title' : safeIdx === 0) ? 'Portada' : currentSlide.layout === 'quiz' ? 'Quiz Interactivo' : currentSlide.layout === 'bullets' ? 'Puntos Clave' : 'Conceptos'}
+              {resolveSlideLayout(currentSlide, safeIdx) === 'title' ? 'Portada' : resolveSlideLayout(currentSlide, safeIdx) === 'quiz' ? 'Quiz Interactivo' : resolveSlideLayout(currentSlide, safeIdx) === 'bullets' ? 'Puntos Clave' : 'Conceptos'}
             </span>
             <span className={`font-mono text-xs font-black ${textSecondary}`}>{safeIdx + 1} / {total}</span>
           </div>
 
           {/* Contenido Dinámico con Tipografía Grande y Legible */}
           <div className="my-auto overflow-y-auto py-2 w-full">
-            {(currentSlide.layout ? currentSlide.layout === 'title' : safeIdx === 0) ? (
+            {resolveSlideLayout(currentSlide, safeIdx) === 'title' ? (
               /* Portada */
               <div className="text-center space-y-6 max-w-4xl mx-auto py-4">
                 <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-red-500/10 border border-red-500/20 text-[#AD3333] dark:text-red-300 text-xs font-extrabold uppercase tracking-widest">
@@ -367,7 +380,7 @@ export const SlidePresenterViewer = ({ presentation, onClose, onEdit, role, them
                   {currentSlide.subtitle || currentSlide.description || 'Contenido académico estructurado'}
                 </p>
               </div>
-            ) : currentSlide.layout === 'quiz' || currentSlide.type === 'quiz' ? (
+            ) : resolveSlideLayout(currentSlide, safeIdx) === 'quiz' ? (
               /* Quiz */
               <div className="space-y-6 max-w-4xl mx-auto w-full py-2">
                 <div className="space-y-2">
@@ -417,7 +430,7 @@ export const SlidePresenterViewer = ({ presentation, onClose, onEdit, role, them
                   </div>
                 )}
               </div>
-            ) : currentSlide.layout === 'bullets' ? (
+            ) : resolveSlideLayout(currentSlide, safeIdx) === 'bullets' ? (
               /* Puntos Clave con Tipografía y Jerarquía Superior */
               <div className="space-y-5 max-w-5xl mx-auto w-full py-2">
                 <h2 className={`text-2xl sm:text-4xl font-black tracking-tight ${textPrimary}`}>
@@ -431,10 +444,10 @@ export const SlidePresenterViewer = ({ presentation, onClose, onEdit, role, them
                       </span>
                       <div className="flex-1 min-w-0 space-y-1">
                         <strong className={`block text-base sm:text-lg font-bold ${textPrimary}`}>
-                          {typeof b === 'object' ? b.title : b}
+                          {typeof b === 'object' ? b?.title : b}
                         </strong>
-                        {b.text && <p className={`text-sm sm:text-base leading-relaxed ${textSecondary}`}>{b.text}</p>}
-                        {b.example && (
+                        {b?.text && <p className={`text-sm sm:text-base leading-relaxed ${textSecondary}`}>{b.text}</p>}
+                        {b?.example && (
                           <div className="mt-2 text-xs sm:text-sm text-red-600 dark:text-red-300 bg-red-500/10 px-3 py-1.5 rounded-xl border border-red-500/20 font-medium flex items-center gap-1.5">
                             <Pin size={13} className="text-[#AD3333] shrink-0" />
                             <span><strong>Ejemplo:</strong> {b.example}</span>
@@ -528,11 +541,20 @@ export const SlideEditorModal = ({ presentation, onClose, onSave, onProject, isD
   if (typeof document === 'undefined' || !document.body) return null;
 
   const activeSlide = slides[activeSlideIdx] || slides[0] || {};
+  const activeLayout = resolveSlideLayout(activeSlide, activeSlideIdx);
 
   const handleSlideChange = (field, value) => {
     setSlides(prev => {
       const copy = [...prev];
-      copy[activeSlideIdx] = { ...copy[activeSlideIdx], [field]: value };
+      const nextSlide = { ...copy[activeSlideIdx], [field]: value };
+      if (field === 'layout') {
+        if (value === 'quiz') {
+          nextSlide.type = 'quiz';
+        } else if (nextSlide.type === 'quiz') {
+          delete nextSlide.type;
+        }
+      }
+      copy[activeSlideIdx] = nextSlide;
       return copy;
     });
   };
@@ -688,7 +710,7 @@ export const SlideEditorModal = ({ presentation, onClose, onSave, onProject, isD
                   </span>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-bold truncate leading-tight">{s.title || `Diapositiva ${idx + 1}`}</p>
-                    <p className="text-[10px] text-gray-400 capitalize">{s.layout || 'conceptos'}</p>
+                    <p className="text-[10px] text-gray-400 capitalize">{resolveSlideLayout(s, idx)}</p>
                   </div>
 
                   <div className="flex items-center gap-0.5 shrink-0" onClick={e => e.stopPropagation()}>
@@ -784,7 +806,7 @@ export const SlideEditorModal = ({ presentation, onClose, onSave, onProject, isD
               <div className="flex items-center gap-2">
                 <label className="text-xs font-bold text-gray-500">Diseño:</label>
                 <select
-                  value={activeSlide.layout || 'cards'}
+                  value={activeLayout}
                   onChange={e => handleSlideChange('layout', e.target.value)}
                   className={`px-3 py-1.5 rounded-xl border text-xs font-bold outline-none ${inputBg}`}
                 >
@@ -811,7 +833,7 @@ export const SlideEditorModal = ({ presentation, onClose, onSave, onProject, isD
             </div>
 
             {/* Campos Específicos según Layout */}
-            {activeSlide.layout === 'title' && (
+            {activeLayout === 'title' && (
               <div className="space-y-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
@@ -828,7 +850,7 @@ export const SlideEditorModal = ({ presentation, onClose, onSave, onProject, isD
               </div>
             )}
 
-            {activeSlide.layout === 'cards' && (
+            {activeLayout === 'cards' && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
@@ -906,7 +928,7 @@ export const SlideEditorModal = ({ presentation, onClose, onSave, onProject, isD
               </div>
             )}
 
-            {activeSlide.layout === 'bullets' && (
+            {activeLayout === 'bullets' && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
@@ -996,7 +1018,7 @@ export const SlideEditorModal = ({ presentation, onClose, onSave, onProject, isD
               </div>
             )}
 
-            {activeSlide.layout === 'quiz' && (
+            {activeLayout === 'quiz' && (
               <div className="space-y-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
