@@ -103,6 +103,18 @@ const vfPregunta = {
 const mjVF = armarMinijuegoPregunta(vfPregunta, [1]);
 chequear("verdadero/falso no genera trampa absurda sobre sinonimos", !mjVF.opcionesJuego.some((o) => o.texto.includes('sinónimos')));
 
+const vfIngles = {
+  type: 'multiple',
+  text: 'State whether the statement is true or false: "Inflation reduces purchasing power."',
+  options: [
+    { text: 'True (Verdadero)', isCorrect: true },
+    { text: 'False (Falso)', isCorrect: false }
+  ]
+};
+const mjVFIngles = armarMinijuegoPregunta(vfIngles, [1]);
+chequear("verdadero/falso en ingles/bilingue tambien usa reto de verificacion de afirmacion sin trampa de sinonimos", !mjVFIngles.opcionesJuego.some((o) => o.texto.includes('sinónimos')) && mjVFIngles.preguntaTrampa.includes('afirmación'));
+
+
 const mjConRazonIA = armarMinijuegoPregunta(multiple, [0], 'Explicacion general', {
   porQueOpciones: ['Razon especifica 1', 'Razon especifica 2', 'Razon especifica 3'],
   retoPregunta: 'Reto personalizado',

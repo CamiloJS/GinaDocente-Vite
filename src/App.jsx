@@ -183,12 +183,15 @@ const safeDecodeURIComponent = (str) => {
 };
 
 // Una pregunta de Verdadero/Falso es una seleccion multiple con las dos opciones tipicas.
-const esVerdaderoFalso = (q) =>
-    q?.type === 'multiple' &&
-    Array.isArray(q.options) &&
-    q.options.length === 2 &&
-    /^verdadero$/i.test(String(q.options[0]?.text || '').trim()) &&
-    /^falso$/i.test(String(q.options[1]?.text || '').trim());
+const esVerdaderoFalso = (q) => {
+  if (q?.type !== 'multiple' || !Array.isArray(q.options) || q.options.length !== 2) return false;
+  const rxV = /^(v|verdadero|true|vrai)$/i;
+  const rxF = /^(f|falso|false|faux)$/i;
+  const esV = (t) => rxV.test(t) || (t.split(/[()\/\-–—]/).map((p) => p.trim()).filter(Boolean).every((p) => rxV.test(p)) && t.length > 0);
+  const esF = (t) => rxF.test(t) || (t.split(/[()\/\-–—]/).map((p) => p.trim()).filter(Boolean).every((p) => rxF.test(p)) && t.length > 0);
+  const textos = q.options.map((o) => String(o?.text || '').trim().toLowerCase());
+  return textos.some(esV) && textos.some(esF);
+};
 
 function App() {
   // --- HELPERS BÁSICOS Y CONSTANTES INICIALES ---
@@ -389,7 +392,19 @@ function App() {
     if (initialActiveSession.role === 'teacher') return getTeacherDisplayName(rawKey || initialActiveSession.name);
     return initialActiveSession.name || rawKey || "";
   });
-  const [userMappings, setUserMappings] = useState(() => initialIsDemo ? DEMO_USER_MAPPINGS : {}); 
+  const getMergedDemoUserMappings = () => {
+    const sandbox = loadDemoSandbox();
+    const deletedSet = new Set((sandbox.deletedIds || []).map(d => typeof d === 'string' ? d : d?.id).filter(Boolean));
+    const merged = {};
+    Object.entries(DEMO_USER_MAPPINGS || {}).forEach(([k, v]) => {
+      if (!deletedSet.has(k)) merged[k] = v;
+    });
+    (sandbox.userMappings || []).forEach(u => {
+      if (u?.id && !deletedSet.has(u.id)) merged[u.id] = u;
+    });
+    return merged;
+  };
+  const [userMappings, setUserMappings] = useState(() => initialIsDemo ? getMergedDemoUserMappings() : {}); 
   const userMappingsRef = useRef(userMappings);
   const [userMappingsLoaded, setUserMappingsLoaded] = useState(() => initialIsDemo);
   const [showPassword, setShowPassword] = useState(false);
@@ -665,13 +680,24 @@ function App() {
   const [rawTasks, setRawTasks] = useState(() => initialIsDemo ? DEMO_TASKS : []);
   const [rawPinnedTasks, setPinnedTasks] = useState(() => initialIsDemo ? DEMO_TASKS.filter(t => t.isPinned) : []);
   const setTasks = useCallback((updater) => {
-    setRawTasks(prev => (typeof updater === 'function' ? updater(prev) : updater));
-    if (typeof updater === 'function') {
-      setPinnedTasks(prev => {
-        const next = updater(prev);
-        return Array.isArray(next) ? next.filter(t => t && t.isPinned) : prev;
-      });
-    }
+    setRawTasks(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      if (Array.isArray(next)) {
+        setPinnedTasks(prevPinned => {
+          const updatedExisting = typeof updater === 'function' ? updater(prevPinned) : next;
+          const baseList = Array.isArray(updatedExisting) ? updatedExisting.filter(t => t && t.isPinned) : [];
+          const seen = new Set(baseList.map(t => t.id));
+          next.forEach(t => {
+            if (t && t.isPinned && !seen.has(t.id)) {
+              baseList.unshift(t);
+              seen.add(t.id);
+            }
+          });
+          return baseList;
+        });
+      }
+      return next;
+    });
   }, []);
   const [tasksLoading, setTasksLoading] = useState(() => !initialIsDemo);
   const [taskLimit, setTaskLimit] = useState(20);
@@ -850,7 +876,7 @@ function App() {
     return ids;
   };
 
-  const activeFallbackMap = isDemoMode ? DEMO_USER_MAPPINGS : FALLBACK_MAP;
+  const activeFallbackMap = isDemoMode ? (userMappings || DEMO_USER_MAPPINGS) : FALLBACK_MAP;
 
   const getAllIdentifiersForStudentKey = (studentKey) => {
     const ids = new Set();
@@ -3095,9 +3121,7 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
                 setAcademicGroups(mergeDemoItemsWithBase(DEMO_ACADEMIC_GROUPS, [], 'academicGroups'));
                 setAcademicGroupsLoaded(true);
                 setChatGroups(mergeDemoItemsWithBase(DEMO_CHAT_GROUPS, [], 'chatGroups'));
-                const sandboxMappings = {};
-                (loadDemoSandbox().userMappings || []).forEach(u => { if (u.id) sandboxMappings[u.id] = u; });
-                const mergedMappings = { ...DEMO_USER_MAPPINGS, ...sandboxMappings };
+                const mergedMappings = getMergedDemoUserMappings();
                 setUserMappings(mergedMappings);
                 userMappingsRef.current = mergedMappings;
                 setUserMappingsLoaded(true);
@@ -3195,9 +3219,7 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
 
           useEffect(() => {
             if (isDemoMode || isInitialDemoLink()) {
-                const sandboxMappings = {};
-                (loadDemoSandbox().userMappings || []).forEach(u => { if (u.id) sandboxMappings[u.id] = u; });
-                const mergedMappings = { ...DEMO_USER_MAPPINGS, ...sandboxMappings };
+                const mergedMappings = getMergedDemoUserMappings();
                 setUserMappings(mergedMappings);
                 userMappingsRef.current = mergedMappings;
                 setUserMappingsLoaded(true);
@@ -3537,9 +3559,7 @@ useEffect(() => {
     setAcademicGroups(mergeDemoItemsWithBase(DEMO_ACADEMIC_GROUPS, [], 'academicGroups'));
     setAcademicGroupsLoaded(true);
     setChatGroups(mergeDemoItemsWithBase(DEMO_CHAT_GROUPS, [], 'chatGroups'));
-    const sandboxMappings = {};
-    (loadDemoSandbox().userMappings || []).forEach(u => { if (u.id) sandboxMappings[u.id] = u; });
-    const mergedMappings = { ...DEMO_USER_MAPPINGS, ...sandboxMappings };
+    const mergedMappings = getMergedDemoUserMappings();
     setUserMappings(mergedMappings);
     userMappingsRef.current = mergedMappings;
     setUserMappingsLoaded(true);
@@ -4282,7 +4302,39 @@ useEffect(() => {
                           }));
                       }
                   } else {
-                      const nextMsgs = chatMessages.map(m => m.id === msgId ? { ...m, isDeleted: true, deletedAt: Date.now(), deletedBy: 'student', originalText: m.text || '', text: 'Este mensaje fue eliminado' } : m);
+                      const isDeletedPlaceholder = (str) => {
+                          if (!str || typeof str !== 'string') return false;
+                          const lower = str.toLowerCase();
+                          return lower.includes('mensaje fue eliminado') || lower.includes('mensaje eliminado');
+                      };
+                      const nextMsgs = chatMessages.map(m => {
+                          if (m.id !== msgId) return m;
+                          let realOriginalText = '';
+                          if (m.originalText && !isDeletedPlaceholder(m.originalText)) {
+                              realOriginalText = m.originalText;
+                          } else if (m.text && !isDeletedPlaceholder(m.text)) {
+                              realOriginalText = m.text;
+                          } else if (m.editHistory && m.editHistory.length > 0) {
+                              const nonDeletedEdit = m.editHistory.find(h => h?.text && !isDeletedPlaceholder(h.text));
+                              if (nonDeletedEdit) realOriginalText = nonDeletedEdit.text;
+                          }
+                          return {
+                              ...m,
+                              isDeleted: true,
+                              deletedAt: Date.now(),
+                              deletedBy: 'student',
+                              originalText: realOriginalText,
+                              originalImageUrl: m.originalImageUrl || m.imageUrl || '',
+                              originalFileUrl: m.originalFileUrl || m.fileUrl || '',
+                              originalFileName: m.originalFileName || m.fileName || '',
+                              originalAudioUrl: m.originalAudioUrl || m.audioUrl || '',
+                              text: 'Este mensaje fue eliminado',
+                              imageUrl: '',
+                              fileUrl: '',
+                              fileName: '',
+                              audioUrl: ''
+                          };
+                      });
                       setChatMessages(nextMsgs);
                       saveDemoChatMessages(activeChat.id, nextMsgs);
                       const isLatestInChat = chatMessages.length > 0 && chatMessages[chatMessages.length - 1]?.id === msgId;
@@ -4352,7 +4404,7 @@ useEffect(() => {
                       } else if (msgObj.text && !isDeletedPlaceholder(msgObj.text)) {
                           realOriginalText = msgObj.text;
                       } else if (msgObj.editHistory && msgObj.editHistory.length > 0) {
-                          const nonDeletedEdit = msgObj.editHistory.slice().reverse().find(h => h?.text && !isDeletedPlaceholder(h.text));
+                          const nonDeletedEdit = msgObj.editHistory.find(h => h?.text && !isDeletedPlaceholder(h.text));
                           if (nonDeletedEdit) realOriginalText = nonDeletedEdit.text;
                       }
 
@@ -4363,6 +4415,7 @@ useEffect(() => {
                       const realOriginalImage = msgObj.originalImageUrl || msgObj.imageUrl || '';
                       const realOriginalFile = msgObj.originalFileUrl || msgObj.fileUrl || '';
                       const realOriginalFileName = msgObj.originalFileName || msgObj.fileName || '';
+                      const realOriginalAudio = msgObj.originalAudioUrl || msgObj.audioUrl || '';
 
                       await updateDoc(msgRef, {
                           isDeleted: true,
@@ -4372,7 +4425,12 @@ useEffect(() => {
                           originalImageUrl: realOriginalImage,
                           originalFileUrl: realOriginalFile,
                           originalFileName: realOriginalFileName,
-                          text: "Este mensaje fue eliminado"
+                          originalAudioUrl: realOriginalAudio,
+                          text: "Este mensaje fue eliminado",
+                          imageUrl: "",
+                          fileUrl: "",
+                          fileName: "",
+                          audioUrl: ""
                       });
 
                       const isLatestInChat = chatMessages.length > 0 && chatMessages[chatMessages.length - 1]?.id === msgId;
@@ -4396,15 +4454,23 @@ useEffect(() => {
 
           const handleEditAppMessage = async () => {
               if (!activeChat || !editAppMessageText.trim()) return;
+              const trimmedEdit = editAppMessageText.trim();
               
               const originalMsg = chatMessages.find(m => m.id === editingAppMessageId);
-              if (originalMsg && originalMsg.text === editAppMessageText.trim()) {
+              if (originalMsg && originalMsg.text === trimmedEdit) {
                   setEditingAppMessageId(null);
                   return;
               }
 
+              if (role !== 'teacher') {
+                  const isOffensive = await checkBadWordsAsync(trimmedEdit);
+                  if (isOffensive) {
+                      showMessage("El mensaje editado contiene palabras no permitidas.");
+                      return;
+                  }
+              }
+
               if (isDemoMode) {
-                  const trimmedEdit = editAppMessageText.trim();
                   const nextMsgs = chatMessages.map(m => {
                       if (m.id !== editingAppMessageId) return m;
                       if (role === 'teacher') return { ...m, text: trimmedEdit };
@@ -4431,7 +4497,6 @@ useEffect(() => {
               }
 
               const msgRef = doc(db, 'artifacts', appId, 'public', 'data', 'chats', activeChat.id, 'messages', editingAppMessageId);
-              const trimmedEdit = editAppMessageText.trim();
 
               try {
                   // Si la docente edita -> sin rastro
@@ -4628,6 +4693,15 @@ useEffect(() => {
                   const updated = { ...group, members: newMembers };
                   setChatGroups(prev => prev.map(g => g.id === group.id ? updated : g));
                   saveDemoSandboxItem('chatGroups', updated);
+                  if (group.academicGroupId || group.id.startsWith('acad_')) {
+                      const acadId = group.academicGroupId || group.id.replace('acad_', '');
+                      setAcademicGroups(prev => prev.map(ag => {
+                          if (ag.id !== acadId) return ag;
+                          const u = { ...ag, members: newMembers.filter(m => !isTeacherId(m)) };
+                          saveDemoSandboxItem('academicGroups', u);
+                          return u;
+                      }));
+                  }
                   setActiveChat(null);
                   showMessage("Abandonaste el grupo (Modo Demo).");
                   return;
@@ -4858,6 +4932,15 @@ useEffect(() => {
               const updatedGrp = { ...grp, members: updatedMembers };
               setChatGroups(prev => prev.map(cg => cg.id === grp.id ? updatedGrp : cg));
               saveDemoSandboxItem('chatGroups', updatedGrp);
+              if (grp.academicGroupId || grp.id.startsWith('acad_')) {
+                  const acadId = grp.academicGroupId || grp.id.replace('acad_', '');
+                  setAcademicGroups(prev => prev.map(ag => {
+                      if (ag.id !== acadId) return ag;
+                      const u = { ...ag, members: updatedMembers.filter(m => !isTeacherId(m)) };
+                      saveDemoSandboxItem('academicGroups', u);
+                      return u;
+                  }));
+              }
               setActiveChat(null);
               setShowGroupInfo(false);
               showMessage("Has salido del grupo (Modo Demo).");
@@ -5565,6 +5648,12 @@ useEffect(() => {
         if (!hasTitle && !hasText && !hasImg) {
             return showMessage("Escribe algo o adjunta una imagen para publicar en tu perfil.");
         }
+        if (role !== 'teacher') {
+            const combinedText = `${(profilePostTitle || '').trim()} ${(profilePostText || '').trim()}`.trim();
+            if (combinedText && await checkBadWordsAsync(combinedText)) {
+                return showMessage("Tu publicación contiene palabras no permitidas.");
+            }
+        }
         setIsPublishingProfile(true);
         try {
             const postPayload = {
@@ -5604,6 +5693,12 @@ useEffect(() => {
 
     const saveEditedProfilePost = async (postId) => {
         if (!editProfilePostData.title.trim() && !editProfilePostData.text.trim()) return;
+        if (role !== 'teacher') {
+            const combinedEdit = `${editProfilePostData.title.trim()} ${editProfilePostData.text.trim()}`.trim();
+            if (combinedEdit && await checkBadWordsAsync(combinedEdit)) {
+                return showMessage("Tu publicación editada contiene palabras no permitidas.");
+            }
+        }
         if (isDemoMode) {
             setUserPosts(prev => prev.map(p => {
                 if (p.id !== postId) return p;
@@ -5651,6 +5746,11 @@ useEffect(() => {
         e.preventDefault();
         const text = profileCommentInputs[postId];
         if (!text || !text.trim()) return;
+        if (role !== 'teacher') {
+            if (await checkBadWordsAsync(text.trim())) {
+                return showMessage("Tu comentario contiene palabras no permitidas.");
+            }
+        }
         const post = userPosts.find(p => p.id === postId);
         if (!post) return;
         const rep = profileReplyingTo[postId];
@@ -7547,12 +7647,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
             const studentName = userMappings[studentKey]?.fullName || activeFallbackMap[studentKey]?.name || studentKey;
             confirmAction(`¿Quitar a ${studentName} de la materia "${currentGroup.name}"?`, async () => {
                 if (isDemoMode) {
-                    const rawMembers = Array.isArray(currentGroup.members) ? currentGroup.members : (currentGroup.members && typeof currentGroup.members === 'object' ? Object.keys(currentGroup.members) : []);
-                    const updatedMembers = rawMembers.filter(m => String(m).toLowerCase().replace('@', '') !== String(studentKey).toLowerCase().replace('@', ''));
-                    const updatedGroup = { ...currentGroup, members: updatedMembers };
-                    setAcademicGroups(prev => prev.map(g => g.id === currentGroup.id ? updatedGroup : g));
-                    setSelectedSubjectDetail(prev => prev ? { ...prev, members: updatedMembers } : null);
-                    saveDemoSandboxItem('academicGroups', updatedGroup);
+                    await removeStudentFromGroupHelper(currentGroup.id, studentKey);
                     showMessage("Estudiante removido de la materia (Modo Demo).");
                     return;
                 }
@@ -7569,10 +7664,17 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
             try {
                 const rawMembers = Array.isArray(currentGroup.members) ? currentGroup.members : (currentGroup.members && typeof currentGroup.members === 'object' ? Object.keys(currentGroup.members) : []);
                 const updatedMembers = Array.from(new Set([...rawMembers, studentKey]));
+                const ownerTeacherId = getItemTeacherId(currentGroup || { teacherId: myChatId });
+                const updatedChatMembers = Array.from(new Set([ownerTeacherId, ...updatedMembers]));
                 setAcademicGroups(prev => prev.map(g => g.id === currentGroup.id ? { ...g, members: updatedMembers } : g));
                 setSelectedSubjectDetail(prev => prev ? { ...prev, members: updatedMembers } : null);
+                setChatGroups(prev => prev.map(cg => (cg.id === `acad_${currentGroup.id}` || cg.academicGroupId === currentGroup.id) ? { ...cg, members: updatedChatMembers } : cg));
                 if (isDemoMode) {
                     saveDemoSandboxItem('academicGroups', { ...currentGroup, members: updatedMembers });
+                    const existingCg = chatGroups.find(cg => cg.id === `acad_${currentGroup.id}` || cg.academicGroupId === currentGroup.id);
+                    if (existingCg) {
+                        saveDemoSandboxItem('chatGroups', { ...existingCg, members: updatedChatMembers });
+                    }
                     showMessage("Estudiante inscrito en la materia (Modo Demo).");
                     return;
                 }
@@ -7580,8 +7682,6 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                     members: updatedMembers
                 });
                 // Sincronizar chat grupal
-                const ownerTeacherId = getItemTeacherId(currentGroup || { teacherId: myChatId });
-                const updatedChatMembers = Array.from(new Set([ownerTeacherId, ...updatedMembers]));
                 await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', `acad_${currentGroup.id}`), {
                     members: updatedChatMembers,
                     name: currentGroup.name,
@@ -8413,12 +8513,20 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                             onClick={() => confirmAction(`¿Eliminar a "${data.fullName}" (@${userKey}) del sistema? Su enlace de perfil será eliminado permanentemente.`, async () => {
                                                 if (isDemoMode) {
                                                     removeDemoSandboxItem('userMappings', userKey);
+                                                    for (const g of academicGroups) {
+                                                        await removeStudentFromGroupHelper(g.id, userKey);
+                                                    }
                                                     setUserMappings(prev => {
                                                         const next = { ...prev };
                                                         delete next[userKey];
                                                         userMappingsRef.current = next;
                                                         return next;
                                                     });
+                                                    if (viewingProfileId === userKey) {
+                                                        setViewingProfileId(null);
+                                                        try { sessionStorage.removeItem('englishTech_viewingProfileId'); } catch(e) {}
+                                                        window.location.hash = 'directory';
+                                                    }
                                                     showMessage("Estudiante removido de la vista (Modo Demo).");
                                                     return;
                                                 }
@@ -9068,6 +9176,15 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                           <div className="pl-8">
                                               <audio controls src={q.audioUrl} className="w-full max-w-md h-10" />
                                               <p className="text-[11px] text-gray-500 font-medium mt-1">{'Escucha el audio y responde.'}</p>
+                                          </div>
+                                      )}
+
+                                      {q.type === 'reading' && q.passage && (
+                                          <div className="pl-8 pt-1">
+                                              <div className="p-3 rounded-xl border border-amber-200 dark:border-amber-800/50 bg-amber-50/40 dark:bg-amber-950/20 text-xs text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed max-h-56 overflow-y-auto">
+                                                  <p className="text-[10px] font-bold text-amber-700 dark:text-amber-300 mb-1 uppercase tracking-wider">Texto de lectura:</p>
+                                                  {q.passage}
+                                              </div>
                                           </div>
                                       )}
 
@@ -11038,6 +11155,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                         type="button"
                                                         onClick={() => confirmAction("¿Borrar evaluación? También se borrarán las notas de los estudiantes.", async () => {
                                                             if (isDemoMode) {
+                                                                grades.filter(g => g.evaluationId === ev.id).forEach(g => removeDemoSandboxItem('grades', g.id));
                                                                 setEvaluations(prev => prev.filter(e => e.id !== ev.id));
                                                                 setGrades(prev => prev.filter(g => g.evaluationId !== ev.id));
                                                                 removeDemoSandboxItem('evaluations', ev.id);
@@ -13498,11 +13616,7 @@ Bot:`;
                                                   if (parsed.params?.title) {
                                                       const ev = evaluations.find(e => (e.title || '').toLowerCase().includes(parsed.params.title.toLowerCase()));
                                                       if (ev) {
-                                                          if (isDemoMode || String(ev.id).startsWith('demo')) {
-                                                              await toggleArchiveEvaluation(ev.id, ev.isArchived);
-                                                          } else {
-                                                              await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'evaluations', ev.id), { isArchived: !ev.isArchived });
-                                                          }
+                                                          await toggleArchiveEvaluation(ev.id, ev.isArchived);
                                                           customReply = `Evaluación "${ev.title}" ${ev.isArchived ? 'restaurada' : 'archivada'}.`;
                                                       }
                                                   }
@@ -14589,7 +14703,7 @@ Bot:`;
                                                                                                       const isPlaceholder = (s) => (s || '').toLowerCase().includes('mensaje fue eliminado') || (s || '').toLowerCase().includes('mensaje eliminado');
                                                                                                       if (m.originalText && !isPlaceholder(m.originalText)) return m.originalText;
                                                                                                       if (m.editHistory && m.editHistory.length > 0) {
-                                                                                                          const lastGood = m.editHistory.slice().reverse().find(h => h?.text && !isPlaceholder(h.text));
+                                                                                                          const lastGood = m.editHistory.find(h => h?.text && !isPlaceholder(h.text));
                                                                                                           if (lastGood) return lastGood.text;
                                                                                                       }
                                                                                                       if (m.text && !isPlaceholder(m.text)) return m.text;

@@ -209,14 +209,21 @@ function normalizarPregunta(q) {
 
   // --- Verdadero / Falso (se guarda como multiple con las dos opciones tipicas) ---
   if (tipo === 'truefalse' || tipo === 'verdadero_falso' || tipo === 'boolean') {
-    const marca = String(q.correctAnswer ?? q.answer ?? '').trim().toLowerCase();
-    const esV = /^(v|verdadero|true|si|s\u00ed)$/.test(marca);
-    const esF = /^(f|falso|false|no)$/.test(marca);
-    let opciones = (Array.isArray(q.options) ? q.options : []).map((o) => limpiar(typeof o === 'string' ? o : o?.text, 60));
-    if (opciones.length < 2) opciones = ['Verdadero', 'Falso'];
+    const rawOpts = Array.isArray(q.options || q.opciones) ? (q.options || q.opciones) : [];
+    let marca = String(q.correctAnswer ?? q.answer ?? q.respuesta ?? '').trim().toLowerCase();
+    if (!marca) {
+      const optCorrecta = rawOpts.find((o) => typeof o === 'object' && (o?.isCorrect || o?.correcta));
+      if (optCorrecta) marca = String(optCorrecta.text || optCorrecta.texto || '').trim().toLowerCase();
+    }
+    const esV = esTextoVerdadero(marca) || /^(si|s\u00ed|yes|oui|1)$/i.test(marca);
+    const esF = esTextoFalso(marca) || /^(no|non|0)$/i.test(marca);
+    let opciones = rawOpts.map((o) => limpiar(typeof o === 'string' ? o : (o?.text || o?.texto), 60)).filter(Boolean);
+    if (opciones.length < 2 || !(opciones.some((t) => esTextoVerdadero(t)) && opciones.some((t) => esTextoFalso(t)))) {
+      opciones = ['Verdadero', 'Falso'];
+    }
     opciones = opciones.slice(0, 2).map((t) => ({ text: t, isCorrect: false }));
     if (!esV && !esF) return { problema: `la pregunta de verdadero/falso "${texto.slice(0, 40)}..." no indica si es verdadero o falso` };
-    const idx = opciones.findIndex((o) => (esV ? /verdadero|true|^v$/i : /falso|false|^f$/i).test(o.text));
+    const idx = opciones.findIndex((o) => (esV ? esTextoVerdadero(o.text) : esTextoFalso(o.text)));
     opciones[idx >= 0 ? idx : esV ? 0 : 1].isCorrect = true;
     return { pregunta: { type: 'multiple', text: texto, options: opciones, permiteMultiples: opciones.filter((o) => o.isCorrect).length > 1, correctAnswer: '', points: puntos, ...extraImg } };
   }
@@ -255,14 +262,37 @@ function normalizarPregunta(q) {
   return { pregunta: { type: 'text', text: texto, options: [], correctAnswer: respuesta, acceptedAnswers: alternativas, points: puntos, ...extraImg } };
 }
 
+const RX_TOKEN_VERDADERO = /^(v|verdadero|true|vrai)$/i;
+const RX_TOKEN_FALSO = /^(f|falso|false|faux)$/i;
+
+/** Detecta si un texto de opcion representa Verdadero (incluyendo formatos bilingues). */
+export function esTextoVerdadero(val) {
+  const limpio = String(val ?? '').trim();
+  if (!limpio) return false;
+  if (RX_TOKEN_VERDADERO.test(limpio)) return true;
+  const partes = limpio.split(/[()\/\-–—]/).map((p) => p.trim()).filter(Boolean);
+  return partes.length > 0 && partes.every((p) => RX_TOKEN_VERDADERO.test(p));
+}
+
+/** Detecta si un texto de opcion representa Falso (incluyendo formatos bilingues). */
+export function esTextoFalso(val) {
+  const limpio = String(val ?? '').trim();
+  if (!limpio) return false;
+  if (RX_TOKEN_FALSO.test(limpio)) return true;
+  const partes = limpio.split(/[()\/\-–—]/).map((p) => p.trim()).filter(Boolean);
+  return partes.length > 0 && partes.every((p) => RX_TOKEN_FALSO.test(p));
+}
+
 /** Clasifica una pregunta ya normalizada en su tipo (para validar cantidades). */
 export function clasificarPregunta(q) {
   if (!q) return 'multiple';
   if (q.type === 'order') return 'orden';
   if (q.type === 'match') return 'match';
   if (q.type === 'text' || q.type === 'dictation') return 'text';
-  const textos = (q.options || []).map((o) => String(o?.text || '').trim().toLowerCase());
-  const esVF = textos.length === 2 && textos.includes('verdadero') && textos.includes('falso');
+  const textos = (q.options || []).map((o) => String(o?.text || '').trim());
+  const esVF = textos.length === 2 &&
+    textos.some((t) => esTextoVerdadero(t)) &&
+    textos.some((t) => esTextoFalso(t));
   return esVF ? 'vf' : 'multiple';
 }
 

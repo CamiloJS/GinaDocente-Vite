@@ -1061,9 +1061,15 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                             </button>
                             <button 
                                 type="button" 
-                                disabled={isPublishing}
+                                disabled={isPublishing || upPub}
                                 onClick={async () => {
                                     if (isPublishing || isPublishingRef.current) return;
+                                    if (recPub) {
+                                        return showMessage("Detén la grabación de voz antes de publicar.");
+                                    }
+                                    if (upPub) {
+                                        return showMessage("Espera a que termine de subir la nota de voz...");
+                                    }
                                     const cleanTitle = (taskTitle || '').trim();
                                     const cleanDesc = (taskDesc || '').trim();
                                     const rawMainImg = (postImageUrls && postImageUrls.length > 0 ? postImageUrls[0] : (postImageUrl || ''));

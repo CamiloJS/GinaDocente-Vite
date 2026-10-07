@@ -160,6 +160,15 @@ export default function SimulacroEvaluacion({ evaluacion = {}, isDarkMode = fals
                   </div>
                 )}
 
+                {q.type === 'reading' && q.passage && (
+                  <div className="pl-8 pt-2">
+                    <div className="p-3 rounded-xl border border-amber-200 dark:border-amber-800/50 bg-amber-50/40 dark:bg-amber-950/20 text-xs text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed max-h-56 overflow-y-auto">
+                      <p className="text-[10px] font-bold text-amber-700 dark:text-amber-300 mb-1 uppercase tracking-wider">Texto de lectura:</p>
+                      {q.passage}
+                    </div>
+                  </div>
+                )}
+
                 {(q.type === 'multiple' || q.type === 'listening' || q.type === 'reading') && Array.isArray(q.options) && q.options.length >= 2 ? (
                   <div className="space-y-2 pt-1 pl-8">
                       <p className="text-[11px] text-gray-500 font-medium">{permiteVariasRespuestas(q) ? 'Puedes marcar una o varias opciones.' : 'Marca solo una opción.'}</p>

@@ -66,7 +66,11 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
             if (ticket === solicitudNarracionRef.current) setPreparandoNarracion(false);
         }
     };
-    useEffect(() => () => { try { narracionRef.current?.detener?.(); } catch (e) { /* nada */ } }, []);
+    const pinAnimCleanupRef = useRef(null);
+    useEffect(() => () => {
+        try { narracionRef.current?.detener?.(); } catch (e) { /* nada */ }
+        try { pinAnimCleanupRef.current?.(); } catch (e) { /* nada */ }
+    }, []);
 
 
     const activeTeacherId = role === 'teacher' ? getCanonicalTeacherId(myChatId || loggedInName) : null;
@@ -782,6 +786,7 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
             
             // Si vamos a fijar la tarjeta, reproducimos la animación física de despegue y vuelo hacia la cima
             if (nextPinned && cardRef.current) {
+                try { pinAnimCleanupRef.current?.(); } catch (e) { /* nada */ }
                 const rect = cardRef.current.getBoundingClientRect();
                 const clone = cardRef.current.cloneNode(true);
                 clone.style.position = 'fixed';
@@ -814,18 +819,31 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                 clone.style.transform = `translateY(${targetY}px) scale(0.98)`;
                 clone.style.opacity = '0.95';
                 
-                setTimeout(() => {
+                let t2 = null;
+                const t1 = setTimeout(() => {
                     clone.style.opacity = '0';
                     clone.style.filter = 'blur(4px)';
                     clone.style.transform = `translateY(${targetY - 15}px) scale(0.95)`;
-                    setTimeout(() => {
+                    t2 = setTimeout(() => {
                         if (clone.parentNode) clone.parentNode.removeChild(clone);
                         if (cardRef.current) {
                             cardRef.current.style.opacity = '';
                             cardRef.current.style.filter = '';
                         }
+                        pinAnimCleanupRef.current = null;
                     }, 300);
                 }, 680);
+
+                pinAnimCleanupRef.current = () => {
+                    clearTimeout(t1);
+                    if (t2) clearTimeout(t2);
+                    if (clone.parentNode) clone.parentNode.removeChild(clone);
+                    if (cardRef.current) {
+                        cardRef.current.style.opacity = '';
+                        cardRef.current.style.filter = '';
+                    }
+                    pinAnimCleanupRef.current = null;
+                };
             }
 
             await updateTaskDoc({ isPinned: nextPinned });
@@ -878,11 +896,16 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                     } else if (c.text && !isPlaceholder(c.text)) {
                         preservedText = c.text;
                     } else if (c.editHistory && c.editHistory.length > 0) {
-                        const good = c.editHistory.slice().reverse().find(h => h?.text && !isPlaceholder(h.text));
+                        const good = c.editHistory.find(h => h?.text && !isPlaceholder(h.text));
                         if (good) preservedText = good.text;
                     } else {
                         preservedText = c.originalText || c.text || '';
                     }
+
+                    const preservedImgUrls = Array.isArray(c.originalImageUrls) && c.originalImageUrls.length > 0
+                        ? c.originalImageUrls
+                        : (Array.isArray(c.imageUrls) && c.imageUrls.length > 0 ? c.imageUrls : (c.imageUrl ? [c.imageUrl] : null));
+                    const preservedImgUrl = c.originalImageUrl || c.imageUrl || (preservedImgUrls && preservedImgUrls[0]) || null;
 
                     return {
                         ...c,
@@ -890,7 +913,11 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                         deletedAt: Date.now(),
                         deletedBy: 'student',
                         originalText: preservedText,
-                        originalMedia: c.originalMedia || c.media || null
+                        originalMedia: c.originalMedia || c.media || null,
+                        originalImageUrl: preservedImgUrl,
+                        originalImageUrls: preservedImgUrls,
+                        imageUrl: null,
+                        imageUrls: []
                     };
                 }
                 return c;
@@ -2374,7 +2401,7 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                                                                     const isPlaceholder = (s) => (s || '').toLowerCase().includes('mensaje fue eliminado') || (s || '').toLowerCase().includes('mensaje eliminado') || (s || '').toLowerCase().includes('comentario eliminado');
                                                                     if (c.originalText && !isPlaceholder(c.originalText)) return c.originalText;
                                                                     if (c.editHistory && c.editHistory.length > 0) {
-                                                                        const good = c.editHistory.slice().reverse().find(h => h?.text && !isPlaceholder(h.text));
+                                                                        const good = c.editHistory.find(h => h?.text && !isPlaceholder(h.text));
                                                                         if (good) return good.text;
                                                                     }
                                                                     if (c.text && !isPlaceholder(c.text)) return c.text;

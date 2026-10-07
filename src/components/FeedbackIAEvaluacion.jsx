@@ -304,6 +304,14 @@ export default function FeedbackIAEvaluacion({
                   </div>
                 )}
 
+                {/* Texto de lectura si es reading */}
+                {q?.type === 'reading' && q?.passage && (
+                  <div className="p-2.5 rounded-xl border border-amber-200 dark:border-amber-800/50 bg-amber-50/40 dark:bg-amber-950/20 text-xs text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">
+                    <p className="text-[10px] font-bold text-amber-700 dark:text-amber-300 mb-1 uppercase tracking-wider">Texto de lectura:</p>
+                    {q.passage}
+                  </div>
+                )}
+
                 {/* Resumen de respuesta del estudiante vs respuesta correcta */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
                   <div className={`p-2.5 rounded-xl border ${

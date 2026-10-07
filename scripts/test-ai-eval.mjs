@@ -305,6 +305,68 @@ const genClamp = await generarPreguntasConIA(
 );
 chequear("generarPreguntasConIA limita solicitudes >100 a un maximo de 100 preguntas", genClamp.ok && genClamp.preguntas.length === 100);
 
+const vfFrances = parsearEvaluacion(
+  JSON.stringify([
+    {
+      type: "truefalse",
+      text: "Paris est la capitale de la France.",
+      options: ["Vrai", "Faux"],
+      correctAnswer: "Vrai",
+    },
+    {
+      type: "truefalse",
+      text: "Londres est en Espagne.",
+      options: [
+        { text: "True", isCorrect: false },
+        { text: "False", isCorrect: true },
+      ],
+      correctAnswer: "",
+    },
+    {
+      type: "truefalse",
+      text: "Water boils at 100 degrees Celsius.",
+      options: [
+        { text: "True (Verdadero)", isCorrect: true },
+        { text: "False (Falso)", isCorrect: false },
+      ],
+      correctAnswer: "True (Verdadero)",
+    },
+    {
+      type: "truefalse",
+      text: "The Earth revolves around the Sun.",
+      options: [
+        { text: "False", isCorrect: false },
+        { text: "True", isCorrect: true },
+      ],
+      correctAnswer: "True",
+    },
+    {
+      type: "truefalse",
+      text: "Le soleil est chaud.",
+      options: [
+        { text: "Oui", isCorrect: true },
+        { text: "Non", isCorrect: false },
+      ],
+      correctAnswer: "",
+    },
+  ]),
+  5,
+  { multiple: 0, vf: 5, text: 0, orden: 0, match: 0 }
+);
+chequear(
+  "normaliza y clasifica V/F en frances, ingles, bilingue (True (Verdadero)), orden invertido y Oui/Non",
+  vfFrances.ok &&
+    vfFrances.preguntas.length === 5 &&
+    vfFrances.preguntas[0].options[0].isCorrect === true &&
+    vfFrances.preguntas[1].options[1].isCorrect === true &&
+    vfFrances.preguntas[2].options[0].isCorrect === true &&
+    vfFrances.preguntas[3].options[1].isCorrect === true &&
+    vfFrances.preguntas[4].options[0].isCorrect === true &&
+    vfFrances.preguntas.every((q) => clasificarPregunta(q) === "vf"),
+  JSON.stringify(vfFrances.problemas)
+);
+
 console.log(`\nRESULTADO: ${ok} OK, ${fallos} fallos\n`);
 process.exit(fallos ? 1 : 0);
+
 

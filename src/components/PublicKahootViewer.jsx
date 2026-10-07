@@ -206,12 +206,18 @@ const PublicKahootViewer = ({
     const deletedTaskIds = new Set();
     try {
       const sandbox = loadDemoSandbox();
-      const deletedList = Array.isArray(sandbox?.deletedIds?.tasks) ? sandbox.deletedIds.tasks : [];
-      deletedList.forEach((id) => deletedTaskIds.add(String(id)));
+      const rawDeleted = Array.isArray(sandbox?.deletedIds)
+        ? sandbox.deletedIds
+        : (Array.isArray(sandbox?.deletedIds?.tasks) ? sandbox.deletedIds.tasks : []);
+      rawDeleted.forEach((d) => {
+        const id = typeof d === 'string' ? d : d?.id;
+        if (id) deletedTaskIds.add(String(id));
+      });
       const sandboxTasks = Array.isArray(sandbox?.tasks) ? sandbox.tasks : [];
       sandboxTasks.forEach((t) => {
         if (
           t?.id &&
+          !t.isDeleted &&
           !deletedTaskIds.has(String(t.id)) &&
           !isDemoItemExpired(t) &&
           (t.type === 'kahoot' || t.kahoot) &&
@@ -227,6 +233,7 @@ const PublicKahootViewer = ({
     (DEMO_TASKS || []).forEach((t) => {
       if (
         t?.id &&
+        !t.isDeleted &&
         !deletedTaskIds.has(String(t.id)) &&
         (t.type === 'kahoot' || t.kahoot) &&
         !mapById.has(String(t.id))

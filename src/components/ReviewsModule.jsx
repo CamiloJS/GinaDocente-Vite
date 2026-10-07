@@ -550,8 +550,24 @@ export const SlideEditorModal = ({ presentation, onClose, onSave, onProject, isD
       if (field === 'layout') {
         if (value === 'quiz') {
           nextSlide.type = 'quiz';
-        } else if (nextSlide.type === 'quiz') {
-          delete nextSlide.type;
+          if (!Array.isArray(nextSlide.options) || nextSlide.options.length === 0) {
+            nextSlide.options = [
+              { text: nextSlide.answer || 'Opción A (Correcta)', isCorrect: true, explanation: '¡Correcto!' },
+              { text: 'Opción B', isCorrect: false, explanation: 'Incorrecta' }
+            ];
+          }
+          if (nextSlide.question === undefined) {
+            nextSlide.question = nextSlide.content || nextSlide.title || '¿Cuál es la opción correcta?';
+          }
+        } else {
+          if (nextSlide.type === 'quiz') {
+            delete nextSlide.type;
+          }
+          if (value === 'cards' && (!Array.isArray(nextSlide.cards) || nextSlide.cards.length === 0)) {
+            nextSlide.cards = [{ title: nextSlide.title || 'Concepto 1', text: nextSlide.content || nextSlide.subtitle || '', example: '' }];
+          } else if (value === 'bullets' && (!Array.isArray(nextSlide.bullets) || nextSlide.bullets.length === 0)) {
+            nextSlide.bullets = [{ title: nextSlide.title || 'Punto 1', text: nextSlide.content || nextSlide.subtitle || '', example: '' }];
+          }
         }
       }
       copy[activeSlideIdx] = nextSlide;
@@ -840,7 +856,7 @@ export const SlideEditorModal = ({ presentation, onClose, onSave, onProject, isD
                     Subtítulo / Objetivo de la lección:
                   </label>
                   <textarea
-                    value={activeSlide.subtitle || activeSlide.description || ''}
+                    value={activeSlide.subtitle !== undefined ? activeSlide.subtitle : (activeSlide.description || '')}
                     onChange={e => handleSlideChange('subtitle', e.target.value)}
                     rows={3}
                     placeholder="Descripción y objetivos de la clase..."
@@ -1026,7 +1042,7 @@ export const SlideEditorModal = ({ presentation, onClose, onSave, onProject, isD
                   </label>
                   <input
                     type="text"
-                    value={activeSlide.question || activeSlide.title || ''}
+                    value={activeSlide.question !== undefined ? activeSlide.question : (activeSlide.title || '')}
                     onChange={e => handleSlideChange('question', e.target.value)}
                     placeholder="¿Cuál es la pregunta?"
                     className={`w-full px-3.5 py-2.5 rounded-xl border text-sm font-bold outline-none ${inputBg}`}

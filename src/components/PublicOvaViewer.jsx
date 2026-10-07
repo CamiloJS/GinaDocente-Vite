@@ -119,18 +119,20 @@ export default function PublicOvaViewer({
           }
         }
 
-        // Try localStorage cache
+        // Try localStorage cache (include demo keys as fallback for #ova?id=... links opened from Demo Mode)
         if (!loaded) {
           try {
+            const demoKeys = new Set(['englishTech_demo_ovas', 'englishTech_demo_ovas_teacher', 'englishTech_demo_ovas_camilodocente']);
             const keysToCheck = isDemoMode
               ? ['englishTech_demo_ovas', 'englishTech_demo_ovas_teacher', 'englishTech_demo_ovas_camilodocente']
-              : ['englishTech_ovas', 'englishTech_ovas_camilodocente'];
+              : ['englishTech_ovas', 'englishTech_ovas_camilodocente', 'englishTech_demo_ovas', 'englishTech_demo_ovas_teacher', 'englishTech_demo_ovas_camilodocente'];
             const combined = [];
             keysToCheck.forEach(k => {
               try {
                 const parsed = JSON.parse(localStorage.getItem(k) || '[]');
                 if (Array.isArray(parsed)) {
-                  const validItems = isDemoMode
+                  const isDemoKey = isDemoMode || demoKeys.has(k);
+                  const validItems = isDemoKey
                     ? parsed.filter(item => item && !isDemoItemExpired(item))
                     : parsed.filter(Boolean);
                   combined.push(...validItems);

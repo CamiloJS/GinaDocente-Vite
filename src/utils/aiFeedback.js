@@ -366,7 +366,11 @@ export function armarMinijuegoPregunta(q, respuesta, explicacion = '', minijuego
       ];
     } else if ((detalle.tipo === 'multiple' || detalle.tipo === 'listening' || detalle.tipo === 'reading') && Array.isArray(q?.options) && q.options.length >= 2) {
       const textosOpciones = q.options.map((o) => limpio(o?.text, 80).toLowerCase());
-      const esVF = q.options.length === 2 && textosOpciones.includes('verdadero') && textosOpciones.includes('falso');
+      const rxTokenV = /^(v|verdadero|true|vrai)$/i;
+      const rxTokenF = /^(f|falso|false|faux)$/i;
+      const esOptV = (t) => rxTokenV.test(t) || (t.split(/[()\/\-–—]/).map((p) => p.trim()).filter(Boolean).every((p) => rxTokenV.test(p)) && t.length > 0);
+      const esOptF = (t) => rxTokenF.test(t) || (t.split(/[()\/\-–—]/).map((p) => p.trim()).filter(Boolean).every((p) => rxTokenF.test(p)) && t.length > 0);
+      const esVF = q.options.length === 2 && textosOpciones.some(esOptV) && textosOpciones.some(esOptF);
       const incorrectas = q.options.filter((o) => !o?.isCorrect).map((o) => limpio(o?.text, 100)).filter(Boolean);
       const distractorElegido = !detalle.acierto && detalle.delEstudiante !== '(en blanco)' ? detalle.delEstudiante : (incorrectas[0] || 'otra opción');
       const otroDistractor = incorrectas.find((t) => t !== distractorElegido) || incorrectas[0] || 'las demás opciones';

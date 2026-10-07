@@ -97,10 +97,7 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
     if (q.type === 'listening') return 'Comprensi\u00f3n auditiva';
     if (q.type === 'speaking') return 'Speaking';
     if (q.type === 'text') return TIPOS_ETIQUETAS.text;
-    const esVF = Array.isArray(q.options) && q.options.length === 2 &&
-      /^verdadero$/i.test(String(q.options[0]?.text || '').trim()) &&
-      /^falso$/i.test(String(q.options[1]?.text || '').trim());
-    return esVF ? TIPOS_ETIQUETAS.vf : TIPOS_ETIQUETAS.multiple;
+    return clasificarPregunta(q) === 'vf' ? TIPOS_ETIQUETAS.vf : TIPOS_ETIQUETAS.multiple;
   }
 
   const input = 'w-full px-3 py-2 rounded-xl border text-xs font-semibold outline-none focus:ring-2 focus:ring-blue-500 ' + (isDarkMode ? 'bg-gray-800 border-gray-700 text-gray-100' : 'bg-white border-gray-300 text-gray-800')
