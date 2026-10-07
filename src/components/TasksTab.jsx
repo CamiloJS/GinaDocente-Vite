@@ -1087,6 +1087,7 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                             questionStartedAt: 0,
                                             musicEnabled: true,
                                             allowNicknameChange: true,
+                                            reviewEnabled: false,
                                             questions: validation.normalizedQuestions,
                                             participants: {},
                                             updatedAt: Date.now()

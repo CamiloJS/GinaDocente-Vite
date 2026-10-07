@@ -537,6 +537,7 @@ export function validateKahootConfig(kahootInput) {
     questions: normalizedQuestions,
     musicEnabled: true,
     allowNicknameChange: true,
+    reviewEnabled: Boolean(kahootInput?.reviewEnabled),
   };
 }
 
@@ -1255,3 +1256,75 @@ export async function generarKahootConIA(config, callGemini) {
     error: 'No se pudo generar el Kahoot con IA en este momento. Revisa tu conexión o intenta con otro tema.',
   };
 }
+
+/**
+ * Determina si un usuario puede acceder al modo Repasar o práctica individual con respuestas visibles.
+ * El docente siempre puede acceder; los estudiantes e invitados solo cuando el docente habilita reviewEnabled.
+ */
+export function canAccessKahootReview(kahoot, role) {
+  if (role === 'teacher') return true;
+  return Boolean(kahoot?.reviewEnabled);
+}
+
+/**
+ * Extrae si la URL actual corresponde al modo público de Kahoot (#kahoot) y su PIN opcional.
+ */
+export function parseKahootUrlInfo(hash = '', search = '') {
+  const cleanHash = String(hash || '').replace(/^#\/?/, '').trim();
+  const lowerHash = cleanHash.toLowerCase();
+
+  if (
+    lowerHash === 'kahoot' ||
+    lowerHash.startsWith('kahoot/') ||
+    lowerHash.startsWith('kahoot=') ||
+    lowerHash.startsWith('kahoot-') ||
+    lowerHash.startsWith('kahoot?')
+  ) {
+    let rawPin = '';
+    if (lowerHash.startsWith('kahoot?') && cleanHash.includes('?')) {
+      const queryPart = cleanHash.slice(cleanHash.indexOf('?'));
+      const params = new URLSearchParams(queryPart);
+      rawPin = params.get('pin') || params.get('code') || params.get('kahoot') || '';
+    } else if (cleanHash.length > 6) {
+      rawPin = cleanHash.slice(7).trim();
+    }
+    const digits = String(rawPin || '').replace(/\D/g, '').slice(0, 6);
+    return {
+      isKahootRoute: true,
+      pin: digits,
+    };
+  }
+
+  try {
+    const params = new URLSearchParams(String(search || ''));
+    if (params.has('kahoot')) {
+      const val = String(params.get('kahoot') || '').trim();
+      const pinParam = String(params.get('pin') || '').trim();
+      const digits = (val.replace(/\D/g, '').length >= 4 ? val : pinParam).replace(/\D/g, '').slice(0, 6);
+      return {
+        isKahootRoute: true,
+        pin: digits,
+      };
+    }
+  } catch {
+    // ignore malformed query
+  }
+
+  return {
+    isKahootRoute: false,
+    pin: '',
+  };
+}
+
+/**
+ * Construye el enlace público directo para compartir un Kahoot (#kahoot o #kahoot=PIN).
+ */
+export function buildPublicKahootUrl(pin = '', origin = '', pathname = '/') {
+  const baseOrigin =
+    origin || (typeof window !== 'undefined' && window.location ? window.location.origin : 'https://englishtech.vercel.app');
+  const basePath =
+    pathname || (typeof window !== 'undefined' && window.location ? window.location.pathname : '/');
+  const cleanPin = String(pin || '').replace(/\D/g, '').slice(0, 6);
+  return cleanPin ? `${baseOrigin}${basePath}#kahoot=${cleanPin}` : `${baseOrigin}${basePath}#kahoot`;
+}
+

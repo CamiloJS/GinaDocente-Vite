@@ -30,6 +30,9 @@ import {
   ArrowDown,
   Gamepad2,
   Bell,
+  Lock,
+  Unlock,
+  Share2,
 } from './Icons.jsx';
 import {
   KAHOOT_COLORS,
@@ -42,6 +45,8 @@ import {
   buildKahootLeaderboard,
   DEMO_KAHOOT_BOTS,
   buildSimulatedBotAnswer,
+  canAccessKahootReview,
+  buildPublicKahootUrl,
 } from '../utils/kahootEngine.js';
 import {
   startLobbyMusic,
@@ -69,6 +74,8 @@ const KahootLiveModal = ({
   setTasks,
   showMessage,
   initialMode = 'live', // 'live' | 'review'
+  initialAvatar = '🦊',
+  onProfileChange = null,
 }) => {
   const isDemoTask = Boolean(
     isDemoMode || task?.isDemoCreated || (task?.id && String(task.id).startsWith('demo-'))
@@ -147,6 +154,8 @@ const KahootLiveModal = ({
           const nextKahoot = fresh.kahoot || {};
           const prevStatus = lastSyncedStatusRef.current;
           const nextStatus = nextKahoot.status;
+          const prevReviewEnabled = Boolean(prevKahoot.reviewEnabled);
+          const nextReviewEnabled = Boolean(nextKahoot.reviewEnabled);
 
           liveTaskRef.current = fresh;
 
@@ -159,12 +168,13 @@ const KahootLiveModal = ({
             buildKahootLeaderboard(nextKahoot.participants || {}, activeIdx);
           const allAnsweredNow = snapTotal > 0 && snapAnswered >= snapTotal;
 
-          // Transiciones críticas (cambio de pregunta, fase, estado, propia respuesta o 100% respondido) se renderizan en 0ms
+          // Transiciones críticas (cambio de pregunta, fase, estado, permiso de repaso, propia respuesta o 100% respondido) se renderizan en 0ms
           const isCriticalTransition =
             prevKahoot.status !== nextKahoot.status ||
             prevKahoot.phase !== nextKahoot.phase ||
             prevKahoot.currentQuestionIndex !== nextKahoot.currentQuestionIndex ||
             prevKahoot.questionStartedAt !== nextKahoot.questionStartedAt ||
+            prevReviewEnabled !== nextReviewEnabled ||
             Boolean(prevMyEntry) !== Boolean(nextMyEntry) ||
             prevMyAns?.answeredAt !== nextMyAns?.answeredAt ||
             allAnsweredNow;
@@ -188,9 +198,9 @@ const KahootLiveModal = ({
             }, waitMs);
           }
 
-          // Solo propagar a App.jsx si cambió el status general ('lobby' -> 'live' -> 'finished')
+          // Solo propagar a App.jsx si cambió el status general o el permiso de repaso
           // para evitar re-renderizar toda la aplicación en cada respuesta de 40+ estudiantes.
-          if (prevStatus !== nextStatus) {
+          if (prevStatus !== nextStatus || prevReviewEnabled !== nextReviewEnabled) {
             lastSyncedStatusRef.current = nextStatus;
             syncTaskToParent(fresh);
           }
@@ -236,8 +246,12 @@ const KahootLiveModal = ({
     }
   }, [questionsSignature]);
 
+  const isReviewEnabled = Boolean(kahoot.reviewEnabled);
+  const canReview = canAccessKahootReview(kahoot, role);
+
   // Modo local: 'live' (conectado a la sesión grupal), 'review' (guía de estudio), 'solo' (práctica individual)
   const [viewMode, setViewMode] = useState(() => {
+    if (!canAccessKahootReview(kahoot, role)) return 'live';
     if (initialMode === 'review') return 'review';
     if (kahoot.status === 'finished' && !canControlGame) return 'solo';
     return 'live';
@@ -258,7 +272,7 @@ const KahootLiveModal = ({
   const [myNickname, setMyNickname] = useState(
     () => existingMe?.nickname || loggedInName || (role === 'teacher' ? 'Docente Host' : 'Estudiante')
   );
-  const [myAvatar, setMyAvatar] = useState(() => existingMe?.avatar || '🦊');
+  const [myAvatar, setMyAvatar] = useState(() => existingMe?.avatar || initialAvatar || '🦊');
   const [isEditingNickname, setIsEditingNickname] = useState(false);
   const [nicknameDraft, setNicknameDraft] = useState(myNickname);
 
@@ -269,8 +283,10 @@ const KahootLiveModal = ({
     setNicknameDraft(nextName);
     if (existingMe?.avatar) {
       setMyAvatar(existingMe.avatar);
+    } else if (initialAvatar) {
+      setMyAvatar(initialAvatar);
     }
-  }, [existingMe?.nickname, existingMe?.avatar, loggedInName, role, task?.id]);
+  }, [existingMe?.nickname, existingMe?.avatar, loggedInName, initialAvatar, role, task?.id]);
 
   // Selección temporal para preguntas multi-opción, respuesta corta o puzzle
   const [selectedMultiIndices, setSelectedMultiIndices] = useState([]);
@@ -280,7 +296,11 @@ const KahootLiveModal = ({
 
   // Estado para el modo de práctica individual ("solo")
   const [soloState, setSoloState] = useState(() => {
-    const startImmediateSolo = initialMode !== 'review' && kahoot.status === 'finished' && !canControlGame;
+    const startImmediateSolo =
+      canAccessKahootReview(kahoot, role) &&
+      initialMode !== 'review' &&
+      kahoot.status === 'finished' &&
+      !canControlGame;
     return {
       active: startImmediateSolo,
       qIndex: 0,
@@ -293,7 +313,20 @@ const KahootLiveModal = ({
     };
   });
 
-  const rawPhase = viewMode === 'solo' ? soloState.phase : (kahoot.phase || 'lobby');
+  // Si el docente deshabilita el repaso en tiempo real, sacar a estudiantes/invitados de 'review' o 'solo'
+  useEffect(() => {
+    if (!canReview && (viewMode === 'review' || viewMode === 'solo')) {
+      setViewMode('live');
+      setSoloState((prev) => (prev.active ? { ...prev, active: false } : prev));
+    }
+  }, [canReview, viewMode]);
+
+  const rawPhase =
+    viewMode === 'solo'
+      ? soloState.phase
+      : kahoot.status === 'finished'
+        ? 'podium'
+        : (kahoot.phase || 'lobby');
   const activeQIndex = viewMode === 'solo'
     ? soloState.qIndex
     : Math.max(0, Math.min(Number(kahoot.currentQuestionIndex) || 0, Math.max(0, questions.length - 1)));
@@ -377,7 +410,11 @@ const KahootLiveModal = ({
       liveTaskRef.current = nextTask;
       setLiveTask(nextTask);
 
-      if (isDemoTask || partialKahootUpdates?.status) {
+      if (
+        isDemoTask ||
+        partialKahootUpdates?.status ||
+        partialKahootUpdates?.reviewEnabled !== undefined
+      ) {
         lastSyncedStatusRef.current = nextKahoot.status;
         syncTaskToParent(nextTask);
       }
@@ -498,6 +535,16 @@ const KahootLiveModal = ({
     if (role === 'teacher') {
       showMessage?.(`✨ Perfil de anfitrión actualizado a "${newAvatar} ${clean}"`);
       return;
+    }
+
+    try {
+      localStorage.setItem('englishTech_kahootGuestName', clean);
+      localStorage.setItem('englishTech_kahootGuestAvatar', newAvatar);
+    } catch {
+      // ignorar si localStorage está restringido
+    }
+    if (typeof onProfileChange === 'function') {
+      onProfileChange({ nickname: clean, avatar: newAvatar });
     }
 
     const currentParticipants = { ...(liveTaskRef.current?.kahoot?.participants || {}) };
@@ -1249,7 +1296,35 @@ const KahootLiveModal = ({
     showMessage?.('🤖 4 participantes simulados se unieron a la sala.');
   };
 
+  const handleToggleReviewEnabled = async () => {
+    if (role !== 'teacher') return;
+    const nextReview = !Boolean(kahoot.reviewEnabled);
+    await updateKahootState(
+      { reviewEnabled: nextReview },
+      { 'kahoot.reviewEnabled': nextReview }
+    );
+    showMessage?.(
+      nextReview
+        ? '🔓 Repaso habilitado: los participantes ya pueden ver y repasar las preguntas.'
+        : '🔒 Repaso bloqueado: las respuestas están ocultas para los participantes.'
+    );
+  };
+
+  const handleCopyPublicLink = async () => {
+    const url = buildPublicKahootUrl(kahoot.pin || '482915');
+    try {
+      await navigator.clipboard.writeText(url);
+      showMessage?.(`🔗 Enlace público copiado: ${url}`);
+    } catch {
+      showMessage?.(`🔗 Enlace público: ${url}`);
+    }
+  };
+
   const startSoloPractice = () => {
+    if (!canReview) {
+      showMessage?.('🔒 El docente aún no ha habilitado el modo repaso.');
+      return;
+    }
     const firstDur = Number(questions[0]?.timeLimit) || 20;
     const now = Date.now();
     gongTriggeredForRoundRef.current = '';
@@ -1428,29 +1503,65 @@ const KahootLiveModal = ({
             )}
           </div>
 
-          {/* Conmutador entre Sala en Vivo y Guía de Repaso */}
+          {/* Botón para compartir enlace público #kahoot */}
           <button
             type="button"
-            onClick={() => {
-              if (viewMode === 'review') {
-                if (soloState.active) {
-                  setViewMode('solo');
-                } else if (kahoot.status === 'finished' && !canControlGame) {
-                  startSoloPractice();
-                } else {
-                  setViewMode('live');
-                }
-              } else {
-                setViewMode('review');
-              }
-            }}
+            onClick={handleCopyPublicLink}
             className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+            title="Copiar enlace público #kahoot para invitados externos"
           >
-            <BookOpen size={14} />
-            <span className="hidden sm:inline">
-              {viewMode === 'review' ? 'Volver al juego' : 'Repasar'}
-            </span>
+            <Share2 size={14} />
+            <span className="hidden lg:inline">Link #kahoot</span>
           </button>
+
+          {/* Control del Docente: Habilitar / Ocultar Repaso a estudiantes e invitados */}
+          {role === 'teacher' && (
+            <button
+              type="button"
+              onClick={handleToggleReviewEnabled}
+              className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                isReviewEnabled
+                  ? 'bg-emerald-500/80 border-emerald-300/50 text-white'
+                  : 'bg-white/10 hover:bg-white/20 border-white/15 text-amber-200'
+              }`}
+              title={
+                isReviewEnabled
+                  ? 'El repaso está habilitado para los participantes (clic para ocultar)'
+                  : 'El repaso está oculto para los participantes (clic para habilitar)'
+              }
+            >
+              {isReviewEnabled ? <Unlock size={14} /> : <Lock size={14} />}
+              <span className="hidden sm:inline">
+                {isReviewEnabled ? 'Repaso: Visible' : 'Repaso: Oculto'}
+              </span>
+            </button>
+          )}
+
+          {/* Conmutador entre Sala en Vivo y Guía de Repaso (solo si tiene permiso) */}
+          {canReview && (
+            <button
+              type="button"
+              onClick={() => {
+                if (viewMode === 'review') {
+                  if (soloState.active) {
+                    setViewMode('solo');
+                  } else if (kahoot.status === 'finished' && !canControlGame) {
+                    startSoloPractice();
+                  } else {
+                    setViewMode('live');
+                  }
+                } else {
+                  setViewMode('review');
+                }
+              }}
+              className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+            >
+              <BookOpen size={14} />
+              <span className="hidden sm:inline">
+                {viewMode === 'review' ? 'Volver al juego' : 'Repasar'}
+              </span>
+            </button>
+          )}
 
           {/* Botón de Música Ambiental */}
           <button
@@ -1497,7 +1608,7 @@ const KahootLiveModal = ({
         {/* =====================================================================
             MODO 1: GUÍA DE REPASO Y ESTUDIO
            ===================================================================== */}
-        {viewMode === 'review' ? (
+        {viewMode === 'review' && canReview ? (
           <div className="max-w-4xl w-full mx-auto space-y-5 pb-10 animate-in fade-in">
             <div className="p-5 rounded-3xl bg-white/10 backdrop-blur-md border border-white/15 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
@@ -1509,6 +1620,22 @@ const KahootLiveModal = ({
                 </h3>
               </div>
               <div className="flex flex-wrap items-center gap-2 shrink-0">
+                {role === 'teacher' && (
+                  <button
+                    type="button"
+                    onClick={handleToggleReviewEnabled}
+                    className={`px-4 py-2.5 rounded-2xl font-black text-xs flex items-center gap-1.5 border shadow-lg cursor-pointer transition-all ${
+                      isReviewEnabled
+                        ? 'bg-emerald-500/30 border-emerald-300/50 text-emerald-200 hover:bg-emerald-500/40'
+                        : 'bg-amber-500/25 border-amber-300/50 text-amber-200 hover:bg-amber-500/35'
+                    }`}
+                  >
+                    {isReviewEnabled ? <Unlock size={14} /> : <Lock size={14} />}
+                    <span>
+                      {isReviewEnabled ? 'Repaso habilitado a alumnos' : 'Habilitar repaso a alumnos'}
+                    </span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={startSoloPractice}
@@ -1700,14 +1827,28 @@ const KahootLiveModal = ({
                 {liveTask.title}
               </h1>
 
-              <div className="inline-flex flex-col sm:flex-row items-center gap-3 bg-white text-[#0f172a] px-6 py-3.5 rounded-2xl shadow-xl">
-                <span className="text-xs font-black uppercase tracking-wider text-[#475569]">
-                  PIN:
-                </span>
-                <span className="text-3xl sm:text-4xl font-black tracking-widest text-[#46178F]">
-                  {kahoot.pin || '482915'}
-                </span>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <div className="inline-flex flex-col sm:flex-row items-center gap-3 bg-white text-[#0f172a] px-6 py-3.5 rounded-2xl shadow-xl">
+                  <span className="text-xs font-black uppercase tracking-wider text-[#475569]">
+                    PIN:
+                  </span>
+                  <span className="text-3xl sm:text-4xl font-black tracking-widest text-[#46178F]">
+                    {kahoot.pin || '482915'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCopyPublicLink}
+                  className="px-4 py-3.5 rounded-2xl bg-white/15 hover:bg-white/25 border border-white/25 text-white text-xs font-black flex items-center gap-2 shadow-lg transition-all cursor-pointer"
+                  title="Copiar enlace público #kahoot para participantes sin cuenta"
+                >
+                  <Share2 size={15} />
+                  <span>Copiar link #kahoot</span>
+                </button>
               </div>
+              <p className="text-[11px] font-bold text-purple-200/80">
+                Acceso público sin cuenta: <span className="text-amber-300 font-black">englishtech.vercel.app/#kahoot</span> con el PIN <span className="text-white font-black">{kahoot.pin || '482915'}</span>
+              </p>
 
               {/* Editor directo de Nombre / Apodo para el participante */}
               {role !== 'teacher' && (
@@ -1838,13 +1979,15 @@ const KahootLiveModal = ({
                       <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
                       <span>Esperando a que inicie la partida...</span>
                     </div>
-                    <button
-                      type="button"
-                      onClick={startSoloPractice}
-                      className="px-4 py-3 rounded-2xl bg-white/15 hover:bg-white/25 text-white text-xs font-extrabold border border-white/20 cursor-pointer"
-                    >
-                      Practicar individualmente
-                    </button>
+                    {canReview && (
+                      <button
+                        type="button"
+                        onClick={startSoloPractice}
+                        className="px-4 py-3 rounded-2xl bg-white/15 hover:bg-white/25 text-white text-xs font-extrabold border border-white/20 cursor-pointer"
+                      >
+                        Practicar individualmente
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -2566,23 +2709,49 @@ const KahootLiveModal = ({
 
             {/* Botones de Acción post-juego: Repasar preguntas, Practicar de nuevo o Cerrar */}
             <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
-              <button
-                type="button"
-                onClick={() => setViewMode('review')}
-                className="px-6 py-3 rounded-2xl bg-white text-[#46178F] hover:bg-purple-50 font-black text-sm flex items-center gap-2 shadow-xl cursor-pointer transition-transform hover:scale-105"
-              >
-                <BookOpen size={17} />
-                <span>Repasar preguntas</span>
-              </button>
+              {canReview ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('review')}
+                    className="px-6 py-3 rounded-2xl bg-white text-[#46178F] hover:bg-purple-50 font-black text-sm flex items-center gap-2 shadow-xl cursor-pointer transition-transform hover:scale-105"
+                  >
+                    <BookOpen size={17} />
+                    <span>Repasar preguntas</span>
+                  </button>
 
-              <button
-                type="button"
-                onClick={startSoloPractice}
-                className="px-5 py-3 rounded-2xl bg-emerald-400 hover:bg-emerald-300 text-gray-950 font-black text-sm flex items-center gap-2 shadow-xl cursor-pointer transition-transform hover:scale-105"
-              >
-                <Gamepad2 size={17} />
-                <span>Practicar de nuevo</span>
-              </button>
+                  <button
+                    type="button"
+                    onClick={startSoloPractice}
+                    className="px-5 py-3 rounded-2xl bg-emerald-400 hover:bg-emerald-300 text-gray-950 font-black text-sm flex items-center gap-2 shadow-xl cursor-pointer transition-transform hover:scale-105"
+                  >
+                    <Gamepad2 size={17} />
+                    <span>Practicar de nuevo</span>
+                  </button>
+                </>
+              ) : (
+                <div className="px-5 py-3 rounded-2xl bg-white/10 border border-white/15 text-xs sm:text-sm font-bold text-purple-200 flex items-center gap-2">
+                  <Lock size={15} className="text-amber-300 shrink-0" />
+                  <span>El repaso de preguntas estará disponible cuando el docente lo habilite.</span>
+                </div>
+              )}
+
+              {role === 'teacher' && (
+                <button
+                  type="button"
+                  onClick={handleToggleReviewEnabled}
+                  className={`px-5 py-3 rounded-2xl border font-black text-sm flex items-center gap-2 shadow-xl cursor-pointer transition-all ${
+                    isReviewEnabled
+                      ? 'bg-emerald-500/30 border-emerald-300/60 text-emerald-200 hover:bg-emerald-500/40'
+                      : 'bg-amber-400 hover:bg-amber-300 border-amber-300 text-gray-950'
+                  }`}
+                >
+                  {isReviewEnabled ? <Unlock size={16} /> : <Lock size={16} />}
+                  <span>
+                    {isReviewEnabled ? 'Ocultar repaso a participantes' : 'Habilitar repaso a participantes'}
+                  </span>
+                </button>
+              )}
 
               {canControlGame && (
                 <button

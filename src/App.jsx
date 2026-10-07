@@ -46,6 +46,8 @@ import { useVoiceRecorder } from './utils/useVoiceRecorder.js'
 import RichTextToolbar from './components/RichTextToolbar.jsx'
 import TeacherToolsTab from './components/TeacherToolsTab.jsx'
 import PublicOvaViewer from './components/PublicOvaViewer.jsx'
+import PublicKahootViewer from './components/PublicKahootViewer.jsx'
+import { parseKahootUrlInfo } from './utils/kahootEngine.js'
 import RichVisualEditor from './components/RichVisualEditor.jsx'
 import DocumentPreviewModal from './components/DocumentPreviewModal.jsx'
 import CommandPaletteModal from './components/CommandPaletteModal.jsx'
@@ -223,13 +225,17 @@ function App() {
         } catch (e) {}
       }
 
+      const kahootInfo = parseKahootUrlInfo(window.location.hash, window.location.search);
+
       return {
         tab: ['tasks', 'reviews', 'syllabus', 'evaluations', 'directory', 'groups', 'inbox', 'profile', 'settings', 'tools'].includes(mainTab) ? mainTab : 'tasks',
         profileId: profileId || null,
-        ovaId: ovaId || null
+        ovaId: ovaId || null,
+        kahootRoute: kahootInfo.isKahootRoute,
+        kahootPin: kahootInfo.pin || ''
       };
     } catch (e) {
-      return { tab: 'tasks', profileId: null, ovaId: null };
+      return { tab: 'tasks', profileId: null, ovaId: null, kahootRoute: false, kahootPin: '' };
     }
   };
   const initialHashInfo = getInitialHashInfo();
@@ -335,6 +341,8 @@ function App() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [viewingProfileId, setViewingProfileId] = useState(() => initialHashInfo.profileId);
   const [publicOvaId, setPublicOvaId] = useState(() => initialHashInfo.ovaId);
+  const [publicKahootActive, setPublicKahootActive] = useState(() => Boolean(initialHashInfo.kahootRoute));
+  const [publicKahootPin, setPublicKahootPin] = useState(() => initialHashInfo.kahootPin || '');
   const [profileCommentInputs, setProfileCommentInputs] = useState({});
   const [userPosts, setUserPosts] = useState(() => initialIsDemo ? mergeDemoItemsWithBase(DEMO_USER_POSTS, [], 'userPosts') : []);
   const [profilePostText, setProfilePostText] = useState("");
@@ -2077,6 +2085,17 @@ function App() {
     const handleHashChange = () => {
       try {
         const hash = window.location.hash ? window.location.hash.replace('#', '').replace(/^\/+/, '') : '';
+        const kahootInfo = parseKahootUrlInfo(window.location.hash, window.location.search);
+        if (kahootInfo.isKahootRoute) {
+          setIsChatAppOpen(false);
+          setPublicOvaId(null);
+          setPublicKahootActive(true);
+          setPublicKahootPin(kahootInfo.pin || '');
+          return;
+        }
+        setPublicKahootActive(false);
+        setPublicKahootPin('');
+
         if (hash === 'chat') {
           setIsChatAppOpen(true);
         } else {
@@ -2140,7 +2159,7 @@ function App() {
 
   // Sincronización en tiempo real e instantánea de la URL del perfil activo
   useEffect(() => {
-    if (activeTab === 'profile') {
+    if (activeTab === 'profile' && !publicKahootActive && !publicOvaId) {
       const targetHash = viewingProfileId ? `profile/${viewingProfileId}` : (myChatId ? `profile/${myChatId}` : 'profile');
       const currentHash = window.location.hash.replace('#', '');
       if (currentHash !== targetHash) {
@@ -2154,7 +2173,7 @@ function App() {
         try { sessionStorage.setItem('englishTech_viewingProfileId', viewingProfileId); } catch(e) {}
       }
     }
-  }, [activeTab, viewingProfileId, role, myChatId]);
+  }, [activeTab, viewingProfileId, role, myChatId, publicKahootActive, publicOvaId]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
@@ -2242,12 +2261,14 @@ function App() {
       inbox: 'Buzón',
       profile: 'Perfil',
     };
-              if (isChatAppOpen) {
+              if (publicKahootActive) {
+                  document.title = 'Kahoot en Vivo | English TECH';
+              } else if (isChatAppOpen) {
                   document.title = 'Mensajes | English TECH';
               } else {
                   document.title = `${tabNames[activeTab] || 'Inicio'} | English TECH`;
               }
-          }, [activeTab, isChatAppOpen]);
+          }, [activeTab, isChatAppOpen, publicKahootActive]);
 
 
           const getTabClass = (tabName) => {
@@ -3785,7 +3806,7 @@ useEffect(() => {
 
           // Listener de llamadas entrantes (Firestore) — fix multi-sesión y limpieza de llamadas fantasma
           useEffect(() => {
-              if (!myChatId || isDemoMode) return
+              if (!myChatId || isDemoMode || publicKahootActive || publicOvaId) return
               const callsRef = collection(db, 'artifacts', appId, 'public', 'data', 'calls')
               const unsubscribe = onSnapshot(callsRef, (snapshot) => {
                   const currentIncoming = incomingCallRef.current
@@ -3860,7 +3881,7 @@ useEffect(() => {
                   }
               }, (err) => console.error('[llamadas] fallo la escucha:', err))
               return () => unsubscribe()
-          }, [myChatId, isDemoMode])
+          }, [myChatId, isDemoMode, publicKahootActive, publicOvaId])
 
           // Ringtone para llamada entrante
           useEffect(() => {
@@ -12056,6 +12077,29 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                 }}
                 user={user}
                 role={role}
+              />
+            );
+          }
+
+          if (publicKahootActive) {
+            return (
+              <PublicKahootViewer
+                initialPin={publicKahootPin}
+                db={db}
+                appId={appId}
+                isDemoMode={isDemoMode}
+                loggedInName={loggedInName}
+                currentUser={user}
+                role={role}
+                onBackToPortal={() => {
+                  setPublicKahootActive(false);
+                  setPublicKahootPin('');
+                  try {
+                    window.history.pushState(null, '', window.location.pathname + '#tasks');
+                  } catch (e) {
+                    window.location.hash = 'tasks';
+                  }
+                }}
               />
             );
           }

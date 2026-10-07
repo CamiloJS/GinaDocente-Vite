@@ -20,6 +20,9 @@ import {
   parsearKahootIA,
   generarKahootConIA,
   reconcileKahootParticipantsAfterEdit,
+  canAccessKahootReview,
+  parseKahootUrlInfo,
+  buildPublicKahootUrl,
   KAHOOT_MAX_QUESTIONS,
   KAHOOT_AI_BATCH_SIZE
 } from '../src/utils/kahootEngine.js';
@@ -809,7 +812,90 @@ check(
     liveModalSrc.includes('if (soloState.active)')
 );
 
+// 17. Control de Repaso por el Docente (reviewEnabled) y Modo Público /#kahoot
+console.log('\n--- 17. Control de Repaso por Docente y Modo Público /#kahoot ---');
+
+check(
+  'canAccessKahootReview bloquea el repaso a estudiantes e invitados por defecto (reviewEnabled false o indefinido)',
+  canAccessKahootReview({ status: 'live' }, 'student') === false &&
+    canAccessKahootReview({ status: 'finished', reviewEnabled: false }, 'student') === false &&
+    canAccessKahootReview({ status: 'live', reviewEnabled: false }, 'guest') === false &&
+    canAccessKahootReview({}, null) === false
+);
+
+check(
+  'canAccessKahootReview permite siempre al docente y permite a estudiantes/invitados solo cuando reviewEnabled === true',
+  canAccessKahootReview({ status: 'live', reviewEnabled: false }, 'teacher') === true &&
+    canAccessKahootReview({}, 'teacher') === true &&
+    canAccessKahootReview({ status: 'finished', reviewEnabled: true }, 'student') === true &&
+    canAccessKahootReview({ status: 'live', reviewEnabled: true }, 'guest') === true
+);
+
+const urlKahootBase = parseKahootUrlInfo('#kahoot', '');
+const urlKahootEq = parseKahootUrlInfo('#kahoot=749205', '');
+const urlKahootSlash = parseKahootUrlInfo('#kahoot/482915', '');
+const urlKahootQueryHash = parseKahootUrlInfo('#kahoot?pin=123456', '');
+const urlKahootSearch = parseKahootUrlInfo('', '?kahoot=654321');
+const urlNonKahoot = parseKahootUrlInfo('#tasks', '');
+
+check(
+  'parseKahootUrlInfo detecta #kahoot, #kahoot=PIN, #kahoot/PIN, #kahoot?pin=PIN y ?kahoot=PIN',
+  urlKahootBase.isKahootRoute === true &&
+    urlKahootBase.pin === '' &&
+    urlKahootEq.isKahootRoute === true &&
+    urlKahootEq.pin === '749205' &&
+    urlKahootSlash.isKahootRoute === true &&
+    urlKahootSlash.pin === '482915' &&
+    urlKahootQueryHash.isKahootRoute === true &&
+    urlKahootQueryHash.pin === '123456' &&
+    urlKahootSearch.isKahootRoute === true &&
+    urlKahootSearch.pin === '654321' &&
+    urlNonKahoot.isKahootRoute === false
+);
+
+check(
+  'buildPublicKahootUrl genera enlaces publicos #kahoot y #kahoot=PIN correctamente',
+  buildPublicKahootUrl('', 'https://englishtech.vercel.app', '/') === 'https://englishtech.vercel.app/#kahoot' &&
+    buildPublicKahootUrl('749205', 'https://englishtech.vercel.app', '/') === 'https://englishtech.vercel.app/#kahoot=749205'
+);
+
+const publicKahootSrc = fs.readFileSync(new URL('../src/components/PublicKahootViewer.jsx', import.meta.url), 'utf8');
+check(
+  'KahootLiveModal y TaskCard restringen el modo Repaso y Practica Individual segun canAccessKahootReview y permiten al docente alternar reviewEnabled',
+  liveModalSrc.includes('canAccessKahootReview(kahoot, role)') &&
+    liveModalSrc.includes('handleToggleReviewEnabled') &&
+    liveModalSrc.includes("viewMode === 'review' && canReview") &&
+    taskCardSrc.includes('canAccessKahootReview(kahoot, role)') &&
+    taskCardSrc.includes('Habilitar repaso')
+);
+
+check(
+  'PublicKahootViewer y App.jsx permiten el acceso directo sin login mediante /#kahoot sincronizado en tiempo real con Firestore',
+  publicKahootSrc.includes('KahootLiveModal') &&
+    publicKahootSrc.includes('signInAnonymously') &&
+    publicKahootSrc.includes('onSnapshot') &&
+    appSrc.includes('<PublicKahootViewer') &&
+    appSrc.includes('if (publicKahootActive)')
+);
+
+check(
+  'PublicKahootViewer aisla al participante como estudiante/invitado (effectiveRole = student) y filtra DEMO_TASKS de salas en vivo cuando isDemoMode es false',
+  publicKahootSrc.includes("const effectiveRole = 'student';") &&
+    !publicKahootSrc.includes("const effectiveRole = role === 'teacher'") &&
+    publicKahootSrc.includes('const [guestPlayerId] = useState(() => getOrCreateGuestPlayerId());') &&
+    publicKahootSrc.includes('const sourceList = isDemoMode ? allAvailableKahoots : firestoreKahoots;') &&
+    publicKahootSrc.includes('onProfileChange=')
+);
+
+check(
+  'KahootLiveModal y TaskCard sincronizan reviewEnabled en 0ms sin sobrescribir participantes concurrentes en Firestore',
+  liveModalSrc.includes('prevReviewEnabled !== nextReviewEnabled') &&
+    liveModalSrc.includes('partialKahootUpdates?.reviewEnabled !== undefined') &&
+    taskCardSrc.includes("'kahoot.reviewEnabled': nextReview")
+);
+
 console.log(`\nRESULTADO KAHOOT: ${okCount} OK, ${failCount} fallos\n`);
 if (failCount > 0) {
   process.exit(1);
 }
+

@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import ReactDOM from 'react-dom'
 import {
-  CheckCheck, CheckCircle2, CheckLine, Clock, Edit3, EyeOff, FileDocIcon, FileText, ImageIcon, Loader2, Lock, MessageSquareText, Mic, PaperclipIcon, Plus, ReplyIcon, Send, SmileIcon, Square, Star, Pin, Trash2, Upload, X, XLine, Volume2, VolumeX, Languages, UserIcon, BookOpen, NavNotebook, Play, Pause, Download, MessageCircle, BarChart2, Vote, Gamepad2, Trophy, Zap, Flame
+  CheckCheck, CheckCircle2, CheckLine, Clock, Edit3, EyeOff, FileDocIcon, FileText, ImageIcon, Loader2, Lock, Unlock, Share2, MessageSquareText, Mic, PaperclipIcon, Plus, ReplyIcon, Send, SmileIcon, Square, Star, Pin, Trash2, Upload, X, XLine, Volume2, VolumeX, Languages, UserIcon, BookOpen, NavNotebook, Play, Pause, Download, MessageCircle, BarChart2, Vote, Gamepad2, Trophy, Zap, Flame
 } from './Icons.jsx'
 import {
   compressImage, containsBadWords, checkBadWordsAsync, uploadImageToStorage, uploadRawFileToStorage, TEACHER_NAME, SECOND_TEACHER_NAME, SECOND_TEACHER_ID, isCamiloTeacher, isTeacherId, getCanonicalTeacherId, getTeacherDisplayName, getItemTeacherId, COMMENT_EMOJIS, REACTION_EMOJIS, splitNameFirstAndLast, FALLBACK_MAP, format12HourTime, formatDateTime12H
@@ -19,7 +19,7 @@ import CustomVideoPlayer, { isDirectVideoUrl } from './CustomVideoPlayer.jsx'
 import GeniallyEmbedPlayer, { extractGeniallyUrl } from './GeniallyEmbedPlayer.jsx'
 import KahootLiveModal from './KahootLiveModal.jsx'
 import KahootBuilder from './KahootBuilder.jsx'
-import { validateKahootConfig, buildKahootLeaderboard, reconcileKahootParticipantsAfterEdit } from '../utils/kahootEngine.js'
+import { validateKahootConfig, buildKahootLeaderboard, reconcileKahootParticipantsAfterEdit, canAccessKahootReview, buildPublicKahootUrl } from '../utils/kahootEngine.js'
 import { useVoiceRecorder } from '../utils/useVoiceRecorder.js'
 import { auth, signInAnonymously, doc, setDoc, updateDoc, deleteDoc } from '../firebase/config.js'
 import { runTransaction } from 'firebase/firestore'
@@ -1726,6 +1726,8 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                 const topThree = leaderboard.slice(0, 3);
                 const rawPin = String(kahoot.pin || '482915');
                 const formattedPin = rawPin.length === 6 ? `${rawPin.slice(0, 3)} ${rawPin.slice(3)}` : rawPin;
+                const isReviewEnabled = Boolean(kahoot.reviewEnabled);
+                const canReview = canAccessKahootReview(kahoot, role);
 
                 return (
                     <div className="my-3 rounded-2xl border border-fuchsia-200 dark:border-fuchsia-800/60 bg-gradient-to-br from-purple-950 via-indigo-950 to-fuchsia-950 text-white shadow-lg overflow-hidden">
@@ -1813,24 +1815,91 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                                     <Gamepad2 size={17} />
                                     <span>
                                         {status === 'finished'
-                                            ? 'Volver a jugar'
+                                            ? (canReview ? 'Volver a jugar' : 'Ver resultados')
                                             : role === 'teacher'
                                                 ? 'Iniciar Kahoot'
                                                 : 'Unirse al Kahoot'}
                                     </span>
                                 </button>
 
+                                {canReview && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setKahootModalStartInReview(true);
+                                            setShowKahootLiveModal(true);
+                                        }}
+                                        className="py-2.5 px-4 rounded-xl font-extrabold text-xs bg-white/15 hover:bg-white/25 text-white border border-white/20 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                                    >
+                                        <BookOpen size={15} />
+                                        <span>Repasar preguntas</span>
+                                    </button>
+                                )}
+
                                 <button
                                     type="button"
-                                    onClick={() => {
-                                        setKahootModalStartInReview(true);
-                                        setShowKahootLiveModal(true);
+                                    onClick={async () => {
+                                        const url = buildPublicKahootUrl(rawPin);
+                                        try {
+                                            await navigator.clipboard.writeText(url);
+                                            showMessage(`🔗 Enlace público copiado: ${url}`);
+                                        } catch {
+                                            showMessage(`🔗 Enlace público: ${url}`);
+                                        }
                                     }}
-                                    className="py-2.5 px-4 rounded-xl font-extrabold text-xs bg-white/15 hover:bg-white/25 text-white border border-white/20 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                                    className="py-2.5 px-3.5 rounded-xl font-bold text-xs bg-white/10 hover:bg-white/20 text-purple-200 border border-white/20 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                                    title="Copiar enlace público #kahoot para invitados externos sin cuenta"
                                 >
-                                    <BookOpen size={15} />
-                                    <span>Repasar preguntas</span>
+                                    <Share2 size={14} />
+                                    <span>Link #kahoot</span>
                                 </button>
+
+                                {role === 'teacher' && (
+                                    <button
+                                        type="button"
+                                        onClick={async () => {
+                                            const nextReview = !Boolean(kahoot.reviewEnabled);
+                                            const nowTs = Date.now();
+                                            const nextKahootObj = {
+                                                ...kahoot,
+                                                reviewEnabled: nextReview,
+                                                updatedAt: nowTs
+                                            };
+                                            try {
+                                                if (isDemoTask) {
+                                                    await updateTaskDoc({ kahoot: nextKahootObj });
+                                                } else {
+                                                    if (!auth?.currentUser) {
+                                                        try { await signInAnonymously(auth); } catch { /* continuar */ }
+                                                    }
+                                                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), {
+                                                        'kahoot.reviewEnabled': nextReview,
+                                                        'kahoot.updatedAt': nowTs
+                                                    });
+                                                    if (typeof setTasks === 'function') {
+                                                        setTasks(prev => (prev || []).map(t => String(t.id) === String(task.id) ? { ...t, kahoot: { ...(t.kahoot || kahoot), reviewEnabled: nextReview, updatedAt: nowTs } } : t));
+                                                    }
+                                                }
+                                                showMessage(
+                                                    nextReview
+                                                        ? '🔓 Repaso habilitado: los participantes ya pueden ver las preguntas y respuestas.'
+                                                        : '🔒 Repaso oculto para los participantes.'
+                                                );
+                                            } catch {
+                                                showMessage('No se pudo actualizar el estado del repaso.');
+                                            }
+                                        }}
+                                        className={`py-2.5 px-3.5 rounded-xl font-bold text-xs border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                                            isReviewEnabled
+                                                ? 'bg-emerald-500/25 hover:bg-emerald-500/35 text-emerald-200 border-emerald-400/40'
+                                                : 'bg-white/10 hover:bg-white/20 text-amber-200 border-white/20'
+                                        }`}
+                                        title={isReviewEnabled ? 'El repaso está visible para los participantes (clic para ocultar)' : 'Habilitar repaso para que los participantes puedan ver las respuestas'}
+                                    >
+                                        {isReviewEnabled ? <Unlock size={14} /> : <Lock size={14} />}
+                                        <span>{isReviewEnabled ? 'Repaso: Activo' : 'Habilitar repaso'}</span>
+                                    </button>
+                                )}
 
                                 {role === 'teacher' && (
                                     <button
