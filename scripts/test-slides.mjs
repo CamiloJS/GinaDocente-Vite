@@ -488,7 +488,7 @@ check('shiftFieldTextStylesOnDelete desplaza correctamente los índices de estil
   shiftedStyles.title?.color === '#111111'
 );
 
-const iconsSrc = fs.readFileSync(path.join(rootDir, 'src/components/Icons.jsx'), 'utf8');
+  const iconsSrc = fs.readFileSync(path.join(rootDir, 'src/components/Icons.jsx'), 'utf8');
 check('Icons.jsx exporta Clipboard, Eraser y ListOrdered y ReviewsModule.jsx usa SLIDE_FONTS[el.fontFamily].css sin errores de referencia',
   iconsSrc.includes('export const Clipboard') &&
   iconsSrc.includes('export const Eraser') &&
@@ -499,7 +499,163 @@ check('Icons.jsx exporta Clipboard, Eraser y ListOrdered y ReviewsModule.jsx usa
   reviewsSrc.includes('autoAdvanceSeconds: Number(updatedPres.autoAdvanceSeconds)')
 );
 
+console.log('\n== 9. Contraste Automático, Tamaños de Título, Protección Firestore 1MB y Cinta de Opciones ==');
+const { isLightHexColor } = await import('../src/utils/slidesEngine.js');
+check('isLightHexColor distingue colores claros (amarillo pastel, blanco) y oscuros (azul noche, carmesí)',
+  isLightHexColor('#FEF08A') === true &&
+  isLightHexColor('#FFFFFF') === true &&
+  isLightHexColor('#0F172A') === false &&
+  isLightHexColor('#AD3333') === false
+);
+
+const flippedToLight = resolveTheme({ theme: 'midnight' }, { bgColor: '#FFFFFF' }, 'dark');
+const flippedToDark = resolveTheme({ theme: 'unipamplona' }, { bgColor: '#0F172A' }, 'light');
+check('resolveTheme adapta contraste de texto y tarjetas automáticamente si bgColor invierte la luminosidad del tema',
+  flippedToLight.isDark === false &&
+  flippedToLight.textPrimary === '#0F172A' &&
+  flippedToDark.isDark === true &&
+  flippedToDark.textPrimary === '#F8FAFC'
+);
+
+const badgeEl = createCanvasElement('badge', { text: 'B2' });
+check('createCanvasElement incluye lineHeight numérico en insignias (badge)',
+  typeof badgeEl.lineHeight === 'number' && badgeEl.lineHeight > 0
+);
+
+check('getDefaultFieldStyleMeta respeta slide.titleSize (sm, md, lg, xl) y SLIDE_FONT_SIZES cubre todos los tamaños por defecto',
+  getDefaultFieldStyleMeta({ layout: 'cards', titleSize: 'sm' }, 'title', 1).fontSize === 20 &&
+  getDefaultFieldStyleMeta({ layout: 'cards', titleSize: 'xl' }, 'title', 1).fontSize === 38 &&
+  [12, 13, 15, 17, 22, 26, 38].every(sz => SLIDE_FONT_SIZES.includes(sz))
+);
+
+const titleSlideWithDesc = { layout: 'title', title: 'Portada', subtitle: 'Subtítulo', description: 'Nota inferior distinta' };
+check('listSlideEditableFields expone el campo description en portadas cuando es distinto de subtitle',
+  listSlideEditableFields(titleSlideWithDesc, 0).some(f => f.key === 'description')
+);
+
+const hugeDataUrl = 'data:image/jpeg;base64,' + 'A'.repeat(420000);
+const mediumDataUrl = 'data:image/jpeg;base64,' + 'B'.repeat(300000);
+const sanitizedHuge = sanitizeSlidesForFirestore([
+  {
+    layout: 'image_text',
+    title: 'Foto pesada',
+    imageUrl: hugeDataUrl,
+    elements: [{ id: 'el_img_1', type: 'image', imageUrl: hugeDataUrl, x: 10, y: 10, w: 30, h: 30 }]
+  },
+  {
+    layout: 'image_text',
+    title: 'Foto mediana 1',
+    imageUrl: mediumDataUrl
+  },
+  {
+    layout: 'image_text',
+    title: 'Foto mediana 2',
+    imageUrl: mediumDataUrl
+  },
+  {
+    layout: 'image_text',
+    title: 'Foto mediana 3',
+    imageUrl: mediumDataUrl
+  }
+]);
+check('sanitizeSlidesForFirestore protege el límite de 1 MB de Firestore compactando imágenes inline excesivas (> 380 KB individuales o > 750 KB acumuladas)',
+  sanitizedHuge[0].imageUrl.length < 2000 &&
+  sanitizedHuge[0].elements[0].imageUrl.length < 2000 &&
+  JSON.stringify(sanitizedHuge).length < 750000
+);
+
+check('ReviewsModule preserva el foco del lienzo al pulsar botones de la Cinta y rasteriza SVGs para exportar .pptx',
+  reviewsSrc.includes('ribbonContainerRef') &&
+  reviewsSrc.includes('resolvePptxImageSource') &&
+  reviewsSrc.includes('uploadOrInlineSlideImage') &&
+  reviewsSrc.includes('compactDeckSlidesImages')
+);
+
+// 21. Pruebas de regresión adicionales (Wildcard '*' override/clear, contraste de resaltado, bgImage acumulado, quoteAuthor vacío y lienzo)
+let wildcardSlide = {
+  layout: 'title',
+  title: 'Portada Principal',
+  subtitle: 'Subtítulo de prueba',
+  badge: 'UNIT 1'
+};
+wildcardSlide = updateFieldTextStyle(wildcardSlide, '*', { bold: true, color: '#EF4444', bgColor: '#FEF08A', align: 'center' });
+wildcardSlide = clearFieldTextStyle(wildcardSlide, 'subtitle');
+check('clearFieldTextStyle sobre un campo individual desglosa el comodín "*" para limpiar solo el campo objetivo sin perder el estilo en los demás',
+  !wildcardSlide.textStyles?.['*'] &&
+  getFieldTextStyle(wildcardSlide, 'subtitle').bold === false &&
+  getFieldTextStyle(wildcardSlide, 'subtitle').color === '' &&
+  getFieldTextStyle(wildcardSlide, 'title').bold === true &&
+  getFieldTextStyle(wildcardSlide, 'title').color === '#EF4444'
+);
+
+let wildcardResetColorSlide = updateFieldTextStyle(
+  { layout: 'title', title: 'Título', subtitle: 'Subtítulo' },
+  '*',
+  { color: '#38BDF8', bgColor: '#FEF08A' }
+);
+wildcardResetColorSlide = updateFieldTextStyle(wildcardResetColorSlide, 'title', { color: '', bgColor: 'transparent' });
+check('updateFieldTextStyle permite restablecer color automático ("") o fondo transparente en un campo individual aunque existiera estilo global "*"',
+  getFieldTextStyle(wildcardResetColorSlide, 'title').color === '' &&
+  getFieldTextStyle(wildcardResetColorSlide, 'title').bgColor === '' &&
+  getFieldTextStyle(wildcardResetColorSlide, 'subtitle').color === '#38BDF8' &&
+  getFieldTextStyle(wildcardResetColorSlide, 'subtitle').bgColor === '#FEF08A'
+);
+
+const clearedTitleAlignSlide = clearFieldTextStyle(
+  { layout: 'cards', title: 'Título centrado', titleAlign: 'center', textStyles: { title: { align: 'center' } } },
+  'title'
+);
+check('clearFieldTextStyle en "title" restablece también slide.titleAlign a left',
+  clearedTitleAlignSlide.titleAlign === 'left' &&
+  getFieldTextStyle(clearedTitleAlignSlide, 'title').align === 'left'
+);
+
+const highlightedOnDarkSlide = updateFieldTextStyle(
+  { layout: 'title', title: 'Texto resaltado' },
+  'title',
+  { bgColor: '#FEF08A' }
+);
+const highlightedInlineStyle = buildInlineTextStyle(highlightedOnDarkSlide, 'title', { color: '#F8FAFC' });
+const darkHighlightSlide = updateFieldTextStyle(
+  { layout: 'title', title: 'Texto resaltado oscuro' },
+  'title',
+  { bgColor: '#1E293B' }
+);
+const darkHighlightedInlineStyle = buildInlineTextStyle(darkHighlightSlide, 'title', { color: '#0F172A' });
+check('buildInlineTextStyle ajusta automáticamente el contraste de texto cuando se aplica un resaltado sin color explícito',
+  highlightedInlineStyle.color === '#0F172A' &&
+  darkHighlightedInlineStyle.color === '#F8FAFC'
+);
+
+const bgCumulativeSlides = sanitizeSlidesForFirestore([
+  { layout: 'title', title: 'BG 1', bgImage: mediumDataUrl },
+  { layout: 'title', title: 'BG 2', bgImage: mediumDataUrl },
+  { layout: 'title', title: 'BG 3', bgImage: mediumDataUrl }
+]);
+check('sanitizeSlidesForFirestore incluye bgImage en el presupuesto acumulado de 750 KB para proteger documentos de Firestore',
+  JSON.stringify(bgCumulativeSlides).length < 750000
+);
+
+const emptyAuthorQuote = normalizeSingleSlide({
+  layout: 'quote',
+  quote: 'Learning never exhausts the mind.',
+  quoteAuthor: '',
+  badge: 'Cita'
+}, 1, 'Quote Test');
+check('normalizeSingleSlide preserva quoteAuthor vacío ("") cuando el usuario borra el autor en diseño quote',
+  emptyAuthorQuote.quoteAuthor === ''
+);
+
+check('ReviewsModule escala fuentes de elementos libres en miniaturas/tarjetas, protege selección al arrastrar y cicla los 4 modos de mayúsculas/minúsculas',
+  reviewsSrc.includes('data-canvas-element={el.id}') &&
+  reviewsSrc.includes('scaledElFontSize') &&
+  reviewsSrc.includes('getNextCaseMode') &&
+  reviewsSrc.includes('hasDefaultShapeFill')
+);
+
 console.log(`\nRESULTADO SLIDES STUDIO: ${okCount} OK, ${failCount} fallos\n`);
 if (failCount > 0) {
   process.exit(1);
 }
+
+

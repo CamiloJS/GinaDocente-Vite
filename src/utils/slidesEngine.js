@@ -248,7 +248,7 @@ export const SLIDE_TRANSITION_GALLERY = [
   { id: 'flip', name: 'Giro / Mostrar', desc: 'Efecto de giro y perspectiva' }
 ];
 
-export const SLIDE_FONT_SIZES = [10, 11, 12, 14, 16, 18, 20, 22, 24, 28, 32, 36, 40, 44, 48, 54, 60];
+export const SLIDE_FONT_SIZES = [10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 22, 24, 26, 28, 30, 32, 36, 38, 40, 44, 48, 54, 60, 64, 72];
 
 export const SLIDE_COLOR_SWATCHES = [
   { hex: '#0F172A', name: 'Pizarra Oscuro' },
@@ -383,6 +383,26 @@ export const cleanHexNoHash = (hex, fallback = '0F172A') => {
   return fallback;
 };
 
+export const isLightHexColor = (colorStr, fallback = true) => {
+  if (!colorStr || typeof colorStr !== 'string' || colorStr === 'transparent') return fallback;
+  const trimmed = colorStr.trim();
+  const rgbMatch = trimmed.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)$/i);
+  if (rgbMatch) {
+    const a = rgbMatch[4] !== undefined ? parseFloat(rgbMatch[4]) : 1;
+    if (Number.isFinite(a) && a < 0.35) return fallback;
+    const r = Number(rgbMatch[1]);
+    const g = Number(rgbMatch[2]);
+    const b = Number(rgbMatch[3]);
+    return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.58;
+  }
+  const hex = cleanHexNoHash(trimmed, '');
+  if (!hex || hex.length !== 6) return fallback;
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.58;
+};
+
 export const resolveTheme = (presentation, slide = null, appThemeMode = 'light') => {
   const themeKey = slide?.theme || presentation?.theme || (appThemeMode === 'light' ? 'unipamplona' : 'midnight');
   const base = SLIDE_THEMES[themeKey] || (appThemeMode === 'light' ? SLIDE_THEMES.unipamplona : SLIDE_THEMES.midnight);
@@ -393,13 +413,41 @@ export const resolveTheme = (presentation, slide = null, appThemeMode = 'light')
 
   const effectiveBg = customBg || base.bg;
   const effectivePrimary = customAccent || base.primary;
+  const effectiveIsDark = customBg ? !isLightHexColor(customBg, !base.isDark) : base.isDark;
+  const contrastFlipped = Boolean(customBg && effectiveIsDark !== base.isDark);
+
+  let badgeBg = base.badgeBg;
+  let badgeText = base.badgeText;
+  if (customAccent) {
+    const cleanAcc = cleanHexNoHash(customAccent, '');
+    if (cleanAcc.length === 6) {
+      const r = parseInt(cleanAcc.slice(0, 2), 16);
+      const g = parseInt(cleanAcc.slice(2, 4), 16);
+      const b = parseInt(cleanAcc.slice(4, 6), 16);
+      badgeBg = `rgba(${r}, ${g}, ${b}, ${effectiveIsDark ? 0.22 : 0.12})`;
+      badgeText = effectivePrimary;
+    }
+  } else if (contrastFlipped) {
+    badgeText = effectivePrimary;
+  }
 
   return {
     ...base,
+    isDark: effectiveIsDark,
     bg: effectiveBg,
     primary: effectivePrimary,
+    textPrimary: contrastFlipped ? (effectiveIsDark ? '#F8FAFC' : '#0F172A') : base.textPrimary,
+    textSecondary: contrastFlipped ? (effectiveIsDark ? '#CBD5E1' : '#475569') : base.textSecondary,
+    cardBg: contrastFlipped ? (effectiveIsDark ? '#1E293B' : '#FFFFFF') : base.cardBg,
+    cardBorder: contrastFlipped ? (effectiveIsDark ? '#334155' : '#E2E8F0') : base.cardBorder,
+    badgeBg,
+    badgeText,
     pptxBg: customBg ? cleanHexNoHash(customBg, base.pptxBg) : base.pptxBg,
     pptxPrimary: customAccent ? cleanHexNoHash(customAccent, base.pptxPrimary) : base.pptxPrimary,
+    pptxText: contrastFlipped ? (effectiveIsDark ? 'F8FAFC' : '0F172A') : base.pptxText,
+    pptxMuted: contrastFlipped ? (effectiveIsDark ? 'CBD5E1' : '475569') : base.pptxMuted,
+    pptxCardBg: contrastFlipped ? (effectiveIsDark ? '1E293B' : 'FFFFFF') : base.pptxCardBg,
+    pptxCardBorder: contrastFlipped ? (effectiveIsDark ? '334155' : 'CBD5E1') : base.pptxCardBorder,
     fontFamily: fontObj.css,
     pptxFont: fontObj.pptx,
     fontId: fontObj.id
@@ -858,6 +906,7 @@ export const createCanvasElement = (type = 'textbox', overrides = {}) => {
       underline: !!overrides.underline,
       strikethrough: !!overrides.strikethrough,
       align: overrides.align || 'center',
+      lineHeight: overrides.lineHeight || 1.2,
       ...rect
     };
   }
@@ -917,12 +966,19 @@ export const normalizeFieldKey = (fieldKey = 'title') => {
 export const getDefaultFieldStyleMeta = (arg1 = 'title', arg2 = 'cards', arg3 = 0) => {
   let rawKey = 'title';
   let layout = 'cards';
+  let slideObj = null;
   if (arg1 && typeof arg1 === 'object') {
+    slideObj = arg1;
     rawKey = String(arg2 || 'title');
     layout = resolveSlideLayout(arg1, arg3);
   } else {
     rawKey = String(arg1 || 'title');
-    layout = (arg2 && typeof arg2 === 'object') ? resolveSlideLayout(arg2, arg3) : String(arg2 || 'cards');
+    if (arg2 && typeof arg2 === 'object') {
+      slideObj = arg2;
+      layout = resolveSlideLayout(arg2, arg3);
+    } else {
+      layout = String(arg2 || 'cards');
+    }
   }
   const key = normalizeFieldKey(rawKey);
   const isCenteredLayout = layout === 'title' || layout === 'section' || layout === 'quote';
@@ -934,7 +990,11 @@ export const getDefaultFieldStyleMeta = (arg1 = 'title', arg2 = 'cards', arg3 = 
     return { label: 'Insignia superior', fontSize: 11, bold: true, italic: false, align: isCenteredLayout ? 'center' : 'left' };
   }
   if (key === 'title') {
-    return { label: 'Título de diapositiva', fontSize: layout === 'title' ? 38 : 24, bold: true, italic: false, align: isCenteredLayout ? 'center' : 'left' };
+    let defaultTitleFontSize = layout === 'title' ? 38 : 24;
+    if (slideObj?.titleSize === 'sm') defaultTitleFontSize = 20;
+    else if (slideObj?.titleSize === 'md') defaultTitleFontSize = 22;
+    else if (slideObj?.titleSize === 'xl') defaultTitleFontSize = 38;
+    return { label: 'Título de diapositiva', fontSize: defaultTitleFontSize, bold: true, italic: false, align: isCenteredLayout ? 'center' : 'left' };
   }
   if (key === 'subtitle') {
     return { label: 'Subtítulo', fontSize: 18, bold: false, italic: false, align: isCenteredLayout ? 'center' : 'left' };
@@ -1068,10 +1128,16 @@ export const updateFieldTextStyle = (slide, fieldKey = 'title', stylePatch = {})
     normalizedPatch.highlight = normalizedPatch.bgColor;
   }
 
+  const isResetValue = (k, v) =>
+    v === undefined ||
+    v === null ||
+    v === '' ||
+    ((k === 'bgColor' || k === 'highlight') && v === 'transparent');
+
   const cleanObject = (obj) => {
     const out = {};
     for (const [k, v] of Object.entries(obj)) {
-      if (v !== undefined && v !== null && v !== '') {
+      if (!isResetValue(k, v)) {
         out[k] = v;
       }
     }
@@ -1096,6 +1162,23 @@ export const updateFieldTextStyle = (slide, fieldKey = 'title', stylePatch = {})
     return nextSlide;
   }
 
+  if (
+    currentMap['*'] &&
+    typeof currentMap['*'] === 'object' &&
+    Object.entries(normalizedPatch).some(([k, v]) => isResetValue(k, v) && currentMap['*'][k] !== undefined)
+  ) {
+    const wildcardStyle = currentMap['*'];
+    delete currentMap['*'];
+    listSlideEditableFields(slide).forEach((f) => {
+      if (!f?.key || f.key === '*') return;
+      const fk = normalizeFieldKey(f.key);
+      const materialized = cleanObject({ ...wildcardStyle, ...(currentMap[fk] || {}) });
+      if (Object.keys(materialized).length > 0) {
+        currentMap[fk] = materialized;
+      }
+    });
+  }
+
   const prevFieldStyle = (currentMap[key] && typeof currentMap[key] === 'object') ? currentMap[key] : {};
   const mergedFieldStyle = cleanObject({ ...prevFieldStyle, ...normalizedPatch });
   if (Object.keys(mergedFieldStyle).length > 0) {
@@ -1117,15 +1200,30 @@ export const updateFieldTextStyle = (slide, fieldKey = 'title', stylePatch = {})
 export const clearFieldTextStyle = (slide, fieldKey = 'title') => {
   if (!slide || typeof slide !== 'object') return slide;
   const key = normalizeFieldKey(fieldKey);
+  const defaultTitleAlign = getDefaultFieldStyleMeta(slide, 'title').align || 'left';
   if (key === '*') {
-    return { ...slide, textStyles: {} };
+    return { ...slide, textStyles: {}, titleAlign: defaultTitleAlign };
   }
   const currentMap = (slide.textStyles && typeof slide.textStyles === 'object' && !Array.isArray(slide.textStyles))
     ? { ...slide.textStyles }
     : {};
+  if (currentMap['*'] && typeof currentMap['*'] === 'object' && Object.keys(currentMap['*']).length > 0) {
+    const wildcardStyle = currentMap['*'];
+    delete currentMap['*'];
+    listSlideEditableFields(slide).forEach((f) => {
+      if (!f?.key || f.key === '*') return;
+      const fk = normalizeFieldKey(f.key);
+      if (fk === key) return;
+      currentMap[fk] = { ...wildcardStyle, ...(currentMap[fk] || {}) };
+    });
+  }
   delete currentMap[key];
   if (fieldKey !== key) delete currentMap[fieldKey];
-  return { ...slide, textStyles: currentMap };
+  const nextSlide = { ...slide, textStyles: currentMap };
+  if (key === 'title') {
+    nextSlide.titleAlign = defaultTitleAlign;
+  }
+  return nextSlide;
 };
 
 export const shiftFieldTextStylesOnDelete = (textStyles, collectionType = 'cards', deletedIdx = 0) => {
@@ -1200,6 +1298,9 @@ export const buildInlineTextStyle = (slide, fieldKey, baseStyle = {}, mode = 'pr
   const bg = st.bgColor || st.highlight;
   if (bg && bg !== 'transparent') {
     style.backgroundColor = bg;
+    if (!st.color && !String(bg).startsWith('rgba')) {
+      style.color = isLightHexColor(bg, true) ? '#0F172A' : '#F8FAFC';
+    }
     if (!style.borderRadius) style.borderRadius = '6px';
     if (!style.paddingLeft) {
       style.paddingLeft = '6px';
@@ -1430,6 +1531,9 @@ export const listSlideEditableFields = (slide, slideIdx = 0) => {
 
   if (layout === 'title' || layout === 'section') {
     fields.push({ key: 'subtitle', label: 'Subtítulo' });
+    if (layout === 'title' && slide.description && slide.description !== slide.subtitle) {
+      fields.push({ key: 'description', label: 'Descripción' });
+    }
   } else if (layout === 'title_body') {
     fields.push({ key: 'body', label: 'Cuerpo de texto' });
     fields.push({ key: 'callout', label: 'Nota destacada (Callout)' });
@@ -1639,13 +1743,23 @@ export const getTableRows = (table) => {
   return table.rows.map(r => extractTableRowCells(r, headers));
 };
 
+const COMPACT_FALLBACK_IMAGE_URL = SLIDE_ACADEMIC_ILLUSTRATIONS[0].url;
+const MAX_SINGLE_DATA_IMAGE_CHARS = 380000;
+const MAX_TOTAL_FIRESTORE_SLIDES_CHARS = 750000;
+
 const sanitizeValueForFirestore = (val, insideArray = false) => {
   if (val === undefined) return undefined;
   if (val === null) return null;
   if (typeof val === 'number') {
     return Number.isFinite(val) ? val : 0;
   }
-  if (typeof val === 'string' || typeof val === 'boolean') {
+  if (typeof val === 'boolean') {
+    return val;
+  }
+  if (typeof val === 'string') {
+    if (val.startsWith('data:image/') && val.length > MAX_SINGLE_DATA_IMAGE_CHARS) {
+      return COMPACT_FALLBACK_IMAGE_URL;
+    }
     return val;
   }
   if (Array.isArray(val)) {
@@ -1685,7 +1799,55 @@ const sanitizeValueForFirestore = (val, insideArray = false) => {
 
 export const sanitizeSlidesForFirestore = (slides = []) => {
   if (!Array.isArray(slides)) return [];
-  return slides.map((s, idx) => sanitizeValueForFirestore(normalizeSingleSlide(s, idx), false));
+  const sanitized = slides.map((s, idx) => sanitizeValueForFirestore(normalizeSingleSlide(s, idx), false));
+
+  let totalLen = JSON.stringify(sanitized).length;
+  if (totalLen <= MAX_TOTAL_FIRESTORE_SLIDES_CHARS) {
+    return sanitized;
+  }
+
+  // Si la suma de imágenes embebidas supera el margen seguro de 1 MB de Firestore,
+  // reemplazamos progresivamente los data:image/ más pesados por una ilustración vectorial ligera.
+  const candidates = [];
+  sanitized.forEach((slide, sIdx) => {
+    if (!slide || typeof slide !== 'object') return;
+    if (typeof slide.imageUrl === 'string' && slide.imageUrl.startsWith('data:image/') && slide.imageUrl.length > 4000) {
+      candidates.push({
+        len: slide.imageUrl.length,
+        replace: () => { sanitized[sIdx] = { ...sanitized[sIdx], imageUrl: COMPACT_FALLBACK_IMAGE_URL }; }
+      });
+    }
+    if (typeof slide.bgImage === 'string' && slide.bgImage.startsWith('data:image/') && slide.bgImage.length > 4000) {
+      candidates.push({
+        len: slide.bgImage.length,
+        replace: () => { sanitized[sIdx] = { ...sanitized[sIdx], bgImage: COMPACT_FALLBACK_IMAGE_URL }; }
+      });
+    }
+    if (Array.isArray(slide.elements)) {
+      slide.elements.forEach((el, elIdx) => {
+        if (el && typeof el.imageUrl === 'string' && el.imageUrl.startsWith('data:image/') && el.imageUrl.length > 4000) {
+          candidates.push({
+            len: el.imageUrl.length,
+            replace: () => {
+              const nextEls = [...sanitized[sIdx].elements];
+              nextEls[elIdx] = { ...nextEls[elIdx], imageUrl: COMPACT_FALLBACK_IMAGE_URL };
+              sanitized[sIdx] = { ...sanitized[sIdx], elements: nextEls };
+            }
+          });
+        }
+      });
+    }
+  });
+
+  candidates.sort((a, b) => b.len - a.len);
+  for (const item of candidates) {
+    if (totalLen <= MAX_TOTAL_FIRESTORE_SLIDES_CHARS) break;
+    const saved = item.len - COMPACT_FALLBACK_IMAGE_URL.length;
+    item.replace();
+    totalLen -= Math.max(0, saved);
+  }
+
+  return sanitized;
 };
 
 export const hydrateSlidesFromFirestore = (slides = []) => {
@@ -1782,7 +1944,7 @@ export const normalizeSingleSlide = (rawSlide, idx = 0) => {
     normalized.table = { headers, rows };
   } else if (layout === 'quote') {
     normalized.quoteText = String(rawSlide.quoteText || rawSlide.body || rawSlide.content || normalized.subtitle || normalized.title);
-    normalized.quoteAuthor = String(rawSlide.quoteAuthor || rawSlide.badge || '');
+    normalized.quoteAuthor = rawSlide.quoteAuthor !== undefined ? String(rawSlide.quoteAuthor) : String(rawSlide.badge || '');
     normalized.statValue = rawSlide.statValue ? String(rawSlide.statValue) : '';
   } else if (layout === 'title_body') {
     normalized.body = String(rawSlide.body || rawSlide.content || normalized.subtitle || '');
