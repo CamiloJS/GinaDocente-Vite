@@ -241,6 +241,85 @@ check('buildFallbackAiSlides genera la cantidad exacta con variedad de layouts (
   fallbackSlides[fallbackSlides.length - 1].layout === 'quiz'
 );
 
+console.log('\n== 7. Publicación en Muro de Evaluaciones y Diapositivas ==');
+import fs from 'node:fs';
+import path from 'node:path';
+const rootDir = process.cwd();
+const reviewsSrc = fs.readFileSync(path.join(rootDir, 'src/components/ReviewsModule.jsx'), 'utf8');
+const taskCardSrc = fs.readFileSync(path.join(rootDir, 'src/components/TaskCard.jsx'), 'utf8');
+const tasksTabSrc = fs.readFileSync(path.join(rootDir, 'src/components/TasksTab.jsx'), 'utf8');
+const appSrc = fs.readFileSync(path.join(rootDir, 'src/App.jsx'), 'utf8');
+
+check('ReviewsModule exporta SlideCanvasSurface, SlidePresenterViewer y exportReviewToPresentation y publica rev_wall_ en tasks',
+  reviewsSrc.includes('export const SlideCanvasSurface') &&
+  reviewsSrc.includes('export const SlidePresenterViewer') &&
+  reviewsSrc.includes('export const exportReviewToPresentation') &&
+  reviewsSrc.includes('rev_wall_${newDoc.id}') &&
+  reviewsSrc.includes('buildCleanSlideWallDesc') &&
+  reviewsSrc.includes('initialEditingPresentation.openCreate')
+);
+
+check('TaskCard implementa tarjetas personalizadas de Evaluación y Diapositivas con vista previa 16:9, visor en vivo, matching de studentId/studentEmail y estado cancelled_tab_change',
+  taskCardSrc.includes("const isEvaluation = task?.type === 'evaluation'") &&
+  taskCardSrc.includes("const isSlides = task?.type === 'slides'") &&
+  taskCardSrc.includes('<SlideCanvasSurface') &&
+  taskCardSrc.includes('<SlidePresenterViewer') &&
+  taskCardSrc.includes('Presentar evaluación') &&
+  taskCardSrc.includes('Ver resultados y entregas') &&
+  taskCardSrc.includes('isSynthesizedFeedItem') &&
+  taskCardSrc.includes('g.studentId') &&
+  taskCardSrc.includes('g.studentEmail') &&
+  taskCardSrc.includes("myEvalGrade?.status === 'cancelled_tab_change'") &&
+  taskCardSrc.includes('isDeletedFromWall: true')
+);
+
+check('TasksTab fusiona evaluaciones activas y diapositivas en combinedTasks sin duplicar y filtra archivadas/eliminadas (isDeletedFromWall)',
+  tasksTabSrc.includes('eval_wall_${ev.id}') &&
+  tasksTabSrc.includes('rev_wall_${rev.id}') &&
+  tasksTabSrc.includes('isSynthesizedFeedItem: true') &&
+  tasksTabSrc.includes('t.isDeletedFromWall') &&
+  tasksTabSrc.includes('isPlaceholderSub') &&
+  tasksTabSrc.includes('onStartEvaluation={onStartEvaluation}') &&
+  tasksTabSrc.includes('onOpenEvaluationResults={onOpenEvaluationResults}')
+);
+
+check('App.jsx publica eval_wall_ al crear evaluación, limpia al eliminar y conecta TasksTab general y de grupos',
+  appSrc.includes('eval_wall_${evalId}') &&
+  appSrc.includes('onStartEvaluation={(ev) =>') &&
+  appSrc.includes('onOpenEvaluationResults={(ev) =>') &&
+  appSrc.includes('tasks={tasks}') &&
+  appSrc.includes('setTasks={setTasks}') &&
+  appSrc.includes('rev.openCreate')
+);
+
+check('TasksTab reconcilia visiblePinnedTasks con combinedTasks/tasks y filtra huérfanos incluso cuando evaluations/reviews quedan vacíos',
+  tasksTabSrc.includes('const combinedPinned = (combinedTasks || []).filter(t => t && t.isPinned)') &&
+  tasksTabSrc.includes('stateTask.isPinned === false') &&
+  tasksTabSrc.includes('Array.isArray(evaluations)') &&
+  tasksTabSrc.includes('Array.isArray(reviews)') &&
+  !tasksTabSrc.includes('(evaluations || []).length > 0 && String(t.id') &&
+  !tasksTabSrc.includes('(reviews || []).length > 0 && !reviewMap.has')
+);
+
+check('TaskCard propaga ediciones inline de título, descripción y fecha límite (task.dueDate / task.dueTime) sobre linkedEvaluation y linkedReview',
+  taskCardSrc.includes('const evDueStr = task.dueDate || ev.dueDate;') &&
+  taskCardSrc.includes("const evTimeStr = task.dueTime || ev.dueTime || '23:59';") &&
+  taskCardSrc.includes('dueDate: task?.dueDate || found.dueDate') &&
+  taskCardSrc.includes("topic: task?.title || found.topic || 'Presentación de Diapositivas'")
+);
+
+check('TasksTab y ReviewsModule permiten visibilidad de grupos y publicaciones creadas en Modo Demo (isDemoMode / isDemoTask)',
+  tasksTabSrc.includes("if (isDemoMode || String(group.id || '').startsWith('demo_') || String(group.id || '').startsWith('demo-')) return true;") &&
+  tasksTabSrc.includes("if (!fixedTargetGroup && (isDemoTask || String(t.id || '').startsWith('demo-'))) return true;") &&
+  reviewsSrc.includes("if (isDemoMode || String(g.id || '').startsWith('demo_') || String(g.id || '').startsWith('demo-')) return true;")
+);
+
+check('App.jsx ignora eliminados/archivados en isTaskForGroup, sincroniza isPinned/isDeletedFromWall en toggleArchiveEvaluation y limpia sub-vistas en onStartEvaluation',
+  appSrc.includes('if (!t || !groupId || t.isDeletedFromWall || t.isArchived) return false;') &&
+  appSrc.includes('? { isArchived: true, isPinned: false }') &&
+  appSrc.includes(': { isArchived: false, isDeletedFromWall: false }')
+);
+
 console.log(`\nRESULTADO SLIDES STUDIO: ${okCount} OK, ${failCount} fallos\n`);
 if (failCount > 0) {
   process.exit(1);

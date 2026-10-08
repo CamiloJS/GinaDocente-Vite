@@ -25,7 +25,7 @@ import {
   selectBestFemaleVoice
 } from '../utils/helpers.js'
 import EmptyState from './EmptyState.jsx'
-import { doc, addDoc, collection, deleteDoc, updateDoc } from '../firebase/config.js'
+import { doc, addDoc, setDoc, collection, deleteDoc, updateDoc } from '../firebase/config.js'
 import { DEMO_TTL_MS, saveDemoSandboxItem, removeDemoSandboxItem } from '../utils/demoData.js'
 import {
   SLIDE_THEMES,
@@ -585,7 +585,7 @@ export const exportReviewToPresentation = async (review) => {
 // =========================================================================
 // 2. LIENZO VISUAL 16:9 UNIFICADO (Miniatura, Tarjeta, Editor WYSIWYG y Presentador)
 // =========================================================================
-const SlideCanvasSurface = ({
+export const SlideCanvasSurface = ({
   presentation,
   slide,
   slideIdx = 0,
@@ -4511,6 +4511,8 @@ export const ReviewsModule = ({
   redButton,
   reviews = [],
   setReviews,
+  tasks = [],
+  setTasks,
   isDemoMode = false,
   db,
   appId,
@@ -4520,7 +4522,9 @@ export const ReviewsModule = ({
   user = null,
   showMessage = () => {},
   confirmAction = () => {},
-  callGemini
+  callGemini,
+  initialEditingPresentation = null,
+  onClearInitialEditingPresentation = null
 }) => {
   const [topic, setTopic] = useState('');
   const [extraNotes, setExtraNotes] = useState('');
@@ -4541,7 +4545,32 @@ export const ReviewsModule = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [groupFilter, setGroupFilter] = useState('all');
 
+  useEffect(() => {
+    if (!initialEditingPresentation) return;
+    if (Array.isArray(initialEditingPresentation.slides)) {
+      setEditingPresentation(initialEditingPresentation);
+    } else if (initialEditingPresentation.openCreate) {
+      if (initialEditingPresentation.targetGroupId) {
+        setReviewTargetGroup(initialEditingPresentation.targetGroupId);
+      }
+      setCreationMode(initialEditingPresentation.mode || 'template');
+    }
+    if (typeof onClearInitialEditingPresentation === 'function') {
+      onClearInitialEditingPresentation();
+    }
+  }, [initialEditingPresentation, onClearInitialEditingPresentation]);
+
   const canonicalTeacherId = getCanonicalTeacherId(myChatId || loggedInName || user?.displayName || user?.email);
+
+  const buildCleanSlideWallDesc = (firstSlide, slideTotal, lang) => {
+    const rawSub = String(firstSlide?.subtitle || firstSlide?.description || '').trim();
+    const isPlaceholder = !rawSub ||
+      rawSub === 'Subtítulo de la presentación' ||
+      rawSub.toLowerCase().startsWith('haz clic para añadir');
+    return !isPlaceholder
+      ? rawSub
+      : `Presentación interactiva de ${slideTotal} ${slideTotal === 1 ? 'diapositiva' : 'diapositivas'} (${lang || 'Inglés'}).`;
+  };
 
   const persistNewPresentation = async (docPayload) => {
     const now = Date.now();
@@ -4565,6 +4594,48 @@ export const ReviewsModule = ({
       const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'reviews'), newDoc);
       newDoc.id = docRef.id;
     }
+
+    // Publicar automáticamente la presentación en el Muro / Publicaciones
+    const wallTaskId = `rev_wall_${newDoc.id}`;
+    const firstSlide = (newDoc.slides || [])[0] || {};
+    const wallTitle = newDoc.topic || firstSlide.title || 'Presentación de Diapositivas';
+    const wallDesc = buildCleanSlideWallDesc(firstSlide, (newDoc.slides || []).length, newDoc.language);
+    const wallTask = {
+      id: wallTaskId,
+      type: 'slides',
+      reviewId: newDoc.id,
+      title: wallTitle,
+      description: wallDesc,
+      slideCount: (newDoc.slides || []).length,
+      language: newDoc.language || 'Inglés',
+      theme: newDoc.theme || 'unipamplona',
+      targetGroupId: newDoc.targetGroupId || 'all',
+      targetGroupName: newDoc.targetGroupName || 'General',
+      author: getTeacherDisplayName(canonicalTeacherId),
+      authorName: getTeacherDisplayName(canonicalTeacherId),
+      authorId: canonicalTeacherId,
+      authorRole: 'teacher',
+      teacherId: canonicalTeacherId,
+      ownerTeacherId: canonicalTeacherId,
+      createdAt: now,
+      reactions: {},
+      comments: [],
+      ...(isDemoMode ? { isDemoCreated: true, expiresAt: now + DEMO_TTL_MS } : {})
+    };
+
+    try {
+      if (isDemoMode) {
+        saveDemoSandboxItem('tasks', wallTask);
+      } else {
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', wallTaskId), wallTask);
+      }
+      if (typeof setTasks === 'function') {
+        setTasks(prev => [wallTask, ...(prev || []).filter(t => String(t.id) !== String(wallTask.id) && String(t.reviewId) !== String(newDoc.id))]);
+      }
+    } catch (wallErr) {
+      console.error('Error al publicar presentación en el muro:', wallErr);
+    }
+
     return newDoc;
   };
 
@@ -4718,7 +4789,40 @@ export const ReviewsModule = ({
         saveDemoSandboxItem('reviews', merged);
       } else {
         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reviews', updatedPres.id), updates);
+        if (typeof setReviews === 'function') {
+          setReviews(prev => (prev || []).map(r => String(r.id) === String(updatedPres.id) ? { ...r, ...updates } : r));
+        }
       }
+
+      // Sincronizar también la publicación vinculada en el muro si existe
+      const firstSlide = slidesList[0] || {};
+      const wallUpdates = {
+        title: updates.topic || 'Presentación de Diapositivas',
+        description: buildCleanSlideWallDesc(firstSlide, slidesList.length, updates.language),
+        slideCount: slidesList.length,
+        language: updates.language,
+        theme: updates.theme,
+        targetGroupId: updates.targetGroupId,
+        targetGroupName: updates.targetGroupName,
+        isDeletedFromWall: false
+      };
+      const linkedWallTasks = (tasks || []).filter(t => String(t?.reviewId) === String(updatedPres.id) || String(t?.id) === `rev_wall_${updatedPres.id}`);
+      for (const wt of linkedWallTasks) {
+        const mergedTask = { ...wt, ...wallUpdates };
+        if (isDemoPres || wt.isDemoCreated || String(wt.id).startsWith('demo_') || String(wt.reviewId || '').startsWith('demo')) {
+          saveDemoSandboxItem('tasks', mergedTask);
+        } else {
+          try {
+            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', wt.id), wallUpdates, { merge: true });
+          } catch {
+            // ignore
+          }
+        }
+      }
+      if (typeof setTasks === 'function' && linkedWallTasks.length > 0) {
+        setTasks(prev => (prev || []).map(t => (String(t?.reviewId) === String(updatedPres.id) || String(t?.id) === `rev_wall_${updatedPres.id}`) ? { ...t, ...wallUpdates } : t));
+      }
+
       showMessage('Presentación guardada.');
       if (activePresentation?.id === updatedPres.id) {
         setActivePresentation({ ...updatedPres, ...updates });
@@ -4736,10 +4840,17 @@ export const ReviewsModule = ({
       try {
         const targetReview = (reviews || []).find(r => String(r?.id) === String(id));
         const isDemoPres = isDemoMode || targetReview?.isDemoCreated || String(id || '').startsWith('demo_') || String(id || '').startsWith('demo-');
+        const linkedWallTasks = (tasks || []).filter(t => String(t?.reviewId) === String(id) || String(t?.id) === `rev_wall_${id}`);
+
         if (isDemoPres) {
           removeDemoSandboxItem('reviews', id);
           if (typeof setReviews === 'function') {
             setReviews(prev => (prev || []).filter(r => String(r.id) !== String(id)));
+          }
+          linkedWallTasks.forEach(wt => removeDemoSandboxItem('tasks', wt.id));
+          removeDemoSandboxItem('tasks', `rev_wall_${id}`);
+          if (typeof setTasks === 'function') {
+            setTasks(prev => (prev || []).filter(t => String(t.reviewId) !== String(id) && String(t.id) !== `rev_wall_${id}`));
           }
           showMessage('Presentación eliminada del entorno Demo.');
           if (activePresentation?.id === id) setActivePresentation(null);
@@ -4747,6 +4858,22 @@ export const ReviewsModule = ({
           return;
         }
         await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reviews', id));
+        for (const wt of linkedWallTasks) {
+          try {
+            await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', wt.id));
+          } catch {
+            // ignore
+          }
+        }
+        try {
+          await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', `rev_wall_${id}`));
+        } catch {
+          // ignore
+        }
+        setReviews(prev => prev.filter(r => r.id !== id));
+        if (typeof setTasks === 'function') {
+          setTasks(prev => (prev || []).filter(t => String(t.reviewId) !== String(id) && String(t.id) !== `rev_wall_${id}`));
+        }
         showMessage('Presentación eliminada.');
         if (activePresentation?.id === id) setActivePresentation(null);
         if (editingPresentation?.id === id) setEditingPresentation(null);
@@ -4759,7 +4886,7 @@ export const ReviewsModule = ({
   // Grupos visibles y filtrado por membresía
   const myEnrolledGroups = (academicGroups || []).filter(g => {
     if (!g) return false;
-    if (String(g.id || '').startsWith('demo_') || String(g.id || '').startsWith('demo-')) return true;
+    if (isDemoMode || String(g.id || '').startsWith('demo_') || String(g.id || '').startsWith('demo-')) return true;
     const membersList = Array.isArray(g.members)
       ? g.members
       : (g.members && typeof g.members === 'object' ? Object.keys(g.members) : []);
@@ -4780,10 +4907,9 @@ export const ReviewsModule = ({
   const visibleReviews = (role === 'teacher'
     ? (reviews || []).filter(r => {
       if (!r) return false;
-      if (r.isDemoCreated || String(r.id || '').startsWith('demo-') || String(r.id || '').startsWith('demo_')) return true;
-      if (canonicalTeacherId === 'teacher') return true;
+      if (isDemoMode || r.isDemoCreated || String(r.id || '').startsWith('demo-') || String(r.id || '').startsWith('demo_')) return true;
       const ownerId = getItemTeacherId(r);
-      return ownerId === 'teacher' || ownerId === canonicalTeacherId;
+      return ownerId === canonicalTeacherId;
     })
     : (reviews || []).filter(r => {
       if (r?.isDemoCreated || String(r?.id || '').startsWith('demo-') || String(r?.id || '').startsWith('demo_')) return true;

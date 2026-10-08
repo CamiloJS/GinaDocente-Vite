@@ -1,7 +1,7 @@
 // src/components/TasksTab.jsx
 import React, { useState, useRef } from 'react'
 import {
-  Book, BookOpen, CheckCheck, ChevronRight, Globe, ImageIcon, Mic, NavNotebook, PaperclipIcon, Plus, SearchIcon, Sparkles, Square, Target, Loader2, Undo2, X, Play, Pause, MessageCircle, BarChart2, Vote, Gamepad2
+  Book, BookOpen, CheckCheck, ChevronRight, Globe, ImageIcon, Mic, NavNotebook, PaperclipIcon, Plus, SearchIcon, Sparkles, Square, Target, Loader2, Undo2, X, Play, Pause, MessageCircle, BarChart2, Vote, Gamepad2, ClipboardList, NavSlides
 } from './Icons.jsx'
 import TaskCard from './TaskCard.jsx'
 import KahootBuilder from './KahootBuilder.jsx'
@@ -15,7 +15,7 @@ import AudioPlayer, { AudioRecordingVisualizer } from './AudioPlayer.jsx'
 import CustomVideoPlayer from './CustomVideoPlayer.jsx'
 import GeniallyEmbedPlayer, { extractGeniallyUrl } from './GeniallyEmbedPlayer.jsx'
 import { DEMO_TTL_MS, saveDemoSandboxItem } from '../utils/demoData.js'
-import { getItemTeacherId } from '../utils/helpers.js'
+import { getItemTeacherId, getTeacherDisplayName } from '../utils/helpers.js'
 import { createDefaultKahootQuestion, validateKahootConfig, generateKahootPin } from '../utils/kahootEngine.js'
 
 const TasksTab = React.memo(({
@@ -27,13 +27,16 @@ const TasksTab = React.memo(({
     prevTaskTitle, setPrevTaskTitle, prevTaskDesc, setPrevTaskDesc, hasAiModified,
     setHasAiModified, callGemini, showMessage, handleAiTranslate, taskDate, setTaskDate,
     taskTime, setTaskTime, allowLate, setAllowLate, db, appId, loggedInName, getToday,
-    tasks, setTasks, isDemoMode = false, user, isDarkMode, confirmAction, setFullScreenImage, handleOpenProfileByName,
+    tasks, setTasks, isDemoMode = false, user, isDarkMode, themeMode = 'light', confirmAction, setFullScreenImage, handleOpenProfileByName,
     academicGroups, myChatId, userMappings, tasksLoading, taskLimit, loadMoreTasks, pinnedTasks,
     filterType, setFilterType, selectedGroupFilter, setSelectedGroupFilter, onTogglePin,
     taskSortOrder, setTaskSortOrder, wallSearchTerm: propWallSearchTerm, setWallSearchTerm: propSetWallSearchTerm,
     isFormExpanded: propIsFormExpanded, setIsFormExpanded: propSetIsFormExpanded,
     postTargetGroup: propPostTargetGroup, setPostTargetGroup: propSetPostTargetGroup,
     fixedTargetGroup, isGroupChannelMode = false,
+    evaluations = [], grades = [], reviews = [],
+    onStartEvaluation, onOpenEvaluationResults, onOpenImmediateFeedback,
+    onRetryDemoEvaluation, onOpenEvaluationsTab, onOpenReviewsTab
 }) => {
 
     // ESTADOS DEL MENÚ LIQUID GLASS
@@ -136,7 +139,7 @@ const TasksTab = React.memo(({
     // 2. Comprobar si el estudiante pertenece a un grupo académico
     const isStudentInGroup = React.useCallback((group) => {
         if (!group) return false;
-        if (String(group.id || '').startsWith('demo_')) return true;
+        if (isDemoMode || String(group.id || '').startsWith('demo_') || String(group.id || '').startsWith('demo-')) return true;
         if (!group.members) return false;
         const membersList = Array.isArray(group.members)
             ? group.members
@@ -147,7 +150,7 @@ const TasksTab = React.memo(({
             const cleanM = String(m).toLowerCase().replace('@', '').trim();
             return cleanM && studentIdentifiers.has(cleanM);
         });
-    }, [studentIdentifiers]);
+    }, [studentIdentifiers, isDemoMode]);
 
     // 3. Materias / grupos en los que está inscrito el estudiante
     const myEnrolledGroups = React.useMemo(() => {
@@ -158,8 +161,15 @@ const TasksTab = React.memo(({
     // 4. Verificador estricto de visibilidad de publicaciones y tareas
     const isTaskVisibleForUser = React.useCallback((t) => {
         if (!t) return false;
-        const isDemoTask = Boolean(isDemoMode || t.isDemoCreated || String(t.id || '').startsWith('demo-') || String(t.id || '').startsWith('demo_'));
-        if (!fixedTargetGroup && String(t.id || '').startsWith('demo-')) return true;
+        const isDemoTask = Boolean(
+            isDemoMode ||
+            t.isDemoCreated ||
+            String(t.id || '').startsWith('demo-') ||
+            String(t.id || '').startsWith('demo_') ||
+            String(t.evaluationId || '').startsWith('demo') ||
+            String(t.reviewId || '').startsWith('demo')
+        );
+        if (!fixedTargetGroup && (isDemoTask || String(t.id || '').startsWith('demo-'))) return true;
 
         const taskTeacherId = getItemTeacherId(t);
 
@@ -268,7 +278,7 @@ const TasksTab = React.memo(({
             return myEnrolledGroups.some(g => getItemTeacherId(g) === taskTeacherId);
         }
         return taskTeacherId === 'teacher';
-    }, [role, fixedTargetGroup, academicGroups, myEnrolledGroups]);
+    }, [role, fixedTargetGroup, academicGroups, myEnrolledGroups, isDemoMode]);
 
     // Deduplicación estricta por ID y huella de contenido para evitar duplicados en el feed
     const deduplicateTasks = React.useCallback((list) => {
@@ -306,15 +316,164 @@ const TasksTab = React.memo(({
         return result;
     }, []);
 
+    // Combinar publicaciones del muro con evaluaciones activas y presentaciones de diapositivas
+    const combinedTasks = React.useMemo(() => {
+        const getTs = (item) => {
+            if (!item) return 0;
+            if (typeof item.createdAt === 'number') return item.createdAt;
+            if (item.createdAt?.toMillis) return item.createdAt.toMillis();
+            if (item.createdAt?.seconds) return item.createdAt.seconds * 1000;
+            if (typeof item.createdAt === 'string') {
+                const p = new Date(item.createdAt).getTime();
+                return isNaN(p) ? 0 : p;
+            }
+            return 0;
+        };
+
+        const evalMap = new Map((evaluations || []).filter(Boolean).map(ev => [String(ev.id), ev]));
+        const reviewMap = new Map((reviews || []).filter(Boolean).map(rv => [String(rv.id), rv]));
+
+        // Registrar IDs ya presentes en tasks o pinnedTasks (incluso si fueron ocultados del muro con isDeletedFromWall)
+        const existingEvalIds = new Set();
+        const existingReviewIds = new Set();
+        [...(tasks || []), ...(pinnedTasks || [])].forEach(t => {
+            if (!t) return;
+            if (t.evaluationId) existingEvalIds.add(String(t.evaluationId));
+            if (String(t.id || '').startsWith('eval_wall_')) existingEvalIds.add(String(t.id).replace(/^eval_wall_/, ''));
+            if (t.reviewId) existingReviewIds.add(String(t.reviewId));
+            if (String(t.id || '').startsWith('rev_wall_')) existingReviewIds.add(String(t.id).replace(/^rev_wall_/, ''));
+        });
+
+        const baseList = (tasks || []).filter(t => {
+            if (!t || t.isDeletedFromWall || t.isArchived) return false;
+            if (t.type === 'evaluation' || t.evaluationId) {
+                const evId = String(t.evaluationId || '').trim();
+                if (evId && evalMap.has(evId)) {
+                    const linkedEv = evalMap.get(evId);
+                    if (linkedEv?.isArchived) return false;
+                } else if (evId && Array.isArray(evaluations) && String(t.id || '').startsWith('eval_wall_')) {
+                    return false;
+                }
+            }
+            if (t.type === 'slides' || t.type === 'review' || t.reviewId) {
+                const revId = String(t.reviewId || '').trim();
+                if (revId && Array.isArray(reviews) && !reviewMap.has(revId) && String(t.id || '').startsWith('rev_wall_')) {
+                    return false;
+                }
+            }
+            return true;
+        });
+
+        const synthesized = [];
+
+        (evaluations || []).forEach(ev => {
+            if (!ev || !ev.id || ev.isArchived) return;
+            if (existingEvalIds.has(String(ev.id))) return;
+            const ownerTid = getItemTeacherId(ev);
+            const teacherDisp = ev.authorName || getTeacherDisplayName(ownerTid);
+            synthesized.push({
+                id: `eval_wall_${ev.id}`,
+                type: 'evaluation',
+                evaluationId: ev.id,
+                title: ev.title || 'Evaluación Académica',
+                description: ev.description || '',
+                dueDate: ev.dueDate || '',
+                dueTime: ev.dueTime || '23:59',
+                timeLimit: ev.timeLimit || 30,
+                strictAntiCheat: Boolean(ev.strictAntiCheat),
+                immediateFeedback: Boolean(ev.immediateFeedback),
+                questionCount: Array.isArray(ev.questions) ? ev.questions.length : 0,
+                targetGroupId: ev.targetGroupId || 'all',
+                targetGroupName: ev.targetGroupName || 'General',
+                author: teacherDisp,
+                authorName: teacherDisp,
+                authorId: ownerTid,
+                authorRole: 'teacher',
+                teacherId: ownerTid,
+                ownerTeacherId: ownerTid,
+                createdAt: ev.createdAt || Date.now(),
+                reactions: {},
+                comments: [],
+                isDemoCreated: Boolean(ev.isDemoCreated),
+                isSynthesizedFeedItem: true
+            });
+        });
+
+        (reviews || []).forEach(rev => {
+            if (!rev || !rev.id) return;
+            if (existingReviewIds.has(String(rev.id))) return;
+            const ownerTid = getItemTeacherId(rev);
+            const teacherDisp = rev.author || getTeacherDisplayName(ownerTid);
+            const firstSlide = Array.isArray(rev.slides) && rev.slides.length > 0 ? rev.slides[0] : {};
+            const rawSub = String(firstSlide.subtitle || firstSlide.description || '').trim();
+            const isPlaceholderSub = !rawSub ||
+                /^subt[íi]tulo de la presentaci[óo]n$/i.test(rawSub) ||
+                /^haz clic para a[ñn]adir/i.test(rawSub) ||
+                /^escribe un subt[íi]tulo/i.test(rawSub) ||
+                /^a[ñn]ade una descripci[óo]n/i.test(rawSub);
+            const slideCountNum = Array.isArray(rev.slides) ? rev.slides.length : (Number(rev.slideCount) || 0);
+            const cleanSlideDesc = isPlaceholderSub
+                ? `Presentación interactiva de ${slideCountNum} diapositivas (${rev.language || 'Inglés'}).`
+                : rawSub;
+            synthesized.push({
+                id: `rev_wall_${rev.id}`,
+                type: 'slides',
+                reviewId: rev.id,
+                title: rev.topic || firstSlide.title || 'Presentación de Diapositivas',
+                description: cleanSlideDesc,
+                slideCount: slideCountNum,
+                language: rev.language || 'Inglés',
+                theme: rev.theme || 'unipamplona',
+                targetGroupId: rev.targetGroupId || 'all',
+                targetGroupName: rev.targetGroupName || 'General',
+                author: teacherDisp,
+                authorName: teacherDisp,
+                authorId: ownerTid,
+                authorRole: 'teacher',
+                teacherId: ownerTid,
+                ownerTeacherId: ownerTid,
+                createdAt: rev.createdAt || Date.now(),
+                reactions: {},
+                comments: [],
+                isDemoCreated: Boolean(rev.isDemoCreated),
+                isSynthesizedFeedItem: true
+            });
+        });
+
+        const merged = [...baseList, ...synthesized];
+        merged.sort((a, b) => getTs(b) - getTs(a));
+        return merged;
+    }, [tasks, pinnedTasks, evaluations, reviews]);
+
     // Publicaciones regulares filtradas y deduplicadas
     const visibleTasks = React.useMemo(() => {
-        return deduplicateTasks((tasks || []).filter(isTaskVisibleForUser));
-    }, [tasks, isTaskVisibleForUser, deduplicateTasks]);
+        return deduplicateTasks((combinedTasks || []).filter(isTaskVisibleForUser));
+    }, [combinedTasks, isTaskVisibleForUser, deduplicateTasks]);
 
     // Publicaciones fijadas (Pinned Posts) con el MISMO filtro estricto y deduplicadas
     const visiblePinnedTasks = React.useMemo(() => {
-        return deduplicateTasks((pinnedTasks || []).filter(isTaskVisibleForUser));
-    }, [pinnedTasks, isTaskVisibleForUser, deduplicateTasks]);
+        const evalMap = new Map((evaluations || []).filter(Boolean).map(ev => [String(ev.id), ev]));
+        const reviewMap = new Map((reviews || []).filter(Boolean).map(rv => [String(rv.id), rv]));
+        const tasksById = new Map((tasks || []).filter(Boolean).map(t => [String(t.id), t]));
+        const combinedPinned = (combinedTasks || []).filter(t => t && t.isPinned);
+        const rawCandidates = [...combinedPinned, ...(pinnedTasks || [])];
+        const validPinned = rawCandidates.filter(t => {
+            if (!t || t.isDeletedFromWall || t.isArchived) return false;
+            const stateTask = tasksById.get(String(t.id));
+            if (stateTask && (stateTask.isPinned === false || stateTask.isDeletedFromWall || stateTask.isArchived)) return false;
+            if (t.type === 'evaluation' || t.evaluationId) {
+                const evId = String(t.evaluationId || '').trim();
+                if (evId && evalMap.has(evId) && evalMap.get(evId)?.isArchived) return false;
+                if (evId && Array.isArray(evaluations) && !evalMap.has(evId) && String(t.id || '').startsWith('eval_wall_')) return false;
+            }
+            if (t.type === 'slides' || t.type === 'review' || t.reviewId) {
+                const revId = String(t.reviewId || '').trim();
+                if (revId && Array.isArray(reviews) && !reviewMap.has(revId) && String(t.id || '').startsWith('rev_wall_')) return false;
+            }
+            return isTaskVisibleForUser(t);
+        });
+        return deduplicateTasks(validPinned);
+    }, [combinedTasks, tasks, pinnedTasks, evaluations, reviews, isTaskVisibleForUser, deduplicateTasks]);
 
     // Buscador de publicaciones
     const filteredTasks = React.useMemo(() => {
@@ -348,6 +507,7 @@ const TasksTab = React.memo(({
     }, [filteredTasks, visiblePinnedTasks]);
 
     const teacherPic = userMappings?.[myChatId]?.profilePicUrl;
+    const activeComposerGroupObj = (academicGroups || []).find(g => String(g?.id || '').replace(/^acad_/i, '').toLowerCase() === String((fixedTargetGroup || postTargetGroup || '')).replace(/^acad_/i, '').toLowerCase());
 
     return (
         <div className="space-y-4">
@@ -417,6 +577,37 @@ const TasksTab = React.memo(({
                                 >
                                     <Gamepad2 size={15} /> Kahoot
                                 </button>
+                                {typeof onOpenEvaluationsTab === 'function' && (
+                                    <button 
+                                        type="button" 
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onOpenEvaluationsTab(
+                                                activeComposerGroupObj?.id || fixedTargetGroup || 'all',
+                                                activeComposerGroupObj?.name || 'Todos los estudiantes (Global)'
+                                            );
+                                        }} 
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-950/60 transition-colors shrink-0 whitespace-nowrap"
+                                    >
+                                        <ClipboardList size={15} /> Evaluación
+                                    </button>
+                                )}
+                                {typeof onOpenReviewsTab === 'function' && (
+                                    <button 
+                                        type="button" 
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onOpenReviewsTab({
+                                                openCreate: true,
+                                                targetGroupId: activeComposerGroupObj?.id || fixedTargetGroup || 'all',
+                                                targetGroupName: activeComposerGroupObj?.name || 'Todos los estudiantes (Global)'
+                                            });
+                                        }} 
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-950/60 transition-colors shrink-0 whitespace-nowrap"
+                                    >
+                                        <NavSlides size={15} /> Diapositivas
+                                    </button>
+                                )}
                                 <button 
                                     type="button" 
                                     onClick={(e) => { e.stopPropagation(); setIsFormExpanded(true); setShowPostAttachmentMenu(true); }} 
@@ -493,6 +684,31 @@ const TasksTab = React.memo(({
                                     >
                                         <Gamepad2 size={14} /> Kahoot
                                     </button>
+                                    {typeof onOpenEvaluationsTab === 'function' && (
+                                        <button 
+                                            type="button" 
+                                            onClick={() => onOpenEvaluationsTab(
+                                                activeComposerGroupObj?.id || fixedTargetGroup || 'all',
+                                                activeComposerGroupObj?.name || 'Todos los estudiantes (Global)'
+                                            )} 
+                                            className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 text-rose-600 dark:text-rose-400 hover:bg-white dark:hover:bg-gray-900"
+                                        >
+                                            <ClipboardList size={14} /> Evaluación
+                                        </button>
+                                    )}
+                                    {typeof onOpenReviewsTab === 'function' && (
+                                        <button 
+                                            type="button" 
+                                            onClick={() => onOpenReviewsTab({
+                                                openCreate: true,
+                                                targetGroupId: activeComposerGroupObj?.id || fixedTargetGroup || 'all',
+                                                targetGroupName: activeComposerGroupObj?.name || 'Todos los estudiantes (Global)'
+                                            })} 
+                                            className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 text-amber-700 dark:text-amber-300 hover:bg-white dark:hover:bg-gray-900"
+                                        >
+                                            <NavSlides size={14} /> Diapositivas
+                                        </button>
+                                    )}
                                 </div>
                                 
                                 <button 
@@ -1351,10 +1567,20 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                 loggedInName={loggedInName} 
                                 myChatId={myChatId}
                                 isDarkMode={isDarkMode} 
+                                themeMode={themeMode}
                                 confirmAction={confirmAction} 
                                 handleOpenProfileByName={handleOpenProfileByName} 
                                 setFullScreenImage={setFullScreenImage} 
                                 userMappings={userMappings} 
+                                evaluations={evaluations}
+                                grades={grades}
+                                reviews={reviews}
+                                onStartEvaluation={onStartEvaluation}
+                                onOpenEvaluationResults={onOpenEvaluationResults}
+                                onOpenImmediateFeedback={onOpenImmediateFeedback}
+                                onRetryDemoEvaluation={onRetryDemoEvaluation}
+                                onOpenEvaluationsTab={onOpenEvaluationsTab}
+                                onOpenReviewsTab={onOpenReviewsTab}
                             />
                         </div>
                     ))}
@@ -1381,10 +1607,20 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                             loggedInName={loggedInName} 
                             myChatId={myChatId}
                             isDarkMode={isDarkMode} 
+                            themeMode={themeMode}
                             confirmAction={confirmAction} 
                             handleOpenProfileByName={handleOpenProfileByName} 
                             setFullScreenImage={setFullScreenImage} 
                             userMappings={userMappings} 
+                            evaluations={evaluations}
+                            grades={grades}
+                            reviews={reviews}
+                            onStartEvaluation={onStartEvaluation}
+                            onOpenEvaluationResults={onOpenEvaluationResults}
+                            onOpenImmediateFeedback={onOpenImmediateFeedback}
+                            onRetryDemoEvaluation={onRetryDemoEvaluation}
+                            onOpenEvaluationsTab={onOpenEvaluationsTab}
+                            onOpenReviewsTab={onOpenReviewsTab}
                         />
                     </div>
                 ))}

@@ -753,6 +753,7 @@ function App() {
   const chatSoundIndexRef = useRef(chatSoundIndex);
   const pushEnabledRef = useRef(pushEnabled);
   const [isChatMinimized, setIsChatMinimized] = useState(false);
+  const [pendingStudioReview, setPendingStudioReview] = useState(null);
   const [activeCall, setActiveCall] = useState(null);
   const [incomingCall, setIncomingCall] = useState(null);
   const incomingRingtoneRef = useRef(null);
@@ -992,14 +993,24 @@ function App() {
 
   const pinnedTasks = useMemo(() => {
     if (isDemoMode) {
-      return (rawTasks || []).filter(t => t && t.isPinned);
+      return (rawTasks || []).filter(t => t && t.isPinned && !t.isDeletedFromWall && !t.isArchived);
     }
-    const list = rawPinnedTasks || [];
+    const localPinned = (rawTasks || []).filter(t => t && t.isPinned && !t.isDeletedFromWall && !t.isArchived);
+    const localById = new Map((rawTasks || []).filter(Boolean).map(t => [String(t.id), t]));
+    const mergedMap = new Map();
+    localPinned.forEach(t => mergedMap.set(String(t.id), t));
+    (rawPinnedTasks || []).forEach(t => {
+      if (!t || t.isDeletedFromWall || t.isArchived) return;
+      const inLocal = localById.get(String(t.id));
+      if (inLocal && (!inLocal.isPinned || inLocal.isDeletedFromWall || inLocal.isArchived)) return;
+      if (!mergedMap.has(String(t.id))) mergedMap.set(String(t.id), t);
+    });
+    const list = Array.from(mergedMap.values());
     if (role === 'teacher') {
-      return list.filter(t => String(t?.id || '').startsWith('demo') || getItemTeacherId(t) === currentTeacherId);
+      return list.filter(t => String(t?.id || '').startsWith('demo') || Boolean(t?.isDemoCreated) || getItemTeacherId(t) === currentTeacherId);
     }
     return list.filter(t => {
-      if (String(t?.id || '').startsWith('demo')) return true;
+      if (String(t?.id || '').startsWith('demo') || Boolean(t?.isDemoCreated)) return true;
       const rawGrp = String(t.targetGroupId || t.groupId || t.academicGroupId || t.targetGroup || '').trim().toLowerCase();
       const isGlobal = !rawGrp || rawGrp === 'all' || rawGrp === 'global' || rawGrp === 'todos';
       return isGlobal ? matchesStudentTeacher(t) : true;
@@ -1239,7 +1250,7 @@ function App() {
   };
 
   const isTaskForGroup = (t, groupId) => {
-    if (!t || !groupId) return false;
+    if (!t || !groupId || t.isDeletedFromWall || t.isArchived) return false;
     const cleanGId = String(groupId).trim().replace(/^acad_/i, '').toLowerCase();
     if (!cleanGId) return false;
 
@@ -1947,22 +1958,35 @@ function App() {
   };
 
   const toggleArchiveEvaluation = async (evalId, currentIsArchived) => {
+    const nextArchived = !currentIsArchived;
+    const wallTaskId = `eval_wall_${evalId}`;
+    const wallPatch = nextArchived
+      ? { isArchived: true, isPinned: false }
+      : { isArchived: false, isDeletedFromWall: false };
     if (isDemoMode || String(evalId).startsWith('demo')) {
       setEvaluations(prev => {
-        const next = prev.map(e => e.id === evalId ? { ...e, isArchived: !currentIsArchived } : e);
+        const next = prev.map(e => e.id === evalId ? { ...e, isArchived: nextArchived } : e);
         const updated = next.find(e => e.id === evalId);
         if (updated) saveDemoSandboxItem('evaluations', updated);
         return next;
       });
-      showMessage(!currentIsArchived ? "Evaluación archivada en Modo Demo." : "Evaluación desarchivada en Modo Demo.");
+      setTasks(prev => {
+        const next = (prev || []).map(t => (String(t.id) === wallTaskId || String(t.evaluationId) === String(evalId)) ? { ...t, ...wallPatch } : t);
+        const updatedWall = next.find(t => String(t.id) === wallTaskId || String(t.evaluationId) === String(evalId));
+        if (updatedWall) saveDemoSandboxItem('tasks', updatedWall);
+        return next;
+      });
+      showMessage(nextArchived ? "Evaluación archivada en Modo Demo." : "Evaluación desarchivada en Modo Demo.");
       return;
     }
     try {
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'evaluations', evalId), {
-        isArchived: !currentIsArchived
+        isArchived: nextArchived
       });
-      setEvaluations(prev => prev.map(e => e.id === evalId ? { ...e, isArchived: !currentIsArchived } : e));
-      showMessage(!currentIsArchived ? "Evaluación archivada correctamente." : "Evaluación desarchivada y activa.");
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', wallTaskId), wallPatch, { merge: true }).catch(() => {});
+      setEvaluations(prev => prev.map(e => e.id === evalId ? { ...e, isArchived: nextArchived } : e));
+      setTasks(prev => (prev || []).map(t => (String(t.id) === wallTaskId || String(t.evaluationId) === String(evalId)) ? { ...t, ...wallPatch } : t));
+      showMessage(nextArchived ? "Evaluación archivada correctamente." : "Evaluación desarchivada y activa.");
     } catch (err) {
       console.error(err);
       showMessage("Error al cambiar estado de archivado.");
@@ -3678,13 +3702,14 @@ useEffect(() => {
     return () => uUserPosts();
 }, [hasEntered, myChatId, activeTab, isDemoMode]);
 
-// 4. PESTAÑA: REPASOS (Diapositivas)
+// 4. PESTAÑA: REPASOS (Diapositivas) Y MURO
+const needsReviewsSubscription = activeTab === 'reviews' || activeTab === 'tasks' || activeTab === 'groups';
 useEffect(() => {
-    if (!hasEntered || !myChatId || isDemoMode || activeTab !== 'reviews') return;
-    const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'reviews'), orderBy('createdAt', 'desc'), limit(15));
+    if (!hasEntered || !myChatId || isDemoMode || !needsReviewsSubscription) return;
+    const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'reviews'), orderBy('createdAt', 'desc'), limit(50));
     const uReviews = onSnapshot(q, s => setReviews(s.docs.map(d => ({ id: d.id, ...d.data() }))), err => console.error(err));
     return () => uReviews();
-}, [hasEntered, myChatId, activeTab, isDemoMode]);
+}, [hasEntered, myChatId, needsReviewsSubscription, isDemoMode]);
 
 // 5. PESTAÑA: SYLLABUS
 useEffect(() => {
@@ -3693,13 +3718,14 @@ useEffect(() => {
     return () => uSyllabus();
 }, [hasEntered, myChatId, activeTab, isDemoMode]);
 
-// 6. PESTAÑA: EVALUACIONES Y NOTAS
+// 6. PESTAÑA: EVALUACIONES, NOTAS Y MURO
+const needsEvaluationsSubscription = activeTab === 'evaluations' || activeTab === 'tasks' || activeTab === 'groups';
 useEffect(() => {
-    if (!hasEntered || !myChatId || isDemoMode || activeTab !== 'evaluations') return;
+    if (!hasEntered || !myChatId || isDemoMode || !needsEvaluationsSubscription) return;
     const uEvals = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'evaluations'), limit(100)), s => setEvaluations(s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))), err => console.error(err));
     const uGrades = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'grades'), limit(500)), s => setGrades(s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.submittedAt || b.createdAt || 0) - (a.submittedAt || a.createdAt || 0))), err => console.error(err));
     return () => { uEvals(); uGrades(); };
-}, [hasEntered, myChatId, activeTab, isDemoMode]);
+}, [hasEntered, myChatId, needsEvaluationsSubscription, isDemoMode]);
 
 // 7. PESTAÑA: BUZÓN (Solo para la profesora)
 useEffect(() => {
@@ -5454,11 +5480,42 @@ useEffect(() => {
                       ...(isDemoMode ? { isDemoCreated: true, expiresAt: now + DEMO_TTL_MS } : {})
                   };
 
+                  const buildEvalWallTask = (evalId) => ({
+                      id: `eval_wall_${evalId}`,
+                      type: 'evaluation',
+                      evaluationId: evalId,
+                      title: newEval.title,
+                      description: newEval.description || `Evaluación de ${(newEval.questions || []).length} preguntas (${parsedTimeLimit} min).`,
+                      dueDate: newEval.dueDate,
+                      dueTime: newEval.dueTime || '23:59',
+                      timeLimit: parsedTimeLimit,
+                      strictAntiCheat: Boolean(newEval.strictAntiCheat),
+                      immediateFeedback: Boolean(newEval.immediateFeedback),
+                      questionCount: (newEval.questions || []).length,
+                      targetGroupId: newEval.targetGroupId || 'all',
+                      targetGroupName: newEval.targetGroupName || 'Todos los estudiantes (Global)',
+                      author: myDisplayName,
+                      authorName: myDisplayName,
+                      authorId: myChatId,
+                      authorRole: 'teacher',
+                      teacherId: myChatId,
+                      ownerTeacherId: myChatId,
+                      createdAt: now,
+                      reactions: {},
+                      comments: [],
+                      ...(isDemoMode ? { isDemoCreated: true, expiresAt: now + DEMO_TTL_MS } : {})
+                  });
+
                   if (isDemoMode) {
                       const createdId = `demo_eval_${now}`;
                       const createdEval = { id: createdId, ...newEval };
                       saveDemoSandboxItem('evaluations', createdEval);
                       setEvaluations(prev => [createdEval, ...prev.filter(ev => ev.id !== createdId)]);
+
+                      const wallTask = buildEvalWallTask(createdId);
+                      saveDemoSandboxItem('tasks', wallTask);
+                      setTasks(prev => [wallTask, ...(prev || []).filter(t => String(t.id) !== String(wallTask.id) && String(t.evaluationId) !== String(createdId))]);
+
                       setIsCreatingEval(false);
                       setEvalTabFilter('active');
                       setEvalFormData({
@@ -5473,12 +5530,21 @@ useEffect(() => {
                           targetGroupName: "Todos los estudiantes (Global)",
                           questions: [{ type: 'multiple', text: '', options: [{text: '', isCorrect: false}, {text: '', isCorrect: false}], correctAnswer: '' }]
                       });
-                      showMessage("Evaluación creada en Modo Demo.");
+                      showMessage("Evaluación creada y publicada en el muro (Modo Demo).");
                       return;
                   }
 
                   const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'evaluations'), newEval);
                   setEvaluations(prev => [{ id: docRef.id, ...newEval }, ...prev]);
+
+                  try {
+                      const wallTask = buildEvalWallTask(docRef.id);
+                      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', wallTask.id), wallTask);
+                      setTasks(prev => [wallTask, ...(prev || []).filter(t => String(t.id) !== String(wallTask.id) && String(t.evaluationId) !== String(docRef.id))]);
+                  } catch (wallErr) {
+                      console.error("Error al publicar evaluación en el muro:", wallErr);
+                  }
+
                   setIsCreatingEval(false);
                   setEvalTabFilter('active');
                   setEvalFormData({
@@ -5493,7 +5559,7 @@ useEffect(() => {
                       targetGroupName: "Todos los estudiantes (Global)",
                       questions: [{ type: 'multiple', text: '', options: [{text: '', isCorrect: false}, {text: '', isCorrect: false}], correctAnswer: '' }]
                   });
-                  showMessage("Evaluación creada exitosamente.");
+                  showMessage("Evaluación creada y publicada exitosamente.");
               } catch (err) {
                   console.error(err);
                   showMessage("Error al crear la evaluación. Intenta de nuevo.");
@@ -6309,6 +6375,8 @@ useEffect(() => {
               redButton={redButton}
               reviews={reviews}
               setReviews={setReviews}
+              tasks={tasks}
+              setTasks={setTasks}
               isDemoMode={isDemoMode}
               db={db}
               appId={appId}
@@ -6319,6 +6387,8 @@ useEffect(() => {
               showMessage={showMessage}
               confirmAction={confirmAction}
               callGemini={callGemini}
+              initialEditingPresentation={pendingStudioReview}
+              onClearInitialEditingPresentation={() => setPendingStudioReview(null)}
             />
             </React.Suspense>
           );
@@ -9085,12 +9155,71 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                             prevTaskDesc={prevTaskDesc} setPrevTaskDesc={setPrevTaskDesc} hasAiModified={hasAiModified} setHasAiModified={setHasAiModified}
                             callGemini={callGemini} showMessage={showMessage} handleAiTranslate={handleAiTranslate} taskDate={taskDate}
                             setTaskDate={setTaskDate} taskTime={taskTime} setTaskTime={setTaskTime} allowLate={allowLate} setAllowLate={setAllowLate}
-                            db={db} appId={appId} loggedInName={loggedInName} getToday={getToday} tasks={tasks} setTasks={setTasks} isDemoMode={isDemoMode} user={user} isDarkMode={isDarkMode}
+                            db={db} appId={appId} loggedInName={loggedInName} getToday={getToday} tasks={tasks} setTasks={setTasks} isDemoMode={isDemoMode} user={user} isDarkMode={isDarkMode} themeMode={themeMode}
                             confirmAction={confirmAction} setFullScreenImage={setFullScreenImage} tasksLoading={tasksLoading} taskLimit={taskLimit} loadMoreTasks={loadMoreTasks} pinnedTasks={pinnedTasks}
                             wallSearchTerm={wallSearchTerm} setWallSearchTerm={setWallSearchTerm}
                             fixedTargetGroup={selectedGroupForFeed.id}
                             postTargetGroup={postTargetGroup} setPostTargetGroup={setPostTargetGroup}
                             isFormExpanded={isFormExpanded} setIsFormExpanded={setIsFormExpanded}
+                            evaluations={evaluations}
+                            grades={grades}
+                            reviews={reviews}
+                            onStartEvaluation={(ev) => {
+                                if (!ev) return;
+                                const safeMinutes = Math.max(1, parseInt(ev.timeLimit, 10) || 30);
+                                const confirmMsg = ev.strictAntiCheat
+                                    ? `Esta prueba cuenta con Modo Anti-trampas activo. Tienes ${safeMinutes} minutos para completarla. Por seguridad académica, no debes cambiar de pestaña, salir de la app ni abrir otras ventanas, o la prueba se anulará automáticamente con nota 0.0.`
+                                    : `Tienes ${safeMinutes} minutos para completar la prueba sin pausas.`;
+                                confirmAction(confirmMsg, () => {
+                                    setIsCreatingEval(false);
+                                    setViewingResultsFor(null);
+                                    setActiveImmediateFeedback(null);
+                                    setActiveTakingEval(ev);
+                                    setTimeRemaining(safeMinutes * 60);
+                                    setStudentAnswers({});
+                                    changeTab('evaluations');
+                                }, "Empezar", false, "¿Empezar prueba?");
+                            }}
+                            onOpenEvaluationResults={(ev) => {
+                                if (!ev) return;
+                                setIsCreatingEval(false);
+                                setActiveImmediateFeedback(null);
+                                setViewingResultsFor(ev);
+                                changeTab('evaluations');
+                            }}
+                            onOpenImmediateFeedback={(ev, grade) => {
+                                if (!ev) return;
+                                setIsCreatingEval(false);
+                                setViewingResultsFor(null);
+                                setActiveImmediateFeedback({ evaluacion: ev, grade });
+                                changeTab('evaluations');
+                            }}
+                            onRetryDemoEvaluation={(ev) => {
+                                if (!ev || !isDemoMode) return;
+                                grades.filter(g => g.evaluationId === ev.id).forEach(g => removeDemoSandboxItem('grades', g.id));
+                                setGrades(prev => prev.filter(g => g.evaluationId !== ev.id));
+                            }}
+                            onOpenEvaluationsTab={(targetGrpId, targetGrpName) => {
+                                setViewingResultsFor(null);
+                                setActiveImmediateFeedback(null);
+                                if (targetGrpId) {
+                                    setEvalFormData(prev => ({
+                                        ...prev,
+                                        targetGroupId: targetGrpId,
+                                        targetGroupName: targetGrpName || (targetGrpId === 'all' ? 'Todos los estudiantes (Global)' : 'Grupo')
+                                    }));
+                                    setIsCreatingEval(true);
+                                } else {
+                                    setIsCreatingEval(false);
+                                }
+                                changeTab('evaluations');
+                            }}
+                            onOpenReviewsTab={(rev) => {
+                                if (rev && (Array.isArray(rev.slides) || rev.openCreate)) {
+                                    setPendingStudioReview(rev);
+                                }
+                                changeTab('reviews');
+                            }}
                         />
                     </React.Suspense>
                 </div>
@@ -11154,11 +11283,15 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                     <button 
                                                         type="button"
                                                         onClick={() => confirmAction("¿Borrar evaluación? También se borrarán las notas de los estudiantes.", async () => {
+                                                            const wallTaskId = `eval_wall_${ev.id}`;
                                                             if (isDemoMode) {
                                                                 grades.filter(g => g.evaluationId === ev.id).forEach(g => removeDemoSandboxItem('grades', g.id));
                                                                 setEvaluations(prev => prev.filter(e => e.id !== ev.id));
                                                                 setGrades(prev => prev.filter(g => g.evaluationId !== ev.id));
                                                                 removeDemoSandboxItem('evaluations', ev.id);
+                                                                removeDemoSandboxItem('tasks', wallTaskId);
+                                                                (tasks || []).filter(t => String(t.evaluationId) === String(ev.id)).forEach(t => removeDemoSandboxItem('tasks', t.id));
+                                                                setTasks(prev => (prev || []).filter(t => String(t.id) !== wallTaskId && String(t.evaluationId) !== String(ev.id)));
                                                                 if (viewingResultsFor?.id === ev.id) setViewingResultsFor(null);
                                                                 showMessage("Evaluación eliminada del Modo Demo.");
                                                                 return;
@@ -11167,8 +11300,14 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                                 const gradeSnap = await getDocs(query(collection(db, 'artifacts', appId, 'public', 'data', 'grades'), where('evaluationId', '==', ev.id)));
                                                                 await Promise.all(gradeSnap.docs.map(d => deleteDoc(d.ref)));
                                                                 await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'evaluations', ev.id));
+                                                                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', wallTaskId)).catch(() => {});
+                                                                const linkedTasks = (tasks || []).filter(t => String(t.evaluationId) === String(ev.id) && String(t.id) !== wallTaskId);
+                                                                for (const lt of linkedTasks) {
+                                                                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', lt.id)).catch(() => {});
+                                                                }
                                                                 setEvaluations(prev => prev.filter(e => e.id !== ev.id));
                                                                 setGrades(prev => prev.filter(g => g.evaluationId !== ev.id));
+                                                                setTasks(prev => (prev || []).filter(t => String(t.id) !== wallTaskId && String(t.evaluationId) !== String(ev.id)));
                                                                 if (viewingResultsFor?.id === ev.id) setViewingResultsFor(null);
                                                                 showMessage("Evaluación y notas eliminadas.");
                                                             } catch (err) {
@@ -13065,12 +13204,71 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                               prevTaskDesc={prevTaskDesc} setPrevTaskDesc={setPrevTaskDesc} hasAiModified={hasAiModified} setHasAiModified={setHasAiModified}
                               callGemini={callGemini} showMessage={showMessage} handleAiTranslate={handleAiTranslate} taskDate={taskDate}
                               setTaskDate={setTaskDate} taskTime={taskTime} setTaskTime={setTaskTime} allowLate={allowLate} setAllowLate={setAllowLate}
-                              db={db} appId={appId} loggedInName={loggedInName} getToday={getToday} tasks={tasks} setTasks={setTasks} user={user} isDarkMode={isDarkMode}
+                              db={db} appId={appId} loggedInName={loggedInName} getToday={getToday} tasks={tasks} setTasks={setTasks} user={user} isDarkMode={isDarkMode} themeMode={themeMode}
                               confirmAction={confirmAction} setFullScreenImage={setFullScreenImage} tasksLoading={tasksLoading} taskLimit={taskLimit} loadMoreTasks={loadMoreTasks} pinnedTasks={pinnedTasks}
                               wallSearchTerm={wallSearchTerm} setWallSearchTerm={setWallSearchTerm}
                               postTargetGroup={postTargetGroup} setPostTargetGroup={setPostTargetGroup}
                               isFormExpanded={isFormExpanded} setIsFormExpanded={setIsFormExpanded}
                               isDemoMode={isDemoMode}
+                              evaluations={evaluations}
+                              grades={grades}
+                              reviews={reviews}
+                              onStartEvaluation={(ev) => {
+                                  if (!ev) return;
+                                  const safeMinutes = Math.max(1, parseInt(ev.timeLimit, 10) || 30);
+                                  const confirmMsg = ev.strictAntiCheat
+                                      ? `Esta prueba cuenta con Modo Anti-trampas activo. Tienes ${safeMinutes} minutos para completarla. Por seguridad académica, no debes cambiar de pestaña, salir de la app ni abrir otras ventanas, o la prueba se anulará automáticamente con nota 0.0.`
+                                      : `Tienes ${safeMinutes} minutos para completar la prueba sin pausas.`;
+                                  confirmAction(confirmMsg, () => {
+                                      setIsCreatingEval(false);
+                                      setViewingResultsFor(null);
+                                      setActiveImmediateFeedback(null);
+                                      setActiveTakingEval(ev);
+                                      setTimeRemaining(safeMinutes * 60);
+                                      setStudentAnswers({});
+                                      changeTab('evaluations');
+                                  }, "Empezar", false, "¿Empezar prueba?");
+                              }}
+                              onOpenEvaluationResults={(ev) => {
+                                  if (!ev) return;
+                                  setIsCreatingEval(false);
+                                  setActiveImmediateFeedback(null);
+                                  setViewingResultsFor(ev);
+                                  changeTab('evaluations');
+                              }}
+                              onOpenImmediateFeedback={(ev, grade) => {
+                                  if (!ev) return;
+                                  setIsCreatingEval(false);
+                                  setViewingResultsFor(null);
+                                  setActiveImmediateFeedback({ evaluacion: ev, grade });
+                                  changeTab('evaluations');
+                              }}
+                              onRetryDemoEvaluation={(ev) => {
+                                  if (!ev || !isDemoMode) return;
+                                  grades.filter(g => g.evaluationId === ev.id).forEach(g => removeDemoSandboxItem('grades', g.id));
+                                  setGrades(prev => prev.filter(g => g.evaluationId !== ev.id));
+                              }}
+                              onOpenEvaluationsTab={(targetGrpId, targetGrpName) => {
+                                  setViewingResultsFor(null);
+                                  setActiveImmediateFeedback(null);
+                                  if (targetGrpId) {
+                                      setEvalFormData(prev => ({
+                                          ...prev,
+                                          targetGroupId: targetGrpId,
+                                          targetGroupName: targetGrpName || (targetGrpId === 'all' ? 'Todos los estudiantes (Global)' : 'Grupo')
+                                      }));
+                                      setIsCreatingEval(true);
+                                  } else {
+                                      setIsCreatingEval(false);
+                                  }
+                                  changeTab('evaluations');
+                              }}
+                              onOpenReviewsTab={(rev) => {
+                                  if (rev && (Array.isArray(rev.slides) || rev.openCreate)) {
+                                      setPendingStudioReview(rev);
+                                  }
+                                  changeTab('reviews');
+                              }}
                           />
                           </React.Suspense>
                       )}

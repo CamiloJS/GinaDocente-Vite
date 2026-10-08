@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import ReactDOM from 'react-dom'
 import {
-  CheckCheck, CheckCircle2, CheckLine, Clock, Edit3, EyeOff, FileDocIcon, FileText, ImageIcon, Loader2, Lock, Unlock, Share2, MessageSquareText, Mic, PaperclipIcon, Plus, ReplyIcon, Send, SmileIcon, Square, Star, Pin, Trash2, Upload, X, XLine, Volume2, VolumeX, Languages, UserIcon, BookOpen, NavNotebook, Play, Pause, Download, MessageCircle, BarChart2, Vote, Gamepad2, Trophy, Zap, Flame
+  CheckCheck, CheckCircle2, CheckLine, Clock, Edit3, EyeOff, FileDocIcon, FileText, ImageIcon, Loader2, Lock, Unlock, Share2, MessageSquareText, Mic, PaperclipIcon, Plus, ReplyIcon, Send, SmileIcon, Square, Star, Pin, Trash2, Upload, X, XLine, Volume2, VolumeX, Languages, UserIcon, BookOpen, NavNotebook, Play, Pause, Download, MessageCircle, BarChart2, Vote, Gamepad2, Trophy, Zap, Flame, NavSlides, ClipboardList, Shield, ShieldAlert, AlertTriangle, ChevronLeft, ChevronRight, Maximize2, Layers, MonitorPlay, Globe, Sparkles, RotateCcw, Eye
 } from './Icons.jsx'
 import {
   compressImage, containsBadWords, checkBadWordsAsync, uploadImageToStorage, uploadRawFileToStorage, TEACHER_NAME, SECOND_TEACHER_NAME, SECOND_TEACHER_ID, isCamiloTeacher, isTeacherId, getCanonicalTeacherId, getTeacherDisplayName, getItemTeacherId, COMMENT_EMOJIS, REACTION_EMOJIS, splitNameFirstAndLast, FALLBACK_MAP, format12HourTime, formatDateTime12H
@@ -20,13 +20,42 @@ import GeniallyEmbedPlayer, { extractGeniallyUrl } from './GeniallyEmbedPlayer.j
 import KahootLiveModal from './KahootLiveModal.jsx'
 import KahootBuilder from './KahootBuilder.jsx'
 import { validateKahootConfig, buildKahootLeaderboard, reconcileKahootParticipantsAfterEdit, canAccessKahootReview, buildPublicKahootUrl } from '../utils/kahootEngine.js'
+import { SlideCanvasSurface, SlidePresenterViewer, exportReviewToPresentation } from './ReviewsModule.jsx'
 import { useVoiceRecorder } from '../utils/useVoiceRecorder.js'
 import { auth, signInAnonymously, doc, setDoc, updateDoc, deleteDoc } from '../firebase/config.js'
 import { runTransaction } from 'firebase/firestore'
 import AudioPlayer, { AudioRecordingVisualizer } from './AudioPlayer.jsx'
 import { saveDemoSandboxItem, removeDemoSandboxItem } from '../utils/demoData.js'
 
-const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, appId, academicGroups, glassInput: propGlassInput, callGemini, currentUser, showMessage, loggedInName, myChatId, isDarkMode, confirmAction, handleOpenProfileByName, userMappings }) => {
+const TaskCard = React.memo(({
+    task,
+    role,
+    isDemoMode = false,
+    setTasks,
+    db,
+    appId,
+    academicGroups,
+    glassInput: propGlassInput,
+    callGemini,
+    currentUser,
+    showMessage,
+    loggedInName,
+    myChatId,
+    isDarkMode,
+    themeMode = 'light',
+    confirmAction,
+    handleOpenProfileByName,
+    userMappings,
+    evaluations = [],
+    grades = [],
+    reviews = [],
+    onStartEvaluation,
+    onOpenEvaluationResults,
+    onOpenImmediateFeedback,
+    onRetryDemoEvaluation,
+    onOpenEvaluationsTab,
+    onOpenReviewsTab
+}) => {
     const cardRef = React.useRef(null);
     const editTaskDescRef = React.useRef(null);
     const [isEditingTask, setIsEditingTask] = useState(false);
@@ -36,6 +65,8 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
     const [kahootModalStartInReview, setKahootModalStartInReview] = useState(false);
     const [isEditingKahootQuestions, setIsEditingKahootQuestions] = useState(false);
     const [editedKahootQuestions, setEditedKahootQuestions] = useState(() => task?.kahoot?.questions || []);
+    const [slidePreviewIdx, setSlidePreviewIdx] = useState(0);
+    const [showSlidePresenter, setShowSlidePresenter] = useState(false);
     // Narracion de la publicacion: voz de mujer y deteccion del idioma de cada parte.
     const narracionRef = useRef(null);
     const solicitudNarracionRef = useRef(0);
@@ -152,8 +183,64 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
     const isForum = task?.type === 'forum';
     const isPoll = task?.type === 'poll' || Boolean(task?.poll);
     const isKahoot = task?.type === 'kahoot' || Boolean(task?.kahoot);
-    const isPost = task?.type === 'post' || (!isTask && !isForum && !isPoll && !isKahoot);
+    const isEvaluation = task?.type === 'evaluation' || Boolean(task?.evaluationId);
+    const isSlides = task?.type === 'slides' || task?.type === 'review' || Boolean(task?.reviewId);
+    const isPost = task?.type === 'post' || (!isTask && !isForum && !isPoll && !isKahoot && !isEvaluation && !isSlides);
     const isTaskType = isTask || isForum;
+
+    const linkedEvaluation = React.useMemo(() => {
+        if (!isEvaluation) return null;
+        const found = (evaluations || []).find(e => String(e?.id) === String(task?.evaluationId));
+        if (found) {
+            return {
+                ...found,
+                title: task?.title || found.title || 'Evaluación Académica',
+                description: task?.description !== undefined && task?.description !== '' ? task.description : (found.description || ''),
+                dueDate: task?.dueDate || found.dueDate || '',
+                dueTime: task?.dueTime || found.dueTime || '23:59'
+            };
+        }
+        return {
+            id: task?.evaluationId || task?.id,
+            title: task?.title || 'Evaluación Académica',
+            description: task?.description || '',
+            dueDate: task?.dueDate || '',
+            dueTime: task?.dueTime || '23:59',
+            timeLimit: task?.timeLimit || 30,
+            strictAntiCheat: Boolean(task?.strictAntiCheat),
+            immediateFeedback: Boolean(task?.immediateFeedback),
+            questions: Array.isArray(task?.questions) ? task.questions : Array.from({ length: Number(task?.questionCount) || 1 }),
+            targetGroupId: task?.targetGroupId || 'all',
+            targetGroupName: task?.targetGroupName || 'General',
+            isDemoCreated: Boolean(task?.isDemoCreated)
+        };
+    }, [isEvaluation, evaluations, task]);
+
+    const linkedReview = React.useMemo(() => {
+        if (!isSlides) return null;
+        const found = (reviews || []).find(r => String(r?.id) === String(task?.reviewId));
+        if (found) {
+            return {
+                ...found,
+                topic: task?.title || found.topic || 'Presentación de Diapositivas'
+            };
+        }
+        if (Array.isArray(task?.slides) && task.slides.length > 0) {
+            return {
+                id: task?.reviewId || task?.id,
+                topic: task?.title || 'Presentación de Diapositivas',
+                language: task?.language || 'Inglés',
+                theme: task?.theme || 'unipamplona',
+                slides: task.slides,
+                slideCount: task.slides.length,
+                author: task?.authorName || task?.author || TEACHER_NAME,
+                targetGroupId: task?.targetGroupId || 'all',
+                targetGroupName: task?.targetGroupName || 'General',
+                createdAt: task?.createdAt
+            };
+        }
+        return null;
+    }, [isSlides, reviews, task]);
 
     const [filterOnlyUngraded, setFilterOnlyUngraded] = useState(false);
 
@@ -227,13 +314,26 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
     // Para encuestas, si expiró la fecha de cierre, se bloquea la votación
     const isLocked = isPoll ? isExpired : (isTask ? (isExpired && !isAllowLate) : (isExpired && !isAllowLate));
 
-    const isDemoTask = Boolean(isDemoMode || task?.isDemoCreated || (task?.id && (String(task.id).startsWith('demo-') || String(task.id).startsWith('demo_'))));
+    const isDemoTask = Boolean(
+        isDemoMode ||
+        task?.isDemoCreated ||
+        (task?.id && (String(task.id).startsWith('demo-') || String(task.id).startsWith('demo_'))) ||
+        String(task?.evaluationId || '').startsWith('demo') ||
+        String(task?.reviewId || '').startsWith('demo')
+    );
 
     const updateTaskDoc = async (updates) => {
+        const { isSynthesizedFeedItem, ...cleanBase } = task;
         if (isDemoTask) {
-            const nextTask = { ...task, ...updates };
+            const nextTask = { ...cleanBase, ...updates };
             if (typeof setTasks === 'function') {
-                setTasks(prev => (prev || []).map(t => String(t.id) === String(task.id) ? { ...t, ...updates } : t));
+                setTasks(prev => {
+                    const list = prev || [];
+                    const exists = list.some(t => String(t.id) === String(task.id));
+                    return exists
+                        ? list.map(t => String(t.id) === String(task.id) ? nextTask : t)
+                        : [nextTask, ...list];
+                });
             }
             saveDemoSandboxItem('tasks', nextTask);
             return;
@@ -241,9 +341,23 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
         if (!auth?.currentUser) {
             try { await signInAnonymously(auth); } catch { /* continuar */ }
         }
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), updates);
+        if (isSynthesizedFeedItem) {
+            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), { ...cleanBase, ...updates }, { merge: true });
+        } else {
+            try {
+                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), updates);
+            } catch {
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), { ...cleanBase, ...updates }, { merge: true });
+            }
+        }
         if (typeof setTasks === 'function') {
-            setTasks(prev => (prev || []).map(t => String(t.id) === String(task.id) ? { ...t, ...updates } : t));
+            setTasks(prev => {
+                const list = prev || [];
+                const exists = list.some(t => String(t.id) === String(task.id));
+                return exists
+                    ? list.map(t => String(t.id) === String(task.id) ? { ...cleanBase, ...updates } : t)
+                    : [{ ...cleanBase, ...updates }, ...list];
+            });
         }
     };
 
@@ -933,7 +1047,7 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
     };
 
     const handleSaveEditedTask = async () => {
-        if (!editTaskData.title.trim() || (!isKahoot && !isPoll && !editTaskData.description.trim())) return showMessage("El título y la descripción no pueden estar vacíos.");
+        if (!editTaskData.title.trim() || (!isKahoot && !isPoll && !isEvaluation && !isSlides && !editTaskData.description.trim())) return showMessage("El título y la descripción no pueden estar vacíos.");
         try {
             const updates = { 
                 title: editTaskData.title.trim(), 
@@ -941,7 +1055,7 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                 geniallyUrl: editTaskData.geniallyUrl ? extractGeniallyUrl(editTaskData.geniallyUrl.trim()) : '',
                 hideDate: Boolean(editTaskData.hideDate)
             };
-            if (task.type !== 'post' && task.type !== 'kahoot') { updates.dueDate = editTaskData.dueDate; updates.dueTime = editTaskData.dueTime; updates.allowLate = editTaskData.allowLate; }
+            if (task.type !== 'post' && task.type !== 'kahoot' && !isSlides) { updates.dueDate = editTaskData.dueDate; updates.dueTime = editTaskData.dueTime; updates.allowLate = editTaskData.allowLate; }
             if (isKahoot && isEditingKahootQuestions) {
                 const validation = validateKahootConfig(editedKahootQuestions);
                 if (!validation.valid) {
@@ -1303,9 +1417,13 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                                 ? 'bg-emerald-500 dark:bg-emerald-600' 
                                 : isKahoot
                                     ? 'bg-fuchsia-500 dark:bg-fuchsia-600'
-                                    : isTask 
-                                        ? 'bg-[#AD3333] dark:bg-[#c93b3b]' 
-                                        : 'bg-blue-500 dark:bg-blue-600'
+                                    : isEvaluation
+                                        ? 'bg-rose-600 dark:bg-rose-500'
+                                        : isSlides
+                                            ? 'bg-amber-500 dark:bg-amber-400'
+                                            : isTask 
+                                                ? 'bg-[#AD3333] dark:bg-[#c93b3b]' 
+                                                : 'bg-blue-500 dark:bg-blue-600'
                         }`} 
                     />
                     <button 
@@ -1352,6 +1470,20 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                                 </span>
                             )}
 
+                            {isEvaluation && (
+                                <span className="inline-flex items-center gap-1 text-[9.5px] font-bold px-2 py-0.5 rounded-full bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60 shrink-0 whitespace-nowrap">
+                                    <ClipboardList size={10} className="shrink-0" />
+                                    Evaluación
+                                </span>
+                            )}
+
+                            {isSlides && (
+                                <span className="inline-flex items-center gap-1 text-[9.5px] font-bold px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 shrink-0 whitespace-nowrap">
+                                    <NavSlides size={10} className="shrink-0" />
+                                    Diapositivas
+                                </span>
+                            )}
+
                             {task.isDemoCreated && (
                                 <span className="inline-flex items-center gap-1 text-[9.5px] font-bold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-700/60 shrink-0 whitespace-nowrap">
                                     <span>Demo</span>
@@ -1392,6 +1524,11 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                                         </button>
                                         <button onClick={() => confirmAction("¿Desea eliminar esta publicación definitivamente?", async () => {
                                             try {
+                                                if (isEvaluation || isSlides) {
+                                                    await updateTaskDoc({ isDeletedFromWall: true, isPinned: false });
+                                                    showMessage("✅ Publicación retirada del muro.");
+                                                    return;
+                                                }
                                                 if (isDemoTask) {
                                                     removeDemoSandboxItem('tasks', task.id);
                                                     if (typeof setTasks === 'function') {
@@ -1503,7 +1640,7 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
             )}
 
             {/* Edición de Fecha Límite en modo edición */}
-            {isTaskType && isEditingTask && (
+            {(isTaskType || isEvaluation) && isEditingTask && (
                 <div className="flex flex-wrap gap-2 mb-3 p-2.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 items-center text-xs">
                     <input type="date" value={editTaskData.dueDate} onChange={e => setEditTaskData({...editTaskData, dueDate: e.target.value})} className="py-1 px-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs" />
                     <input type="time" value={editTaskData.dueTime} onChange={e => setEditTaskData({...editTaskData, dueTime: e.target.value})} className="py-1 px-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs" />
@@ -2037,6 +2174,383 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                 );
             })()}
 
+            {/* Módulo Interactivo de Evaluación Académica (Publicación en el Muro) */}
+            {isEvaluation && linkedEvaluation && (() => {
+                const ev = linkedEvaluation;
+                const evalGrades = (grades || []).filter(g => String(g?.evaluationId) === String(ev.id));
+                const myNameClean = (loggedInName || '').trim().toLowerCase();
+                const myChatClean = (myChatId || '').trim().toLowerCase().replace('@', '');
+                const myUidClean = (currentUser?.uid || currentUserId || '').trim().toLowerCase();
+                const myEmailClean = (currentUser?.email || '').trim().toLowerCase();
+
+                const myEvalGrade = role !== 'teacher' ? evalGrades.find(g => {
+                    const gStudentId = String(g.studentId || '').trim().toLowerCase().replace('@', '');
+                    const gEmail = String(g.studentEmail || '').trim().toLowerCase();
+                    const gUser = String(g.studentUsername || '').trim().toLowerCase().replace('@', '');
+                    const gName = String(g.studentName || '').trim().toLowerCase();
+                    const gUid = String(g.uid || g.studentUid || '').trim().toLowerCase();
+                    if (myUidClean && (gStudentId === myUidClean || gUid === myUidClean)) return true;
+                    if (myChatClean && (gStudentId === myChatClean || gUser === myChatClean)) return true;
+                    if (myEmailClean && (gEmail === myEmailClean || gStudentId === myEmailClean)) return true;
+                    if (myNameClean && gName && gName === myNameClean) return true;
+                    if (myNameClean && gName) {
+                        const p1 = splitNameFirstAndLast(myNameClean);
+                        const p2 = splitNameFirstAndLast(gName);
+                        if (p1.first && p1.last && p1.first === p2.first && p1.last === p2.last) return true;
+                    }
+                    return false;
+                }) : null;
+
+                const isEvalCheated = Boolean(myEvalGrade?.cheated || myEvalGrade?.status === 'cancelled_tab_change');
+
+                const evDueStr = task.dueDate || ev.dueDate;
+                const evTimeStr = task.dueTime || ev.dueTime || '23:59';
+                const evDeadline = evDueStr ? new Date(`${evDueStr}T${evTimeStr}`) : null;
+                const isEvExpired = evDeadline && !isNaN(evDeadline.getTime()) ? new Date() > evDeadline : false;
+                const hasRealQuestions = Boolean(Array.isArray(ev.questions) && ev.questions.length > 0 && ev.questions[0]?.text);
+                const questionTotal = Array.isArray(ev.questions) && ev.questions.length > 0
+                    ? ev.questions.length
+                    : (Number(task.questionCount) || 0);
+                const timeLimitMin = Math.max(1, parseInt(ev.timeLimit || task.timeLimit, 10) || 30);
+                const hasStrictAntiCheat = Boolean(ev.strictAntiCheat ?? task.strictAntiCheat);
+                const hasImmediateFeedback = Boolean(ev.immediateFeedback ?? task.immediateFeedback);
+                const avgScore = evalGrades.length > 0
+                    ? (evalGrades.reduce((acc, g) => acc + (parseFloat(g.score) || 0), 0) / evalGrades.length).toFixed(1)
+                    : null;
+
+                return (
+                    <div className="my-3 rounded-2xl border border-rose-200/80 dark:border-rose-900/50 bg-gradient-to-br from-rose-50/60 via-white to-orange-50/30 dark:from-rose-950/25 dark:via-gray-900/60 dark:to-orange-950/15 shadow-xs overflow-hidden">
+                        {/* Cabecera de la Evaluación */}
+                        <div className="p-3.5 sm:p-4 border-b border-rose-100/80 dark:border-rose-900/40 flex flex-wrap items-center justify-between gap-2.5 bg-gradient-to-r from-rose-500/5 via-transparent to-orange-500/5">
+                            <div className="flex items-center gap-2.5 flex-wrap">
+                                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#AD3333] to-rose-700 text-white flex items-center justify-center shadow-sm shrink-0">
+                                    <ClipboardList size={18} />
+                                </div>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="inline-flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-0.5 rounded-full bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 shadow-2xs">
+                                        <Clock size={11} className="text-[#AD3333] dark:text-rose-400" />
+                                        {timeLimitMin} min
+                                    </span>
+                                    {questionTotal > 0 && (
+                                        <span className="inline-flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-0.5 rounded-full bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 shadow-2xs">
+                                            <FileText size={11} className="text-blue-500" />
+                                            {questionTotal} {questionTotal === 1 ? 'pregunta' : 'preguntas'}
+                                        </span>
+                                    )}
+                                    {hasStrictAntiCheat && (
+                                        <span className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-rose-100/80 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60">
+                                            <Shield size={10} /> Anti-trampas
+                                        </span>
+                                    )}
+                                    {hasImmediateFeedback && (
+                                        <span className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-amber-100/80 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60">
+                                            <Sparkles size={10} /> Retroalimentación IA
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Pill de Estado (Estudiante vs Docente) */}
+                            <div className="flex items-center gap-1.5">
+                                {role === 'teacher' ? (
+                                    <>
+                                        <span className="text-[10.5px] font-extrabold px-2.5 py-1 rounded-full bg-rose-50 dark:bg-rose-950/50 text-[#AD3333] dark:text-rose-300 border border-rose-200 dark:border-rose-800/60">
+                                            {evalGrades.length} {evalGrades.length === 1 ? 'entrega' : 'entregas'}
+                                        </span>
+                                        {avgScore !== null && (
+                                            <span className="text-[10.5px] font-extrabold px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
+                                                Promedio: {avgScore} / 5.0
+                                            </span>
+                                        )}
+                                    </>
+                                ) : myEvalGrade ? (
+                                    isEvalCheated ? (
+                                        <span className="inline-flex items-center gap-1 text-[10.5px] font-extrabold px-2.5 py-1 rounded-full bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-800">
+                                            <AlertTriangle size={11} /> Anulada por anti-trampas
+                                        </span>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1 text-[10.5px] font-extrabold px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                                            <CheckCircle2 size={11} /> Evaluación completada
+                                        </span>
+                                    )
+                                ) : isEvExpired ? (
+                                    <span className="inline-flex items-center gap-1 text-[10.5px] font-extrabold px-2.5 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-700">
+                                        <Lock size={11} /> Plazo vencido
+                                    </span>
+                                ) : (
+                                    <span className="inline-flex items-center gap-1.5 text-[10.5px] font-extrabold px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700 shadow-2xs">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                        <Clock size={11} /> Evaluación pendiente
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Cuerpo de la tarjeta de evaluación */}
+                        <div className="p-3.5 sm:p-4 space-y-3">
+                            {role === 'teacher' ? (
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <div className="text-xs text-gray-600 dark:text-gray-300 font-medium">
+                                        {evalGrades.length > 0
+                                            ? `Han respondido ${evalGrades.length} ${evalGrades.length === 1 ? 'estudiante' : 'estudiantes'} con un promedio de ${avgScore} / 5.0.`
+                                            : 'Aún no se registran entregas para esta evaluación.'}
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (typeof onOpenEvaluationResults === 'function') {
+                                                    onOpenEvaluationResults(ev);
+                                                } else if (typeof onOpenEvaluationsTab === 'function') {
+                                                    onOpenEvaluationsTab();
+                                                }
+                                            }}
+                                            className="px-4 py-2 rounded-xl text-xs font-extrabold bg-[#AD3333] hover:bg-[#932828] text-white shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                                        >
+                                            <BarChart2 size={14} />
+                                            <span>Ver resultados y entregas ({evalGrades.length})</span>
+                                        </button>
+                                        {typeof onOpenEvaluationsTab === 'function' && (
+                                            <button
+                                                type="button"
+                                                onClick={() => onOpenEvaluationsTab()}
+                                                className="px-3.5 py-2 rounded-xl text-xs font-bold bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 flex items-center gap-1.5 transition-all cursor-pointer"
+                                            >
+                                                <ClipboardList size={14} />
+                                                <span>Gestionar evaluaciones</span>
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            ) : myEvalGrade ? (
+                                <div className="space-y-2.5">
+                                    <div className={`p-3 rounded-xl border flex flex-wrap items-center justify-between gap-3 ${
+                                        isEvalCheated
+                                            ? 'bg-red-50/80 dark:bg-red-950/30 border-red-200 dark:border-red-900/60'
+                                            : 'bg-emerald-50/80 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900/60'
+                                    }`}>
+                                        <div className="space-y-0.5">
+                                            <span className={`text-xs font-extrabold flex items-center gap-1.5 ${
+                                                isEvalCheated ? 'text-red-700 dark:text-red-300' : 'text-emerald-800 dark:text-emerald-200'
+                                            }`}>
+                                                {isEvalCheated ? '🚫 Evaluación anulada por cambio de pestaña / anti-trampas' : '✅ Ya presentaste esta evaluación'}
+                                            </span>
+                                            {myEvalGrade.teacherFeedback && (
+                                                <p className="text-[11px] text-gray-600 dark:text-gray-300 italic mt-1">
+                                                    Nota docente: &ldquo;{myEvalGrade.teacherFeedback}&rdquo;
+                                                </p>
+                                            )}
+                                        </div>
+                                        <div className={`px-3 py-1.5 rounded-xl font-black text-sm border ${
+                                            isEvalCheated
+                                                ? 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-200 border-red-300 dark:border-red-800'
+                                                : 'bg-white dark:bg-gray-900 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 shadow-2xs'
+                                        }`}>
+                                            Nota: {Number(myEvalGrade.score || 0).toFixed(1)} <span className="text-[11px] font-semibold opacity-75">/ 5.0</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        {(hasImmediateFeedback || isEvExpired) && typeof onOpenImmediateFeedback === 'function' && (
+                                            <button
+                                                type="button"
+                                                onClick={() => onOpenImmediateFeedback(ev, myEvalGrade)}
+                                                className="px-4 py-2 rounded-xl text-xs font-extrabold bg-amber-500/15 hover:bg-amber-500/25 text-amber-800 dark:text-amber-300 border border-amber-500/30 flex items-center gap-1.5 transition-all cursor-pointer"
+                                            >
+                                                <Sparkles size={14} />
+                                                <span>Ver retroalimentación detallada</span>
+                                            </button>
+                                        )}
+                                        {(isDemoMode || ev.isDemoCreated) && typeof onRetryDemoEvaluation === 'function' && (
+                                            <button
+                                                type="button"
+                                                onClick={() => onRetryDemoEvaluation(ev)}
+                                                className="px-3.5 py-2 rounded-xl text-xs font-bold bg-purple-500/15 hover:bg-purple-500/25 text-purple-700 dark:text-purple-300 border border-purple-500/30 flex items-center gap-1.5 transition-all cursor-pointer"
+                                            >
+                                                <RotateCcw size={13} />
+                                                <span>Reintentar (Demo)</span>
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            ) : isEvExpired ? (
+                                <div className="p-3 rounded-xl bg-gray-100/80 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 flex items-center justify-between gap-3 text-xs text-gray-500 dark:text-gray-400 font-semibold">
+                                    <span className="flex items-center gap-1.5">
+                                        <Lock size={14} className="text-red-500 shrink-0" />
+                                        El plazo para presentar esta evaluación venció el {evDueStr}{evTimeStr ? ` a las ${format12HourTime(evTimeStr)}` : ''}.
+                                    </span>
+                                </div>
+                            ) : (
+                                <div className="p-3 rounded-xl bg-amber-50/70 dark:bg-amber-950/25 border border-amber-200/80 dark:border-amber-800/50 flex flex-wrap items-center justify-between gap-3">
+                                    <div className="space-y-1">
+                                        <div className="text-xs font-extrabold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                                            <Clock size={13} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                                            <span>Tienes esta evaluación pendiente por presentar</span>
+                                        </div>
+                                        <div className="text-[11.5px] text-gray-600 dark:text-gray-300 font-medium">
+                                            Dispones de <strong className="text-gray-900 dark:text-white">{timeLimitMin} minutos</strong> para responder {questionTotal > 0 ? <strong className="text-gray-900 dark:text-white">{questionTotal} {questionTotal === 1 ? 'pregunta' : 'preguntas'}</strong> : 'el cuestionario'}{evDueStr ? ` • Cierra el ${evDueStr}${evTimeStr ? ` a las ${format12HourTime(evTimeStr)}` : ''}` : ''}.
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (hasRealQuestions && typeof onStartEvaluation === 'function') {
+                                                onStartEvaluation(ev);
+                                            } else if (typeof onOpenEvaluationsTab === 'function') {
+                                                onOpenEvaluationsTab();
+                                            }
+                                        }}
+                                        className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs sm:text-sm font-black bg-gradient-to-r from-[#AD3333] to-rose-700 hover:from-[#932828] hover:to-rose-800 text-white shadow-md shadow-rose-600/20 flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+                                    >
+                                        <Play size={14} />
+                                        <span>Presentar evaluación</span>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            })()}
+
+            {/* Módulo Interactivo de Diapositivas (Publicación de Presentación en el Muro) */}
+            {isSlides && (linkedReview || task.slideCount) && (() => {
+                const rev = linkedReview;
+                const slidesArr = Array.isArray(rev?.slides) ? rev.slides : [];
+                const totalSlidesCount = slidesArr.length || Number(task.slideCount) || 0;
+                const safeSlideIdx = slidesArr.length > 0 ? Math.min(slidePreviewIdx, slidesArr.length - 1) : 0;
+                const currentPreviewSlide = slidesArr[safeSlideIdx] || null;
+                const deckLanguage = rev?.language || task.language || 'Inglés';
+
+                return (
+                    <div className="my-3 rounded-2xl border border-amber-200/80 dark:border-amber-800/50 bg-gradient-to-br from-amber-50/50 via-white to-red-50/30 dark:from-gray-900 dark:via-gray-900/95 dark:to-amber-950/20 shadow-sm overflow-hidden">
+                        {/* Cabecera de la Presentación */}
+                        <div className="px-4 py-3 border-b border-amber-100/80 dark:border-amber-900/40 flex flex-wrap items-center justify-between gap-2 bg-gradient-to-r from-amber-500/10 via-transparent to-red-500/5">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#AD3333] to-amber-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                                    <NavSlides size={16} />
+                                </div>
+                                <span className="inline-flex items-center gap-1 text-[10.5px] font-extrabold px-2.5 py-0.5 rounded-full bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700 shadow-2xs">
+                                    <Layers size={11} className="text-[#AD3333] dark:text-amber-400" />
+                                    {totalSlidesCount} {totalSlidesCount === 1 ? 'diapositiva' : 'diapositivas'}
+                                </span>
+                                <span className="inline-flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-0.5 rounded-full bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 shadow-2xs">
+                                    <Globe size={11} className="text-blue-500" />
+                                    {deckLanguage}
+                                </span>
+                            </div>
+
+                            {slidesArr.length > 0 && (
+                                <span className="text-[10.5px] font-extrabold text-amber-800 dark:text-amber-300 bg-amber-100/70 dark:bg-amber-950/60 px-2.5 py-0.5 rounded-full border border-amber-200/80 dark:border-amber-800/60">
+                                    Diapositiva {safeSlideIdx + 1} de {slidesArr.length}
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Lienzo 16:9 en vivo de la diapositiva con controles rápidos */}
+                        {rev && currentPreviewSlide && (
+                            <div
+                                onClick={() => setShowSlidePresenter(true)}
+                                className="relative group/slidecard cursor-pointer overflow-hidden bg-slate-950 border-b border-amber-100/80 dark:border-gray-800"
+                                title="Clic para abrir la presentación en pantalla completa"
+                            >
+                                <SlideCanvasSurface
+                                    presentation={rev}
+                                    slide={currentPreviewSlide}
+                                    slideIdx={safeSlideIdx}
+                                    totalSlides={slidesArr.length}
+                                    appThemeMode={themeMode || (isDarkMode ? 'dark' : 'light')}
+                                    mode="card"
+                                />
+
+                                {/* Botones Anterior / Siguiente para hojear las diapositivas desde el muro */}
+                                {slidesArr.length > 1 && (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSlidePreviewIdx(prev => (prev <= 0 ? slidesArr.length - 1 : prev - 1));
+                                            }}
+                                            className="absolute left-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 text-white border border-white/20 flex items-center justify-center shadow-lg transition-all hover:scale-110 z-20 cursor-pointer"
+                                            title="Diapositiva anterior"
+                                        >
+                                            <ChevronLeft size={16} />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSlidePreviewIdx(prev => (prev >= slidesArr.length - 1 ? 0 : prev + 1));
+                                            }}
+                                            className="absolute right-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 text-white border border-white/20 flex items-center justify-center shadow-lg transition-all hover:scale-110 z-20 cursor-pointer"
+                                            title="Siguiente diapositiva"
+                                        >
+                                            <ChevronRight size={16} />
+                                        </button>
+                                    </>
+                                )}
+
+                                {/* Botón flotante superior derecho para pantalla completa */}
+                                <div className="absolute top-2.5 right-2.5 px-2.5 py-1 rounded-lg bg-black/65 backdrop-blur-md text-white text-[10px] font-extrabold border border-white/20 flex items-center gap-1.5 opacity-90 group-hover/slidecard:opacity-100 transition-opacity z-20">
+                                    <Maximize2 size={11} />
+                                    <span>Pantalla completa</span>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Barra de acciones de la presentación */}
+                        <div className="p-3.5 sm:p-4 flex flex-wrap items-center justify-between gap-2.5">
+                            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                                {rev ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowSlidePresenter(true)}
+                                        className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-[#AD3333] to-amber-700 hover:from-[#932828] hover:to-amber-800 text-white shadow-sm flex items-center justify-center gap-2 transition-all hover:scale-[1.01] cursor-pointer"
+                                    >
+                                        <Play size={14} />
+                                        <span>Ver presentación</span>
+                                    </button>
+                                ) : (
+                                    typeof onOpenReviewsTab === 'function' && (
+                                        <button
+                                            type="button"
+                                            onClick={() => onOpenReviewsTab()}
+                                            className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-[#AD3333] to-amber-700 hover:from-[#932828] hover:to-amber-800 text-white shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
+                                        >
+                                            <NavSlides size={14} />
+                                            <span>Abrir en Diapositivas</span>
+                                        </button>
+                                    )
+                                )}
+
+                                {rev && (
+                                    <button
+                                        type="button"
+                                        onClick={() => exportReviewToPresentation(rev)}
+                                        className="px-3.5 py-2.5 rounded-xl text-xs font-extrabold bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                                        title="Descargar archivo PowerPoint (.pptx)"
+                                    >
+                                        <Download size={14} className="text-[#AD3333] dark:text-amber-400" />
+                                        <span>Descargar .pptx</span>
+                                    </button>
+                                )}
+
+                                {role === 'teacher' && typeof onOpenReviewsTab === 'function' && (
+                                    <button
+                                        type="button"
+                                        onClick={() => onOpenReviewsTab(rev)}
+                                        className="px-3.5 py-2.5 rounded-xl text-xs font-bold bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/25 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                                    >
+                                        <Edit3 size={13} />
+                                        <span>Estudio de Diapositivas</span>
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
+
             {/* Audio adjunto */}
             {task.audioUrl && (
                 <div className="mt-2.5">
@@ -2197,9 +2711,9 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                             {task.comments?.length > 0 
                                 ? (isForum 
                                     ? `${task.comments.length} aporte${task.comments.length > 1 ? 's' : ''} en el foro` 
-                                    : isPoll 
-                                        ? `${task.comments.length} comentario${task.comments.length > 1 ? 's' : ''}` 
-                                        : `${task.comments.length} comentario${task.comments.length > 1 ? 's' : ''} y entregas`
+                                    : isTask 
+                                        ? `${task.comments.length} comentario${task.comments.length > 1 ? 's' : ''} y entregas` 
+                                        : `${task.comments.length} comentario${task.comments.length > 1 ? 's' : ''}`
                                   )
                                 : (isForum 
                                     ? 'Participar en el foro de debate' 
@@ -3167,6 +3681,20 @@ const TaskCard = React.memo(({ task, role, isDemoMode = false, setTasks, db, app
                     appId={appId}
                     showMessage={showMessage}
                     initialMode={kahootModalStartInReview ? 'review' : 'live'}
+                />
+            )}
+
+            {/* VISOR INTERACTIVO DE DIAPOSITIVAS EN PANTALLA COMPLETA DESDE EL MURO */}
+            {showSlidePresenter && linkedReview && (
+                <SlidePresenterViewer
+                    presentation={linkedReview}
+                    onClose={() => setShowSlidePresenter(false)}
+                    onEdit={role === 'teacher' && typeof onOpenReviewsTab === 'function' ? () => {
+                        setShowSlidePresenter(false);
+                        onOpenReviewsTab(linkedReview);
+                    } : undefined}
+                    role={role}
+                    themeMode={themeMode || (isDarkMode ? 'dark' : 'light')}
                 />
             )}
         </div>
