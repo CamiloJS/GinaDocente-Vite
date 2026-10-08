@@ -7,6 +7,12 @@ import {
   SLIDE_LAYOUT_CATALOG,
   VALID_SLIDE_LAYOUTS,
   SLIDE_TRANSITIONS,
+  SLIDE_TRANSITION_GALLERY,
+  SLIDE_FONT_SIZES,
+  SLIDE_COLOR_SWATCHES,
+  SLIDE_HIGHLIGHT_SWATCHES,
+  SLIDE_ACADEMIC_BADGES,
+  SLIDE_ACADEMIC_ILLUSTRATIONS,
   SLIDE_PATTERNS,
   SLIDE_STARTER_TEMPLATES,
   resolveSlideLayout,
@@ -17,6 +23,16 @@ import {
   convertSlideLayout,
   clampElementRect,
   createCanvasElement,
+  getDefaultFieldStyleMeta,
+  getFieldTextStyle,
+  updateFieldTextStyle,
+  clearFieldTextStyle,
+  shiftFieldTextStylesOnDelete,
+  buildInlineTextStyle,
+  transformTextCase,
+  getSlideFieldTextValue,
+  setSlideFieldTextValue,
+  listSlideEditableFields,
   buildDeckAiPrompt,
   normalizeSingleSlide,
   parseDeckAiResponse,
@@ -47,8 +63,16 @@ console.log('\n== 1. Catálogo de Temas, Fuentes, Diseños y Transiciones ==');
 check('8 temas visuales definidos', Object.keys(SLIDE_THEMES).length === 8 && !!SLIDE_THEMES.unipamplona && !!SLIDE_THEMES.midnight);
 check('5 familias tipográficas definidas con mapeo CSS y PPTX', Object.keys(SLIDE_FONTS).length === 5 && SLIDE_FONTS.sans.pptx === 'Arial');
 check('11 diseños (layouts) estilo PowerPoint/Google Slides definidos', SLIDE_LAYOUT_CATALOG.length === 11 && VALID_SLIDE_LAYOUTS.has('two_columns') && VALID_SLIDE_LAYOUTS.has('table'));
-check('5 transiciones y 4 patrones definidos', SLIDE_TRANSITIONS.length === 5 && SLIDE_PATTERNS.length === 4);
+check('5 transiciones base, 8 transiciones en galería y 4 patrones definidos', SLIDE_TRANSITIONS.length === 5 && SLIDE_TRANSITION_GALLERY.length === 8 && SLIDE_PATTERNS.length === 4);
 check('4 plantillas iniciales definidas y generan diapositivas válidas', SLIDE_STARTER_TEMPLATES.length === 4 && SLIDE_STARTER_TEMPLATES.every(t => Array.isArray(t.buildSlides('Test')) && t.buildSlides('Test').length >= 3));
+check('Paletas de colores, resaltados, tamaños de fuente e ilustraciones académicas disponibles',
+  SLIDE_FONT_SIZES.length >= 10 &&
+  SLIDE_COLOR_SWATCHES.length >= 12 &&
+  SLIDE_HIGHLIGHT_SWATCHES.length >= 6 &&
+  SLIDE_ACADEMIC_BADGES.length >= 6 &&
+  SLIDE_ACADEMIC_ILLUSTRATIONS.length === 6 &&
+  SLIDE_ACADEMIC_ILLUSTRATIONS.every(ill => ill.dataUrl.startsWith('data:image/svg+xml;utf8,'))
+);
 
 console.log('\n== 2. Compatibilidad Hacia Atrás (resolveSlideLayout & DEMO_REVIEWS) ==');
 check('resolveSlideLayout maneja nulo/indefinido devolviendo cards', resolveSlideLayout(null) === 'cards' && resolveSlideLayout(undefined) === 'cards');
@@ -151,14 +175,15 @@ check('convertSlideLayout round-trip (table -> cards -> edit -> table) actualiza
 );
 
 console.log('\n== 4. Objetos Libres del Lienzo 16:9 (Canvas Elements) y Límites ==');
-const tb = createCanvasElement('textbox', { x: 10, y: 15, w: 40, h: 20, text: 'Hola Clase' });
+const tb = createCanvasElement('textbox', { x: 10, y: 15, w: 40, h: 20, text: 'Hola Clase', underline: true, strikethrough: true, fontFamily: 'serif' });
 const sh = createCanvasElement('shape', { shapeType: 'circle', fill: '#1D4ED8' });
 const nt = createCanvasElement('note', { text: 'Recordar tarea' });
 const im = createCanvasElement('image', { x: 200, y: -50, w: 2, h: 150 });
 const zeroEl = createCanvasElement('textbox', { x: 0, y: 0, w: 0, h: 0, id: undefined, type: 'malicioso' });
 
-check('createCanvasElement crea textbox, shape, note e image con IDs únicos',
-  tb.type === 'textbox' && sh.type === 'shape' && nt.type === 'note' && im.type === 'image' && tb.id !== sh.id
+check('createCanvasElement crea textbox, shape, note e image con IDs únicos y propiedades extendidas de fuente',
+  tb.type === 'textbox' && sh.type === 'shape' && nt.type === 'note' && im.type === 'image' && tb.id !== sh.id &&
+  tb.underline === true && tb.strikethrough === true && tb.fontFamily === 'serif'
 );
 check('clampElementRect restringe coordenadas fuera de rango y tamaños mínimos',
   im.w >= 6 && im.w <= 100 && im.h >= 5 && im.h <= 100 && im.x <= 95 && im.y >= -5
@@ -361,8 +386,120 @@ check('parseDeckAiResponse recupera diapositivas completas aunque la respuesta J
   !hasNestedArrayAnywhere(sanitizeSlidesForFirestore(recoveredFromTruncated))
 );
 
+console.log('\n== 8. Cinta de Opciones estilo PowerPoint (6 Pestañas) y Formato Individual por Texto ==');
+const styledSlide0 = createDefaultSlide('cards', 1);
+const defaultTitleMeta = getDefaultFieldStyleMeta('title', 'cards');
+check('getDefaultFieldStyleMeta y getFieldTextStyle devuelven metadatos base para título, subtítulo y tarjetas',
+  defaultTitleMeta.fontSize === 24 &&
+  defaultTitleMeta.bold === true &&
+  getFieldTextStyle(styledSlide0, 'card_0_title').bold === true &&
+  getFieldTextStyle(styledSlide0, 'card_0_text').bold === false
+);
+
+const styledSlide1 = updateFieldTextStyle(styledSlide0, 'title', {
+  color: '#DC2626',
+  highlight: '#FEF08A',
+  fontSize: 32,
+  fontFamily: 'serif',
+  italic: true,
+  underline: true,
+  strikethrough: true,
+  align: 'center'
+});
+const titleStyleAfter = getFieldTextStyle(styledSlide1, 'title');
+const inlineTitleCss = buildInlineTextStyle(styledSlide1, 'title', { color: '#000000' }, 'editor');
+
+check('updateFieldTextStyle y buildInlineTextStyle aplican color, resaltado, tamaño, fuente, cursiva, subrayado, tachado y alineación individualmente al campo seleccionado',
+  titleStyleAfter.color === '#DC2626' &&
+  titleStyleAfter.highlight === '#FEF08A' &&
+  titleStyleAfter.fontSize === 32 &&
+  inlineTitleCss.color === '#DC2626' &&
+  inlineTitleCss.backgroundColor === '#FEF08A' &&
+  inlineTitleCss.fontSize === '32px' &&
+  inlineTitleCss.fontStyle === 'italic' &&
+  inlineTitleCss.textDecoration.includes('underline') &&
+  inlineTitleCss.textDecoration.includes('line-through') &&
+  inlineTitleCss.textAlign === 'center' &&
+  getFieldTextStyle(styledSlide1, 'card_0_title').color === ''
+);
+
+const clearedSlide = clearFieldTextStyle(styledSlide1, 'title');
+check('clearFieldTextStyle restaura el formato original del campo sin afectar otros campos',
+  !clearedSlide.textStyles?.title &&
+  getFieldTextStyle(clearedSlide, 'title').fontSize === 24
+);
+
+check('transformTextCase convierte entre MAYÚSCULAS, minúsculas, Tipo Título y Tipo oración',
+  transformTextCase('hello world', 'upper') === 'HELLO WORLD' &&
+  transformTextCase('HELLO WORLD', 'lower') === 'hello world' &&
+  transformTextCase('hello world', 'title') === 'Hello World' &&
+  transformTextCase('HELLO WORLD. second sentence', 'sentence') === 'Hello world. Second sentence'
+);
+
+const updatedCardTitleSlide = setSlideFieldTextValue(styledSlide1, 'cards.0.title', 'NUEVO CONCEPTO');
+check('getSlideFieldTextValue y setSlideFieldTextValue leen y escriben cualquier campo individual (título, tarjetas, columnas, tabla, quiz)',
+  getSlideFieldTextValue(updatedCardTitleSlide, 'cards.0.title') === 'NUEVO CONCEPTO' &&
+  updatedCardTitleSlide.cards[0].title === 'NUEVO CONCEPTO' &&
+  listSlideEditableFields(updatedCardTitleSlide).some(f => f.key === 'cards.0.title')
+);
+
+const normalizedWithStyles = normalizeSingleSlide(styledSlide1, 1);
+const sanitizedWithStyles = sanitizeSlidesForFirestore([normalizedWithStyles]);
+const hydratedWithStyles = hydrateSlidesFromFirestore(sanitizedWithStyles);
+check('normalizeSingleSlide, sanitizeSlidesForFirestore e hydrateSlidesFromFirestore preservan slide.textStyles sin arreglos anidados',
+  !hasNestedArrayAnywhere(sanitizedWithStyles) &&
+  hydratedWithStyles[0]?.textStyles?.title?.color === '#DC2626' &&
+  hydratedWithStyles[0]?.textStyles?.title?.highlight === '#FEF08A'
+);
+
+check('ReviewsModule implementa la Cinta de Opciones (Ribbon) con sus 6 pestañas (Inicio, Insertar, Diseño, Transiciones, IA / Copilot, Presentación y Vista) y pegado/arrastre de imágenes',
+  reviewsSrc.includes("{ id: 'inicio', label: 'Inicio'") &&
+  reviewsSrc.includes("{ id: 'insertar', label: 'Insertar'") &&
+  reviewsSrc.includes("{ id: 'diseno', label: 'Diseño'") &&
+  reviewsSrc.includes("{ id: 'transiciones', label: 'Transiciones'") &&
+  reviewsSrc.includes("{ id: 'ia', label: 'IA / Copilot'") &&
+  reviewsSrc.includes("{ id: 'presentacion', label: 'Presentación y Vista'") &&
+  reviewsSrc.includes('handleStagePaste') &&
+  reviewsSrc.includes('SLIDE_ACADEMIC_ILLUSTRATIONS') &&
+  reviewsSrc.includes('applyFieldPptxOpts')
+);
+
+const quizSlideForFields = createDefaultSlide('quiz', 2);
+const quizEditableKeys = listSlideEditableFields(quizSlideForFields, 2).map(f => f.key);
+check('listSlideEditableFields en diapositivas quiz incluye tanto el texto como la explicación de cada opción',
+  quizEditableKeys.includes('options.0.text') &&
+  quizEditableKeys.includes('options.0.explanation')
+);
+
+const shiftedStyles = shiftFieldTextStylesOnDelete(
+  {
+    title: { color: '#111111' },
+    'cards.0.title': { color: '#EF4444' },
+    'cards.1.title': { color: '#10B981' },
+    'cards.2.text': { color: '#3B82F6' }
+  },
+  'cards',
+  0
+);
+check('shiftFieldTextStylesOnDelete desplaza correctamente los índices de estilos al eliminar tarjetas, puntos, opciones o filas/columnas',
+  !shiftedStyles['cards.0.title']?.color?.includes('EF4444') &&
+  shiftedStyles['cards.0.title']?.color === '#10B981' &&
+  shiftedStyles['cards.1.text']?.color === '#3B82F6' &&
+  shiftedStyles.title?.color === '#111111'
+);
+
+const iconsSrc = fs.readFileSync(path.join(rootDir, 'src/components/Icons.jsx'), 'utf8');
+check('Icons.jsx exporta Clipboard, Eraser y ListOrdered y ReviewsModule.jsx usa SLIDE_FONTS[el.fontFamily].css sin errores de referencia',
+  iconsSrc.includes('export const Clipboard') &&
+  iconsSrc.includes('export const Eraser') &&
+  iconsSrc.includes('export const ListOrdered') &&
+  reviewsSrc.includes('SLIDE_FONTS[el.fontFamily].css') &&
+  !reviewsSrc.includes('SLIDE_FONTS[el.fontFamily].family') &&
+  reviewsSrc.includes('transitionDuration: Number(updatedPres.transitionDuration)') &&
+  reviewsSrc.includes('autoAdvanceSeconds: Number(updatedPres.autoAdvanceSeconds)')
+);
+
 console.log(`\nRESULTADO SLIDES STUDIO: ${okCount} OK, ${failCount} fallos\n`);
 if (failCount > 0) {
   process.exit(1);
 }
-

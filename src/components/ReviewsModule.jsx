@@ -9,8 +9,9 @@ import {
   Minimize2, ChevronLeft, ChevronRight, BookOpen, Edit3, Copy,
   ArrowUp, ArrowDown, CheckCheck, Globe, CheckCircle2, ChevronDown,
   Lightbulb, Pin, Palette, Layers, Grid, Play, Pause, Undo2, Redo2,
-  AlignLeft, AlignCenter, AlignRight, Type, TableIcon, ColumnsIcon,
-  LayoutIcon, Bold, Italic, Underline, ImageIcon, Upload, Search,
+  AlignLeft, AlignCenter, AlignRight, AlignJustify, Type, TableIcon, ColumnsIcon,
+  LayoutIcon, Bold, Italic, Underline, Strikethrough, Highlighter,
+  List, ListOrdered, Clipboard, Eraser, MonitorPlay, Timer, Sliders, ImageIcon, Upload, Search,
   Volume2, VolumeX, PenTool, RotateCcw, FileText, Eye
 } from './Icons.jsx'
 import {
@@ -32,7 +33,13 @@ import {
   SLIDE_FONTS,
   SLIDE_LAYOUT_CATALOG,
   SLIDE_TRANSITIONS,
+  SLIDE_TRANSITION_GALLERY,
   SLIDE_PATTERNS,
+  SLIDE_FONT_SIZES,
+  SLIDE_COLOR_SWATCHES,
+  SLIDE_HIGHLIGHT_SWATCHES,
+  SLIDE_ACADEMIC_BADGES,
+  SLIDE_ACADEMIC_ILLUSTRATIONS,
   SLIDE_STARTER_TEMPLATES,
   resolveSlideLayout,
   getSlidePatternStyle,
@@ -42,6 +49,16 @@ import {
   convertSlideLayout,
   clampElementRect,
   createCanvasElement,
+  getDefaultFieldStyleMeta,
+  getFieldTextStyle,
+  updateFieldTextStyle,
+  clearFieldTextStyle,
+  shiftFieldTextStylesOnDelete,
+  buildInlineTextStyle,
+  transformTextCase,
+  getSlideFieldTextValue,
+  setSlideFieldTextValue,
+  listSlideEditableFields,
   buildDeckAiPrompt,
   parseDeckAiResponse,
   buildSingleSlideAiPrompt,
@@ -85,8 +102,43 @@ export const exportReviewToPresentation = async (review) => {
 
     slide.background = { color: BG_COLOR };
 
+    if (s.bgImage && typeof s.bgImage === 'string') {
+      try {
+        if (s.bgImage.startsWith('data:image/') && !s.bgImage.startsWith('data:image/svg')) {
+          slide.addImage({ data: s.bgImage, x: 0, y: 0, w: 13.33, h: 7.5, transparency: Math.round((1 - (s.bgOverlayOpacity ?? 0.22)) * 100) });
+        } else if (/^https?:\/\//i.test(s.bgImage)) {
+          slide.addImage({ path: s.bgImage, x: 0, y: 0, w: 13.33, h: 7.5, transparency: Math.round((1 - (s.bgOverlayOpacity ?? 0.22)) * 100) });
+        }
+      } catch {
+        // ignore invalid background image
+      }
+    }
+
     const slideLayout = resolveSlideLayout(s, idx);
     const titleAlign = s.titleAlign || (slideLayout === 'title' || slideLayout === 'section' || slideLayout === 'quote' ? 'center' : 'left');
+
+    const applyFieldPptxOpts = (fieldKey, baseOpts = {}) => {
+      const st = getFieldTextStyle(s, fieldKey);
+      const opts = { ...baseOpts };
+      if (st.color) opts.color = cleanHexNoHash(st.color, opts.color || TEXT_MAIN);
+      if (st.bgColor && st.bgColor !== 'transparent' && !String(st.bgColor).startsWith('rgba')) {
+        opts.fill = { color: cleanHexNoHash(st.bgColor, CARD_BG) };
+      }
+      if (st.fontFamily && SLIDE_FONTS[st.fontFamily]) {
+        opts.fontFace = SLIDE_FONTS[st.fontFamily].pptx;
+      }
+      if (st.fontSize && Number.isFinite(Number(st.fontSize))) {
+        opts.fontSize = Math.max(8, Math.min(64, Math.round(Number(st.fontSize) * 0.85)));
+      }
+      if (st.bold !== undefined) opts.bold = !!st.bold;
+      if (st.italic !== undefined) opts.italic = !!st.italic;
+      if (st.underline) opts.underline = { style: 'sng' };
+      if (st.strikethrough) opts.strike = 'sngStrike';
+      if (st.align && ['left', 'center', 'right', 'justify'].includes(st.align)) {
+        opts.align = st.align;
+      }
+      return opts;
+    };
 
     if (slideLayout === 'title') {
       slide.addShape(pptx.ShapeType.rect, {
@@ -99,27 +151,27 @@ export const exportReviewToPresentation = async (review) => {
       });
 
       if (s.badge) {
-        slide.addText(String(s.badge).toUpperCase(), {
+        slide.addText(String(s.badge).toUpperCase(), applyFieldPptxOpts('badge', {
           x: 0.8, y: 1.55, w: 11.7, h: 0.4,
           fontSize: 12, fontFace, color: PRIMARY_COLOR, bold: true, align: titleAlign
-        });
+        }));
       }
 
-      slide.addText(s.title || displayTitle, {
+      slide.addText(s.title || displayTitle, applyFieldPptxOpts('title', {
         x: 0.8, y: 2.1, w: 11.7, h: 2.2,
         fontSize: 38, fontFace, color: TEXT_MAIN, bold: true, align: titleAlign,
         valign: 'middle', breakLine: true
-      });
+      }));
 
       const titleSubText = [
         s.subtitle,
         s.description && s.description !== s.subtitle ? s.description : ''
       ].filter(Boolean).join('\n\n') || 'Presentación Académica Interactiva';
 
-      slide.addText(titleSubText, {
+      slide.addText(titleSubText, applyFieldPptxOpts('subtitle', {
         x: 1.0, y: 4.5, w: 11.3, h: 1.5,
         fontSize: 18, fontFace, color: TEXT_MUTED, align: titleAlign, valign: 'top', breakLine: true
-      });
+      }));
 
     } else if (slideLayout === 'section') {
       slide.addShape(pptx.ShapeType.roundRect, {
@@ -129,33 +181,33 @@ export const exportReviewToPresentation = async (review) => {
         rectRadius: 0.2
       });
 
-      slide.addText(String(s.badge || `SECCIÓN ${idx + 1}`).toUpperCase(), {
+      slide.addText(String(s.badge || `SECCIÓN ${idx + 1}`).toUpperCase(), applyFieldPptxOpts('badge', {
         x: 1.2, y: 1.9, w: 10.9, h: 0.5,
         fontSize: 13, fontFace, color: PRIMARY_COLOR, bold: true, align: 'center'
-      });
+      }));
 
-      slide.addText(s.title || 'Encabezado de Sección', {
+      slide.addText(s.title || 'Encabezado de Sección', applyFieldPptxOpts('title', {
         x: 1.2, y: 2.5, w: 10.9, h: 1.6,
         fontSize: 34, fontFace, color: TEXT_MAIN, bold: true, align: 'center', valign: 'middle'
-      });
+      }));
 
       if (s.subtitle) {
-        slide.addText(s.subtitle, {
+        slide.addText(s.subtitle, applyFieldPptxOpts('subtitle', {
           x: 1.6, y: 4.2, w: 10.1, h: 1.2,
           fontSize: 17, fontFace, color: TEXT_MUTED, align: 'center'
-        });
+        }));
       }
 
     } else if (slideLayout === 'title_body') {
-      slide.addText(s.badge || `DIAPOSITIVA ${idx + 1}`, {
+      slide.addText(s.badge || `DIAPOSITIVA ${idx + 1}`, applyFieldPptxOpts('badge', {
         x: 0.8, y: 0.55, w: 11.5, h: 0.3,
         fontSize: 10, fontFace, color: PRIMARY_COLOR, bold: true
-      });
+      }));
 
-      slide.addText(s.title || 'Desarrollo del Tema', {
+      slide.addText(s.title || 'Desarrollo del Tema', applyFieldPptxOpts('title', {
         x: 0.8, y: 0.9, w: 11.5, h: 0.75,
         fontSize: 25, fontFace, color: TEXT_MAIN, bold: true, align: titleAlign
-      });
+      }));
 
       const hasCallout = Boolean(s.callout && String(s.callout).trim());
       slide.addShape(pptx.ShapeType.roundRect, {
@@ -165,10 +217,10 @@ export const exportReviewToPresentation = async (review) => {
         rectRadius: 0.15
       });
 
-      slide.addText(s.body || s.content || s.subtitle || '', {
+      slide.addText(s.body || s.content || s.subtitle || '', applyFieldPptxOpts('body', {
         x: 1.1, y: 2.0, w: 11.1, h: hasCallout ? 3.1 : 4.3,
         fontSize: 16, fontFace, color: TEXT_MAIN, valign: 'top', breakLine: true
-      });
+      }));
 
       if (hasCallout) {
         slide.addShape(pptx.ShapeType.roundRect, {
@@ -177,26 +229,26 @@ export const exportReviewToPresentation = async (review) => {
           line: { color: PRIMARY_COLOR, width: 1.5 },
           rectRadius: 0.12
         });
-        slide.addText(`💡 ${s.callout}`, {
+        slide.addText(`💡 ${s.callout}`, applyFieldPptxOpts('callout', {
           x: 1.1, y: 5.65, w: 11.1, h: 0.8,
           fontSize: 14, fontFace, color: PRIMARY_COLOR, bold: true, valign: 'middle'
-        });
+        }));
       }
 
     } else if (slideLayout === 'two_columns') {
-      slide.addText(s.badge || `DIAPOSITIVA ${idx + 1} • COMPARACIÓN`, {
+      slide.addText(s.badge || `DIAPOSITIVA ${idx + 1} • COMPARACIÓN`, applyFieldPptxOpts('badge', {
         x: 0.8, y: 0.55, w: 11.5, h: 0.3,
         fontSize: 10, fontFace, color: PRIMARY_COLOR, bold: true
-      });
+      }));
 
-      slide.addText(s.title || 'Comparación', {
+      slide.addText(s.title || 'Comparación', applyFieldPptxOpts('title', {
         x: 0.8, y: 0.9, w: 11.7, h: 0.75,
         fontSize: 25, fontFace, color: TEXT_MAIN, bold: true, align: titleAlign
-      });
+      }));
 
       const cols = [
-        { data: s.leftColumn || { title: 'Columna A', text: '', items: [] }, x: 0.8, accent: PRIMARY_COLOR },
-        { data: s.rightColumn || { title: 'Columna B', text: '', items: [] }, x: 6.8, accent: SECONDARY_COLOR }
+        { key: 'leftColumn', data: s.leftColumn || { title: 'Columna A', text: '', items: [] }, x: 0.8, accent: PRIMARY_COLOR },
+        { key: 'rightColumn', data: s.rightColumn || { title: 'Columna B', text: '', items: [] }, x: 6.8, accent: SECONDARY_COLOR }
       ];
 
       cols.forEach((col) => {
@@ -208,44 +260,49 @@ export const exportReviewToPresentation = async (review) => {
         });
 
         if (col.data.badge) {
-          slide.addText(String(col.data.badge).toUpperCase(), {
+          slide.addText(String(col.data.badge).toUpperCase(), applyFieldPptxOpts(`${col.key}.badge`, {
             x: col.x + 0.35, y: 2.05, w: 5.0, h: 0.3,
             fontSize: 10, fontFace, color: col.accent, bold: true
-          });
+          }));
         }
 
-        slide.addText(col.data.title || ' Bloque', {
+        slide.addText(col.data.title || ' Bloque', applyFieldPptxOpts(`${col.key}.title`, {
           x: col.x + 0.35, y: 2.4, w: 5.0, h: 0.55,
           fontSize: 18, fontFace, color: TEXT_MAIN, bold: true
-        });
+        }));
 
         if (col.data.text) {
-          slide.addText(col.data.text, {
+          slide.addText(col.data.text, applyFieldPptxOpts(`${col.key}.text`, {
             x: col.x + 0.35, y: 3.05, w: 5.0, h: 1.2,
             fontSize: 13, fontFace, color: TEXT_MUTED, valign: 'top'
-          });
+          }));
         }
 
         const listItems = Array.isArray(col.data.items) ? col.data.items.filter(Boolean) : [];
         if (listItems.length > 0) {
-          const formattedList = listItems.map(it => `•  ${it}`).join('\n');
-          slide.addText(formattedList, {
+          const itemRuns = listItems.map((it, iIdx) => ({
+            text: `•  ${it}${iIdx < listItems.length - 1 ? '\n' : ''}`,
+            options: applyFieldPptxOpts(`${col.key}.items.${iIdx}`, {
+              fontSize: 13, fontFace, color: TEXT_MAIN
+            })
+          }));
+          slide.addText(itemRuns, applyFieldPptxOpts(`${col.key}.items.0`, {
             x: col.x + 0.35, y: col.data.text ? 4.35 : 3.2, w: 5.0, h: 2.0,
             fontSize: 13, fontFace, color: TEXT_MAIN, valign: 'top', breakLine: true
-          });
+          }));
         }
       });
 
     } else if (slideLayout === 'table') {
-      slide.addText(s.badge || `DIAPOSITIVA ${idx + 1} • TABLA`, {
+      slide.addText(s.badge || `DIAPOSITIVA ${idx + 1} • TABLA`, applyFieldPptxOpts('badge', {
         x: 0.8, y: 0.55, w: 11.5, h: 0.3,
         fontSize: 10, fontFace, color: PRIMARY_COLOR, bold: true
-      });
+      }));
 
-      slide.addText(s.title || 'Tabla de Datos', {
+      slide.addText(s.title || 'Tabla de Datos', applyFieldPptxOpts('title', {
         x: 0.8, y: 0.9, w: 11.7, h: 0.75,
         fontSize: 25, fontFace, color: TEXT_MAIN, bold: true, align: titleAlign
-      });
+      }));
 
       const headers = Array.isArray(s.table?.headers) && s.table.headers.length > 0
         ? s.table.headers
@@ -253,15 +310,22 @@ export const exportReviewToPresentation = async (review) => {
       const rows = getTableRows(s.table);
 
       const pptxRows = [
-        headers.map(h => ({
-          text: String(h || ''),
-          options: { fill: PRIMARY_COLOR, color: 'FFFFFF', bold: true, fontSize: 13, fontFace, valign: 'middle' }
-        })),
-        ...rows.map((r) =>
-          headers.map((_, cIdx) => ({
-            text: String((Array.isArray(r) ? r[cIdx] : '') || ''),
-            options: { fill: CARD_BG, color: TEXT_MAIN, fontSize: 12, fontFace, valign: 'middle' }
-          }))
+        headers.map((h, hIdx) => {
+          const hOpts = applyFieldPptxOpts(`table.header.${hIdx}`, {
+            fill: PRIMARY_COLOR, color: 'FFFFFF', bold: true, fontSize: 13, fontFace, valign: 'middle'
+          });
+          return { text: String(h || ''), options: hOpts };
+        }),
+        ...rows.map((r, rIdx) =>
+          headers.map((_, cIdx) => {
+            const cOpts = applyFieldPptxOpts(`table.cell.${rIdx}.${cIdx}`, {
+              fill: CARD_BG, color: TEXT_MAIN, fontSize: 12, fontFace, valign: 'middle'
+            });
+            return {
+              text: String((Array.isArray(r) ? r[cIdx] : '') || ''),
+              options: cOpts
+            };
+          })
         )
       ];
 
@@ -274,15 +338,15 @@ export const exportReviewToPresentation = async (review) => {
       });
 
     } else if (slideLayout === 'image_text') {
-      slide.addText(s.badge || `DIAPOSITIVA ${idx + 1}`, {
+      slide.addText(s.badge || `DIAPOSITIVA ${idx + 1}`, applyFieldPptxOpts('badge', {
         x: 0.8, y: 0.55, w: 11.5, h: 0.3,
         fontSize: 10, fontFace, color: PRIMARY_COLOR, bold: true
-      });
+      }));
 
-      slide.addText(s.title || 'Análisis Visual', {
+      slide.addText(s.title || 'Análisis Visual', applyFieldPptxOpts('title', {
         x: 0.8, y: 0.9, w: 11.7, h: 0.75,
         fontSize: 25, fontFace, color: TEXT_MAIN, bold: true, align: titleAlign
-      });
+      }));
 
       const imgLeft = s.imagePosition === 'left';
       const textX = imgLeft ? 6.6 : 0.8;
@@ -295,16 +359,16 @@ export const exportReviewToPresentation = async (review) => {
         rectRadius: 0.15
       });
 
-      slide.addText(s.body || s.content || s.subtitle || '', {
+      slide.addText(s.body || s.content || s.subtitle || '', applyFieldPptxOpts('body', {
         x: textX + 0.35, y: 2.1, w: 5.0, h: 3.2,
         fontSize: 15, fontFace, color: TEXT_MAIN, valign: 'top', breakLine: true
-      });
+      }));
 
       if (s.callout) {
-        slide.addText(`📌 ${s.callout}`, {
+        slide.addText(`📌 ${s.callout}`, applyFieldPptxOpts('callout', {
           x: textX + 0.35, y: 5.4, w: 5.0, h: 0.9,
           fontSize: 12, fontFace, color: PRIMARY_COLOR, bold: true, valign: 'top'
-        });
+        }));
       }
 
       slide.addShape(pptx.ShapeType.roundRect, {
@@ -326,10 +390,10 @@ export const exportReviewToPresentation = async (review) => {
         }
       }
       if (s.imageCaption) {
-        slide.addText(s.imageCaption, {
+        slide.addText(s.imageCaption, applyFieldPptxOpts('imageCaption', {
           x: imgX + 0.3, y: 5.9, w: 5.1, h: 0.5,
           fontSize: 11, fontFace, color: TEXT_MUTED, italic: true, align: 'center'
-        });
+        }));
       }
 
     } else if (slideLayout === 'quote') {
@@ -341,34 +405,34 @@ export const exportReviewToPresentation = async (review) => {
       });
 
       if (s.statValue) {
-        slide.addText(String(s.statValue), {
+        slide.addText(String(s.statValue), applyFieldPptxOpts('statValue', {
           x: 1.3, y: 1.5, w: 10.7, h: 1.2,
           fontSize: 44, fontFace, color: PRIMARY_COLOR, bold: true, align: 'center'
-        });
+        }));
       }
 
-      slide.addText(`“${s.quoteText || s.body || s.title || ''}”`, {
+      slide.addText(`“${s.quoteText || s.body || s.title || ''}”`, applyFieldPptxOpts('quoteText', {
         x: 1.4, y: s.statValue ? 2.8 : 2.0, w: 10.5, h: 2.2,
         fontSize: 24, fontFace, color: TEXT_MAIN, bold: true, italic: true, align: 'center', valign: 'middle'
-      });
+      }));
 
       if (s.quoteAuthor || s.title) {
-        slide.addText(`— ${s.quoteAuthor || s.title}`, {
+        slide.addText(`— ${s.quoteAuthor || s.title}`, applyFieldPptxOpts('quoteAuthor', {
           x: 1.4, y: 5.1, w: 10.5, h: 0.6,
           fontSize: 15, fontFace, color: TEXT_MUTED, bold: true, align: 'center'
-        });
+        }));
       }
 
     } else if (slideLayout === 'quiz') {
-      slide.addText(`SLIDE ${idx + 1} • QUIZ`, {
+      slide.addText(`SLIDE ${idx + 1} • QUIZ`, applyFieldPptxOpts('badge', {
         x: 0.8, y: 0.6, w: 11.5, h: 0.3,
         fontSize: 11, fontFace, color: SECONDARY_COLOR, bold: true
-      });
+      }));
 
-      slide.addText(s.title || 'Pregunta de Repaso', {
+      slide.addText(s.title || 'Pregunta de Repaso', applyFieldPptxOpts('title', {
         x: 0.8, y: 1.0, w: 11.5, h: 0.7,
         fontSize: 24, fontFace, color: TEXT_MAIN, bold: true
-      });
+      }));
 
       slide.addShape(pptx.ShapeType.roundRect, {
         x: 0.8, y: 1.8, w: 11.5, h: 1.4,
@@ -376,10 +440,10 @@ export const exportReviewToPresentation = async (review) => {
         line: { color: CARD_BORDER, width: 1 },
         rectRadius: 0.15
       });
-      slide.addText(s.question || s.content || '', {
+      slide.addText(s.question || s.content || '', applyFieldPptxOpts('question', {
         x: 1.1, y: 2.0, w: 10.9, h: 1.0,
         fontSize: 17, fontFace, color: PRIMARY_COLOR, bold: true
-      });
+      }));
 
       const options = s.options || [
         { text: s.answer || 'Respuesta correcta', isCorrect: true, explanation: '' }
@@ -398,23 +462,36 @@ export const exportReviewToPresentation = async (review) => {
           rectRadius: 0.15
         });
 
-        slide.addText(`${String.fromCharCode(65 + oIdx)})  ${opt.text}`, {
-          x: posX + 0.2, y: posY + 0.12, w: 5.2, h: 0.8,
-          fontSize: 14, fontFace, color: opt.isCorrect ? 'A7F3D0' : TEXT_MAIN,
-          bold: opt.isCorrect, valign: 'middle'
-        });
+        if (opt.explanation) {
+          slide.addText(`${String.fromCharCode(65 + oIdx)})  ${opt.text}`, applyFieldPptxOpts(`options.${oIdx}.text`, {
+            x: posX + 0.2, y: posY + 0.08, w: 5.2, h: 0.5,
+            fontSize: 13, fontFace, color: opt.isCorrect ? 'A7F3D0' : TEXT_MAIN,
+            bold: opt.isCorrect, valign: 'middle'
+          }));
+          slide.addText(String(opt.explanation), applyFieldPptxOpts(`options.${oIdx}.explanation`, {
+            x: posX + 0.2, y: posY + 0.58, w: 5.2, h: 0.38,
+            fontSize: 10, fontFace, color: opt.isCorrect ? 'A7F3D0' : TEXT_MUTED,
+            italic: true, valign: 'top'
+          }));
+        } else {
+          slide.addText(`${String.fromCharCode(65 + oIdx)})  ${opt.text}`, applyFieldPptxOpts(`options.${oIdx}.text`, {
+            x: posX + 0.2, y: posY + 0.12, w: 5.2, h: 0.8,
+            fontSize: 14, fontFace, color: opt.isCorrect ? 'A7F3D0' : TEXT_MAIN,
+            bold: opt.isCorrect, valign: 'middle'
+          }));
+        }
       });
 
     } else if (slideLayout === 'bullets') {
-      slide.addText(s.badge || `SLIDE ${idx + 1}`, {
+      slide.addText(s.badge || `SLIDE ${idx + 1}`, applyFieldPptxOpts('badge', {
         x: 0.8, y: 0.6, w: 11.5, h: 0.3,
         fontSize: 11, fontFace, color: PRIMARY_COLOR, bold: true
-      });
+      }));
 
-      slide.addText(s.title || 'Conceptos Esenciales', {
+      slide.addText(s.title || 'Conceptos Esenciales', applyFieldPptxOpts('title', {
         x: 0.8, y: 1.0, w: 11.5, h: 0.8,
         fontSize: 26, fontFace, color: TEXT_MAIN, bold: true, align: titleAlign
-      });
+      }));
 
       const items = s.bullets || (s.content ? s.content.split('\n').filter(Boolean).map(t => ({ title: t, text: '' })) : []);
 
@@ -437,30 +514,56 @@ export const exportReviewToPresentation = async (review) => {
         const bText = (typeof b === 'object' && b.text) ? ` — ${b.text}` : '';
         const bEx = (typeof b === 'object' && b.example) ? ` [Ej: ${b.example}]` : '';
 
-        slide.addText(`${bTitle}${bText}${bEx}`, {
+        const bRuns = [
+          {
+            text: String(bTitle || ''),
+            options: applyFieldPptxOpts(`bullets.${bIdx}.title`, {
+              fontSize: 14, fontFace, color: TEXT_MAIN, bold: true
+            })
+          }
+        ];
+        if (bText) {
+          bRuns.push({
+            text: bText,
+            options: applyFieldPptxOpts(`bullets.${bIdx}.text`, {
+              fontSize: 13, fontFace, color: TEXT_MUTED, bold: false
+            })
+          });
+        }
+        if (bEx) {
+          bRuns.push({
+            text: bEx,
+            options: applyFieldPptxOpts(`bullets.${bIdx}.example`, {
+              fontSize: 12, fontFace, color: PRIMARY_COLOR, italic: true
+            })
+          });
+        }
+
+        slide.addText(bRuns, applyFieldPptxOpts(`bullets.${bIdx}.title`, {
           x: 1.6, y: posY + 0.1, w: 10.4, h: stepH - 0.3,
           fontSize: 14, fontFace, color: TEXT_MAIN, bold: false, valign: 'middle'
-        });
+        }));
       });
+
 
     } else if (slideLayout === 'blank') {
       if (!s.hideHeader && s.title) {
-        slide.addText(s.title, {
+        slide.addText(s.title, applyFieldPptxOpts('title', {
           x: 0.8, y: 0.55, w: 11.7, h: 0.65,
           fontSize: 22, fontFace, color: TEXT_MAIN, bold: true, align: titleAlign
-        });
+        }));
       }
     } else {
       // 'cards'
-      slide.addText(s.badge || `SLIDE ${idx + 1}`, {
+      slide.addText(s.badge || `SLIDE ${idx + 1}`, applyFieldPptxOpts('badge', {
         x: 0.8, y: 0.6, w: 11.5, h: 0.3,
         fontSize: 11, fontFace, color: PRIMARY_COLOR, bold: true
-      });
+      }));
 
-      slide.addText(s.title || 'Explicación del Tema', {
+      slide.addText(s.title || 'Explicación del Tema', applyFieldPptxOpts('title', {
         x: 0.8, y: 1.0, w: 11.5, h: 0.8,
         fontSize: 26, fontFace, color: TEXT_MAIN, bold: true, align: titleAlign
-      });
+      }));
 
       const cards = s.cards || (s.content ? [{ title: s.title, text: s.content }] : []);
       const count = Math.min(Math.max(cards.length, 1), 4);
@@ -477,21 +580,21 @@ export const exportReviewToPresentation = async (review) => {
           rectRadius: 0.15
         });
 
-        slide.addText(c.title || `Concepto ${cIdx + 1}`, {
+        slide.addText(c.title || `Concepto ${cIdx + 1}`, applyFieldPptxOpts(`cards.${cIdx}.title`, {
           x: posX + 0.25, y: 2.25, w: cardW - 0.5, h: 0.65,
           fontSize: 16, fontFace, color: TEXT_MAIN, bold: true
-        });
+        }));
 
-        slide.addText(c.text || '', {
+        slide.addText(c.text || '', applyFieldPptxOpts(`cards.${cIdx}.text`, {
           x: posX + 0.25, y: 2.95, w: cardW - 0.5, h: 2.1,
           fontSize: 13, fontFace, color: TEXT_MUTED, valign: 'top', breakLine: true
-        });
+        }));
 
         if (c.example) {
-          slide.addText(`Ej: ${c.example}`, {
+          slide.addText(`Ej: ${c.example}`, applyFieldPptxOpts(`cards.${cIdx}.example`, {
             x: posX + 0.25, y: 5.15, w: cardW - 0.5, h: 1.0,
             fontSize: 12, fontFace, color: PRIMARY_COLOR, italic: true, valign: 'top'
-          });
+          }));
         }
       });
     }
@@ -551,19 +654,23 @@ export const exportReviewToPresentation = async (review) => {
         }
 
         if (el.text) {
-          slide.addText(String(el.text), {
+          const elFontFace = (el.fontFamily && SLIDE_FONTS[el.fontFamily]?.pptx) || fontFace;
+          const elTextOpts = {
             x: xIn + 0.1,
             y: yIn + 0.06,
             w: Math.max(0.3, wIn - 0.2),
             h: Math.max(0.25, hIn - 0.12),
-            fontSize: Math.max(10, Math.min(44, Number(el.fontSize) || 16)),
-            fontFace,
+            fontSize: Math.max(10, Math.min(60, Number(el.fontSize) || 16)),
+            fontFace: elFontFace,
             color: cleanHexNoHash(el.textColor, hasFill ? 'FFFFFF' : TEXT_MAIN),
             bold: !!el.bold,
             italic: !!el.italic,
             align: el.align || 'left',
             valign: 'middle'
-          });
+          };
+          if (el.underline) elTextOpts.underline = { style: 'sng' };
+          if (el.strikethrough) elTextOpts.strike = 'sngStrike';
+          slide.addText(String(el.text), elTextOpts);
         }
       });
     }
@@ -603,6 +710,9 @@ export const SlideCanvasSurface = ({
   onSelectElement = null,
   onStartElementPointer = null,
   onUpdateElementField = null,
+  activeTextField = null,
+  onSelectTextField = null,
+  onTriggerSlideImageUpload = null,
   showGridGuides = false,
   snapGuides = { xCenter: false, yCenter: false },
   spotlightIdx = null,
@@ -615,8 +725,8 @@ export const SlideCanvasSurface = ({
   const isInteractiveEditor = mode === 'editor' && typeof onUpdateSlideField === 'function';
   const isCompact = mode === 'thumbnail' || mode === 'card';
 
-  const titleAlign = safeSlide.titleAlign || (layout === 'title' || layout === 'section' || layout === 'quote' ? 'center' : 'left');
-  const alignClass = titleAlign === 'center' ? 'text-center' : titleAlign === 'right' ? 'text-right' : 'text-left';
+  const titleAlign = safeSlide.textStyles?.title?.align || safeSlide.titleAlign || (layout === 'title' || layout === 'section' || layout === 'quote' ? 'center' : 'left');
+  const alignClass = titleAlign === 'center' ? 'text-center' : titleAlign === 'right' ? 'text-right' : titleAlign === 'justify' ? 'text-justify' : 'text-left';
 
   const titleSizeMap = {
     sm: isCompact ? 'text-xs' : 'text-xl sm:text-2xl',
@@ -639,6 +749,28 @@ export const SlideCanvasSurface = ({
     quiz: 'Quiz Interactivo',
     blank: 'Lienzo'
   };
+
+  const fStyle = (fieldKey, baseStyle = {}) => buildInlineTextStyle(safeSlide, fieldKey, baseStyle, mode);
+  const fRing = (fieldKey) => (
+    isInteractiveEditor && !selectedElementId && activeTextField === fieldKey
+      ? 'ring-2 ring-sky-500/80 bg-sky-500/5 rounded-lg'
+      : ''
+  );
+  const bindField = (fieldKey) => (
+    isInteractiveEditor
+      ? {
+          onFocus: () => {
+            onSelectElement?.(null);
+            onSelectTextField?.(fieldKey);
+          },
+          onClick: (e) => {
+            e.stopPropagation();
+            onSelectElement?.(null);
+            onSelectTextField?.(fieldKey);
+          }
+        }
+      : {}
+  );
 
   return (
     <div
@@ -692,13 +824,31 @@ export const SlideCanvasSurface = ({
       {/* Encabezado superior de la diapositiva (salvo en Lienzo libre oculto o miniatura) */}
       {!isCompact && !(layout === 'blank' && safeSlide.hideHeader) && (
         <div className="flex items-center justify-between gap-2 z-10 shrink-0">
-          <span
-            style={{ backgroundColor: theme.badgeBg, color: theme.badgeText }}
-            className="px-2.5 py-1 rounded-lg uppercase tracking-wider text-[10px] font-black inline-flex items-center gap-1.5"
-          >
-            <Sparkles size={11} />
-            <span>{safeSlide.badge || layoutLabelMap[layout] || 'Diapositiva'}</span>
-          </span>
+          {isInteractiveEditor ? (
+            <div
+              style={{ backgroundColor: theme.badgeBg, color: theme.badgeText }}
+              className={`px-2.5 py-1 rounded-lg uppercase tracking-wider text-[10px] font-black inline-flex items-center gap-1.5 ${fRing('badge')}`}
+            >
+              <Sparkles size={11} className="shrink-0" />
+              <input
+                type="text"
+                value={safeSlide.badge || ''}
+                onChange={(e) => onUpdateSlideField('badge', e.target.value)}
+                placeholder={layoutLabelMap[layout] || 'Etiqueta'}
+                style={fStyle('badge', { color: theme.badgeText })}
+                {...bindField('badge')}
+                className="bg-transparent outline-none uppercase tracking-wider w-28 sm:w-36 placeholder:opacity-60"
+              />
+            </div>
+          ) : (
+            <span
+              style={fStyle('badge', { backgroundColor: theme.badgeBg, color: theme.badgeText })}
+              className="px-2.5 py-1 rounded-lg uppercase tracking-wider text-[10px] font-black inline-flex items-center gap-1.5"
+            >
+              <Sparkles size={11} />
+              <span>{safeSlide.badge || layoutLabelMap[layout] || 'Diapositiva'}</span>
+            </span>
+          )}
           <span style={{ color: theme.textSecondary }} className="font-mono text-xs font-extrabold">
             {slideIdx + 1} / {Math.max(1, totalSlides)}
           </span>
@@ -734,16 +884,18 @@ export const SlideCanvasSurface = ({
                   value={safeSlide.title || ''}
                   onChange={(e) => onUpdateSlideField('title', e.target.value)}
                   placeholder="Título principal de la presentación..."
-                  style={{ color: theme.textPrimary }}
-                  className={`w-full bg-transparent font-black leading-tight tracking-tight outline-none rounded-xl px-2 py-1 border border-transparent hover:border-current/20 focus:border-current/40 ${titleSizeClass} ${alignClass}`}
+                  style={fStyle('title', { color: theme.textPrimary })}
+                  {...bindField('title')}
+                  className={`w-full bg-transparent font-black leading-tight tracking-tight outline-none rounded-xl px-2 py-1 border border-transparent hover:border-current/20 focus:border-current/40 ${titleSizeClass} ${alignClass} ${fRing('title')}`}
                 />
                 <textarea
                   value={safeSlide.subtitle !== undefined ? safeSlide.subtitle : (safeSlide.description || '')}
                   onChange={(e) => onUpdateSlideField('subtitle', e.target.value)}
                   rows={2}
                   placeholder="Haz clic para escribir un subtítulo u objetivo de la clase..."
-                  style={{ color: theme.textSecondary }}
-                  className={`w-full bg-transparent text-base sm:text-xl font-medium leading-relaxed outline-none resize-none rounded-xl px-2 py-1 border border-transparent hover:border-current/20 focus:border-current/40 ${alignClass}`}
+                  style={fStyle('subtitle', { color: theme.textSecondary })}
+                  {...bindField('subtitle')}
+                  className={`w-full bg-transparent text-base sm:text-xl font-medium leading-relaxed outline-none resize-none rounded-xl px-2 py-1 border border-transparent hover:border-current/20 focus:border-current/40 ${alignClass} ${fRing('subtitle')}`}
                 />
                 {safeSlide.subtitle && safeSlide.description && safeSlide.description !== safeSlide.subtitle && (
                   <textarea
@@ -751,19 +903,23 @@ export const SlideCanvasSurface = ({
                     onChange={(e) => onUpdateSlideField('description', e.target.value)}
                     rows={2}
                     placeholder="Descripción adicional de portada..."
-                    style={{ color: theme.textSecondary }}
-                    className={`w-full bg-transparent text-xs sm:text-base font-medium leading-relaxed outline-none resize-none rounded-xl px-2 py-1 border border-transparent hover:border-current/20 focus:border-current/40 opacity-90 ${alignClass}`}
+                    style={fStyle('description', { color: theme.textSecondary })}
+                    {...bindField('description')}
+                    className={`w-full bg-transparent text-xs sm:text-base font-medium leading-relaxed outline-none resize-none rounded-xl px-2 py-1 border border-transparent hover:border-current/20 focus:border-current/40 opacity-90 ${alignClass} ${fRing('description')}`}
                   />
                 )}
               </>
             ) : (
               <>
-                <h1 className={`font-black leading-tight tracking-tight ${ isCompact ? 'text-sm sm:text-base line-clamp-2' : titleSizeClass }`}>
+                <h1
+                  style={fStyle('title', { color: theme.textPrimary })}
+                  className={`font-black leading-tight tracking-tight ${isCompact ? 'text-sm sm:text-base line-clamp-2' : titleSizeClass}`}
+                >
                   {safeSlide.title || presentation?.topic || 'Presentación'}
                 </h1>
                 {(safeSlide.subtitle || safeSlide.description) && (
                   <p
-                    style={{ color: theme.textSecondary }}
+                    style={fStyle('subtitle', { color: theme.textSecondary })}
                     className={isCompact ? 'text-[11px] line-clamp-1 font-medium' : 'text-base sm:text-xl md:text-2xl font-medium leading-relaxed max-w-3xl mx-auto'}
                   >
                     {safeSlide.subtitle || safeSlide.description}
@@ -771,7 +927,7 @@ export const SlideCanvasSurface = ({
                 )}
                 {!isCompact && safeSlide.subtitle && safeSlide.description && safeSlide.description !== safeSlide.subtitle && (
                   <p
-                    style={{ color: theme.textSecondary }}
+                    style={fStyle('description', { color: theme.textSecondary })}
                     className="text-xs sm:text-base font-medium leading-relaxed max-w-2xl mx-auto opacity-85"
                   >
                     {safeSlide.description}
@@ -785,12 +941,24 @@ export const SlideCanvasSurface = ({
             style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorder }}
             className={`max-w-4xl mx-auto border rounded-3xl ${isCompact ? 'p-3' : 'p-6 sm:p-10'} shadow-sm ${alignClass} space-y-3`}
           >
-            <div
-              style={{ color: theme.primary }}
-              className="text-xs font-black uppercase tracking-widest"
-            >
-              {safeSlide.badge || `Sección ${slideIdx + 1}`}
-            </div>
+            {isInteractiveEditor ? (
+              <input
+                type="text"
+                value={safeSlide.badge || ''}
+                onChange={(e) => onUpdateSlideField('badge', e.target.value)}
+                placeholder={`Sección ${slideIdx + 1}`}
+                style={fStyle('badge', { color: theme.primary })}
+                {...bindField('badge')}
+                className={`w-full bg-transparent text-xs font-black uppercase tracking-widest outline-none ${alignClass} ${fRing('badge')}`}
+              />
+            ) : (
+              <div
+                style={fStyle('badge', { color: theme.primary })}
+                className="text-xs font-black uppercase tracking-widest"
+              >
+                {safeSlide.badge || `Sección ${slideIdx + 1}`}
+              </div>
+            )}
             {isInteractiveEditor ? (
               <>
                 <input
@@ -798,22 +966,27 @@ export const SlideCanvasSurface = ({
                   value={safeSlide.title || ''}
                   onChange={(e) => onUpdateSlideField('title', e.target.value)}
                   placeholder="Título de la sección..."
-                  className={`w-full bg-transparent font-black outline-none rounded-lg px-2 py-1 border border-transparent hover:border-current/20 focus:border-current/40 ${titleSizeClass} ${alignClass}`}
+                  style={fStyle('title', { color: theme.textPrimary })}
+                  {...bindField('title')}
+                  className={`w-full bg-transparent font-black outline-none rounded-lg px-2 py-1 border border-transparent hover:border-current/20 focus:border-current/40 ${titleSizeClass} ${alignClass} ${fRing('title')}`}
                 />
                 <textarea
                   value={safeSlide.subtitle || ''}
                   onChange={(e) => onUpdateSlideField('subtitle', e.target.value)}
                   rows={2}
                   placeholder="Descripción breve de la sección..."
-                  style={{ color: theme.textSecondary }}
-                  className={`w-full bg-transparent text-sm sm:text-lg font-medium outline-none resize-none rounded-lg px-2 py-1 border border-transparent hover:border-current/20 focus:border-current/40 ${alignClass}`}
+                  style={fStyle('subtitle', { color: theme.textSecondary })}
+                  {...bindField('subtitle')}
+                  className={`w-full bg-transparent text-sm sm:text-lg font-medium outline-none resize-none rounded-lg px-2 py-1 border border-transparent hover:border-current/20 focus:border-current/40 ${alignClass} ${fRing('subtitle')}`}
                 />
               </>
             ) : (
               <>
-                <h2 className={`font-black tracking-tight ${titleSizeClass}`}>{safeSlide.title || 'Sección'}</h2>
+                <h2 style={fStyle('title', { color: theme.textPrimary })} className={`font-black tracking-tight ${titleSizeClass}`}>
+                  {safeSlide.title || 'Sección'}
+                </h2>
                 {safeSlide.subtitle && (
-                  <p style={{ color: theme.textSecondary }} className={isCompact ? 'text-[10px] line-clamp-1' : 'text-base sm:text-lg font-medium'}>
+                  <p style={fStyle('subtitle', { color: theme.textSecondary })} className={isCompact ? 'text-[10px] line-clamp-1' : 'text-base sm:text-lg font-medium'}>
                     {safeSlide.subtitle}
                   </p>
                 )}
@@ -828,10 +1001,12 @@ export const SlideCanvasSurface = ({
                 value={safeSlide.title || ''}
                 onChange={(e) => onUpdateSlideField('title', e.target.value)}
                 placeholder="Título de la diapositiva..."
-                className={`w-full bg-transparent font-black tracking-tight outline-none rounded-lg px-1.5 py-0.5 border border-transparent hover:border-current/20 focus:border-current/40 ${titleSizeClass} ${alignClass}`}
+                style={fStyle('title', { color: theme.textPrimary })}
+                {...bindField('title')}
+                className={`w-full bg-transparent font-black tracking-tight outline-none rounded-lg px-1.5 py-0.5 border border-transparent hover:border-current/20 focus:border-current/40 ${titleSizeClass} ${alignClass} ${fRing('title')}`}
               />
             ) : (
-              <h2 className={`font-black tracking-tight ${titleSizeClass} ${alignClass}`}>
+              <h2 style={fStyle('title', { color: theme.textPrimary })} className={`font-black tracking-tight ${titleSizeClass} ${alignClass}`}>
                 {safeSlide.title || 'Contenido Principal'}
               </h2>
             )}
@@ -846,11 +1021,15 @@ export const SlideCanvasSurface = ({
                   onChange={(e) => onUpdateSlideField('body', e.target.value)}
                   rows={5}
                   placeholder="Escribe aquí el desarrollo o explicación de la diapositiva..."
-                  style={{ color: theme.textPrimary }}
-                  className="w-full bg-transparent text-sm sm:text-lg leading-relaxed font-medium outline-none resize-none"
+                  style={fStyle('body', { color: theme.textPrimary })}
+                  {...bindField('body')}
+                  className={`w-full bg-transparent text-sm sm:text-lg leading-relaxed font-medium outline-none resize-none ${fRing('body')}`}
                 />
               ) : (
-                <p className={`${isCompact ? 'text-[10px] line-clamp-3' : 'text-sm sm:text-lg leading-relaxed whitespace-pre-line font-medium'}`}>
+                <p
+                  style={fStyle('body', { color: theme.textPrimary })}
+                  className={`${isCompact ? 'text-[10px] line-clamp-3' : 'text-sm sm:text-lg leading-relaxed whitespace-pre-line font-medium'}`}
+                >
                   {safeSlide.body || safeSlide.content || safeSlide.subtitle || ''}
                 </p>
               )}
@@ -859,7 +1038,7 @@ export const SlideCanvasSurface = ({
             {(safeSlide.callout || isInteractiveEditor) && !isCompact && (
               <div
                 style={{ backgroundColor: theme.badgeBg, borderColor: theme.primary, color: theme.textPrimary }}
-                className="p-3.5 rounded-xl border-l-4 flex items-center gap-2.5 text-xs sm:text-sm font-semibold"
+                className={`p-3.5 rounded-xl border-l-4 flex items-center gap-2.5 text-xs sm:text-sm font-semibold ${fRing('callout')}`}
               >
                 <Lightbulb size={16} style={{ color: theme.primary }} className="shrink-0" />
                 {isInteractiveEditor ? (
@@ -868,10 +1047,12 @@ export const SlideCanvasSurface = ({
                     value={safeSlide.callout || ''}
                     onChange={(e) => onUpdateSlideField('callout', e.target.value)}
                     placeholder="Nota destacada o conclusión clave (opcional)..."
+                    style={fStyle('callout', { color: theme.textPrimary })}
+                    {...bindField('callout')}
                     className="w-full bg-transparent outline-none"
                   />
                 ) : (
-                  <span>{safeSlide.callout}</span>
+                  <span style={fStyle('callout', { color: theme.textPrimary })}>{safeSlide.callout}</span>
                 )}
               </div>
             )}
@@ -884,10 +1065,12 @@ export const SlideCanvasSurface = ({
                 value={safeSlide.title || ''}
                 onChange={(e) => onUpdateSlideField('title', e.target.value)}
                 placeholder="Título comparativo..."
-                className={`w-full bg-transparent font-black tracking-tight outline-none rounded-lg px-1.5 py-0.5 border border-transparent hover:border-current/20 focus:border-current/40 ${titleSizeClass} ${alignClass}`}
+                style={fStyle('title', { color: theme.textPrimary })}
+                {...bindField('title')}
+                className={`w-full bg-transparent font-black tracking-tight outline-none rounded-lg px-1.5 py-0.5 border border-transparent hover:border-current/20 focus:border-current/40 ${titleSizeClass} ${alignClass} ${fRing('title')}`}
               />
             ) : (
-              <h2 className={`font-black tracking-tight ${titleSizeClass} ${alignClass}`}>
+              <h2 style={fStyle('title', { color: theme.textPrimary })} className={`font-black tracking-tight ${titleSizeClass} ${alignClass}`}>
                 {safeSlide.title || 'Comparación'}
               </h2>
             )}
@@ -901,9 +1084,8 @@ export const SlideCanvasSurface = ({
                   items: []
                 };
                 const accent = cIdx === 0 ? theme.primary : theme.secondary;
-                const nonEmptyItems = Array.isArray(col.items)
-                  ? col.items.filter(it => String(it || '').trim() !== '')
-                  : [];
+                const rawItems = Array.isArray(col.items) ? col.items : [];
+                const nonEmptyItems = rawItems.filter(it => String(it || '').trim() !== '');
                 return (
                   <div
                     key={colKey}
@@ -911,12 +1093,24 @@ export const SlideCanvasSurface = ({
                     className={`rounded-2xl border flex flex-col justify-between ${isCompact ? 'p-2' : 'p-4 sm:p-5'} shadow-2xs`}
                   >
                     <div className="space-y-2">
-                      <span
-                        style={{ color: accent, backgroundColor: theme.badgeBg }}
-                        className="inline-block text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md"
-                      >
-                        {col.badge || (cIdx === 0 ? 'Bloque A' : 'Bloque B')}
-                      </span>
+                      {isInteractiveEditor ? (
+                        <input
+                          type="text"
+                          value={col.badge || ''}
+                          onChange={(e) => onUpdateSlideField(colKey, { ...col, badge: e.target.value })}
+                          placeholder={cIdx === 0 ? 'Bloque A' : 'Bloque B'}
+                          style={fStyle(`${colKey}.badge`, { color: accent, backgroundColor: theme.badgeBg })}
+                          {...bindField(`${colKey}.badge`)}
+                          className={`inline-block text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md outline-none w-36 ${fRing(`${colKey}.badge`)}`}
+                        />
+                      ) : (
+                        <span
+                          style={fStyle(`${colKey}.badge`, { color: accent, backgroundColor: theme.badgeBg })}
+                          className="inline-block text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md"
+                        >
+                          {col.badge || (cIdx === 0 ? 'Bloque A' : 'Bloque B')}
+                        </span>
+                      )}
 
                       {isInteractiveEditor ? (
                         <>
@@ -925,39 +1119,84 @@ export const SlideCanvasSurface = ({
                             value={col.title || ''}
                             onChange={(e) => onUpdateSlideField(colKey, { ...col, title: e.target.value })}
                             placeholder="Subtítulo de columna..."
-                            className="w-full bg-transparent text-sm sm:text-lg font-extrabold outline-none border-b border-transparent focus:border-current/30 pb-0.5"
+                            style={fStyle(`${colKey}.title`, { color: theme.textPrimary })}
+                            {...bindField(`${colKey}.title`)}
+                            className={`w-full bg-transparent text-sm sm:text-lg font-extrabold outline-none border-b border-transparent focus:border-current/30 pb-0.5 ${fRing(`${colKey}.title`)}`}
                           />
                           <textarea
                             value={col.text || ''}
                             onChange={(e) => onUpdateSlideField(colKey, { ...col, text: e.target.value })}
                             rows={2}
                             placeholder="Descripción de esta columna..."
-                            style={{ color: theme.textSecondary }}
-                            className="w-full bg-transparent text-xs sm:text-sm leading-relaxed outline-none resize-none"
+                            style={fStyle(`${colKey}.text`, { color: theme.textSecondary })}
+                            {...bindField(`${colKey}.text`)}
+                            className={`w-full bg-transparent text-xs sm:text-sm leading-relaxed outline-none resize-none ${fRing(`${colKey}.text`)}`}
                           />
                         </>
                       ) : (
                         <>
-                          <h4 className={`font-extrabold leading-tight ${isCompact ? 'text-[11px] line-clamp-1' : 'text-base sm:text-xl'}`}>
+                          <h4
+                            style={fStyle(`${colKey}.title`, { color: theme.textPrimary })}
+                            className={`font-extrabold leading-tight ${isCompact ? 'text-[11px] line-clamp-1' : 'text-base sm:text-xl'}`}
+                          >
                             {col.title}
                           </h4>
                           {col.text && (
-                            <p style={{ color: theme.textSecondary }} className={isCompact ? 'text-[9px] line-clamp-2' : 'text-xs sm:text-sm leading-relaxed'}>
+                            <p
+                              style={fStyle(`${colKey}.text`, { color: theme.textSecondary })}
+                              className={isCompact ? 'text-[9px] line-clamp-2' : 'text-xs sm:text-sm leading-relaxed'}
+                            >
                               {col.text}
                             </p>
                           )}
                         </>
                       )}
 
-                      {!isCompact && nonEmptyItems.length > 0 && (
-                        <ul className="space-y-1.5 pt-1">
-                          {nonEmptyItems.map((item, iIdx) => (
-                            <li key={iIdx} className="flex items-start gap-2 text-xs sm:text-sm font-medium">
-                              <span style={{ backgroundColor: accent }} className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" />
-                              <span className="flex-1">{item}</span>
-                            </li>
+                      {!isCompact && isInteractiveEditor ? (
+                        <div className="space-y-1.5 pt-1">
+                          {rawItems.map((item, iIdx) => (
+                            <div key={iIdx} className="flex items-center gap-1.5 text-xs sm:text-sm font-medium">
+                              <span style={{ backgroundColor: accent }} className="w-1.5 h-1.5 rounded-full shrink-0" />
+                              <input
+                                type="text"
+                                value={item || ''}
+                                onChange={(e) => {
+                                  const nextItems = [...rawItems];
+                                  nextItems[iIdx] = e.target.value;
+                                  onUpdateSlideField(colKey, { ...col, items: nextItems });
+                                }}
+                                placeholder={`Punto ${iIdx + 1}...`}
+                                style={fStyle(`${colKey}.items.${iIdx}`, { color: theme.textPrimary })}
+                                {...bindField(`${colKey}.items.${iIdx}`)}
+                                className={`flex-1 bg-transparent outline-none px-1 py-0.5 rounded ${fRing(`${colKey}.items.${iIdx}`)}`}
+                              />
+                            </div>
                           ))}
-                        </ul>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onUpdateSlideField(colKey, { ...col, items: [...rawItems, `Punto ${rawItems.length + 1}`] });
+                            }}
+                            style={{ color: accent }}
+                            className="text-[10px] font-bold hover:underline inline-flex items-center gap-1 pt-0.5"
+                          >
+                            <Plus size={10} /> Añadir viñeta
+                          </button>
+                        </div>
+                      ) : (
+                        !isCompact && nonEmptyItems.length > 0 && (
+                          <ul className="space-y-1.5 pt-1">
+                            {nonEmptyItems.map((item, iIdx) => (
+                              <li key={iIdx} className="flex items-start gap-2 text-xs sm:text-sm font-medium">
+                                <span style={{ backgroundColor: accent }} className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" />
+                                <span style={fStyle(`${colKey}.items.${iIdx}`, { color: theme.textPrimary })} className="flex-1">
+                                  {item}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        )
                       )}
                     </div>
                   </div>
@@ -973,10 +1212,12 @@ export const SlideCanvasSurface = ({
                 value={safeSlide.title || ''}
                 onChange={(e) => onUpdateSlideField('title', e.target.value)}
                 placeholder="Título de la tabla..."
-                className={`w-full bg-transparent font-black tracking-tight outline-none rounded-lg px-1.5 py-0.5 border border-transparent hover:border-current/20 focus:border-current/40 ${titleSizeClass} ${alignClass}`}
+                style={fStyle('title', { color: theme.textPrimary })}
+                {...bindField('title')}
+                className={`w-full bg-transparent font-black tracking-tight outline-none rounded-lg px-1.5 py-0.5 border border-transparent hover:border-current/20 focus:border-current/40 ${titleSizeClass} ${alignClass} ${fRing('title')}`}
               />
             ) : (
-              <h2 className={`font-black tracking-tight ${titleSizeClass} ${alignClass}`}>
+              <h2 style={fStyle('title', { color: theme.textPrimary })} className={`font-black tracking-tight ${titleSizeClass} ${alignClass}`}>
                 {safeSlide.title || 'Tabla Comparativa'}
               </h2>
             )}
@@ -1009,10 +1250,14 @@ export const SlideCanvasSurface = ({
                                   nextHeaders[hIdx] = e.target.value;
                                   onUpdateSlideField('table', { headers: nextHeaders, rows: tableRows });
                                 }}
-                                className="w-full bg-transparent text-white placeholder-white/60 font-black outline-none"
+                                style={fStyle(`table.header.${hIdx}`, { color: '#FFFFFF' })}
+                                {...bindField(`table.header.${hIdx}`)}
+                                className={`w-full bg-transparent text-white placeholder-white/60 font-black outline-none px-1 rounded ${fRing(`table.header.${hIdx}`)}`}
                               />
                             ) : (
-                              hdr
+                              <span style={fStyle(`table.header.${hIdx}`, { color: '#FFFFFF' })} className="block">
+                                {hdr}
+                              </span>
                             )}
                           </th>
                         ))}
@@ -1027,6 +1272,7 @@ export const SlideCanvasSurface = ({
                         >
                           {tableHeaders.map((_, cIdx) => {
                             const cellVal = Array.isArray(row) ? (row[cIdx] || '') : '';
+                            const cellKey = `table.cell.${rIdx}.${cIdx}`;
                             return (
                               <td
                                 key={cIdx}
@@ -1046,10 +1292,14 @@ export const SlideCanvasSurface = ({
                                       });
                                       onUpdateSlideField('table', { headers: tableHeaders, rows: nextRows });
                                     }}
-                                    className="w-full bg-transparent outline-none"
+                                    style={fStyle(cellKey, { color: cIdx === 0 ? theme.textPrimary : theme.textSecondary })}
+                                    {...bindField(cellKey)}
+                                    className={`w-full bg-transparent outline-none px-1 rounded ${fRing(cellKey)}`}
                                   />
                                 ) : (
-                                  cellVal
+                                  <span style={fStyle(cellKey, { color: cIdx === 0 ? theme.textPrimary : theme.textSecondary })} className="block">
+                                    {cellVal}
+                                  </span>
                                 )}
                               </td>
                             );
@@ -1070,10 +1320,12 @@ export const SlideCanvasSurface = ({
                 value={safeSlide.title || ''}
                 onChange={(e) => onUpdateSlideField('title', e.target.value)}
                 placeholder="Título..."
-                className={`w-full bg-transparent font-black tracking-tight outline-none rounded-lg px-1.5 py-0.5 border border-transparent hover:border-current/20 focus:border-current/40 ${titleSizeClass} ${alignClass}`}
+                style={fStyle('title', { color: theme.textPrimary })}
+                {...bindField('title')}
+                className={`w-full bg-transparent font-black tracking-tight outline-none rounded-lg px-1.5 py-0.5 border border-transparent hover:border-current/20 focus:border-current/40 ${titleSizeClass} ${alignClass} ${fRing('title')}`}
               />
             ) : (
-              <h2 className={`font-black tracking-tight ${titleSizeClass} ${alignClass}`}>
+              <h2 style={fStyle('title', { color: theme.textPrimary })} className={`font-black tracking-tight ${titleSizeClass} ${alignClass}`}>
                 {safeSlide.title || 'Contexto Visual'}
               </h2>
             )}
@@ -1089,21 +1341,38 @@ export const SlideCanvasSurface = ({
                     onChange={(e) => onUpdateSlideField('body', e.target.value)}
                     rows={4}
                     placeholder="Explicación que acompaña la imagen..."
-                    className="w-full bg-transparent text-xs sm:text-base leading-relaxed font-medium outline-none resize-none"
+                    style={fStyle('body', { color: theme.textPrimary })}
+                    {...bindField('body')}
+                    className={`w-full bg-transparent text-xs sm:text-base leading-relaxed font-medium outline-none resize-none ${fRing('body')}`}
                   />
                 ) : (
-                  <p className={isCompact ? 'text-[9px] line-clamp-3' : 'text-sm sm:text-base leading-relaxed whitespace-pre-line font-medium'}>
+                  <p
+                    style={fStyle('body', { color: theme.textPrimary })}
+                    className={isCompact ? 'text-[9px] line-clamp-3' : 'text-sm sm:text-base leading-relaxed whitespace-pre-line font-medium'}
+                  >
                     {safeSlide.body || safeSlide.content || safeSlide.subtitle || ''}
                   </p>
                 )}
 
-                {safeSlide.callout && !isCompact && (
+                {(safeSlide.callout || isInteractiveEditor) && !isCompact && (
                   <div
                     style={{ backgroundColor: theme.badgeBg, color: theme.primary }}
-                    className="mt-3 p-2.5 rounded-xl text-xs font-bold flex items-center gap-1.5"
+                    className={`mt-3 p-2.5 rounded-xl text-xs font-bold flex items-center gap-1.5 ${fRing('callout')}`}
                   >
                     <Pin size={13} className="shrink-0" />
-                    <span>{safeSlide.callout}</span>
+                    {isInteractiveEditor ? (
+                      <input
+                        type="text"
+                        value={safeSlide.callout || ''}
+                        onChange={(e) => onUpdateSlideField('callout', e.target.value)}
+                        placeholder="Nota destacada opcional..."
+                        style={fStyle('callout', { color: theme.primary })}
+                        {...bindField('callout')}
+                        className="w-full bg-transparent outline-none"
+                      />
+                    ) : (
+                      <span style={fStyle('callout', { color: theme.primary })}>{safeSlide.callout}</span>
+                    )}
                   </div>
                 )}
               </div>
@@ -1112,21 +1381,60 @@ export const SlideCanvasSurface = ({
                 style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorder }}
                 className={`sm:col-span-5 rounded-2xl border overflow-hidden flex flex-col justify-between ${isCompact ? 'p-1.5' : 'p-3'} ${safeSlide.imagePosition === 'left' ? 'sm:order-1' : 'sm:order-2'}`}
               >
-                <div className="w-full aspect-video sm:aspect-auto sm:flex-1 rounded-xl overflow-hidden bg-black/5 flex items-center justify-center min-h-[100px]">
+                <div className="w-full aspect-video sm:aspect-auto sm:flex-1 rounded-xl overflow-hidden bg-black/5 flex items-center justify-center min-h-[100px] relative group/img">
                   {safeSlide.imageUrl ? (
-                    <img
-                      src={safeSlide.imageUrl}
-                      alt={safeSlide.imageCaption || safeSlide.title || 'Slide visual'}
-                      className="w-full h-full object-cover"
-                    />
+                    <>
+                      <img
+                        src={safeSlide.imageUrl}
+                        alt={safeSlide.imageCaption || safeSlide.title || 'Slide visual'}
+                        className="w-full h-full object-cover"
+                      />
+                      {isInteractiveEditor && onTriggerSlideImageUpload && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onTriggerSlideImageUpload();
+                          }}
+                          className="absolute bottom-2 right-2 px-2.5 py-1 rounded-lg bg-black/70 hover:bg-black/90 text-white text-[10px] font-bold flex items-center gap-1 opacity-0 group-hover/img:opacity-100 transition-opacity"
+                        >
+                          <Upload size={11} />
+                          <span>Cambiar</span>
+                        </button>
+                      )}
+                    </>
+                  ) : isInteractiveEditor && onTriggerSlideImageUpload ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onTriggerSlideImageUpload();
+                      }}
+                      className="flex flex-col items-center justify-center gap-1.5 p-4 text-xs font-bold opacity-70 hover:opacity-100 transition-opacity"
+                    >
+                      <Upload size={24} style={{ color: theme.primary }} />
+                      <span>Subir o pegar imagen</span>
+                    </button>
                   ) : (
                     <ImageIcon size={28} className="opacity-30" />
                   )}
                 </div>
-                {safeSlide.imageCaption && !isCompact && (
-                  <p style={{ color: theme.textSecondary }} className="text-[11px] text-center italic pt-2 truncate">
-                    {safeSlide.imageCaption}
-                  </p>
+                {(safeSlide.imageCaption || isInteractiveEditor) && !isCompact && (
+                  isInteractiveEditor ? (
+                    <input
+                      type="text"
+                      value={safeSlide.imageCaption || ''}
+                      onChange={(e) => onUpdateSlideField('imageCaption', e.target.value)}
+                      placeholder="Escribe un pie de imagen..."
+                      style={fStyle('imageCaption', { color: theme.textSecondary })}
+                      {...bindField('imageCaption')}
+                      className={`w-full bg-transparent text-[11px] text-center italic pt-2 outline-none ${fRing('imageCaption')}`}
+                    />
+                  ) : (
+                    <p style={fStyle('imageCaption', { color: theme.textSecondary })} className="text-[11px] text-center italic pt-2 truncate">
+                      {safeSlide.imageCaption}
+                    </p>
+                  )
                 )}
               </div>
             </div>
@@ -1144,11 +1452,12 @@ export const SlideCanvasSurface = ({
                     value={safeSlide.statValue || ''}
                     onChange={(e) => onUpdateSlideField('statValue', e.target.value)}
                     placeholder="Cifra o dato opcional (ej: +85% o Regla #1)"
-                    style={{ color: theme.primary }}
-                    className="w-full bg-transparent text-center text-2xl sm:text-4xl font-black outline-none"
+                    style={fStyle('statValue', { color: theme.primary })}
+                    {...bindField('statValue')}
+                    className={`w-full bg-transparent text-center text-2xl sm:text-4xl font-black outline-none ${fRing('statValue')}`}
                   />
                 ) : (
-                  <div style={{ color: theme.primary }} className="text-3xl sm:text-5xl font-black tracking-tight">
+                  <div style={fStyle('statValue', { color: theme.primary })} className="text-3xl sm:text-5xl font-black tracking-tight">
                     {safeSlide.statValue}
                   </div>
                 )}
@@ -1162,24 +1471,30 @@ export const SlideCanvasSurface = ({
                   onChange={(e) => onUpdateSlideField('quoteText', e.target.value)}
                   rows={3}
                   placeholder="Escribe aquí la cita, idea fuerza o principio clave..."
-                  className="w-full bg-transparent text-center text-lg sm:text-2xl font-extrabold italic leading-relaxed outline-none resize-none"
+                  style={fStyle('quoteText', { color: theme.textPrimary })}
+                  {...bindField('quoteText')}
+                  className={`w-full bg-transparent text-center text-lg sm:text-2xl font-extrabold italic leading-relaxed outline-none resize-none ${fRing('quoteText')}`}
                 />
                 <input
                   type="text"
                   value={safeSlide.quoteAuthor || ''}
                   onChange={(e) => onUpdateSlideField('quoteAuthor', e.target.value)}
                   placeholder="Autor, fuente o contexto..."
-                  style={{ color: theme.textSecondary }}
-                  className="w-full bg-transparent text-center text-xs sm:text-sm font-bold outline-none"
+                  style={fStyle('quoteAuthor', { color: theme.textSecondary })}
+                  {...bindField('quoteAuthor')}
+                  className={`w-full bg-transparent text-center text-xs sm:text-sm font-bold outline-none ${fRing('quoteAuthor')}`}
                 />
               </>
             ) : (
               <>
-                <blockquote className={isCompact ? 'text-xs font-bold italic line-clamp-2' : 'text-xl sm:text-3xl font-extrabold italic leading-snug'}>
+                <blockquote
+                  style={fStyle('quoteText', { color: theme.textPrimary })}
+                  className={isCompact ? 'text-xs font-bold italic line-clamp-2' : 'text-xl sm:text-3xl font-extrabold italic leading-snug'}
+                >
                   “{safeSlide.quoteText || safeSlide.body || safeSlide.title}”
                 </blockquote>
                 {(safeSlide.quoteAuthor || safeSlide.title) && (
-                  <p style={{ color: theme.textSecondary }} className={isCompact ? 'text-[9px] font-bold' : 'text-xs sm:text-base font-bold'}>
+                  <p style={fStyle('quoteAuthor', { color: theme.textSecondary })} className={isCompact ? 'text-[9px] font-bold' : 'text-xs sm:text-base font-bold'}>
                     — {safeSlide.quoteAuthor || safeSlide.title}
                   </p>
                 )}
@@ -1195,10 +1510,15 @@ export const SlideCanvasSurface = ({
                   value={safeSlide.question !== undefined ? safeSlide.question : (safeSlide.title || '')}
                   onChange={(e) => onUpdateSlideField('question', e.target.value)}
                   placeholder="Escribe la pregunta del Quiz..."
-                  className={`w-full bg-transparent font-black tracking-tight outline-none rounded-lg px-1.5 py-0.5 border border-transparent hover:border-current/20 focus:border-current/40 ${titleSizeClass}`}
+                  style={fStyle('question', { color: theme.textPrimary })}
+                  {...bindField('question')}
+                  className={`w-full bg-transparent font-black tracking-tight outline-none rounded-lg px-1.5 py-0.5 border border-transparent hover:border-current/20 focus:border-current/40 ${titleSizeClass} ${fRing('question')}`}
                 />
               ) : (
-                <h2 className={`font-black tracking-tight ${isCompact ? 'text-xs line-clamp-2' : 'text-xl sm:text-3xl md:text-4xl'}`}>
+                <h2
+                  style={fStyle('question', { color: theme.textPrimary })}
+                  className={`font-black tracking-tight ${isCompact ? 'text-xs line-clamp-2' : 'text-xl sm:text-3xl md:text-4xl'}`}
+                >
                   {safeSlide.question || safeSlide.title || 'Pregunta de repaso'}
                 </h2>
               )}
@@ -1216,7 +1536,7 @@ export const SlideCanvasSurface = ({
                       const sel = quizSelection[slideIdx];
                       let customBorder = theme.cardBorder;
                       let customBg = theme.cardBg;
-                      let customColor = theme.textPrimary;
+                      const customColor = theme.textPrimary;
 
                       if (sel !== undefined) {
                         if (opt.isCorrect) {
@@ -1227,6 +1547,9 @@ export const SlideCanvasSurface = ({
                           customBorder = '#EF4444';
                         }
                       }
+
+                      const optKey = `options.${oIdx}.text`;
+                      const optExKey = `options.${oIdx}.explanation`;
 
                       return (
                         <div
@@ -1239,7 +1562,7 @@ export const SlideCanvasSurface = ({
                           style={{ backgroundColor: customBg, borderColor: customBorder, color: customColor }}
                           className={`${isCompact ? 'p-1.5 rounded-lg text-[9px]' : 'p-3.5 sm:p-4 rounded-2xl text-xs sm:text-base'} border text-left font-semibold flex items-center gap-3 transition-all ${
                             !isInteractiveEditor && onSelectQuizOption ? 'cursor-pointer hover:scale-[1.01]' : ''
-                          } ${sel !== undefined && !opt.isCorrect && sel === oIdx ? 'line-through opacity-80' : ''}`}
+                          } ${sel !== undefined && !opt.isCorrect && sel === oIdx ? 'line-through opacity-80' : ''} ${fRing(optKey)}`}
                         >
                           <span
                             style={{
@@ -1251,17 +1574,35 @@ export const SlideCanvasSurface = ({
                             {String.fromCharCode(65 + oIdx)}
                           </span>
                           {isInteractiveEditor ? (
-                            <input
-                              type="text"
-                              value={opt.text || ''}
-                              onChange={(e) => {
-                                const nextOpts = quizOptions.map((o, i) => i === oIdx ? { ...o, text: e.target.value } : o);
-                                onUpdateSlideField('options', nextOpts);
-                              }}
-                              className="flex-1 bg-transparent outline-none"
-                            />
+                            <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                              <input
+                                type="text"
+                                value={opt.text || ''}
+                                onChange={(e) => {
+                                  const nextOpts = quizOptions.map((o, i) => i === oIdx ? { ...o, text: e.target.value } : o);
+                                  onUpdateSlideField('options', nextOpts);
+                                }}
+                                style={fStyle(optKey, { color: customColor })}
+                                {...bindField(optKey)}
+                                className="w-full bg-transparent outline-none"
+                              />
+                              <input
+                                type="text"
+                                value={opt.explanation || ''}
+                                onChange={(e) => {
+                                  const nextOpts = quizOptions.map((o, i) => i === oIdx ? { ...o, explanation: e.target.value } : o);
+                                  onUpdateSlideField('options', nextOpts);
+                                }}
+                                placeholder="Explicación (opcional)..."
+                                style={fStyle(optExKey, { color: theme.textSecondary })}
+                                {...bindField(optExKey)}
+                                className={`w-full bg-transparent outline-none text-[11px] font-normal opacity-80 rounded px-0.5 ${fRing(optExKey)}`}
+                              />
+                            </div>
                           ) : (
-                            <span className="flex-1 leading-snug truncate sm:whitespace-normal">{opt.text}</span>
+                            <span style={fStyle(optKey, { color: customColor })} className="flex-1 leading-snug truncate sm:whitespace-normal">
+                              {opt.text}
+                            </span>
                           )}
                         </div>
                       );
@@ -1272,7 +1613,7 @@ export const SlideCanvasSurface = ({
                     <div className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-xs sm:text-sm font-medium flex items-center justify-between gap-2 animate-in fade-in">
                       <div className="flex items-start gap-2">
                         <Lightbulb size={16} className="text-amber-500 shrink-0 mt-0.5" />
-                        <div>
+                        <div style={fStyle(`options.${quizSelection[slideIdx]}.explanation`)}>
                           <strong>Explicación:</strong>{' '}
                           {quizOptions[quizSelection[slideIdx]]?.explanation || '¡Revisa los conceptos clave para afianzar el tema!'}
                         </div>
@@ -1300,10 +1641,12 @@ export const SlideCanvasSurface = ({
                 value={safeSlide.title || ''}
                 onChange={(e) => onUpdateSlideField('title', e.target.value)}
                 placeholder="Título de puntos clave..."
-                className={`w-full bg-transparent font-black tracking-tight outline-none rounded-lg px-1.5 py-0.5 border border-transparent hover:border-current/20 focus:border-current/40 ${titleSizeClass} ${alignClass}`}
+                style={fStyle('title', { color: theme.textPrimary })}
+                {...bindField('title')}
+                className={`w-full bg-transparent font-black tracking-tight outline-none rounded-lg px-1.5 py-0.5 border border-transparent hover:border-current/20 focus:border-current/40 ${titleSizeClass} ${alignClass} ${fRing('title')}`}
               />
             ) : (
-              <h2 className={`font-black tracking-tight ${titleSizeClass} ${alignClass}`}>
+              <h2 style={fStyle('title', { color: theme.textPrimary })} className={`font-black tracking-tight ${titleSizeClass} ${alignClass}`}>
                 {safeSlide.title || 'Puntos Clave'}
               </h2>
             )}
@@ -1319,6 +1662,9 @@ export const SlideCanvasSurface = ({
                 <div className={isCompact ? 'space-y-1' : 'space-y-2.5'}>
                   {bulletsList.slice(0, isCompact ? 2 : 6).map((b, bIdx) => {
                     const isDimmed = spotlightIdx !== null && spotlightIdx !== bIdx;
+                    const bTitleKey = `bullets.${bIdx}.title`;
+                    const bTextKey = `bullets.${bIdx}.text`;
+                    const bExKey = `bullets.${bIdx}.example`;
                     return (
                       <div
                         key={bIdx}
@@ -1350,7 +1696,9 @@ export const SlideCanvasSurface = ({
                                   onUpdateSlideField('bullets', nextBullets);
                                 }}
                                 placeholder="Título del punto..."
-                                className="w-full bg-transparent text-sm sm:text-base font-bold outline-none"
+                                style={fStyle(bTitleKey, { color: theme.textPrimary })}
+                                {...bindField(bTitleKey)}
+                                className={`w-full bg-transparent text-sm sm:text-base font-bold outline-none px-1 rounded ${fRing(bTitleKey)}`}
                               />
                               <input
                                 type="text"
@@ -1363,8 +1711,9 @@ export const SlideCanvasSurface = ({
                                   onUpdateSlideField('bullets', nextBullets);
                                 }}
                                 placeholder="Explicación..."
-                                style={{ color: theme.textSecondary }}
-                                className="w-full bg-transparent text-xs sm:text-sm outline-none"
+                                style={fStyle(bTextKey, { color: theme.textSecondary })}
+                                {...bindField(bTextKey)}
+                                className={`w-full bg-transparent text-xs sm:text-sm outline-none px-1 rounded ${fRing(bTextKey)}`}
                               />
                               <input
                                 type="text"
@@ -1377,17 +1726,21 @@ export const SlideCanvasSurface = ({
                                   onUpdateSlideField('bullets', nextBullets);
                                 }}
                                 placeholder="Ejemplo (opcional)..."
-                                style={{ color: theme.badgeText }}
-                                className="w-full bg-transparent text-xs italic outline-none opacity-85"
+                                style={fStyle(bExKey, { color: theme.badgeText })}
+                                {...bindField(bExKey)}
+                                className={`w-full bg-transparent text-xs italic outline-none opacity-85 px-1 rounded ${fRing(bExKey)}`}
                               />
                             </>
                           ) : (
                             <>
-                              <strong className={`block font-bold ${isCompact ? 'text-[10px] truncate' : 'text-sm sm:text-lg'}`}>
+                              <strong
+                                style={fStyle(bTitleKey, { color: theme.textPrimary })}
+                                className={`block font-bold ${isCompact ? 'text-[10px] truncate' : 'text-sm sm:text-lg'}`}
+                              >
                                 {typeof b === 'object' ? b?.title : b}
                               </strong>
                               {!isCompact && b?.text && (
-                                <p style={{ color: theme.textSecondary }} className="text-xs sm:text-base leading-relaxed">
+                                <p style={fStyle(bTextKey, { color: theme.textSecondary })} className="text-xs sm:text-base leading-relaxed">
                                   {b.text}
                                 </p>
                               )}
@@ -1397,7 +1750,9 @@ export const SlideCanvasSurface = ({
                                   className="mt-1.5 text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center gap-1.5"
                                 >
                                   <Pin size={12} className="shrink-0" />
-                                  <span><strong>Ejemplo:</strong> {b.example}</span>
+                                  <span style={fStyle(bExKey, { color: theme.badgeText })}>
+                                    <strong>Ejemplo:</strong> {b.example}
+                                  </span>
                                 </div>
                               )}
                             </>
@@ -1419,11 +1774,13 @@ export const SlideCanvasSurface = ({
                   value={safeSlide.title || ''}
                   onChange={(e) => onUpdateSlideField('title', e.target.value)}
                   placeholder="Título opcional del lienzo..."
-                  className={`w-full bg-transparent font-black tracking-tight outline-none rounded-lg px-1.5 py-0.5 border border-transparent hover:border-current/20 focus:border-current/40 ${titleSizeClass} ${alignClass}`}
+                  style={fStyle('title', { color: theme.textPrimary })}
+                  {...bindField('title')}
+                  className={`w-full bg-transparent font-black tracking-tight outline-none rounded-lg px-1.5 py-0.5 border border-transparent hover:border-current/20 focus:border-current/40 ${titleSizeClass} ${alignClass} ${fRing('title')}`}
                 />
               ) : (
                 safeSlide.title && (
-                  <h2 className={`font-black tracking-tight ${titleSizeClass} ${alignClass}`}>
+                  <h2 style={fStyle('title', { color: theme.textPrimary })} className={`font-black tracking-tight ${titleSizeClass} ${alignClass}`}>
                     {safeSlide.title}
                   </h2>
                 )
@@ -1439,10 +1796,12 @@ export const SlideCanvasSurface = ({
                 value={safeSlide.title || ''}
                 onChange={(e) => onUpdateSlideField('title', e.target.value)}
                 placeholder="Título de la diapositiva..."
-                className={`w-full bg-transparent font-black tracking-tight outline-none rounded-lg px-1.5 py-0.5 border border-transparent hover:border-current/20 focus:border-current/40 ${titleSizeClass} ${alignClass}`}
+                style={fStyle('title', { color: theme.textPrimary })}
+                {...bindField('title')}
+                className={`w-full bg-transparent font-black tracking-tight outline-none rounded-lg px-1.5 py-0.5 border border-transparent hover:border-current/20 focus:border-current/40 ${titleSizeClass} ${alignClass} ${fRing('title')}`}
               />
             ) : (
-              <h2 className={`font-black tracking-tight ${titleSizeClass} ${alignClass}`}>
+              <h2 style={fStyle('title', { color: theme.textPrimary })} className={`font-black tracking-tight ${titleSizeClass} ${alignClass}`}>
                 {safeSlide.title || 'Conceptos Principales'}
               </h2>
             )}
@@ -1464,6 +1823,9 @@ export const SlideCanvasSurface = ({
                 <div className={`grid ${gridCols} ${isCompact ? 'gap-1.5' : 'gap-3.5'}`}>
                   {cardsList.slice(0, isCompact ? 2 : 4).map((c, cIdx) => {
                     const isDimmed = spotlightIdx !== null && spotlightIdx !== cIdx;
+                    const cTitleKey = `cards.${cIdx}.title`;
+                    const cTextKey = `cards.${cIdx}.text`;
+                    const cExKey = `cards.${cIdx}.example`;
                     return (
                       <div
                         key={cIdx}
@@ -1495,7 +1857,9 @@ export const SlideCanvasSurface = ({
                                   onUpdateSlideField('cards', nextCards);
                                 }}
                                 placeholder="Título del concepto..."
-                                className="w-full bg-transparent text-sm sm:text-base font-bold outline-none"
+                                style={fStyle(cTitleKey, { color: theme.textPrimary })}
+                                {...bindField(cTitleKey)}
+                                className={`w-full bg-transparent text-sm sm:text-base font-bold outline-none px-1 rounded ${fRing(cTitleKey)}`}
                               />
                               <textarea
                                 value={c.text || ''}
@@ -1505,16 +1869,23 @@ export const SlideCanvasSurface = ({
                                 }}
                                 rows={3}
                                 placeholder="Explicación del concepto..."
-                                style={{ color: theme.textSecondary }}
-                                className="w-full bg-transparent text-xs sm:text-sm leading-relaxed outline-none resize-none"
+                                style={fStyle(cTextKey, { color: theme.textSecondary })}
+                                {...bindField(cTextKey)}
+                                className={`w-full bg-transparent text-xs sm:text-sm leading-relaxed outline-none resize-none px-1 rounded ${fRing(cTextKey)}`}
                               />
                             </>
                           ) : (
                             <>
-                              <h4 className={`font-bold leading-tight ${isCompact ? 'text-[10px] truncate' : 'text-base sm:text-lg'}`}>
+                              <h4
+                                style={fStyle(cTitleKey, { color: theme.textPrimary })}
+                                className={`font-bold leading-tight ${isCompact ? 'text-[10px] truncate' : 'text-base sm:text-lg'}`}
+                              >
                                 {c.title || 'Concepto'}
                               </h4>
-                              <p style={{ color: theme.textSecondary }} className={isCompact ? 'text-[8px] line-clamp-2' : 'text-xs sm:text-sm leading-relaxed'}>
+                              <p
+                                style={fStyle(cTextKey, { color: theme.textSecondary })}
+                                className={isCompact ? 'text-[8px] line-clamp-2' : 'text-xs sm:text-sm leading-relaxed'}
+                              >
                                 {c.text}
                               </p>
                             </>
@@ -1524,7 +1895,7 @@ export const SlideCanvasSurface = ({
                         {!isCompact && (c.example || isInteractiveEditor) && (
                           <div
                             style={{ backgroundColor: theme.badgeBg, color: theme.badgeText }}
-                            className="mt-3 text-xs p-2 rounded-xl font-medium flex items-center gap-1.5"
+                            className={`mt-3 text-xs p-2 rounded-xl font-medium flex items-center gap-1.5 ${fRing(cExKey)}`}
                           >
                             <Lightbulb size={12} className="shrink-0" />
                             {isInteractiveEditor ? (
@@ -1536,10 +1907,14 @@ export const SlideCanvasSurface = ({
                                   onUpdateSlideField('cards', nextCards);
                                 }}
                                 placeholder="Ejemplo práctico (opcional)..."
+                                style={fStyle(cExKey, { color: theme.badgeText })}
+                                {...bindField(cExKey)}
                                 className="w-full bg-transparent outline-none text-xs"
                               />
                             ) : (
-                              <span><strong>Ej:</strong> {c.example}</span>
+                              <span style={fStyle(cExKey, { color: theme.badgeText })}>
+                                <strong>Ej:</strong> {c.example}
+                              </span>
                             )}
                           </div>
                         )}
@@ -1561,6 +1936,7 @@ export const SlideCanvasSurface = ({
             const isSelected = isInteractiveEditor && selectedElementId === el.id;
             const isCircle = el.shapeType === 'circle';
             const isPill = el.shapeType === 'pill' || el.type === 'badge';
+            const isRect = el.shapeType === 'rect';
             const isDivider = el.shapeType === 'divider';
 
             const bgFill = el.fill && el.fill !== 'transparent'
@@ -1570,6 +1946,13 @@ export const SlideCanvasSurface = ({
                 : 'transparent';
 
             const textColor = el.textColor || (bgFill !== 'transparent' && bgFill !== '#FEF08A' ? '#FFFFFF' : theme.textPrimary);
+            const elFontFamily = el.fontFamily && SLIDE_FONTS[el.fontFamily]
+              ? SLIDE_FONTS[el.fontFamily].css
+              : 'inherit';
+            const decorations = [];
+            if (el.underline) decorations.push('underline');
+            if (el.strikethrough) decorations.push('line-through');
+            const elTextDecoration = decorations.length > 0 ? decorations.join(' ') : 'none';
 
             return (
               <div
@@ -1595,11 +1978,12 @@ export const SlideCanvasSurface = ({
                   backgroundColor: isDivider ? 'transparent' : bgFill,
                   borderColor: el.stroke && el.stroke !== 'transparent' ? el.stroke : 'transparent',
                   borderWidth: el.stroke && el.stroke !== 'transparent' ? '2px' : '0px',
+                  borderStyle: el.stroke && el.stroke !== 'transparent' ? 'solid' : 'none',
                   color: textColor,
                   opacity: el.opacity ?? 1
                 }}
                 className={`absolute pointer-events-auto transition-shadow ${
-                  isCircle ? 'rounded-full' : isPill ? 'rounded-full' : 'rounded-2xl'
+                  isCircle ? 'rounded-full' : isPill ? 'rounded-full' : isRect ? 'rounded-md' : 'rounded-2xl'
                 } ${el.type === 'note' ? 'shadow-md' : ''} ${
                   isInteractiveEditor ? 'cursor-move' : ''
                 } ${isSelected ? 'ring-2 ring-sky-500 shadow-lg' : isInteractiveEditor ? 'hover:ring-1 hover:ring-sky-400/60' : ''}`}
@@ -1636,13 +2020,16 @@ export const SlideCanvasSurface = ({
                       <textarea
                         value={el.text || ''}
                         onChange={(e) => onUpdateElementField?.(el.id, 'text', e.target.value)}
+                        onFocus={() => onSelectElement?.(el.id)}
                         placeholder="Escribe aquí..."
                         style={{
+                          fontFamily: elFontFamily,
                           fontSize: isCompact ? '9px' : `${el.fontSize || 16}px`,
                           fontWeight: el.bold ? 800 : 500,
                           fontStyle: el.italic ? 'italic' : 'normal',
-                          textDecoration: el.underline ? 'underline' : 'none',
+                          textDecoration: elTextDecoration,
                           textAlign: el.align || 'left',
+                          lineHeight: el.lineHeight || 1.25,
                           color: textColor
                         }}
                         className="w-full h-full bg-transparent outline-none resize-none leading-snug"
@@ -1650,11 +2037,13 @@ export const SlideCanvasSurface = ({
                     ) : (
                       <div
                         style={{
+                          fontFamily: elFontFamily,
                           fontSize: isCompact ? '8px' : `${el.fontSize || 16}px`,
                           fontWeight: el.bold ? 800 : 500,
                           fontStyle: el.italic ? 'italic' : 'normal',
-                          textDecoration: el.underline ? 'underline' : 'none',
+                          textDecoration: elTextDecoration,
                           textAlign: el.align || 'left',
+                          lineHeight: el.lineHeight || 1.25,
                           color: textColor
                         }}
                         className="w-full whitespace-pre-wrap break-words leading-snug"
@@ -1742,6 +2131,8 @@ export const SlidePresenterViewer = ({ presentation, onClose, onEdit, role, them
   const currentSlide = slides[safeIdx] || {};
   const displayTitle = presentation?.slides?.[0]?.title || presentation?.topic || 'Presentación';
   const transitionType = currentSlide.transition || presentation?.transition || 'fade';
+  const transitionDuration = Number(currentSlide.transitionDuration || presentation?.transitionDuration || 400);
+  const autoAdvanceSec = Number(currentSlide.autoAdvanceSeconds ?? presentation?.autoAdvanceSeconds ?? 0);
 
   const isLight = themeMode === 'light';
   const isDim = themeMode === 'dim';
@@ -1751,6 +2142,14 @@ export const SlidePresenterViewer = ({ presentation, onClose, onEdit, role, them
     setQuizSelection({});
     setSpotlightIdx(null);
   }, [presentation?.id]);
+
+  useEffect(() => {
+    if (!autoAdvanceSec || autoAdvanceSec <= 0 || showOverviewGrid || total <= 1) return undefined;
+    const timer = setTimeout(() => {
+      setCurrentIdx(prev => (prev < total - 1 ? prev + 1 : 0));
+    }, autoAdvanceSec * 1000);
+    return () => clearTimeout(timer);
+  }, [safeIdx, autoAdvanceSec, showOverviewGrid, total]);
 
   useEffect(() => {
     setSpotlightIdx(null);
@@ -1925,8 +2324,11 @@ export const SlidePresenterViewer = ({ presentation, onClose, onEdit, role, them
 
   const transitionAnimClass = {
     fade: 'animate-in fade-in duration-300',
-    slide: 'animate-in fade-in slide-in-from-right-6 duration-300',
-    zoom: 'animate-in fade-in zoom-in-95 duration-300',
+    slide: 'animate-in fade-in slide-in-from-right-8 duration-300',
+    push_up: 'animate-in fade-in slide-in-from-bottom-8 duration-300',
+    wipe: 'animate-in fade-in slide-in-from-left-8 duration-300',
+    split: 'animate-in fade-in zoom-in-95 duration-300',
+    zoom: 'animate-in fade-in zoom-in-90 duration-300',
     flip: 'animate-in fade-in zoom-in-90 duration-300',
     none: ''
   }[transitionType] || 'animate-in fade-in duration-200';
@@ -2164,6 +2566,7 @@ export const SlidePresenterViewer = ({ presentation, onClose, onEdit, role, them
         <main className="flex-1 flex flex-col items-center justify-center min-h-0 py-1 w-full gap-2">
           <div
             key={`${safeIdx}_${transitionType}`}
+            style={{ animationDuration: `${transitionDuration}ms` }}
             onPointerDown={handleStagePointerDown}
             onPointerMove={handleStagePointerMove}
             onPointerUp={handleStagePointerUp}
@@ -2301,6 +2704,8 @@ export const SlideEditorModal = ({
     theme: presentation?.theme || 'unipamplona',
     fontFamily: presentation?.fontFamily || 'sans',
     transition: presentation?.transition || 'fade',
+    transitionDuration: presentation?.transitionDuration || 450,
+    autoAdvanceSeconds: presentation?.autoAdvanceSeconds || 0,
     bgPattern: presentation?.bgPattern || 'none',
     targetGroupId: presentation?.targetGroupId || 'all',
     targetGroupName: presentation?.targetGroupName || 'General'
@@ -2326,13 +2731,24 @@ export const SlideEditorModal = ({
 
   const [activeSlideIdx, setActiveSlideIdx] = useState(0);
   const [selectedElementId, setSelectedElementId] = useState(null);
+  const [activeTextField, setActiveTextField] = useState('title');
+  const [ribbonTab, setRibbonTab] = useState('inicio'); // 'inicio' | 'insertar' | 'diseno' | 'transiciones' | 'ia' | 'presentacion'
   const [inspectorTab, setInspectorTab] = useState('content'); // 'content' | 'layout' | 'theme' | 'ai'
+  const [showRightInspector, setShowRightInspector] = useState(true);
   const [showSpeakerNotesBar, setShowSpeakerNotesBar] = useState(false);
   const [showGridGuides, setShowGridGuides] = useState(false);
   const [canvasZoom, setCanvasZoom] = useState(100);
   const [snapGuides, setSnapGuides] = useState({ xCenter: false, yCenter: false });
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingImg, setIsUploadingImg] = useState(false);
+  const [copiedFormat, setCopiedFormat] = useState(null);
+  const [clipboardItem, setClipboardItem] = useState(null);
+  const [showColorPalette, setShowColorPalette] = useState(false);
+  const [showHighlightPalette, setShowHighlightPalette] = useState(false);
+  const [showImageMenu, setShowImageMenu] = useState(false);
+  const [imageUrlDraft, setImageUrlDraft] = useState('');
+  const [previewAnimKey, setPreviewAnimKey] = useState(0);
+  const [isDragOverStage, setIsDragOverStage] = useState(false);
 
   // Estado del Co-Piloto IA dentro del editor
   const [aiSlidePrompt, setAiSlidePrompt] = useState('');
@@ -2344,6 +2760,7 @@ export const SlideEditorModal = ({
   const slideImageInputRef = useRef(null);
   const elementImageInputRef = useRef(null);
   const replaceElementImageInputRef = useRef(null);
+  const bgImageInputRef = useRef(null);
 
   const pushHistorySnapshot = (nextSlides) => {
     try {
@@ -2400,8 +2817,18 @@ export const SlideEditorModal = ({
   const safeSlideIdx = Math.min(activeSlideIdx, Math.max(0, slides.length - 1));
   const activeSlide = slides[safeSlideIdx] || slides[0] || {};
   const activeLayout = resolveSlideLayout(activeSlide, safeSlideIdx);
+  const activeTheme = resolveTheme(deckMeta, activeSlide, isDarkMode ? 'dark' : 'light');
   const activeElements = Array.isArray(activeSlide.elements) ? activeSlide.elements : [];
   const selectedElement = activeElements.find(el => el.id === selectedElementId) || null;
+  const editableFields = listSlideEditableFields(activeSlide, safeSlideIdx);
+
+  // Asegurar que activeTextField sea válido cuando cambia el layout
+  useEffect(() => {
+    const validKeys = listSlideEditableFields(activeSlide, safeSlideIdx).map(f => f.key);
+    if (validKeys.length > 0 && !validKeys.includes(activeTextField)) {
+      setActiveTextField(validKeys[0]);
+    }
+  }, [activeLayout, safeSlideIdx, activeSlide, activeTextField]);
 
   // Manejo de arrastre y redimensionamiento de objetos libres en el lienzo 16:9
   useEffect(() => {
@@ -2561,6 +2988,215 @@ export const SlideEditorModal = ({
     });
   };
 
+  const handleUpdateElementPatch = (elId, patchObj) => {
+    updateSlidesWithHistory(prev => {
+      const copy = [...prev];
+      const current = copy[safeSlideIdx] || {};
+      const list = Array.isArray(current.elements) ? current.elements : [];
+      copy[safeSlideIdx] = {
+        ...current,
+        elements: list.map(el => el.id === elId ? { ...el, ...patchObj } : el)
+      };
+      return copy;
+    });
+  };
+
+  // =========================================================================
+  // FORMATO INDIVIDUAL POR TEXTO / ELEMENTO (Estilo PowerPoint)
+  // =========================================================================
+  const activeFieldMeta = getDefaultFieldStyleMeta(activeSlide, activeTextField, safeSlideIdx);
+  const activeFieldSavedStyle = getFieldTextStyle(activeSlide, activeTextField);
+
+  const currentTargetStyle = selectedElement && selectedElement.type !== 'image'
+    ? {
+        fontFamily: selectedElement.fontFamily || activeSlide.fontFamily || deckMeta.fontFamily || 'sans',
+        fontSize: Number(selectedElement.fontSize) || 18,
+        bold: Boolean(selectedElement.bold),
+        italic: Boolean(selectedElement.italic),
+        underline: Boolean(selectedElement.underline),
+        strikethrough: Boolean(selectedElement.strikethrough),
+        color: selectedElement.textColor || activeTheme.textPrimary,
+        bgColor: selectedElement.fill && selectedElement.fill !== 'transparent' ? selectedElement.fill : '',
+        align: selectedElement.align || 'left',
+        lineHeight: Number(selectedElement.lineHeight) || 1.25
+      }
+    : {
+        fontFamily: activeFieldSavedStyle.fontFamily || activeSlide.fontFamily || deckMeta.fontFamily || 'sans',
+        fontSize: Number(activeFieldSavedStyle.fontSize) || activeFieldMeta.fontSize || 18,
+        bold: activeFieldSavedStyle.bold !== undefined ? Boolean(activeFieldSavedStyle.bold) : Boolean(activeFieldMeta.bold),
+        italic: activeFieldSavedStyle.italic !== undefined ? Boolean(activeFieldSavedStyle.italic) : Boolean(activeFieldMeta.italic),
+        underline: Boolean(activeFieldSavedStyle.underline),
+        strikethrough: Boolean(activeFieldSavedStyle.strikethrough),
+        color: activeFieldSavedStyle.color || activeTheme.textPrimary,
+        bgColor: activeFieldSavedStyle.bgColor || '',
+        align: activeFieldSavedStyle.align || activeFieldMeta.align || 'left',
+        lineHeight: Number(activeFieldSavedStyle.lineHeight) || 1.3
+      };
+
+  const applyTargetStylePatch = (patch) => {
+    if (!patch || typeof patch !== 'object') return;
+    if (selectedElement && selectedElement.type !== 'image') {
+      const elPatch = {};
+      if ('fontFamily' in patch) elPatch.fontFamily = patch.fontFamily;
+      if ('fontSize' in patch) elPatch.fontSize = Math.max(10, Math.min(72, Number(patch.fontSize) || 16));
+      if ('bold' in patch) elPatch.bold = Boolean(patch.bold);
+      if ('italic' in patch) elPatch.italic = Boolean(patch.italic);
+      if ('underline' in patch) elPatch.underline = Boolean(patch.underline);
+      if ('strikethrough' in patch) elPatch.strikethrough = Boolean(patch.strikethrough);
+      if ('color' in patch) elPatch.textColor = patch.color;
+      if ('bgColor' in patch) elPatch.fill = patch.bgColor || 'transparent';
+      if ('align' in patch) elPatch.align = patch.align;
+      if ('lineHeight' in patch) elPatch.lineHeight = Number(patch.lineHeight) || 1.25;
+      handleUpdateElementPatch(selectedElement.id, elPatch);
+      return;
+    }
+
+    const targetField = activeTextField || 'title';
+    updateSlidesWithHistory(prev => {
+      const copy = [...prev];
+      const current = copy[safeSlideIdx] || {};
+      let updated = updateFieldTextStyle(current, targetField, patch);
+      if (targetField === 'title' && patch.align) {
+        updated = { ...updated, titleAlign: patch.align };
+      }
+      copy[safeSlideIdx] = updated;
+      return copy;
+    });
+  };
+
+  const handleSelectTextField = (fieldKey) => {
+    if (!fieldKey) return;
+    setSelectedElementId(null);
+    setActiveTextField(fieldKey);
+    if (copiedFormat) {
+      updateSlidesWithHistory(prev => {
+        const copy = [...prev];
+        const current = copy[safeSlideIdx] || {};
+        copy[safeSlideIdx] = updateFieldTextStyle(current, fieldKey, copiedFormat);
+        return copy;
+      });
+      setCopiedFormat(null);
+      showMessage('Formato pegado en el texto.');
+    }
+  };
+
+  const handleSelectCanvasElement = (elId) => {
+    setSelectedElementId(elId);
+    if (elId && copiedFormat) {
+      const targetEl = activeElements.find(e => e.id === elId);
+      if (targetEl && targetEl.type !== 'image') {
+        handleUpdateElementPatch(elId, {
+          fontFamily: copiedFormat.fontFamily || targetEl.fontFamily || 'sans',
+          fontSize: copiedFormat.fontSize || targetEl.fontSize || 18,
+          bold: Boolean(copiedFormat.bold),
+          italic: Boolean(copiedFormat.italic),
+          underline: Boolean(copiedFormat.underline),
+          strikethrough: Boolean(copiedFormat.strikethrough),
+          textColor: copiedFormat.color || targetEl.textColor,
+          fill: copiedFormat.bgColor || targetEl.fill,
+          align: copiedFormat.align || targetEl.align || 'left',
+          lineHeight: copiedFormat.lineHeight || targetEl.lineHeight || 1.25
+        });
+        setCopiedFormat(null);
+        showMessage('Formato pegado en el objeto.');
+      }
+    }
+  };
+
+  const handleStepTargetFontSize = (delta) => {
+    const nextSize = Math.max(10, Math.min(72, (Number(currentTargetStyle.fontSize) || 18) + delta));
+    applyTargetStylePatch({ fontSize: nextSize });
+  };
+
+  const handleClearTargetFormatting = () => {
+    if (selectedElement && selectedElement.type !== 'image') {
+      handleUpdateElementPatch(selectedElement.id, {
+        fontFamily: 'sans',
+        fontSize: 18,
+        bold: false,
+        italic: false,
+        underline: false,
+        strikethrough: false,
+        textColor: activeTheme.textPrimary,
+        fill: selectedElement.type === 'note' ? '#FEF08A' : 'transparent',
+        align: 'left',
+        lineHeight: 1.25
+      });
+      showMessage('Formato del objeto restablecido.');
+      return;
+    }
+    const targetField = activeTextField || 'title';
+    updateSlidesWithHistory(prev => {
+      const copy = [...prev];
+      const current = copy[safeSlideIdx] || {};
+      copy[safeSlideIdx] = clearFieldTextStyle(current, targetField);
+      return copy;
+    });
+    showMessage('Formato del texto restablecido.');
+  };
+
+  const handleToggleTargetCase = () => {
+    if (selectedElement && selectedElement.type !== 'image') {
+      const curText = String(selectedElement.text || '');
+      if (!curText) return;
+      const isUpper = curText === curText.toUpperCase() && curText !== curText.toLowerCase();
+      const isLower = curText === curText.toLowerCase() && curText !== curText.toUpperCase();
+      const mode = isUpper ? 'lower' : isLower ? 'capitalize' : 'upper';
+      handleUpdateElementField(selectedElement.id, 'text', transformTextCase(curText, mode));
+      return;
+    }
+    const targetField = activeTextField || 'title';
+    const curText = getSlideFieldTextValue(activeSlide, targetField);
+    if (!curText) return;
+    const isUpper = curText === curText.toUpperCase() && curText !== curText.toLowerCase();
+    const isLower = curText === curText.toLowerCase() && curText !== curText.toUpperCase();
+    const mode = isUpper ? 'lower' : isLower ? 'capitalize' : 'upper';
+    const nextText = transformTextCase(curText, mode);
+    updateSlidesWithHistory(prev => {
+      const copy = [...prev];
+      const current = copy[safeSlideIdx] || {};
+      copy[safeSlideIdx] = setSlideFieldTextValue(current, targetField, nextText);
+      return copy;
+    });
+  };
+
+  const handleToggleBulletsPrefix = (numbered = false) => {
+    if (selectedElement && selectedElement.type !== 'image') {
+      const lines = String(selectedElement.text || '').split('\n');
+      const nextLines = lines.map((line, i) => {
+        const clean = line.replace(/^(\s*[•\-*]\s+|\s*\d+\.\s+)/, '');
+        return numbered ? `${i + 1}. ${clean}` : `• ${clean}`;
+      });
+      handleUpdateElementField(selectedElement.id, 'text', nextLines.join('\n'));
+      return;
+    }
+    const targetField = activeTextField || 'body';
+    const curText = getSlideFieldTextValue(activeSlide, targetField);
+    if (!curText) return;
+    const lines = String(curText).split('\n');
+    const allHavePrefix = lines.every(l => /^(\s*[•\-*]\s+|\s*\d+\.\s+)/.test(l));
+    const nextLines = lines.map((line, i) => {
+      const clean = line.replace(/^(\s*[•\-*]\s+|\s*\d+\.\s+)/, '');
+      if (allHavePrefix) return clean;
+      return numbered ? `${i + 1}. ${clean}` : `• ${clean}`;
+    });
+    updateSlidesWithHistory(prev => {
+      const copy = [...prev];
+      const current = copy[safeSlideIdx] || {};
+      copy[safeSlideIdx] = setSlideFieldTextValue(current, targetField, nextLines.join('\n'));
+      return copy;
+    });
+  };
+
+  const handleToggleFormatPainter = () => {
+    if (copiedFormat) {
+      setCopiedFormat(null);
+      return;
+    }
+    setCopiedFormat({ ...currentTargetStyle });
+    showMessage('Formato copiado. Haz clic en otro texto u objeto para aplicarlo.');
+  };
+
   const handleDeleteCanvasElement = (elId) => {
     updateSlidesWithHistory(prev => {
       const copy = [...prev];
@@ -2593,6 +3229,51 @@ export const SlideEditorModal = ({
       return copy;
     });
     setSelectedElementId(cloned.id);
+  };
+
+  const handleCopySelection = () => {
+    if (selectedElement) {
+      setClipboardItem({ kind: 'element', data: JSON.parse(JSON.stringify(selectedElement)) });
+      showMessage('Objeto copiado al portapapeles.');
+    } else {
+      setClipboardItem({ kind: 'slide', data: JSON.parse(JSON.stringify(activeSlide)) });
+      showMessage('Diapositiva copiada al portapapeles.');
+    }
+  };
+
+  const handlePasteSelection = () => {
+    if (!clipboardItem) {
+      handleDuplicateSlide(safeSlideIdx);
+      return;
+    }
+    if (clipboardItem.kind === 'element' && clipboardItem.data) {
+      const src = clipboardItem.data;
+      const cloned = {
+        ...JSON.parse(JSON.stringify(src)),
+        id: `el_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        ...clampElementRect({ x: (Number(src.x) || 15) + 4, y: (Number(src.y) || 20) + 4, w: src.w, h: src.h })
+      };
+      updateSlidesWithHistory(prev => {
+        const copy = [...prev];
+        const current = copy[safeSlideIdx] || {};
+        const list = Array.isArray(current.elements) ? current.elements : [];
+        copy[safeSlideIdx] = { ...current, elements: [...list, cloned] };
+        return copy;
+      });
+      setSelectedElementId(cloned.id);
+      showMessage('Objeto pegado.');
+    } else if (clipboardItem.kind === 'slide' && clipboardItem.data) {
+      const clone = JSON.parse(JSON.stringify(clipboardItem.data));
+      clone.id = `slide_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      clone.title = `${clone.title || 'Diapositiva'} (Copia)`;
+      updateSlidesWithHistory(prev => {
+        const copy = [...prev];
+        copy.splice(safeSlideIdx + 1, 0, clone);
+        return copy;
+      });
+      setActiveSlideIdx(safeSlideIdx + 1);
+      showMessage('Diapositiva pegada.');
+    }
   };
 
   const keyActionRef = useRef({ handleUndo, handleRedo, handleDeleteCanvasElement, selectedElementId });
@@ -2657,6 +3338,23 @@ export const SlideEditorModal = ({
     setSelectedElementId(null);
   };
 
+  const handleResetSlideFormatting = () => {
+    updateSlidesWithHistory(prev => {
+      const copy = [...prev];
+      const current = copy[safeSlideIdx] || {};
+      copy[safeSlideIdx] = {
+        ...current,
+        textStyles: {},
+        bgColor: '',
+        accentColor: '',
+        titleAlign: undefined,
+        titleSize: undefined
+      };
+      return copy;
+    });
+    showMessage('Formato de la diapositiva restablecido.');
+  };
+
   const handleDeleteSlide = (idx) => {
     if (slides.length <= 1) return;
     updateSlidesWithHistory(prev => prev.filter((_, i) => i !== idx));
@@ -2695,6 +3393,26 @@ export const SlideEditorModal = ({
     setActiveSlideIdx(targetIdx);
   };
 
+  const handleInsertImageUrl = (url, target = 'auto') => {
+    const cleanUrl = String(url || '').trim();
+    if (!cleanUrl) return;
+    if (target === 'bg') {
+      handleSlideChange('bgImage', cleanUrl);
+      showMessage('Imagen de fondo aplicada.');
+    } else if (target === 'slide' || (target === 'auto' && activeLayout === 'image_text' && !activeSlide.imageUrl)) {
+      handleSlideChange('imageUrl', cleanUrl);
+      showMessage('Imagen aplicada al diseño.');
+    } else if (target === 'element' && selectedElement?.type === 'image') {
+      handleUpdateElementField(selectedElement.id, 'imageUrl', cleanUrl);
+      showMessage('Imagen reemplazada.');
+    } else {
+      handleInsertCanvasElement('image', { imageUrl: cleanUrl });
+      showMessage('Imagen insertada en la diapositiva.');
+    }
+    setShowImageMenu(false);
+    setImageUrlDraft('');
+  };
+
   const handleUploadImageFile = async (file, target = 'slide') => {
     if (!file) return;
     setIsUploadingImg(true);
@@ -2710,18 +3428,37 @@ export const SlideEditorModal = ({
           // Fallback seguro al data URL comprimido
         }
       }
-      if (target === 'slide') {
+      if (target === 'bg') {
+        handleSlideChange('bgImage', finalUrl);
+      } else if (target === 'slide' || (target === 'auto' && activeLayout === 'image_text' && !activeSlide.imageUrl)) {
         handleSlideChange('imageUrl', finalUrl);
       } else if (target === 'element' && selectedElement) {
         handleUpdateElementField(selectedElement.id, 'imageUrl', finalUrl);
-      } else if (target === 'new_element') {
+      } else {
         handleInsertCanvasElement('image', { imageUrl: finalUrl });
       }
+      setShowImageMenu(false);
       showMessage('Imagen añadida a la diapositiva.');
     } catch {
       showMessage('No se pudo procesar la imagen.');
     } finally {
       setIsUploadingImg(false);
+    }
+  };
+
+  const handleStagePaste = (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type && item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) {
+          e.preventDefault();
+          handleUploadImageFile(file, 'auto');
+          return;
+        }
+      }
     }
   };
 
@@ -2820,6 +3557,8 @@ export const SlideEditorModal = ({
       theme: deckMeta.theme,
       fontFamily: deckMeta.fontFamily,
       transition: deckMeta.transition,
+      transitionDuration: deckMeta.transitionDuration || 450,
+      autoAdvanceSeconds: deckMeta.autoAdvanceSeconds || 0,
       bgPattern: deckMeta.bgPattern,
       targetGroupId: deckMeta.targetGroupId || 'all',
       targetGroupName,
@@ -2861,6 +3600,20 @@ export const SlideEditorModal = ({
   const ribbonBtn = isDarkMode
     ? 'hover:bg-gray-800 text-gray-200 border-gray-700/80'
     : 'hover:bg-gray-100 text-gray-700 border-gray-200';
+
+  const activeTransitionType = activeSlide.transition || deckMeta.transition || 'fade';
+  const previewTransitionClass = previewAnimKey > 0
+    ? ({
+        fade: 'animate-in fade-in duration-500',
+        slide: 'animate-in fade-in slide-in-from-right-8 duration-500',
+        push_up: 'animate-in fade-in slide-in-from-bottom-8 duration-500',
+        wipe: 'animate-in fade-in slide-in-from-left-8 duration-500',
+        split: 'animate-in fade-in zoom-in-95 duration-500',
+        zoom: 'animate-in fade-in zoom-in-90 duration-500',
+        flip: 'animate-in fade-in zoom-in-90 duration-500',
+        none: ''
+      }[activeTransitionType] || 'animate-in fade-in duration-300')
+    : '';
 
   return createPortal(
     <div className="fixed inset-0 z-[999998] flex items-center justify-center p-1 sm:p-3 bg-black/75 backdrop-blur-xs animate-in fade-in duration-200">
@@ -2981,253 +3734,1079 @@ export const SlideEditorModal = ({
           </div>
         </header>
 
-        {/* 2. CINTA DE OPCIONES (RIBBON ESTILO POWERPOINT / GOOGLE SLIDES) */}
-        <div className={`px-3 py-2 border-b flex items-center justify-between gap-2 overflow-x-auto shrink-0 ${panelBg}`}>
-          <div className="flex items-center gap-1.5 shrink-0">
-            {/* Insertar Objetos */}
-            <button
-              type="button"
-              onClick={() => handleAddSlide(activeLayout === 'title' ? 'cards' : activeLayout)}
-              className="px-2.5 py-1.5 rounded-xl bg-[#AD3333] hover:bg-[#8a2828] text-white text-xs font-bold flex items-center gap-1 shadow-2xs"
-              title="Añadir nueva diapositiva"
-            >
-              <Plus size={13} />
-              <span>Diapositiva</span>
-            </button>
+        {/* 2. CINTA DE OPCIONES MULTIPESTAÑA ESTILO MICROSOFT POWERPOINT */}
+        <div className={`border-b shrink-0 select-none ${panelBg}`}>
+          {/* Inputs ocultos de carga de imágenes */}
+          <input
+            ref={elementImageInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleUploadImageFile(f, 'new_element');
+              e.target.value = '';
+            }}
+          />
+          <input
+            ref={replaceElementImageInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleUploadImageFile(f, 'element');
+              e.target.value = '';
+            }}
+          />
+          <input
+            ref={slideImageInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleUploadImageFile(f, 'slide');
+              e.target.value = '';
+            }}
+          />
+          <input
+            ref={bgImageInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleUploadImageFile(f, 'bg');
+              e.target.value = '';
+            }}
+          />
 
-            <div className="h-5 w-px bg-gray-300 dark:bg-gray-700 mx-0.5" />
-
-            <button
-              type="button"
-              onClick={() => handleInsertCanvasElement('textbox')}
-              className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-colors ${ribbonBtn}`}
-              title="Insertar cuadro de texto libre en la diapositiva"
-            >
-              <Type size={13} className="text-[#AD3333]" />
-              <span>Texto</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleInsertCanvasElement('shape', { shapeType: 'rounded', text: 'Bloque destacado' })}
-              className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-colors ${ribbonBtn}`}
-              title="Insertar forma geométrica o bloque"
-            >
-              <Layers size={13} className="text-blue-500" />
-              <span>Forma</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleInsertCanvasElement('note')}
-              className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-colors ${ribbonBtn}`}
-              title="Insertar nota adhesiva"
-            >
-              <Pin size={13} className="text-amber-500" />
-              <span>Nota</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleInsertCanvasElement('badge')}
-              className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-colors ${ribbonBtn}`}
-              title="Insertar insignia o etiqueta"
-            >
-              <Sparkles size={13} className="text-purple-500" />
-              <span>Insignia</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => elementImageInputRef.current?.click()}
-              disabled={isUploadingImg}
-              className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-colors ${ribbonBtn}`}
-              title="Subir e insertar imagen en la diapositiva"
-            >
-              {isUploadingImg ? <Loader2 size={13} className="animate-spin" /> : <ImageIcon size={13} className="text-emerald-500" />}
-              <span>Imagen</span>
-            </button>
-            <input
-              ref={elementImageInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) handleUploadImageFile(f, 'new_element');
-                e.target.value = '';
-              }}
-            />
-            <input
-              ref={replaceElementImageInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) handleUploadImageFile(f, 'element');
-                e.target.value = '';
-              }}
-            />
-
-            <div className="h-5 w-px bg-gray-300 dark:bg-gray-700 mx-0.5" />
-
-            {/* Selector rápido de Diseño (Layout) */}
-            <div className="flex items-center gap-1">
-              <span className="text-[11px] font-bold text-gray-500 hidden xl:inline">Diseño:</span>
-              <select
-                value={activeLayout}
-                onChange={(e) => handleSlideChange('layout', e.target.value)}
-                className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold outline-none ${inputBg}`}
-                title="Cambiar diseño de la diapositiva"
-              >
-                {SLIDE_LAYOUT_CATALOG.map(l => (
-                  <option key={l.id} value={l.id}>{l.name}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Selector de Fuente */}
-            <select
-              value={activeSlide.fontFamily || deckMeta.fontFamily || 'sans'}
-              onChange={(e) => {
-                const nextFont = e.target.value;
-                setDeckMeta(prev => ({ ...prev, fontFamily: nextFont }));
-                if (activeSlide.fontFamily) handleSlideChange('fontFamily', undefined);
-              }}
-              className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold outline-none ${inputBg}`}
-              title="Tipografía de la presentación"
-            >
-              {Object.values(SLIDE_FONTS).map(f => (
-                <option key={f.id} value={f.id}>{f.name}</option>
-              ))}
-            </select>
-
-            {/* Controles de Alineación y Formato Contextual */}
-            <div className="flex items-center gap-0.5 border rounded-xl p-0.5 border-gray-200 dark:border-gray-700">
+          {/* Fila superior de Pestañas de la Cinta PowerPoint */}
+          <div className="flex items-center justify-between gap-2 px-3 pt-1.5 border-b border-gray-200/80 dark:border-gray-800 overflow-x-auto">
+            <div className="flex items-center gap-1 shrink-0">
               {[
-                { id: 'left', icon: AlignLeft, label: 'Izquierda' },
-                { id: 'center', icon: AlignCenter, label: 'Centro' },
-                { id: 'right', icon: AlignRight, label: 'Derecha' }
-              ].map(al => {
-                const IconComp = al.icon;
-                const currentAlign = selectedElement ? (selectedElement.align || 'left') : (activeSlide.titleAlign || 'left');
+                { id: 'inicio', label: 'Inicio', icon: Type },
+                { id: 'insertar', label: 'Insertar', icon: Plus },
+                { id: 'diseno', label: 'Diseño', icon: Palette },
+                { id: 'transiciones', label: 'Transiciones', icon: Layers },
+                { id: 'ia', label: 'IA / Copilot', icon: Sparkles },
+                { id: 'presentacion', label: 'Presentación y Vista', icon: Play }
+              ].map(t => {
+                const IconTab = t.icon;
+                const isAct = ribbonTab === t.id;
                 return (
                   <button
-                    key={al.id}
+                    key={t.id}
                     type="button"
-                    onClick={() => {
-                      if (selectedElement) handleUpdateElementField(selectedElement.id, 'align', al.id);
-                      else handleSlideChange('titleAlign', al.id);
-                    }}
-                    className={`p-1.5 rounded-lg transition-colors ${
-                      currentAlign === al.id ? 'bg-[#AD3333] text-white' : 'hover:bg-gray-200 dark:hover:bg-gray-800'
+                    onClick={() => setRibbonTab(t.id)}
+                    className={`px-3 py-1.5 rounded-t-xl text-xs font-extrabold flex items-center gap-1.5 border-b-2 transition-all ${
+                      isAct
+                        ? 'border-[#AD3333] text-[#AD3333] dark:text-red-400 bg-white dark:bg-gray-900 shadow-2xs'
+                        : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-200/50 dark:hover:bg-gray-800/50'
                     }`}
-                    title={`Alinear ${al.label}`}
                   >
-                    <IconComp size={13} />
+                    <IconTab size={13} />
+                    <span>{t.label}</span>
                   </button>
                 );
               })}
             </div>
 
-            {/* Si hay un elemento del lienzo seleccionado: Negrita, Cursiva, Subrayado, Tamaño, Color y Eliminar */}
-            {selectedElement && (
-              <div className="flex items-center gap-1 pl-1 border-l border-gray-300 dark:border-gray-700 animate-in fade-in">
-                {selectedElement.type !== 'image' && (
-                  <>
+            {/* Indicador del elemento o texto activo para formato individual */}
+            <div className="flex items-center gap-2 pb-1 shrink-0">
+              <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-500/10 border border-sky-500/25 text-[11px] font-bold text-sky-700 dark:text-sky-300">
+                <Type size={12} />
+                <span>
+                  Editando:{' '}
+                  <strong>
+                    {selectedElement
+                      ? `Objeto (${selectedElement.type})`
+                      : (editableFields.find(f => f.key === activeTextField)?.label || 'Título')}
+                  </strong>
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowGridGuides(prev => !prev)}
+                className={`p-1 rounded-lg border text-xs font-bold transition-colors ${
+                  showGridGuides ? 'bg-[#AD3333] text-white border-[#AD3333]' : ribbonBtn
+                }`}
+                title="Mostrar u ocultar cuadrícula guía"
+              >
+                <Grid size={13} />
+              </button>
+
+              <select
+                value={canvasZoom}
+                onChange={(e) => setCanvasZoom(Number(e.target.value))}
+                className={`px-2 py-1 rounded-lg border text-[11px] font-bold outline-none ${inputBg}`}
+                title="Zoom del lienzo"
+              >
+                <option value={85}>85%</option>
+                <option value={100}>100%</option>
+                <option value={115}>115%</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Cuerpo de la Cinta según la Pestaña Activa */}
+          <div className="px-3 py-2 overflow-x-auto">
+            {/* ==================== PESTAÑA 1: INICIO (Portapapeles, Diapositivas, Fuente, Párrafo, Dibujo) ==================== */}
+            {ribbonTab === 'inicio' && (
+              <div className="flex items-center gap-2 min-w-max">
+                {/* Grupo Portapapeles */}
+                <div className="flex items-center gap-1 pr-2 border-r border-gray-200 dark:border-gray-800">
+                  <button
+                    type="button"
+                    onClick={handlePasteSelection}
+                    className={`px-2 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1 transition-colors ${ribbonBtn}`}
+                    title="Pegar objeto o diapositiva copiada (también puedes usar Ctrl+V para pegar imágenes)"
+                  >
+                    <Clipboard size={13} className="text-[#AD3333]" />
+                    <span>Pegar</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCopySelection}
+                    className={`p-1.5 rounded-xl border text-xs font-bold transition-colors ${ribbonBtn}`}
+                    title="Copiar objeto o diapositiva"
+                  >
+                    <Copy size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleToggleFormatPainter}
+                    className={`px-2 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1 transition-colors ${
+                      copiedFormat
+                        ? 'bg-amber-500 text-white border-amber-500 shadow-xs'
+                        : ribbonBtn
+                    }`}
+                    title="Copiar formato: copia el color, fuente y tamaño del texto actual para aplicarlo a otro texto con un clic"
+                  >
+                    <Wand2 size={13} />
+                    <span className="hidden xl:inline">{copiedFormat ? 'Aplicar...' : 'Copiar formato'}</span>
+                  </button>
+                </div>
+
+                {/* Grupo Diapositivas */}
+                <div className="flex items-center gap-1.5 pr-2 border-r border-gray-200 dark:border-gray-800">
+                  <button
+                    type="button"
+                    onClick={() => handleAddSlide(activeLayout === 'title' ? 'cards' : activeLayout)}
+                    className="px-2.5 py-1.5 rounded-xl bg-[#AD3333] hover:bg-[#8a2828] text-white text-xs font-bold flex items-center gap-1 shadow-2xs"
+                    title="Añadir nueva diapositiva"
+                  >
+                    <Plus size={13} />
+                    <span>Nueva</span>
+                  </button>
+
+                  <select
+                    value={activeLayout}
+                    onChange={(e) => handleSlideChange('layout', e.target.value)}
+                    className={`px-2 py-1.5 rounded-xl border text-xs font-bold outline-none ${inputBg}`}
+                    title="Cambiar diseño (Layout) de la diapositiva actual"
+                  >
+                    {SLIDE_LAYOUT_CATALOG.map(l => (
+                      <option key={l.id} value={l.id}>Diseño: {l.shortName}</option>
+                    ))}
+                  </select>
+
+                  <button
+                    type="button"
+                    onClick={handleResetSlideFormatting}
+                    className={`p-1.5 rounded-xl border text-xs font-bold transition-colors ${ribbonBtn}`}
+                    title="Restablecer colores y estilos de texto de esta diapositiva"
+                  >
+                    <RotateCcw size={13} />
+                  </button>
+                </div>
+
+                {/* Grupo Fuente (Por cada texto seleccionado o elemento libre) */}
+                <div className="flex items-center gap-1.5 pr-2 border-r border-gray-200 dark:border-gray-800 relative">
+                  {/* Selector rápido de qué texto de la diapositiva se está formateando */}
+                  <select
+                    value={selectedElement ? `__el_${selectedElement.id}` : activeTextField}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val.startsWith('__el_')) {
+                        setSelectedElementId(val.replace('__el_', ''));
+                      } else {
+                        setSelectedElementId(null);
+                        setActiveTextField(val);
+                      }
+                    }}
+                    className={`px-2 py-1.5 rounded-xl border text-xs font-bold outline-none max-w-[145px] truncate ${inputBg}`}
+                    title="Selecciona qué texto de la diapositiva quieres personalizar (o haz clic sobre él en el lienzo)"
+                  >
+                    {selectedElement && (
+                      <option value={`__el_${selectedElement.id}`}>Objeto ({selectedElement.type})</option>
+                    )}
+                    {editableFields.map(f => (
+                      <option key={f.key} value={f.key}>{f.label}</option>
+                    ))}
+                  </select>
+
+                  {/* Familia tipográfica individual */}
+                  <select
+                    value={currentTargetStyle.fontFamily || 'sans'}
+                    onChange={(e) => applyTargetStylePatch({ fontFamily: e.target.value })}
+                    className={`px-2 py-1.5 rounded-xl border text-xs font-bold outline-none ${inputBg}`}
+                    title="Fuente del texto seleccionado"
+                  >
+                    {Object.values(SLIDE_FONTS).map(f => (
+                      <option key={f.id} value={f.id}>{f.name}</option>
+                    ))}
+                  </select>
+
+                  {/* Tamaño de fuente numérico */}
+                  <select
+                    value={SLIDE_FONT_SIZES.includes(Number(currentTargetStyle.fontSize)) ? Number(currentTargetStyle.fontSize) : 18}
+                    onChange={(e) => applyTargetStylePatch({ fontSize: Number(e.target.value) })}
+                    className={`px-1.5 py-1.5 rounded-xl border text-xs font-bold outline-none w-16 ${inputBg}`}
+                    title="Tamaño de fuente (px)"
+                  >
+                    {SLIDE_FONT_SIZES.map(sz => (
+                      <option key={sz} value={sz}>{sz} px</option>
+                    ))}
+                  </select>
+
+                  {/* A^ Aumentar tamaño / Av Disminuir tamaño */}
+                  <button
+                    type="button"
+                    onClick={() => handleStepTargetFontSize(2)}
+                    className={`px-1.5 py-1 rounded-lg border text-[11px] font-black transition-colors ${ribbonBtn}`}
+                    title="Aumentar tamaño de fuente (A^)"
+                  >
+                    A↑
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleStepTargetFontSize(-2)}
+                    className={`px-1.5 py-1 rounded-lg border text-[11px] font-bold transition-colors ${ribbonBtn}`}
+                    title="Reducir tamaño de fuente (Av)"
+                  >
+                    A↓
+                  </button>
+
+                  {/* Negrita, Cursiva, Subrayado, Tachado, Mayúsculas/Minúsculas */}
+                  <button
+                    type="button"
+                    onClick={() => applyTargetStylePatch({ bold: !currentTargetStyle.bold })}
+                    className={`p-1.5 rounded-lg border text-xs font-bold transition-colors ${
+                      currentTargetStyle.bold ? 'bg-[#AD3333] text-white border-[#AD3333]' : ribbonBtn
+                    }`}
+                    title="Negrita (B)"
+                  >
+                    <Bold size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyTargetStylePatch({ italic: !currentTargetStyle.italic })}
+                    className={`p-1.5 rounded-lg border text-xs font-bold transition-colors ${
+                      currentTargetStyle.italic ? 'bg-[#AD3333] text-white border-[#AD3333]' : ribbonBtn
+                    }`}
+                    title="Cursiva (I)"
+                  >
+                    <Italic size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyTargetStylePatch({ underline: !currentTargetStyle.underline })}
+                    className={`p-1.5 rounded-lg border text-xs font-bold transition-colors ${
+                      currentTargetStyle.underline ? 'bg-[#AD3333] text-white border-[#AD3333]' : ribbonBtn
+                    }`}
+                    title="Subrayado (U)"
+                  >
+                    <Underline size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyTargetStylePatch({ strikethrough: !currentTargetStyle.strikethrough })}
+                    className={`p-1.5 rounded-lg border text-xs font-bold transition-colors ${
+                      currentTargetStyle.strikethrough ? 'bg-[#AD3333] text-white border-[#AD3333]' : ribbonBtn
+                    }`}
+                    title="Tachado (S)"
+                  >
+                    <Strikethrough size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleToggleTargetCase}
+                    className={`px-1.5 py-1 rounded-lg border text-[11px] font-black transition-colors ${ribbonBtn}`}
+                    title="Cambiar entre MAYÚSCULAS, minúsculas y Tipo Título (Aa)"
+                  >
+                    Aa
+                  </button>
+
+                  {/* Color de fuente individual (A con barra de color + selector rápido de paleta) */}
+                  <div className="flex items-center gap-0.5 border rounded-xl px-1.5 py-0.5 border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50">
+                    <label className="flex flex-col items-center cursor-pointer px-1" title="Cambiar color de este texto">
+                      <span className="text-[11px] font-black leading-none">A</span>
+                      <span
+                        className="w-4 h-1 rounded-full mt-0.5"
+                        style={{ backgroundColor: currentTargetStyle.color || '#AD3333' }}
+                      />
+                      <input
+                        type="color"
+                        value={currentTargetStyle.color && currentTargetStyle.color.startsWith('#') ? currentTargetStyle.color : '#AD3333'}
+                        onChange={(e) => applyTargetStylePatch({ color: e.target.value })}
+                        className="sr-only"
+                      />
+                    </label>
                     <button
                       type="button"
-                      onClick={() => handleUpdateElementField(selectedElement.id, 'bold', !selectedElement.bold)}
-                      className={`p-1.5 rounded-lg border text-xs font-bold ${selectedElement.bold ? 'bg-[#AD3333] text-white border-[#AD3333]' : ribbonBtn}`}
-                      title="Negrita"
+                      onClick={() => {
+                        setShowColorPalette(prev => !prev);
+                        setShowHighlightPalette(false);
+                      }}
+                      className="p-0.5 text-gray-500 hover:text-gray-800 dark:hover:text-white"
+                      title="Paleta de colores de fuente"
                     >
-                      <Bold size={13} />
+                      <ChevronDown size={11} />
                     </button>
+                  </div>
+
+                  {/* Color de resaltado / fondo del texto */}
+                  <div className="flex items-center gap-0.5 border rounded-xl px-1.5 py-0.5 border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50">
                     <button
                       type="button"
-                      onClick={() => handleUpdateElementField(selectedElement.id, 'italic', !selectedElement.italic)}
-                      className={`p-1.5 rounded-lg border text-xs font-bold ${selectedElement.italic ? 'bg-[#AD3333] text-white border-[#AD3333]' : ribbonBtn}`}
-                      title="Cursiva"
+                      onClick={() => {
+                        setShowHighlightPalette(prev => !prev);
+                        setShowColorPalette(false);
+                      }}
+                      className="flex items-center gap-1 text-[11px] font-bold px-1 py-0.5"
+                      title="Color de resaltado o fondo del texto seleccionado"
                     >
-                      <Italic size={13} />
+                      <Highlighter size={12} className="text-amber-500" />
+                      <span
+                        className="w-3 h-3 rounded border border-gray-300 dark:border-gray-600"
+                        style={{ backgroundColor: currentTargetStyle.bgColor || 'transparent' }}
+                      />
                     </button>
+                  </div>
+
+                  {/* Borrar formato del texto */}
+                  <button
+                    type="button"
+                    onClick={handleClearTargetFormatting}
+                    className={`p-1.5 rounded-lg border text-xs transition-colors ${ribbonBtn}`}
+                    title="Borrar formato del texto seleccionado"
+                  >
+                    <Eraser size={13} />
+                  </button>
+                </div>
+
+                {/* Grupo Párrafo (Alineación, Viñetas, Numeración, Interlineado) */}
+                <div className="flex items-center gap-1 pr-2 border-r border-gray-200 dark:border-gray-800">
+                  <div className="flex items-center gap-0.5 border rounded-xl p-0.5 border-gray-200 dark:border-gray-700">
+                    {[
+                      { id: 'left', icon: AlignLeft, label: 'Izquierda' },
+                      { id: 'center', icon: AlignCenter, label: 'Centro' },
+                      { id: 'right', icon: AlignRight, label: 'Derecha' },
+                      { id: 'justify', icon: AlignJustify, label: 'Justificar' }
+                    ].map(al => {
+                      const IconComp = al.icon;
+                      return (
+                        <button
+                          key={al.id}
+                          type="button"
+                          onClick={() => applyTargetStylePatch({ align: al.id })}
+                          className={`p-1.5 rounded-lg transition-colors ${
+                            currentTargetStyle.align === al.id ? 'bg-[#AD3333] text-white' : 'hover:bg-gray-200 dark:hover:bg-gray-800'
+                          }`}
+                          title={`Alinear ${al.label}`}
+                        >
+                          <IconComp size={13} />
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleToggleBulletsPrefix(false)}
+                    className={`p-1.5 rounded-lg border text-xs transition-colors ${ribbonBtn}`}
+                    title="Añadir o quitar viñetas (•)"
+                  >
+                    <List size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleBulletsPrefix(true)}
+                    className={`p-1.5 rounded-lg border text-xs transition-colors ${ribbonBtn}`}
+                    title="Añadir o quitar numeración (1, 2, 3)"
+                  >
+                    <ListOrdered size={13} />
+                  </button>
+
+                  <select
+                    value={currentTargetStyle.lineHeight || 1.3}
+                    onChange={(e) => applyTargetStylePatch({ lineHeight: Number(e.target.value) })}
+                    className={`px-1.5 py-1 rounded-lg border text-[11px] font-bold outline-none ${inputBg}`}
+                    title="Interlineado"
+                  >
+                    <option value={1}>1.0x</option>
+                    <option value={1.25}>1.25x</option>
+                    <option value={1.5}>1.5x</option>
+                    <option value={1.8}>1.8x</option>
+                  </select>
+                </div>
+
+                {/* Grupo Dibujo e Inserción Rápida */}
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => handleInsertCanvasElement('textbox')}
+                    className={`px-2 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1 transition-colors ${ribbonBtn}`}
+                    title="Insertar cuadro de texto libre"
+                  >
+                    <Type size={13} className="text-[#AD3333]" />
+                    <span>Texto</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowImageMenu(prev => !prev)}
+                    disabled={isUploadingImg}
+                    className={`px-2 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1 transition-colors ${
+                      showImageMenu ? 'bg-emerald-600 text-white border-emerald-600' : ribbonBtn
+                    }`}
+                    title="Insertar imagen (PC, URL, Ilustraciones o Ctrl+V)"
+                  >
+                    {isUploadingImg ? <Loader2 size={13} className="animate-spin" /> : <ImageIcon size={13} className="text-emerald-500" />}
+                    <span>Imagen</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleInsertCanvasElement('shape', { shapeType: 'rounded', text: 'Bloque destacado' })}
+                    className={`px-2 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1 transition-colors ${ribbonBtn}`}
+                    title="Insertar forma"
+                  >
+                    <Layers size={13} className="text-blue-500" />
+                    <span>Forma</span>
+                  </button>
+                  {selectedElement && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleReorderCanvasElement(selectedElement.id, 'front')}
+                        className={`p-1.5 rounded-lg border text-xs ${ribbonBtn}`}
+                        title="Traer al frente"
+                      >
+                        <ArrowUp size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCanvasElement(selectedElement.id)}
+                        className="p-1.5 rounded-lg border border-red-500/30 text-red-500 hover:bg-red-500/10"
+                        title="Eliminar objeto seleccionado (Supr)"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ==================== PESTAÑA 2: INSERTAR (Diapositiva, Tabla, Imágenes, Formas, Insignias, Notas, WordArt) ==================== */}
+            {ribbonTab === 'insertar' && (
+              <div className="flex items-center gap-2 min-w-max">
+                {/* Diapositivas y Tablas */}
+                <div className="flex items-center gap-1.5 pr-2 border-r border-gray-200 dark:border-gray-800">
+                  <button
+                    type="button"
+                    onClick={() => handleAddSlide('cards')}
+                    className="px-2.5 py-1.5 rounded-xl bg-[#AD3333] hover:bg-[#8a2828] text-white text-xs font-bold flex items-center gap-1"
+                  >
+                    <Plus size={13} />
+                    <span>Nueva Diapositiva</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (activeLayout === 'table') {
+                        const curH = activeSlide.table?.headers || ['Col 1', 'Col 2', 'Col 3'];
+                        const curR = getTableRows(activeSlide.table);
+                        handleSlideChange('table', { headers: curH, rows: [...curR, curH.map(() => 'Nuevo dato')] });
+                      } else {
+                        handleAddSlide('table');
+                      }
+                    }}
+                    className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 ${ribbonBtn}`}
+                  >
+                    <TableIcon size={13} className="text-blue-500" />
+                    <span>{activeLayout === 'table' ? '+ Fila de Tabla' : 'Tabla'}</span>
+                  </button>
+                  {activeLayout === 'table' && (
                     <button
                       type="button"
-                      onClick={() => handleUpdateElementField(selectedElement.id, 'underline', !selectedElement.underline)}
-                      className={`p-1.5 rounded-lg border text-xs font-bold ${selectedElement.underline ? 'bg-[#AD3333] text-white border-[#AD3333]' : ribbonBtn}`}
-                      title="Subrayado"
+                      onClick={() => {
+                        const curH = activeSlide.table?.headers || ['Col 1', 'Col 2'];
+                        if (curH.length >= 5) return;
+                        const curR = getTableRows(activeSlide.table);
+                        handleSlideChange('table', {
+                          headers: [...curH, `Col ${curH.length + 1}`],
+                          rows: curR.map(r => [...(Array.isArray(r) ? r : []), ''])
+                        });
+                      }}
+                      className={`px-2 py-1.5 rounded-xl border text-xs font-bold ${ribbonBtn}`}
                     >
-                      <Underline size={13} />
+                      + Columna
                     </button>
+                  )}
+                </div>
+
+                {/* Imágenes (Subir PC, URL, Ilustraciones, Fondo) */}
+                <div className="flex items-center gap-1.5 pr-2 border-r border-gray-200 dark:border-gray-800">
+                  <button
+                    type="button"
+                    onClick={() => elementImageInputRef.current?.click()}
+                    disabled={isUploadingImg}
+                    className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 ${ribbonBtn}`}
+                    title="Subir imagen desde tu computador como objeto libre movible"
+                  >
+                    <Upload size={13} className="text-emerald-500" />
+                    <span>Subir imagen</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowImageMenu(prev => !prev)}
+                    className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 ${
+                      showImageMenu ? 'bg-emerald-600 text-white border-emerald-600' : ribbonBtn
+                    }`}
+                    title="Pegar imagen por URL o elegir ilustración académica"
+                  >
+                    <ImageIcon size={13} className="text-teal-500" />
+                    <span>URL / Galería Visual</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => bgImageInputRef.current?.click()}
+                    className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 ${ribbonBtn}`}
+                    title="Subir imagen de fondo para esta diapositiva"
+                  >
+                    <ImageIcon size={13} className="text-purple-500" />
+                    <span>Fondo de diapositiva</span>
+                  </button>
+                </div>
+
+                {/* Cuadro de Texto, Formas y Notas */}
+                <div className="flex items-center gap-1.5 pr-2 border-r border-gray-200 dark:border-gray-800">
+                  <button
+                    type="button"
+                    onClick={() => handleInsertCanvasElement('textbox')}
+                    className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 ${ribbonBtn}`}
+                  >
+                    <Type size={13} className="text-[#AD3333]" />
+                    <span>Cuadro de texto</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleInsertCanvasElement('textbox', {
+                      text: 'TÍTULO DESTACADO',
+                      fontSize: 32,
+                      bold: true,
+                      align: 'center',
+                      textColor: activeTheme.primary,
+                      w: 55,
+                      h: 18
+                    })}
+                    className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 ${ribbonBtn}`}
+                    title="Insertar texto artístico grande (WordArt)"
+                  >
+                    <Sparkles size={13} className="text-amber-500" />
+                    <span>WordArt</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleInsertCanvasElement('shape', { shapeType: 'rounded', text: 'Tarjeta' })}
+                    className={`px-2 py-1.5 rounded-xl border text-xs font-bold ${ribbonBtn}`}
+                  >
+                    Rectángulo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleInsertCanvasElement('shape', { shapeType: 'circle', w: 18, h: 28, text: '1' })}
+                    className={`px-2 py-1.5 rounded-xl border text-xs font-bold ${ribbonBtn}`}
+                  >
+                    Círculo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleInsertCanvasElement('shape', { shapeType: 'divider', w: 60, h: 6, text: '' })}
+                    className={`px-2 py-1.5 rounded-xl border text-xs font-bold ${ribbonBtn}`}
+                  >
+                    Línea
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleInsertCanvasElement('note')}
+                    className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1 ${ribbonBtn}`}
+                  >
+                    <Pin size={13} className="text-amber-500" />
+                    <span>Nota adhesiva</span>
+                  </button>
+                </div>
+
+                {/* Insignias Académicas listas */}
+                <div className="flex items-center gap-1">
+                  {SLIDE_ACADEMIC_BADGES.slice(0, 4).map(b => (
+                    <button
+                      key={b.id}
+                      type="button"
+                      onClick={() => handleInsertCanvasElement('badge', { text: b.text, fill: b.fill, textColor: b.textColor, w: 24, h: 10 })}
+                      style={{ backgroundColor: b.fill, color: b.textColor }}
+                      className="px-2 py-1 rounded-full text-[10px] font-black shadow-2xs hover:opacity-90 transition-opacity"
+                      title={`Insertar insignia: ${b.text}`}
+                    >
+                      {b.text}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ==================== PESTAÑA 3: DISEÑO (Temas, Colores de Fondo/Acento, Patrón, Fondo) ==================== */}
+            {ribbonTab === 'diseno' && (
+              <div className="flex items-center gap-2.5 min-w-max">
+                {/* Galería rápida de los 8 Temas */}
+                <div className="flex items-center gap-1.5 pr-2 border-r border-gray-200 dark:border-gray-800">
+                  <span className="text-[11px] font-black uppercase text-gray-400 mr-1">Temas:</span>
+                  {Object.values(SLIDE_THEMES).map(t => {
+                    const isSelected = (activeSlide.theme || deckMeta.theme) === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => {
+                          setDeckMeta(prev => ({ ...prev, theme: t.id }));
+                          if (activeSlide.theme) handleSlideChange('theme', undefined);
+                        }}
+                        className={`px-2 py-1 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all ${
+                          isSelected
+                            ? 'border-[#AD3333] ring-2 ring-[#AD3333]/25 bg-red-500/5'
+                            : 'border-gray-200 dark:border-gray-800 hover:border-gray-400'
+                        }`}
+                      >
+                        <span
+                          style={{ backgroundColor: t.bg, borderColor: t.primary }}
+                          className="w-4 h-4 rounded-md border-2 flex items-center justify-center shrink-0"
+                        >
+                          <span style={{ backgroundColor: t.primary }} className="w-1.5 h-1.5 rounded-full" />
+                        </span>
+                        <span>{t.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Colores personalizados de la diapositiva */}
+                <div className="flex items-center gap-2 pr-2 border-r border-gray-200 dark:border-gray-800">
+                  <label className="flex items-center gap-1.5 text-xs font-bold cursor-pointer">
+                    <span>Fondo:</span>
                     <input
                       type="color"
-                      value={selectedElement.fill && selectedElement.fill !== 'transparent' ? selectedElement.fill : '#AD3333'}
-                      onChange={(e) => handleUpdateElementField(selectedElement.id, 'fill', e.target.value)}
+                      value={activeSlide.bgColor || activeTheme.bg || '#0F172A'}
+                      onChange={(e) => handleSlideChange('bgColor', e.target.value)}
                       className="w-6 h-6 rounded cursor-pointer border-0 bg-transparent"
-                      title="Color de fondo del objeto"
                     />
-                  </>
-                )}
+                  </label>
+                  <label className="flex items-center gap-1.5 text-xs font-bold cursor-pointer">
+                    <span>Acento:</span>
+                    <input
+                      type="color"
+                      value={activeSlide.accentColor || activeTheme.primary || '#AD3333'}
+                      onChange={(e) => handleSlideChange('accentColor', e.target.value)}
+                      className="w-6 h-6 rounded cursor-pointer border-0 bg-transparent"
+                    />
+                  </label>
+                  {(activeSlide.bgColor || activeSlide.accentColor) && (
+                    <button
+                      type="button"
+                      onClick={() => handleSlidePatch({ bgColor: '', accentColor: '' })}
+                      className="text-[11px] font-bold text-[#AD3333] hover:underline"
+                    >
+                      Restablecer
+                    </button>
+                  )}
+                </div>
+
+                {/* Textura / Patrón y Fondo */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-bold text-gray-500">Textura:</span>
+                  {SLIDE_PATTERNS.map(p => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setDeckMeta(prev => ({ ...prev, bgPattern: p.id }))}
+                      className={`px-2 py-1 rounded-lg border text-xs font-bold ${
+                        deckMeta.bgPattern === p.id ? 'bg-[#AD3333] text-white border-[#AD3333]' : ribbonBtn
+                      }`}
+                    >
+                      {p.name}
+                    </button>
+                  ))}
+                  {activeSlide.bgImage && (
+                    <button
+                      type="button"
+                      onClick={() => handleSlideChange('bgImage', '')}
+                      className="px-2 py-1 rounded-lg bg-red-500/10 text-red-500 text-xs font-bold"
+                    >
+                      Quitar imagen fondo
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ==================== PESTAÑA 4: TRANSICIONES (Vista previa, Galería, Duración, Aplicar a todas) ==================== */}
+            {ribbonTab === 'transiciones' && (
+              <div className="flex items-center gap-2.5 min-w-max">
                 <button
                   type="button"
-                  onClick={() => handleDuplicateCanvasElement(selectedElement.id)}
-                  className={`p-1.5 rounded-lg border text-xs ${ribbonBtn}`}
-                  title="Duplicar objeto"
+                  onClick={() => setPreviewAnimKey(prev => prev + 1)}
+                  className="px-3 py-1.5 rounded-xl bg-[#AD3333] hover:bg-[#8a2828] text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs"
+                  title="Reproducir vista previa de la transición en el lienzo"
                 >
-                  <Copy size={13} />
+                  <Play size={13} />
+                  <span>Vista previa</span>
+                </button>
+
+                <div className="h-5 w-px bg-gray-300 dark:bg-gray-700" />
+
+                {/* Galería de Transiciones */}
+                <div className="flex items-center gap-1.5 pr-2 border-r border-gray-200 dark:border-gray-800">
+                  {SLIDE_TRANSITION_GALLERY.map(tr => {
+                    const currentTr = activeSlide.transition || deckMeta.transition || 'fade';
+                    const isSelected = currentTr === tr.id;
+                    return (
+                      <button
+                        key={tr.id}
+                        type="button"
+                        onClick={() => {
+                          handleSlideChange('transition', tr.id);
+                          setDeckMeta(prev => ({ ...prev, transition: tr.id }));
+                          setPreviewAnimKey(prev => prev + 1);
+                        }}
+                        className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-all ${
+                          isSelected
+                            ? 'bg-[#AD3333] text-white border-[#AD3333] shadow-2xs'
+                            : ribbonBtn
+                        }`}
+                        title={tr.desc}
+                      >
+                        {tr.name}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Duración y Aplicar a todas */}
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-1 text-xs font-bold">
+                    <span className="text-gray-500">Duración:</span>
+                    <select
+                      value={activeSlide.transitionDuration || deckMeta.transitionDuration || 450}
+                      onChange={(e) => {
+                        const ms = Number(e.target.value);
+                        handleSlideChange('transitionDuration', ms);
+                        setDeckMeta(prev => ({ ...prev, transitionDuration: ms }));
+                      }}
+                      className={`px-2 py-1 rounded-lg border text-xs font-bold outline-none ${inputBg}`}
+                    >
+                      <option value={250}>0.25 s (Rápida)</option>
+                      <option value={450}>0.45 s (Normal)</option>
+                      <option value={700}>0.70 s (Suave)</option>
+                      <option value={1000}>1.00 s (Lenta)</option>
+                    </select>
+                  </label>
+
+                  <label className="flex items-center gap-1 text-xs font-bold">
+                    <span className="text-gray-500">Avance auto:</span>
+                    <select
+                      value={deckMeta.autoAdvanceSeconds || 0}
+                      onChange={(e) => setDeckMeta(prev => ({ ...prev, autoAdvanceSeconds: Number(e.target.value) }))}
+                      className={`px-2 py-1 rounded-lg border text-xs font-bold outline-none ${inputBg}`}
+                      title="Avanzar diapositivas automáticamente al presentar"
+                    >
+                      <option value={0}>Al hacer clic</option>
+                      <option value={5}>Cada 5 s</option>
+                      <option value={10}>Cada 10 s</option>
+                      <option value={15}>Cada 15 s</option>
+                      <option value={30}>Cada 30 s</option>
+                    </select>
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const tr = activeSlide.transition || deckMeta.transition || 'fade';
+                      const dur = activeSlide.transitionDuration || deckMeta.transitionDuration || 450;
+                      setDeckMeta(prev => ({ ...prev, transition: tr, transitionDuration: dur }));
+                      updateSlidesWithHistory(prev => prev.map(s => ({ ...s, transition: tr, transitionDuration: dur })));
+                      showMessage('Transición aplicada a todas las diapositivas.');
+                    }}
+                    className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold ${ribbonBtn}`}
+                  >
+                    Aplicar a todas
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ==================== PESTAÑA 5: IA / COPILOT (Generación y Transformación en 1 Clic) ==================== */}
+            {ribbonTab === 'ia' && (
+              <div className="flex items-center gap-2 min-w-max">
+                <div className="flex items-center gap-1.5 pr-2 border-r border-gray-200 dark:border-gray-800">
+                  <Sparkles size={14} className="text-amber-500 shrink-0" />
+                  <input
+                    type="text"
+                    value={aiSlidePrompt}
+                    onChange={(e) => setAiSlidePrompt(e.target.value)}
+                    placeholder="Tema para crear nueva diapositiva con IA..."
+                    disabled={isAiWorking}
+                    className={`px-3 py-1.5 rounded-xl border text-xs font-medium outline-none w-64 ${inputBg}`}
+                  />
+                  <button
+                    type="button"
+                    disabled={isAiWorking || !aiSlidePrompt.trim()}
+                    onClick={() => handleRunSlideAiAction('generate_new')}
+                    className="px-3 py-1.5 rounded-xl bg-[#AD3333] hover:bg-[#8a2828] disabled:opacity-40 text-white text-xs font-bold flex items-center gap-1"
+                  >
+                    {isAiWorking ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />}
+                    <span>Generar Diapositiva</span>
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  {[
+                    { id: 'expand', label: 'Ampliar contenido' },
+                    { id: 'summarize', label: 'Sintetizar' },
+                    { id: 'to_two_columns', label: 'A 2 Columnas' },
+                    { id: 'to_table', label: 'A Tabla' },
+                    { id: 'to_quiz', label: 'Transformar en Quiz' },
+                    { id: 'translate', label: `Traducir a ${deckMeta.language}` }
+                  ].map(act => (
+                    <button
+                      key={act.id}
+                      type="button"
+                      disabled={isAiWorking}
+                      onClick={() => handleRunSlideAiAction(act.id)}
+                      className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-colors ${ribbonBtn}`}
+                    >
+                      {act.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ==================== PESTAÑA 6: PRESENTACIÓN Y VISTA ==================== */}
+            {ribbonTab === 'presentacion' && (
+              <div className="flex items-center gap-2 min-w-max">
+                <button
+                  type="button"
+                  onClick={handleSaveAndProject}
+                  className="px-3 py-1.5 rounded-xl bg-[#AD3333] hover:bg-[#8a2828] text-white text-xs font-bold flex items-center gap-1.5"
+                >
+                  <Play size={13} />
+                  <span>Presentar en Pantalla Completa</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleDeleteCanvasElement(selectedElement.id)}
-                  className="p-1.5 rounded-lg border border-red-500/30 text-red-500 hover:bg-red-500/10"
-                  title="Eliminar objeto (Supr)"
+                  onClick={() => exportReviewToPresentation(buildFullUpdatedPresentation())}
+                  className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 ${ribbonBtn}`}
                 >
-                  <Trash2 size={13} />
+                  <Download size={13} className="text-emerald-500" />
+                  <span>Exportar PowerPoint (.pptx)</span>
+                </button>
+
+                <div className="h-5 w-px bg-gray-300 dark:bg-gray-700 mx-1" />
+
+                <button
+                  type="button"
+                  onClick={() => setShowSpeakerNotesBar(prev => !prev)}
+                  className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 ${
+                    showSpeakerNotesBar ? 'bg-amber-500/15 border-amber-500/40 text-amber-600 dark:text-amber-300' : ribbonBtn
+                  }`}
+                >
+                  <FileText size={13} />
+                  <span>Notas del Orador</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowGridGuides(prev => !prev)}
+                  className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 ${
+                    showGridGuides ? 'bg-[#AD3333] text-white border-[#AD3333]' : ribbonBtn
+                  }`}
+                >
+                  <Grid size={13} />
+                  <span>Guías de Cuadrícula</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowRightInspector(prev => !prev)}
+                  className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 ${
+                    showRightInspector ? 'bg-sky-500/15 border-sky-500/40 text-sky-600 dark:text-sky-300' : ribbonBtn
+                  }`}
+                >
+                  <ColumnsIcon size={13} />
+                  <span>{showRightInspector ? 'Ocultar Inspector Lateral' : 'Mostrar Inspector Lateral'}</span>
                 </button>
               </div>
             )}
           </div>
 
-          {/* Controles derechos de la cinta: Tema, Cuadrícula y Zoom */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            <select
-              value={activeSlide.theme || deckMeta.theme}
-              onChange={(e) => {
-                const nextTheme = e.target.value;
-                setDeckMeta(prev => ({ ...prev, theme: nextTheme }));
-                if (activeSlide.theme) handleSlideChange('theme', undefined);
-              }}
-              className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold outline-none ${inputBg}`}
-              title="Tema visual de la presentación"
-            >
-              {Object.values(SLIDE_THEMES).map(t => (
-                <option key={t.id} value={t.id}>Tema: {t.name}</option>
-              ))}
-            </select>
+          {/* Barra desplegable de Paleta de Colores de Fuente Individual */}
+          {showColorPalette && (
+            <div className="px-4 py-2 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 flex items-center justify-between gap-3 flex-wrap animate-in fade-in">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[11px] font-extrabold text-gray-500 mr-1">
+                  Color para {selectedElement ? `Objeto (${selectedElement.type})` : (editableFields.find(f => f.key === activeTextField)?.label || 'Texto')}:
+                </span>
+                {SLIDE_COLOR_SWATCHES.map(c => {
+                  const hexVal = typeof c === 'string' ? c : c.hex;
+                  const swatchName = typeof c === 'string' ? c : (c.name || c.hex);
+                  return (
+                    <button
+                      key={hexVal}
+                      type="button"
+                      onClick={() => {
+                        applyTargetStylePatch({ color: hexVal });
+                        setShowColorPalette(false);
+                      }}
+                      style={{ backgroundColor: hexVal }}
+                      className={`w-5 h-5 rounded-full border transition-transform hover:scale-125 ${
+                        currentTargetStyle.color === hexVal ? 'ring-2 ring-[#AD3333] scale-110' : 'border-gray-300 dark:border-gray-600'
+                      }`}
+                      title={`Aplicar color ${swatchName}`}
+                    />
+                  );
+                })}
+                <input
+                  type="color"
+                  value={currentTargetStyle.color && currentTargetStyle.color.startsWith('#') ? currentTargetStyle.color : '#AD3333'}
+                  onChange={(e) => applyTargetStylePatch({ color: e.target.value })}
+                  className="w-6 h-6 rounded cursor-pointer border-0 bg-transparent ml-1"
+                  title="Color personalizado"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowColorPalette(false)}
+                className="text-xs font-bold text-gray-400 hover:text-gray-600"
+              >
+                Cerrar
+              </button>
+            </div>
+          )}
 
-            <button
-              type="button"
-              onClick={() => setShowGridGuides(prev => !prev)}
-              className={`p-1.5 rounded-xl border text-xs font-bold transition-colors ${
-                showGridGuides ? 'bg-[#AD3333] text-white border-[#AD3333]' : ribbonBtn
-              }`}
-              title="Mostrar cuadrícula guía"
-            >
-              <Grid size={14} />
-            </button>
+          {/* Barra desplegable de Color de Resaltado / Fondo del Texto */}
+          {showHighlightPalette && (
+            <div className="px-4 py-2 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 flex items-center justify-between gap-3 flex-wrap animate-in fade-in">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[11px] font-extrabold text-gray-500">Resaltado de texto:</span>
+                {SLIDE_HIGHLIGHT_SWATCHES.map(sw => (
+                  <button
+                    key={sw.id}
+                    type="button"
+                    onClick={() => {
+                      applyTargetStylePatch({ bgColor: sw.color });
+                      setShowHighlightPalette(false);
+                    }}
+                    className="px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700 text-xs font-bold flex items-center gap-1.5 hover:border-[#AD3333]"
+                  >
+                    <span
+                      className="w-3.5 h-3.5 rounded border border-gray-300"
+                      style={{ backgroundColor: sw.color || 'transparent' }}
+                    />
+                    <span>{sw.name}</span>
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowHighlightPalette(false)}
+                className="text-xs font-bold text-gray-400 hover:text-gray-600"
+              >
+                Cerrar
+              </button>
+            </div>
+          )}
 
-            <select
-              value={canvasZoom}
-              onChange={(e) => setCanvasZoom(Number(e.target.value))}
-              className={`px-2 py-1.5 rounded-xl border text-xs font-bold outline-none ${inputBg}`}
-              title="Zoom del lienzo"
-            >
-              <option value={85}>85%</option>
-              <option value={100}>100%</option>
-              <option value={115}>115%</option>
-            </select>
-          </div>
+          {/* Menú rápido para Insertar Imágenes (PC, URL, Ilustraciones listas o Ctrl+V) */}
+          {showImageMenu && (
+            <div className="px-4 py-2.5 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 space-y-2 animate-in fade-in">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => elementImageInputRef.current?.click()}
+                    className="px-3 py-1.5 rounded-xl bg-[#AD3333] hover:bg-[#8a2828] text-white text-xs font-bold flex items-center gap-1.5"
+                  >
+                    <Upload size={13} />
+                    <span>Subir imagen libre desde PC</span>
+                  </button>
+                  {activeLayout === 'image_text' && (
+                    <button
+                      type="button"
+                      onClick={() => slideImageInputRef.current?.click()}
+                      className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5"
+                    >
+                      <ImageIcon size={13} />
+                      <span>Subir al marco del diseño</span>
+                    </button>
+                  )}
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="text"
+                      value={imageUrlDraft}
+                      onChange={(e) => setImageUrlDraft(e.target.value)}
+                      placeholder="Pega aquí la URL de una imagen (https://...)"
+                      className={`px-2.5 py-1.5 rounded-xl border text-xs outline-none w-60 ${inputBg}`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleInsertImageUrl(imageUrlDraft, 'auto')}
+                      disabled={!imageUrlDraft.trim()}
+                      className="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 disabled:opacity-40 text-white text-xs font-bold"
+                    >
+                      Insertar URL
+                    </button>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowImageMenu(false)}
+                  className="text-xs font-bold text-gray-400 hover:text-gray-600"
+                >
+                  Cerrar
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2 overflow-x-auto pt-1">
+                <span className="text-[11px] font-extrabold text-gray-500 shrink-0">Ilustraciones listas:</span>
+                {SLIDE_ACADEMIC_ILLUSTRATIONS.map(ill => (
+                  <button
+                    key={ill.id}
+                    type="button"
+                    onClick={() => handleInsertImageUrl(ill.url, 'auto')}
+                    className="px-2.5 py-1 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-[#AD3333] text-xs font-bold flex items-center gap-1.5 shrink-0"
+                  >
+                    <img src={ill.url} alt={ill.name} className="w-6 h-4 rounded object-cover" />
+                    <span>{ill.name}</span>
+                  </button>
+                ))}
+                <span className="text-[10px] text-gray-400 ml-2 shrink-0">
+                  Tip: También puedes copiar cualquier imagen y presionar Ctrl+V o arrastrarla al lienzo
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 3. ÁREA DE TRABAJO EN 3 PANELES (Miniaturas 16:9 + Lienzo Central WYSIWYG + Inspector Derecho) */}
@@ -3346,15 +4925,40 @@ export const SlideEditorModal = ({
           </aside>
 
           {/* PANEL CENTRAL: Lienzo 16:9 Interactivo WYSIWYG + Notas del Orador */}
-          <main className="flex-1 flex flex-col justify-between overflow-hidden bg-slate-200/70 dark:bg-gray-950/90 min-h-0">
+          <main
+            onPaste={handleStagePaste}
+            onDragOver={(e) => {
+              e.preventDefault();
+              if (!isDragOverStage) setIsDragOverStage(true);
+            }}
+            onDragLeave={() => setIsDragOverStage(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setIsDragOverStage(false);
+              const file = e.dataTransfer?.files?.[0];
+              if (file && file.type.startsWith('image/')) {
+                handleUploadImageFile(file, 'auto');
+              }
+            }}
+            className="flex-1 flex flex-col justify-between overflow-hidden bg-slate-200/70 dark:bg-gray-950/90 min-h-0 relative"
+          >
+            {isDragOverStage && (
+              <div className="absolute inset-3 rounded-3xl border-2 border-dashed border-sky-500 bg-sky-500/10 z-40 flex items-center justify-center pointer-events-none">
+                <div className="px-4 py-2 rounded-2xl bg-sky-600 text-white text-xs font-black shadow-lg">
+                  Suelta la imagen aquí para insertarla en la diapositiva
+                </div>
+              </div>
+            )}
+
             <div className="flex-1 overflow-auto p-3 sm:p-6 flex items-center justify-center">
               <div
+                key={`stage_${safeSlideIdx}_${previewAnimKey}`}
                 ref={stageContainerRef}
                 style={{
                   width: `${canvasZoom}%`,
                   maxWidth: canvasZoom > 100 ? '1100px' : '920px'
                 }}
-                className="w-full shadow-2xl rounded-2xl transition-all duration-150 ring-1 ring-black/10 dark:ring-white/10"
+                className={`w-full shadow-2xl rounded-2xl transition-all duration-150 ring-1 ring-black/10 dark:ring-white/10 ${previewTransitionClass}`}
               >
                 <SlideCanvasSurface
                   presentation={deckMeta}
@@ -3365,18 +4969,21 @@ export const SlideEditorModal = ({
                   mode="editor"
                   onUpdateSlideField={handleSlideChange}
                   selectedElementId={selectedElementId}
-                  onSelectElement={setSelectedElementId}
+                  onSelectElement={handleSelectCanvasElement}
                   onStartElementPointer={handleStartElementPointer}
                   onUpdateElementField={handleUpdateElementField}
+                  activeTextField={activeTextField}
+                  onSelectTextField={handleSelectTextField}
+                  onTriggerSlideImageUpload={() => slideImageInputRef.current?.click()}
                   showGridGuides={showGridGuides}
                   snapGuides={snapGuides}
                 />
               </div>
             </div>
 
-            {/* Barra Inferior de Notas del Orador (como en PowerPoint / Google Slides) */}
+            {/* Barra Inferior de Notas del Orador y Estado tipo PowerPoint */}
             <div className={`border-t px-4 py-2 shrink-0 ${panelBg}`}>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
                 <button
                   type="button"
                   onClick={() => setShowSpeakerNotesBar(prev => !prev)}
@@ -3387,7 +4994,7 @@ export const SlideEditorModal = ({
                   <ChevronDown size={14} className={`transition-transform ${showSpeakerNotesBar ? 'rotate-180' : ''}`} />
                 </button>
                 <span className="text-[11px] text-gray-400 hidden sm:inline">
-                  Haz clic directamente sobre cualquier texto del lienzo para editarlo o arrastra objetos
+                  Haz clic en cualquier texto para personalizar su fuente, tamaño o color individual, o pega imágenes con Ctrl+V
                 </span>
               </div>
 
@@ -3406,7 +5013,7 @@ export const SlideEditorModal = ({
           </main>
 
           {/* PANEL DERECHO: Inspector de Propiedades (Contenido, Diseño, Tema, IA) */}
-          <aside className={`w-full lg:w-88 xl:w-96 border-t lg:border-t-0 lg:border-l flex flex-col shrink-0 min-h-0 ${panelBg}`}>
+          <aside className={`${showRightInspector ? 'flex' : 'hidden'} w-full lg:w-88 xl:w-96 border-t lg:border-t-0 lg:border-l flex-col shrink-0 min-h-0 ${panelBg}`}>
             {/* Pestañas del Inspector */}
             <div className="grid grid-cols-4 gap-1 p-2 border-b border-gray-200 dark:border-gray-800 shrink-0">
               {[
@@ -3592,6 +5199,52 @@ export const SlideEditorModal = ({
                     </div>
                   )}
 
+                  {/* Tarjeta rápida de formato del campo de texto activo (cuando no hay elemento libre seleccionado) */}
+                  {!selectedElement && (
+                    <div className="p-3 rounded-2xl border border-[#AD3333]/30 bg-red-500/5 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-black uppercase tracking-wider text-[#AD3333] dark:text-red-400 flex items-center gap-1.5">
+                          <Type size={13} /> Formato individual del texto
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleClearTargetFormatting}
+                          className="text-[10px] font-bold text-gray-500 hover:text-red-500 flex items-center gap-1"
+                          title="Restaurar estilo original de este texto"
+                        >
+                          <RotateCcw size={11} /> Limpiar
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <select
+                          value={activeTextField}
+                          onChange={(e) => handleSelectTextField(e.target.value)}
+                          className={`flex-1 px-2 py-1 rounded-lg border text-[11px] font-bold outline-none ${inputBg}`}
+                        >
+                          {editableFields.map(f => (
+                            <option key={f.key} value={f.key}>{f.label}</option>
+                          ))}
+                        </select>
+                        <input
+                          type="number"
+                          min={10}
+                          max={72}
+                          value={currentTargetStyle.fontSize}
+                          onChange={(e) => applyTargetStylePatch({ fontSize: Math.max(10, Math.min(72, Number(e.target.value) || 16)) })}
+                          className={`w-14 px-2 py-1 rounded-lg border text-[11px] font-bold text-center outline-none ${inputBg}`}
+                          title="Tamaño de letra (px)"
+                        />
+                        <input
+                          type="color"
+                          value={currentTargetStyle.color || activeTheme.accent || '#AD3333'}
+                          onChange={(e) => applyTargetStylePatch({ color: e.target.value })}
+                          className="w-6 h-6 rounded cursor-pointer border-0 bg-transparent shrink-0"
+                          title="Color de este texto"
+                        />
+                      </div>
+                    </div>
+                  )}
+
                   {/* Campos Principales de la Diapositiva Activa */}
                   <div className="space-y-3">
                     <div className="grid grid-cols-3 gap-2">
@@ -3602,6 +5255,7 @@ export const SlideEditorModal = ({
                         <input
                           type="text"
                           value={activeSlide.title || ''}
+                          onFocus={() => handleSelectTextField('title')}
                           onChange={(e) => handleSlideChange('title', e.target.value)}
                           placeholder="Título principal..."
                           className={`w-full px-3 py-2 rounded-xl border text-xs font-bold outline-none ${inputBg}`}
@@ -3614,6 +5268,7 @@ export const SlideEditorModal = ({
                         <input
                           type="text"
                           value={activeSlide.badge || ''}
+                          onFocus={() => handleSelectTextField('badge')}
                           onChange={(e) => handleSlideChange('badge', e.target.value)}
                           placeholder="Ej: Unidad 1"
                           className={`w-full px-2.5 py-2 rounded-xl border text-xs font-bold outline-none ${inputBg}`}
@@ -3642,6 +5297,7 @@ export const SlideEditorModal = ({
                         </label>
                         <textarea
                           value={activeSlide.subtitle !== undefined ? activeSlide.subtitle : (activeSlide.description || '')}
+                          onFocus={() => handleSelectTextField('subtitle')}
                           onChange={(e) => handleSlideChange('subtitle', e.target.value)}
                           rows={3}
                           placeholder="Descripción y objetivos..."
@@ -3658,6 +5314,7 @@ export const SlideEditorModal = ({
                           </label>
                           <textarea
                             value={activeSlide.body !== undefined ? activeSlide.body : (activeSlide.content || '')}
+                            onFocus={() => handleSelectTextField('body')}
                             onChange={(e) => handleSlideChange('body', e.target.value)}
                             rows={5}
                             placeholder="Texto principal..."
@@ -3671,6 +5328,7 @@ export const SlideEditorModal = ({
                           <input
                             type="text"
                             value={activeSlide.callout || ''}
+                            onFocus={() => handleSelectTextField('callout')}
                             onChange={(e) => handleSlideChange('callout', e.target.value)}
                             placeholder="Idea clave para resaltar..."
                             className={`w-full px-3 py-2 rounded-xl border text-xs font-medium outline-none ${inputBg}`}
@@ -3692,6 +5350,7 @@ export const SlideEditorModal = ({
                                 <input
                                   type="text"
                                   value={col.badge || ''}
+                                  onFocus={() => handleSelectTextField(`${colKey}.badge`)}
                                   onChange={(e) => handleSlideChange(colKey, { ...col, badge: e.target.value })}
                                   placeholder="Etiqueta"
                                   className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold outline-none ${inputBg}`}
@@ -3699,6 +5358,7 @@ export const SlideEditorModal = ({
                                 <input
                                   type="text"
                                   value={col.title || ''}
+                                  onFocus={() => handleSelectTextField(`${colKey}.title`)}
                                   onChange={(e) => handleSlideChange(colKey, { ...col, title: e.target.value })}
                                   placeholder="Título de columna"
                                   className={`col-span-2 px-2.5 py-1.5 rounded-xl border text-xs font-bold outline-none ${inputBg}`}
@@ -3706,6 +5366,7 @@ export const SlideEditorModal = ({
                               </div>
                               <textarea
                                 value={col.text || ''}
+                                onFocus={() => handleSelectTextField(`${colKey}.text`)}
                                 onChange={(e) => handleSlideChange(colKey, { ...col, text: e.target.value })}
                                 rows={2}
                                 placeholder="Resumen de la columna..."
@@ -3717,6 +5378,7 @@ export const SlideEditorModal = ({
                                 </label>
                                 <textarea
                                   value={Array.isArray(col.items) ? col.items.join('\n') : ''}
+                                  onFocus={() => handleSelectTextField(`${colKey}.items.0`)}
                                   onChange={(e) => handleSlideChange(colKey, { ...col, items: e.target.value.split('\n') })}
                                   rows={3}
                                   placeholder="Punto 1&#10;Punto 2"
@@ -3779,6 +5441,7 @@ export const SlideEditorModal = ({
                                 <input
                                   type="text"
                                   value={h || ''}
+                                  onFocus={() => handleSelectTextField(`table.header.${hIdx}`)}
                                   onChange={(e) => {
                                     const nextH = [...(activeSlide.table?.headers || [])];
                                     nextH[hIdx] = e.target.value;
@@ -3792,7 +5455,10 @@ export const SlideEditorModal = ({
                                     onClick={() => {
                                       const nextH = (activeSlide.table?.headers || []).filter((_, i) => i !== hIdx);
                                       const nextR = inspectorTableRows.map(r => (Array.isArray(r) ? r.filter((_, i) => i !== hIdx) : r));
-                                      handleSlideChange('table', { headers: nextH, rows: nextR });
+                                      handleSlidePatch({
+                                        table: { headers: nextH, rows: nextR },
+                                        textStyles: shiftFieldTextStylesOnDelete(activeSlide.textStyles, 'table.col', hIdx)
+                                      });
                                     }}
                                     className="text-gray-400 hover:text-red-500"
                                     title="Quitar columna"
@@ -3816,7 +5482,10 @@ export const SlideEditorModal = ({
                                     type="button"
                                     onClick={() => {
                                       const nextRows = inspectorTableRows.filter((_, i) => i !== rIdx);
-                                      handleSlideChange('table', { ...(activeSlide.table || {}), rows: nextRows });
+                                      handleSlidePatch({
+                                        table: { ...(activeSlide.table || {}), rows: nextRows },
+                                        textStyles: shiftFieldTextStylesOnDelete(activeSlide.textStyles, 'table.row', rIdx)
+                                      });
                                     }}
                                     className="text-gray-400 hover:text-red-500"
                                   >
@@ -3830,6 +5499,7 @@ export const SlideEditorModal = ({
                                     key={cIdx}
                                     type="text"
                                     value={(Array.isArray(row) ? row[cIdx] : '') || ''}
+                                    onFocus={() => handleSelectTextField(`table.cell.${rIdx}.${cIdx}`)}
                                     onChange={(e) => {
                                       const nextRows = inspectorTableRows.map((r, ri) => {
                                         if (ri !== rIdx) return r;
@@ -3873,32 +5543,39 @@ export const SlideEditorModal = ({
                           </select>
                         </div>
                         <input
-                          ref={slideImageInputRef}
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            const f = e.target.files?.[0];
-                            if (f) handleUploadImageFile(f, 'slide');
-                            e.target.value = '';
-                          }}
-                        />
-                        <input
                           type="text"
                           value={activeSlide.imageUrl || ''}
                           onChange={(e) => handleSlideChange('imageUrl', e.target.value)}
                           placeholder="O pega la URL de la imagen..."
                           className={`w-full px-3 py-1.5 rounded-xl border text-xs outline-none ${inputBg}`}
                         />
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-black uppercase text-gray-400">O elige una ilustración académica:</span>
+                          <div className="grid grid-cols-3 gap-1.5">
+                            {SLIDE_ACADEMIC_ILLUSTRATIONS.map((ill) => (
+                              <button
+                                key={ill.id}
+                                type="button"
+                                onClick={() => handleSlideChange('imageUrl', ill.dataUrl)}
+                                className="p-1.5 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-[#AD3333] flex flex-col items-center gap-1 text-center"
+                              >
+                                <img src={ill.dataUrl} alt={ill.label} className="w-full h-10 object-cover rounded-lg" />
+                                <span className="text-[9px] font-bold truncate w-full">{ill.label}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
                         <input
                           type="text"
                           value={activeSlide.imageCaption || ''}
+                          onFocus={() => handleSelectTextField('imageCaption')}
                           onChange={(e) => handleSlideChange('imageCaption', e.target.value)}
                           placeholder="Pie de imagen (opcional)..."
                           className={`w-full px-3 py-1.5 rounded-xl border text-xs outline-none ${inputBg}`}
                         />
                         <textarea
                           value={activeSlide.body !== undefined ? activeSlide.body : (activeSlide.content || '')}
+                          onFocus={() => handleSelectTextField('body')}
                           onChange={(e) => handleSlideChange('body', e.target.value)}
                           rows={4}
                           placeholder="Explicación junto a la imagen..."
@@ -3916,6 +5593,7 @@ export const SlideEditorModal = ({
                           <input
                             type="text"
                             value={activeSlide.statValue || ''}
+                            onFocus={() => handleSelectTextField('statValue')}
                             onChange={(e) => handleSlideChange('statValue', e.target.value)}
                             placeholder="Ej: +24.8% o Regla #1"
                             className={`w-full px-3 py-1.5 rounded-xl border text-xs font-bold outline-none ${inputBg}`}
@@ -3927,6 +5605,7 @@ export const SlideEditorModal = ({
                           </label>
                           <textarea
                             value={activeSlide.quoteText || ''}
+                            onFocus={() => handleSelectTextField('quoteText')}
                             onChange={(e) => handleSlideChange('quoteText', e.target.value)}
                             rows={3}
                             placeholder="Escribe la frase o conclusión..."
@@ -3940,6 +5619,7 @@ export const SlideEditorModal = ({
                           <input
                             type="text"
                             value={activeSlide.quoteAuthor || ''}
+                            onFocus={() => handleSelectTextField('quoteAuthor')}
                             onChange={(e) => handleSlideChange('quoteAuthor', e.target.value)}
                             placeholder="Fuente o autor..."
                             className={`w-full px-3 py-1.5 rounded-xl border text-xs outline-none ${inputBg}`}
@@ -3978,7 +5658,10 @@ export const SlideEditorModal = ({
                                   type="button"
                                   onClick={() => {
                                     const newCards = activeSlide.cards.filter((_, i) => i !== cIdx);
-                                    handleSlideChange('cards', newCards);
+                                    handleSlidePatch({
+                                      cards: newCards,
+                                      textStyles: shiftFieldTextStylesOnDelete(activeSlide.textStyles, 'cards', cIdx)
+                                    });
                                   }}
                                   className="text-gray-400 hover:text-red-500"
                                 >
@@ -3989,6 +5672,7 @@ export const SlideEditorModal = ({
                             <input
                               type="text"
                               value={card.title || ''}
+                              onFocus={() => handleSelectTextField(`cards.${cIdx}.title`)}
                               onChange={(e) => {
                                 const newCards = activeSlide.cards.map((c, i) => i === cIdx ? { ...c, title: e.target.value } : c);
                                 handleSlideChange('cards', newCards);
@@ -3998,6 +5682,7 @@ export const SlideEditorModal = ({
                             />
                             <textarea
                               value={card.text || ''}
+                              onFocus={() => handleSelectTextField(`cards.${cIdx}.text`)}
                               onChange={(e) => {
                                 const newCards = activeSlide.cards.map((c, i) => i === cIdx ? { ...c, text: e.target.value } : c);
                                 handleSlideChange('cards', newCards);
@@ -4009,6 +5694,7 @@ export const SlideEditorModal = ({
                             <input
                               type="text"
                               value={card.example || ''}
+                              onFocus={() => handleSelectTextField(`cards.${cIdx}.example`)}
                               onChange={(e) => {
                                 const newCards = activeSlide.cards.map((c, i) => i === cIdx ? { ...c, example: e.target.value } : c);
                                 handleSlideChange('cards', newCards);
@@ -4051,7 +5737,10 @@ export const SlideEditorModal = ({
                                   type="button"
                                   onClick={() => {
                                     const newBullets = activeSlide.bullets.filter((_, i) => i !== bIdx);
-                                    handleSlideChange('bullets', newBullets);
+                                    handleSlidePatch({
+                                      bullets: newBullets,
+                                      textStyles: shiftFieldTextStylesOnDelete(activeSlide.textStyles, 'bullets', bIdx)
+                                    });
                                   }}
                                   className="text-gray-400 hover:text-red-500"
                                 >
@@ -4062,6 +5751,7 @@ export const SlideEditorModal = ({
                             <input
                               type="text"
                               value={typeof bullet === 'object' ? bullet.title : bullet}
+                              onFocus={() => handleSelectTextField(`bullets.${bIdx}.title`)}
                               onChange={(e) => {
                                 const newBullets = activeSlide.bullets.map((b, i) => {
                                   if (i !== bIdx) return b;
@@ -4074,6 +5764,7 @@ export const SlideEditorModal = ({
                             />
                             <textarea
                               value={typeof bullet === 'object' ? bullet.text : ''}
+                              onFocus={() => handleSelectTextField(`bullets.${bIdx}.text`)}
                               onChange={(e) => {
                                 const newBullets = activeSlide.bullets.map((b, i) => {
                                   if (i !== bIdx) return b;
@@ -4088,6 +5779,7 @@ export const SlideEditorModal = ({
                             <input
                               type="text"
                               value={typeof bullet === 'object' ? bullet.example : ''}
+                              onFocus={() => handleSelectTextField(`bullets.${bIdx}.example`)}
                               onChange={(e) => {
                                 const newBullets = activeSlide.bullets.map((b, i) => {
                                   if (i !== bIdx) return b;
@@ -4112,6 +5804,7 @@ export const SlideEditorModal = ({
                           <input
                             type="text"
                             value={activeSlide.question !== undefined ? activeSlide.question : (activeSlide.title || '')}
+                            onFocus={() => handleSelectTextField('question')}
                             onChange={(e) => handleSlideChange('question', e.target.value)}
                             placeholder="¿Cuál es la pregunta?"
                             className={`w-full px-3 py-2 rounded-xl border text-xs font-bold outline-none ${inputBg}`}
@@ -4145,6 +5838,7 @@ export const SlideEditorModal = ({
                                 <input
                                   type="text"
                                   value={opt.text || ''}
+                                  onFocus={() => handleSelectTextField(`options.${oIdx}.text`)}
                                   onChange={(e) => {
                                     const newOpts = (activeSlide.options || []).map((o, idx) => idx === oIdx ? { ...o, text: e.target.value } : o);
                                     handleSlideChange('options', newOpts);
@@ -4173,7 +5867,10 @@ export const SlideEditorModal = ({
                                       if (newOpts.length > 0 && !newOpts.some(o => o.isCorrect)) {
                                         newOpts[0] = { ...newOpts[0], isCorrect: true };
                                       }
-                                      handleSlideChange('options', newOpts);
+                                      handleSlidePatch({
+                                        options: newOpts,
+                                        textStyles: shiftFieldTextStylesOnDelete(activeSlide.textStyles, 'options', oIdx)
+                                      });
                                     }}
                                     className="text-gray-400 hover:text-red-500"
                                   >
@@ -4184,6 +5881,7 @@ export const SlideEditorModal = ({
                               <input
                                 type="text"
                                 value={opt.explanation || ''}
+                                onFocus={() => handleSelectTextField(`options.${oIdx}.explanation`)}
                                 onChange={(e) => {
                                   const newOpts = (activeSlide.options || []).map((o, idx) => idx === oIdx ? { ...o, explanation: e.target.value } : o);
                                   handleSlideChange('options', newOpts);
@@ -4279,7 +5977,7 @@ export const SlideEditorModal = ({
                         onClick={() => handleInsertCanvasElement('shape', { shapeType: 'divider', w: 60, h: 6, text: '' })}
                         className="p-2.5 rounded-xl border border-gray-200 dark:border-gray-800 hover:border-[#AD3333] text-xs font-bold flex items-center gap-2"
                       >
-                        < ColumnsIcon size={14} className="text-gray-500" />
+                        <ColumnsIcon size={14} className="text-gray-500" />
                         <span>Línea divisoria</span>
                       </button>
                     </div>
@@ -4763,6 +6461,8 @@ export const ReviewsModule = ({
         theme: review.theme || 'unipamplona',
         fontFamily: review.fontFamily || 'sans',
         transition: review.transition || 'fade',
+        transitionDuration: Number(review.transitionDuration) || 450,
+        autoAdvanceSeconds: Number(review.autoAdvanceSeconds) || 0,
         bgPattern: review.bgPattern || 'none',
         slides: clonedSlides,
         slideCount: clonedSlides.length,
@@ -4789,6 +6489,8 @@ export const ReviewsModule = ({
         theme: updatedPres.theme || 'unipamplona',
         fontFamily: updatedPres.fontFamily || 'sans',
         transition: updatedPres.transition || 'fade',
+        transitionDuration: Number(updatedPres.transitionDuration) || 450,
+        autoAdvanceSeconds: Number(updatedPres.autoAdvanceSeconds) || 0,
         bgPattern: updatedPres.bgPattern || 'none',
         targetGroupId: updatedPres.targetGroupId || 'all',
         targetGroupName: updatedPres.targetGroupName || 'General'

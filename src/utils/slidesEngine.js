@@ -237,6 +237,102 @@ export const SLIDE_PATTERNS = [
   { id: 'diagonal', name: 'Diagonal' }
 ];
 
+export const SLIDE_TRANSITION_GALLERY = [
+  { id: 'none', name: 'Ninguna', desc: 'Cambio instantáneo' },
+  { id: 'fade', name: 'Desvanecer', desc: 'Fundido suave entre diapositivas' },
+  { id: 'slide', name: 'Empuje', desc: 'Deslizamiento lateral dinámico' },
+  { id: 'push_up', name: 'Barrido vertical', desc: 'Entrada ascendente desde abajo' },
+  { id: 'wipe', name: 'Barrido', desc: 'Revelado progresivo lateral' },
+  { id: 'split', name: 'Dividir', desc: 'Apertura desde el centro' },
+  { id: 'zoom', name: 'Zoom', desc: 'Acercamiento con escala suave' },
+  { id: 'flip', name: 'Giro / Mostrar', desc: 'Efecto de giro y perspectiva' }
+];
+
+export const SLIDE_FONT_SIZES = [10, 11, 12, 14, 16, 18, 20, 22, 24, 28, 32, 36, 40, 44, 48, 54, 60];
+
+export const SLIDE_COLOR_SWATCHES = [
+  { hex: '#0F172A', name: 'Pizarra Oscuro' },
+  { hex: '#FFFFFF', name: 'Blanco Puro' },
+  { hex: '#AD3333', name: 'Carmesí Institucional' },
+  { hex: '#DC2626', name: 'Rojo Vivo' },
+  { hex: '#EA580C', name: 'Naranja Cálido' },
+  { hex: '#D97706', name: 'Ámbar Dorado' },
+  { hex: '#059669', name: 'Verde Esmeralda' },
+  { hex: '#0284C7', name: 'Azul Cielo' },
+  { hex: '#1D4ED8', name: 'Azul Corporativo' },
+  { hex: '#7C3AED', name: 'Violeta Real' },
+  { hex: '#DB2777', name: 'Rosa Magenta' },
+  { hex: '#475569', name: 'Gris Ejecutivo' }
+];
+
+export const SLIDE_HIGHLIGHT_SWATCHES = [
+  { id: 'none', color: 'transparent', hex: 'transparent', name: 'Sin resaltado' },
+  { id: 'yellow', color: '#FEF08A', hex: '#FEF08A', name: 'Amarillo Marcador' },
+  { id: 'green', color: '#BBF7D0', hex: '#BBF7D0', name: 'Verde Menta' },
+  { id: 'sky', color: '#BAE6FD', hex: '#BAE6FD', name: 'Celeste Suave' },
+  { id: 'pink', color: '#FBCFE8', hex: '#FBCFE8', name: 'Rosa Pastel' },
+  { id: 'purple', color: '#DDD6FE', hex: '#DDD6FE', name: 'Lavanda Suave' },
+  { id: 'orange', color: '#FED7AA', hex: '#FED7AA', name: 'Durazno' },
+  { id: 'crimson', color: 'rgba(173, 51, 51, 0.16)', hex: 'rgba(173, 51, 51, 0.16)', name: 'Carmesí Suave' },
+  { id: 'dark', color: '#1E293B', hex: '#1E293B', name: 'Fondo Oscuro' }
+];
+
+export const SLIDE_ACADEMIC_BADGES = [
+  { id: 'key', text: '★ CONCEPTO CLAVE', fill: '#AD3333', textColor: '#FFFFFF' },
+  { id: 'idea', text: '💡 IDEA FUERZA', fill: '#D97706', textColor: '#FFFFFF' },
+  { id: 'rule', text: '✅ REGLA GRAMATICAL', fill: '#059669', textColor: '#FFFFFF' },
+  { id: 'warn', text: '⚠️ ERROR COMÚN', fill: '#DC2626', textColor: '#FFFFFF' },
+  { id: 'pin', text: '📌 RECORDATORIO', fill: '#1D4ED8', textColor: '#FFFFFF' },
+  { id: 'goal', text: '🎯 OBJETIVO', fill: '#7C3AED', textColor: '#FFFFFF' },
+  { id: 'analysis', text: '🔍 ANÁLISIS', fill: '#0F172A', textColor: '#F8FAFC' },
+  { id: 'pron', text: '🗣️ PRONUNCIACIÓN', fill: '#DB2777', textColor: '#FFFFFF' }
+];
+
+export const SLIDE_ACADEMIC_ILLUSTRATIONS = [
+  {
+    id: 'chart_growth',
+    name: 'Gráfico y Tendencias',
+    label: 'Gráfico y Tendencias',
+    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420"><rect width="640" height="420" rx="24" fill="%230f172a"/><rect x="80" y="240" width="65" height="110" rx="10" fill="%23334155"/><rect x="180" y="190" width="65" height="160" rx="10" fill="%230284c7"/><rect x="280" y="140" width="65" height="210" rx="10" fill="%2310b981"/><rect x="380" y="90" width="65" height="260" rx="10" fill="%23f59e0b"/><rect x="480" y="55" width="65" height="295" rx="10" fill="%23ad3333"/><polyline fill="none" stroke="%23f8fafc" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" points="112,220 212,170 312,120 412,72 512,38"/><circle cx="512" cy="38" r="10" fill="%23facc15"/><text x="80" y="390" font-family="Arial,sans-serif" font-size="18" font-weight="bold" fill="%23e2e8f0">Analytics &amp; Key Indicators</text></svg>',
+    dataUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420"><rect width="640" height="420" rx="24" fill="%230f172a"/><rect x="80" y="240" width="65" height="110" rx="10" fill="%23334155"/><rect x="180" y="190" width="65" height="160" rx="10" fill="%230284c7"/><rect x="280" y="140" width="65" height="210" rx="10" fill="%2310b981"/><rect x="380" y="90" width="65" height="260" rx="10" fill="%23f59e0b"/><rect x="480" y="55" width="65" height="295" rx="10" fill="%23ad3333"/><polyline fill="none" stroke="%23f8fafc" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" points="112,220 212,170 312,120 412,72 512,38"/><circle cx="512" cy="38" r="10" fill="%23facc15"/><text x="80" y="390" font-family="Arial,sans-serif" font-size="18" font-weight="bold" fill="%23e2e8f0">Analytics &amp; Key Indicators</text></svg>'
+  },
+  {
+    id: 'global_comm',
+    name: 'Comunicación Global',
+    label: 'Comunicación Global',
+    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420"><rect width="640" height="420" rx="24" fill="%231e293b"/><circle cx="320" cy="195" r="120" fill="none" stroke="%2338bdf8" stroke-width="6"/><ellipse cx="320" cy="195" rx="60" ry="120" fill="none" stroke="%2338bdf8" stroke-width="4"/><line x1="200" y1="195" x2="440" y2="195" stroke="%2338bdf8" stroke-width="4"/><line x1="218" y1="140" x2="422" y2="140" stroke="%2338bdf8" stroke-width="3"/><line x1="218" y1="250" x2="422" y2="250" stroke="%2338bdf8" stroke-width="3"/><circle cx="200" cy="110" r="24" fill="%23ad3333"/><circle cx="450" cy="120" r="24" fill="%2310b981"/><circle cx="430" cy="280" r="24" fill="%23f59e0b"/><text x="195" y="375" font-family="Arial,sans-serif" font-size="18" font-weight="bold" fill="%23f8fafc">Global English &amp; Communication</text></svg>',
+    dataUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420"><rect width="640" height="420" rx="24" fill="%231e293b"/><circle cx="320" cy="195" r="120" fill="none" stroke="%2338bdf8" stroke-width="6"/><ellipse cx="320" cy="195" rx="60" ry="120" fill="none" stroke="%2338bdf8" stroke-width="4"/><line x1="200" y1="195" x2="440" y2="195" stroke="%2338bdf8" stroke-width="4"/><line x1="218" y1="140" x2="422" y2="140" stroke="%2338bdf8" stroke-width="3"/><line x1="218" y1="250" x2="422" y2="250" stroke="%2338bdf8" stroke-width="3"/><circle cx="200" cy="110" r="24" fill="%23ad3333"/><circle cx="450" cy="120" r="24" fill="%2310b981"/><circle cx="430" cy="280" r="24" fill="%23f59e0b"/><text x="195" y="375" font-family="Arial,sans-serif" font-size="18" font-weight="bold" fill="%23f8fafc">Global English &amp; Communication</text></svg>'
+  },
+  {
+    id: 'grammar_map',
+    name: 'Mapa de Estructura',
+    label: 'Mapa de Estructura',
+    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420"><rect width="640" height="420" rx="24" fill="%23f8fafc"/><rect x="210" y="40" width="220" height="68" rx="16" fill="%23ad3333"/><text x="320" y="80" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="bold" fill="%23ffffff">MAIN STRUCTURE</text><line x1="320" y1="108" x2="160" y2="190" stroke="%2364748b" stroke-width="5"/><line x1="320" y1="108" x2="320" y2="190" stroke="%2364748b" stroke-width="5"/><line x1="320" y1="108" x2="480" y2="190" stroke="%2364748b" stroke-width="5"/><rect x="65" y="190" width="175" height="110" rx="16" fill="%231d4ed8"/><text x="152" y="250" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="%23ffffff">Subject + Verb</text><rect x="245" y="190" width="150" height="110" rx="16" fill="%23047857"/><text x="320" y="250" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="%23ffffff">Connector</text><rect x="405" y="190" width="175" height="110" rx="16" fill="%23d97706"/><text x="492" y="250" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="%23ffffff">Context / Result</text></svg>',
+    dataUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420"><rect width="640" height="420" rx="24" fill="%23f8fafc"/><rect x="210" y="40" width="220" height="68" rx="16" fill="%23ad3333"/><text x="320" y="80" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="bold" fill="%23ffffff">MAIN STRUCTURE</text><line x1="320" y1="108" x2="160" y2="190" stroke="%2364748b" stroke-width="5"/><line x1="320" y1="108" x2="320" y2="190" stroke="%2364748b" stroke-width="5"/><line x1="320" y1="108" x2="480" y2="190" stroke="%2364748b" stroke-width="5"/><rect x="65" y="190" width="175" height="110" rx="16" fill="%231d4ed8"/><text x="152" y="250" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="%23ffffff">Subject + Verb</text><rect x="245" y="190" width="150" height="110" rx="16" fill="%23047857"/><text x="320" y="250" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="%23ffffff">Connector</text><rect x="405" y="190" width="175" height="110" rx="16" fill="%23d97706"/><text x="492" y="250" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="%23ffffff">Context / Result</text></svg>'
+  },
+  {
+    id: 'dialogue_scene',
+    name: 'Diálogo y Conversación',
+    label: 'Diálogo y Conversación',
+    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420"><rect width="640" height="420" rx="24" fill="%230f172a"/><rect x="60" y="65" width="310" height="120" rx="22" fill="%231d4ed8"/><polygon points="110,185 145,185 100,220" fill="%231d4ed8"/><text x="90" y="118" font-family="Arial,sans-serif" font-size="17" font-weight="bold" fill="%23ffffff">Speaker A: Question &amp; Context</text><text x="90" y="148" font-family="Arial,sans-serif" font-size="14" fill="%23bfdbfe">"How do we apply this rule in class?"</text><rect x="270" y="215" width="310" height="120" rx="22" fill="%23059669"/><polygon points="500,335 535,335 545,370" fill="%23059669"/><text x="300" y="268" font-family="Arial,sans-serif" font-size="17" font-weight="bold" fill="%23ffffff">Speaker B: Key Answer</text><text x="300" y="298" font-family="Arial,sans-serif" font-size="14" fill="%23a7f3d0">"By identifying the main time marker!"</text></svg>',
+    dataUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420"><rect width="640" height="420" rx="24" fill="%230f172a"/><rect x="60" y="65" width="310" height="120" rx="22" fill="%231d4ed8"/><polygon points="110,185 145,185 100,220" fill="%231d4ed8"/><text x="90" y="118" font-family="Arial,sans-serif" font-size="17" font-weight="bold" fill="%23ffffff">Speaker A: Question &amp; Context</text><text x="90" y="148" font-family="Arial,sans-serif" font-size="14" fill="%23bfdbfe">"How do we apply this rule in class?"</text><rect x="270" y="215" width="310" height="120" rx="22" fill="%23059669"/><polygon points="500,335 535,335 545,370" fill="%23059669"/><text x="300" y="268" font-family="Arial,sans-serif" font-size="17" font-weight="bold" fill="%23ffffff">Speaker B: Key Answer</text><text x="300" y="298" font-family="Arial,sans-serif" font-size="14" fill="%23a7f3d0">"By identifying the main time marker!"</text></svg>'
+  },
+  {
+    id: 'timeline_steps',
+    name: 'Línea de Tiempo',
+    label: 'Línea de Tiempo',
+    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420"><rect width="640" height="420" rx="24" fill="%231e293b"/><line x1="80" y1="210" x2="560" y2="210" stroke="%2394a3b8" stroke-width="6"/><circle cx="140" cy="210" r="28" fill="%23ad3333"/><text x="140" y="216" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="bold" fill="%23ffffff">1</text><circle cx="320" cy="210" r="28" fill="%230284c7"/><text x="320" y="216" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="bold" fill="%23ffffff">2</text><circle cx="500" cy="210" r="28" fill="%2310b981"/><text x="500" y="216" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="bold" fill="%23ffffff">3</text><text x="140" y="150" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" font-weight="bold" fill="%23f8fafc">Past / Origin</text><text x="320" y="280" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" font-weight="bold" fill="%23f8fafc">Present Action</text><text x="500" y="150" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" font-weight="bold" fill="%23f8fafc">Future Goal</text></svg>',
+    dataUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420"><rect width="640" height="420" rx="24" fill="%231e293b"/><line x1="80" y1="210" x2="560" y2="210" stroke="%2394a3b8" stroke-width="6"/><circle cx="140" cy="210" r="28" fill="%23ad3333"/><text x="140" y="216" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="bold" fill="%23ffffff">1</text><circle cx="320" cy="210" r="28" fill="%230284c7"/><text x="320" y="216" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="bold" fill="%23ffffff">2</text><circle cx="500" cy="210" r="28" fill="%2310b981"/><text x="500" y="216" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="bold" fill="%23ffffff">3</text><text x="140" y="150" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" font-weight="bold" fill="%23f8fafc">Past / Origin</text><text x="320" y="280" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" font-weight="bold" fill="%23f8fafc">Present Action</text><text x="500" y="150" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" font-weight="bold" fill="%23f8fafc">Future Goal</text></svg>'
+  },
+  {
+    id: 'vocab_cards',
+    name: 'Vocabulario Visual',
+    label: 'Vocabulario Visual',
+    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420"><rect width="640" height="420" rx="24" fill="%230f172a"/><rect x="55" y="65" width="245" height="130" rx="18" fill="%23ad3333"/><text x="177" y="125" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="bold" fill="%23ffffff">Key Term A</text><rect x="340" y="65" width="245" height="130" rx="18" fill="%231d4ed8"/><text x="462" y="125" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="bold" fill="%23ffffff">Key Term B</text><rect x="55" y="225" width="245" height="130" rx="18" fill="%23047857"/><text x="177" y="285" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="bold" fill="%23ffffff">Key Term C</text><rect x="340" y="225" width="245" height="130" rx="18" fill="%23d97706"/><text x="462" y="285" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="bold" fill="%23ffffff">Key Term D</text></svg>',
+    dataUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420"><rect width="640" height="420" rx="24" fill="%230f172a"/><rect x="55" y="65" width="245" height="130" rx="18" fill="%23ad3333"/><text x="177" y="125" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="bold" fill="%23ffffff">Key Term A</text><rect x="340" y="65" width="245" height="130" rx="18" fill="%231d4ed8"/><text x="462" y="125" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="bold" fill="%23ffffff">Key Term B</text><rect x="55" y="225" width="245" height="130" rx="18" fill="%23047857"/><text x="177" y="285" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="bold" fill="%23ffffff">Key Term C</text><rect x="340" y="225" width="245" height="130" rx="18" fill="%23d97706"/><text x="462" y="285" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="bold" fill="%23ffffff">Key Term D</text></svg>'
+  }
+];
+
 export const resolveSlideLayout = (slide, idx = 1) => {
   if (!slide || typeof slide !== 'object') return 'cards';
   if (slide.layout && VALID_SLIDE_LAYOUTS.has(slide.layout)) {
@@ -710,11 +806,14 @@ export const createCanvasElement = (type = 'textbox', overrides = {}) => {
       fill: overrides.fill || '#AD3333',
       stroke: overrides.stroke || 'transparent',
       textColor: overrides.textColor || '#FFFFFF',
+      fontFamily: overrides.fontFamily || '',
       fontSize: overrides.fontSize || 16,
       bold: overrides.bold !== undefined ? overrides.bold : true,
       italic: !!overrides.italic,
       underline: !!overrides.underline,
+      strikethrough: !!overrides.strikethrough,
       align: overrides.align || 'center',
+      lineHeight: overrides.lineHeight || 1.3,
       opacity: overrides.opacity ?? 1,
       ...rect
     };
@@ -730,10 +829,14 @@ export const createCanvasElement = (type = 'textbox', overrides = {}) => {
       fill: overrides.fill || '#FEF08A',
       stroke: overrides.stroke || '#FACC15',
       textColor: overrides.textColor || '#713F12',
+      fontFamily: overrides.fontFamily || '',
       fontSize: overrides.fontSize || 14,
       bold: !!overrides.bold,
       italic: !!overrides.italic,
+      underline: !!overrides.underline,
+      strikethrough: !!overrides.strikethrough,
       align: overrides.align || 'left',
+      lineHeight: overrides.lineHeight || 1.35,
       ...rect
     };
   }
@@ -748,8 +851,12 @@ export const createCanvasElement = (type = 'textbox', overrides = {}) => {
       fill: overrides.fill || '#AD3333',
       stroke: overrides.stroke || 'transparent',
       textColor: overrides.textColor || '#FFFFFF',
+      fontFamily: overrides.fontFamily || '',
       fontSize: overrides.fontSize || 12,
       bold: overrides.bold !== undefined ? overrides.bold : true,
+      italic: !!overrides.italic,
+      underline: !!overrides.underline,
+      strikethrough: !!overrides.strikethrough,
       align: overrides.align || 'center',
       ...rect
     };
@@ -764,6 +871,8 @@ export const createCanvasElement = (type = 'textbox', overrides = {}) => {
       imageUrl: overrides.imageUrl || 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="280" viewBox="0 0 400 280"><rect width="400" height="280" rx="20" fill="%23334155"/><circle cx="130" cy="100" r="32" fill="%23f59e0b"/><path d="M50 230 L150 130 L230 200 L290 145 L360 230 Z" fill="%2364748b"/></svg>',
       fit: overrides.fit || 'cover',
       borderRadius: overrides.borderRadius ?? 16,
+      stroke: overrides.stroke || 'transparent',
+      opacity: overrides.opacity ?? 1,
       caption: overrides.caption || '',
       ...rect
     };
@@ -779,13 +888,609 @@ export const createCanvasElement = (type = 'textbox', overrides = {}) => {
     fill: overrides.fill || 'transparent',
     stroke: overrides.stroke || 'transparent',
     textColor: overrides.textColor || '',
+    fontFamily: overrides.fontFamily || '',
     fontSize: overrides.fontSize || 18,
     bold: !!overrides.bold,
     italic: !!overrides.italic,
     underline: !!overrides.underline,
+    strikethrough: !!overrides.strikethrough,
     align: overrides.align || 'left',
+    lineHeight: overrides.lineHeight || 1.35,
     ...rect
   };
+};
+
+// =========================================================================
+// FORMATO INDIVIDUAL POR TEXTO / CAMPO (PowerPoint Font & Paragraph Engine)
+// =========================================================================
+export const normalizeFieldKey = (fieldKey = 'title') => {
+  const raw = String(fieldKey || 'title').trim();
+  const cardUnderscore = raw.match(/^cards?_(\d+)_(title|text|example)$/);
+  if (cardUnderscore) return `cards.${cardUnderscore[1]}.${cardUnderscore[2]}`;
+  const bulletUnderscore = raw.match(/^bullets?_(\d+)_(title|text|example)$/);
+  if (bulletUnderscore) return `bullets.${bulletUnderscore[1]}.${bulletUnderscore[2]}`;
+  const optUnderscore = raw.match(/^options?_(\d+)_(text|explanation)$/);
+  if (optUnderscore) return `options.${optUnderscore[1]}.${optUnderscore[2]}`;
+  return raw;
+};
+
+export const getDefaultFieldStyleMeta = (arg1 = 'title', arg2 = 'cards', arg3 = 0) => {
+  let rawKey = 'title';
+  let layout = 'cards';
+  if (arg1 && typeof arg1 === 'object') {
+    rawKey = String(arg2 || 'title');
+    layout = resolveSlideLayout(arg1, arg3);
+  } else {
+    rawKey = String(arg1 || 'title');
+    layout = (arg2 && typeof arg2 === 'object') ? resolveSlideLayout(arg2, arg3) : String(arg2 || 'cards');
+  }
+  const key = normalizeFieldKey(rawKey);
+  const isCenteredLayout = layout === 'title' || layout === 'section' || layout === 'quote';
+
+  if (key === '*') {
+    return { label: 'Todos los textos', fontSize: 16, bold: false, italic: false, align: 'left' };
+  }
+  if (key === 'badge') {
+    return { label: 'Insignia superior', fontSize: 11, bold: true, italic: false, align: isCenteredLayout ? 'center' : 'left' };
+  }
+  if (key === 'title') {
+    return { label: 'Título de diapositiva', fontSize: layout === 'title' ? 38 : 24, bold: true, italic: false, align: isCenteredLayout ? 'center' : 'left' };
+  }
+  if (key === 'subtitle') {
+    return { label: 'Subtítulo', fontSize: 18, bold: false, italic: false, align: isCenteredLayout ? 'center' : 'left' };
+  }
+  if (key === 'description') {
+    return { label: 'Descripción', fontSize: 16, bold: false, italic: false, align: 'center' };
+  }
+  if (key === 'body') {
+    return { label: 'Cuerpo de contenido', fontSize: 17, bold: false, italic: false, align: 'left' };
+  }
+  if (key === 'callout') {
+    return { label: 'Nota destacada', fontSize: 14, bold: true, italic: false, align: 'left' };
+  }
+  if (key === 'imageCaption') {
+    return { label: 'Pie de imagen', fontSize: 12, bold: false, italic: true, align: 'center' };
+  }
+  if (key === 'statValue') {
+    return { label: 'Cifra / Estadística', fontSize: 40, bold: true, italic: false, align: 'center' };
+  }
+  if (key === 'quoteText') {
+    return { label: 'Cita o frase clave', fontSize: 24, bold: true, italic: true, align: 'center' };
+  }
+  if (key === 'quoteAuthor') {
+    return { label: 'Autor / Fuente', fontSize: 15, bold: true, italic: false, align: 'center' };
+  }
+  if (key === 'question') {
+    return { label: 'Pregunta del Quiz', fontSize: 26, bold: true, italic: false, align: 'left' };
+  }
+
+  const cardMatch = key.match(/^cards\.(\d+)\.(title|text|example)$/);
+  if (cardMatch) {
+    const idx = Number(cardMatch[1]) + 1;
+    const prop = cardMatch[2];
+    if (prop === 'title') return { label: `Tarjeta ${idx} • Título`, fontSize: 17, bold: true, italic: false, align: 'left' };
+    if (prop === 'example') return { label: `Tarjeta ${idx} • Ejemplo`, fontSize: 12, bold: false, italic: true, align: 'left' };
+    return { label: `Tarjeta ${idx} • Texto`, fontSize: 14, bold: false, italic: false, align: 'left' };
+  }
+
+  const bulletMatch = key.match(/^bullets\.(\d+)\.(title|text|example)$/);
+  if (bulletMatch) {
+    const idx = Number(bulletMatch[1]) + 1;
+    const prop = bulletMatch[2];
+    if (prop === 'title') return { label: `Punto ${idx} • Título`, fontSize: 16, bold: true, italic: false, align: 'left' };
+    if (prop === 'example') return { label: `Punto ${idx} • Ejemplo`, fontSize: 12, bold: false, italic: true, align: 'left' };
+    return { label: `Punto ${idx} • Explicación`, fontSize: 14, bold: false, italic: false, align: 'left' };
+  }
+
+  const colMatch = key.match(/^(leftColumn|rightColumn)\.(badge|title|text|items\.(\d+))$/);
+  if (colMatch) {
+    const colLabel = colMatch[1] === 'leftColumn' ? 'Columna A' : 'Columna B';
+    const sub = colMatch[2];
+    if (sub === 'badge') return { label: `${colLabel} • Etiqueta`, fontSize: 11, bold: true, italic: false, align: 'left' };
+    if (sub === 'title') return { label: `${colLabel} • Título`, fontSize: 18, bold: true, italic: false, align: 'left' };
+    if (sub === 'text') return { label: `${colLabel} • Descripción`, fontSize: 14, bold: false, italic: false, align: 'left' };
+    const itemIdx = Number(colMatch[3]) + 1;
+    return { label: `${colLabel} • Viñeta ${itemIdx}`, fontSize: 14, bold: false, italic: false, align: 'left' };
+  }
+
+  const tblHeaderMatch = key.match(/^table\.header\.(\d+)$/);
+  if (tblHeaderMatch) {
+    return { label: `Tabla • Encabezado ${Number(tblHeaderMatch[1]) + 1}`, fontSize: 14, bold: true, italic: false, align: 'left' };
+  }
+
+  const tblCellMatch = key.match(/^table\.cell\.(\d+)\.(\d+)$/);
+  if (tblCellMatch) {
+    const r = Number(tblCellMatch[1]) + 1;
+    const c = Number(tblCellMatch[2]) + 1;
+    return { label: `Tabla • Fila ${r}, Col ${c}`, fontSize: 13, bold: c === 1, italic: false, align: 'left' };
+  }
+
+  const optMatch = key.match(/^options\.(\d+)\.(text|explanation)$/);
+  if (optMatch) {
+    const letter = String.fromCharCode(65 + Number(optMatch[1]));
+    if (optMatch[2] === 'explanation') return { label: `Explicación Opción ${letter}`, fontSize: 13, bold: false, italic: false, align: 'left' };
+    return { label: `Opción ${letter}`, fontSize: 15, bold: false, italic: false, align: 'left' };
+  }
+
+  return { label: 'Texto seleccionado', fontSize: 16, bold: false, italic: false, align: 'left' };
+};
+
+export const getExplicitFieldTextStyle = (slide, fieldKey = 'title') => {
+  if (!slide || typeof slide !== 'object') return {};
+  const key = normalizeFieldKey(fieldKey);
+  const map = (slide.textStyles && typeof slide.textStyles === 'object' && !Array.isArray(slide.textStyles))
+    ? slide.textStyles
+    : {};
+  const globalWildcard = (map['*'] && typeof map['*'] === 'object') ? map['*'] : {};
+  const specific = (key && map[key] && typeof map[key] === 'object')
+    ? map[key]
+    : (fieldKey && map[fieldKey] && typeof map[fieldKey] === 'object' ? map[fieldKey] : {});
+  const merged = { ...globalWildcard, ...specific };
+  if (merged.highlight && !merged.bgColor) merged.bgColor = merged.highlight;
+  if (merged.bgColor && !merged.highlight) merged.highlight = merged.bgColor;
+  if (key === 'title' && !merged.align && slide.titleAlign) {
+    merged.align = slide.titleAlign;
+  }
+  return merged;
+};
+
+export const getFieldTextStyle = (slide, fieldKey = 'title') => {
+  const key = normalizeFieldKey(fieldKey);
+  const meta = getDefaultFieldStyleMeta(slide, key);
+  const explicit = getExplicitFieldTextStyle(slide, key);
+  return {
+    fontSize: meta.fontSize,
+    bold: meta.bold,
+    italic: meta.italic,
+    underline: false,
+    strikethrough: false,
+    align: meta.align,
+    color: '',
+    bgColor: '',
+    highlight: '',
+    fontFamily: '',
+    lineHeight: 1.3,
+    ...explicit
+  };
+};
+
+export const updateFieldTextStyle = (slide, fieldKey = 'title', stylePatch = {}) => {
+  if (!slide || typeof slide !== 'object' || !stylePatch || typeof stylePatch !== 'object') return slide;
+  const key = normalizeFieldKey(fieldKey);
+  const currentMap = (slide.textStyles && typeof slide.textStyles === 'object' && !Array.isArray(slide.textStyles))
+    ? { ...slide.textStyles }
+    : {};
+
+  const normalizedPatch = { ...stylePatch };
+  if ('highlight' in normalizedPatch && !('bgColor' in normalizedPatch)) {
+    normalizedPatch.bgColor = normalizedPatch.highlight;
+  } else if ('bgColor' in normalizedPatch && !('highlight' in normalizedPatch)) {
+    normalizedPatch.highlight = normalizedPatch.bgColor;
+  }
+
+  const cleanObject = (obj) => {
+    const out = {};
+    for (const [k, v] of Object.entries(obj)) {
+      if (v !== undefined && v !== null && v !== '') {
+        out[k] = v;
+      }
+    }
+    return out;
+  };
+
+  if (key === '*') {
+    const nextMap = {};
+    const nextWildcard = cleanObject({ ...(currentMap['*'] || {}), ...normalizedPatch });
+    if (Object.keys(nextWildcard).length > 0) {
+      nextMap['*'] = nextWildcard;
+    }
+    for (const [k, existingVal] of Object.entries(currentMap)) {
+      if (k === '*' || !existingVal || typeof existingVal !== 'object') continue;
+      const updatedEntry = cleanObject({ ...existingVal, ...normalizedPatch });
+      if (Object.keys(updatedEntry).length > 0) {
+        nextMap[k] = updatedEntry;
+      }
+    }
+    const nextSlide = { ...slide, textStyles: nextMap };
+    if (normalizedPatch.align) nextSlide.titleAlign = normalizedPatch.align;
+    return nextSlide;
+  }
+
+  const prevFieldStyle = (currentMap[key] && typeof currentMap[key] === 'object') ? currentMap[key] : {};
+  const mergedFieldStyle = cleanObject({ ...prevFieldStyle, ...normalizedPatch });
+  if (Object.keys(mergedFieldStyle).length > 0) {
+    currentMap[key] = mergedFieldStyle;
+  } else {
+    delete currentMap[key];
+  }
+
+  const nextSlide = {
+    ...slide,
+    textStyles: currentMap
+  };
+  if (key === 'title' && normalizedPatch.align) {
+    nextSlide.titleAlign = normalizedPatch.align;
+  }
+  return nextSlide;
+};
+
+export const clearFieldTextStyle = (slide, fieldKey = 'title') => {
+  if (!slide || typeof slide !== 'object') return slide;
+  const key = normalizeFieldKey(fieldKey);
+  if (key === '*') {
+    return { ...slide, textStyles: {} };
+  }
+  const currentMap = (slide.textStyles && typeof slide.textStyles === 'object' && !Array.isArray(slide.textStyles))
+    ? { ...slide.textStyles }
+    : {};
+  delete currentMap[key];
+  if (fieldKey !== key) delete currentMap[fieldKey];
+  return { ...slide, textStyles: currentMap };
+};
+
+export const shiftFieldTextStylesOnDelete = (textStyles, collectionType = 'cards', deletedIdx = 0) => {
+  if (!textStyles || typeof textStyles !== 'object' || Array.isArray(textStyles)) return {};
+  const del = Number(deletedIdx);
+  if (!Number.isFinite(del) || del < 0) return { ...textStyles };
+  const next = {};
+
+  for (const [rawKey, val] of Object.entries(textStyles)) {
+    const key = normalizeFieldKey(rawKey);
+    if (collectionType === 'cards' || collectionType === 'bullets' || collectionType === 'options') {
+      const m = key.match(new RegExp(`^${collectionType}\\.(\\d+)\\.(.+)$`));
+      if (m) {
+        const idx = Number(m[1]);
+        if (idx === del) continue;
+        const nextIdx = idx > del ? idx - 1 : idx;
+        next[`${collectionType}.${nextIdx}.${m[2]}`] = val;
+        continue;
+      }
+    } else if (collectionType === 'leftColumn.items' || collectionType === 'rightColumn.items') {
+      const escaped = collectionType.replace('.', '\\.');
+      const m = key.match(new RegExp(`^${escaped}\\.(\\d+)$`));
+      if (m) {
+        const idx = Number(m[1]);
+        if (idx === del) continue;
+        const nextIdx = idx > del ? idx - 1 : idx;
+        next[`${collectionType}.${nextIdx}`] = val;
+        continue;
+      }
+    } else if (collectionType === 'table.row') {
+      const m = key.match(/^table\.cell\.(\d+)\.(\d+)$/);
+      if (m) {
+        const rIdx = Number(m[1]);
+        const cIdx = Number(m[2]);
+        if (rIdx === del) continue;
+        const nextR = rIdx > del ? rIdx - 1 : rIdx;
+        next[`table.cell.${nextR}.${cIdx}`] = val;
+        continue;
+      }
+    } else if (collectionType === 'table.col') {
+      const hm = key.match(/^table\.header\.(\d+)$/);
+      if (hm) {
+        const hIdx = Number(hm[1]);
+        if (hIdx === del) continue;
+        const nextH = hIdx > del ? hIdx - 1 : hIdx;
+        next[`table.header.${nextH}`] = val;
+        continue;
+      }
+      const cm = key.match(/^table\.cell\.(\d+)\.(\d+)$/);
+      if (cm) {
+        const rIdx = Number(cm[1]);
+        const cIdx = Number(cm[2]);
+        if (cIdx === del) continue;
+        const nextC = cIdx > del ? cIdx - 1 : cIdx;
+        next[`table.cell.${rIdx}.${nextC}`] = val;
+        continue;
+      }
+    }
+    next[rawKey] = val;
+  }
+  return next;
+};
+
+
+export const buildInlineTextStyle = (slide, fieldKey, baseStyle = {}, mode = 'presenter') => {
+  const st = getExplicitFieldTextStyle(slide, fieldKey);
+  const style = { ...baseStyle };
+
+  if (st.color) {
+    style.color = st.color;
+  }
+  const bg = st.bgColor || st.highlight;
+  if (bg && bg !== 'transparent') {
+    style.backgroundColor = bg;
+    if (!style.borderRadius) style.borderRadius = '6px';
+    if (!style.paddingLeft) {
+      style.paddingLeft = '6px';
+      style.paddingRight = '6px';
+    }
+  }
+  if (st.fontFamily) {
+    style.fontFamily = SLIDE_FONTS[st.fontFamily]?.css || st.fontFamily;
+  }
+  if (st.fontSize && Number.isFinite(Number(st.fontSize))) {
+    const px = Number(st.fontSize);
+    if (mode === 'thumbnail') {
+      style.fontSize = `${Math.max(7, Math.round(px * 0.28))}px`;
+    } else if (mode === 'card') {
+      style.fontSize = `${Math.max(9, Math.round(px * 0.45))}px`;
+    } else {
+      style.fontSize = `${px}px`;
+    }
+  }
+  if (st.bold !== undefined) {
+    style.fontWeight = st.bold ? 800 : 400;
+  }
+  if (st.italic !== undefined) {
+    style.fontStyle = st.italic ? 'italic' : 'normal';
+  }
+  if (st.underline !== undefined || st.strikethrough !== undefined) {
+    const decs = [];
+    if (st.underline) decs.push('underline');
+    if (st.strikethrough) decs.push('line-through');
+    style.textDecoration = decs.length > 0 ? decs.join(' ') : 'none';
+  }
+  if (st.align) {
+    style.textAlign = st.align;
+  }
+  if (st.textTransform) {
+    style.textTransform = st.textTransform;
+  }
+  if (st.lineHeight) {
+    style.lineHeight = st.lineHeight;
+  }
+  return style;
+};
+
+export const transformTextCase = (text = '', mode = 'upper') => {
+  const str = String(text ?? '');
+  if (!str) return '';
+  if (mode === 'upper') return str.toUpperCase();
+  if (mode === 'lower') return str.toLowerCase();
+  if (mode === 'capitalize' || mode === 'title') {
+    return str.toLowerCase().replace(/(?:^|\s|["'([{])+\S/g, (c) => c.toUpperCase());
+  }
+  if (mode === 'sentence') {
+    const lower = str.toLowerCase();
+    return lower.replace(/(^\s*\w|[.!?]\s+\w)/g, (c) => c.toUpperCase());
+  }
+  if (mode === 'toggle') {
+    return str
+      .split('')
+      .map(ch => (ch === ch.toUpperCase() ? ch.toLowerCase() : ch.toUpperCase()))
+      .join('');
+  }
+  return str;
+};
+
+export const getSlideFieldTextValue = (slide, fieldKey = 'title') => {
+  if (!slide || typeof slide !== 'object' || !fieldKey) return '';
+  const key = normalizeFieldKey(fieldKey);
+  const simpleFields = new Set([
+    'title', 'subtitle', 'description', 'badge', 'body',
+    'callout', 'imageCaption', 'statValue', 'quoteText', 'quoteAuthor', 'question'
+  ]);
+  if (simpleFields.has(key)) {
+    if (key === 'subtitle' && slide.subtitle === undefined) return String(slide.description || '');
+    if (key === 'body' && slide.body === undefined) return String(slide.content || slide.subtitle || '');
+    return String(slide[key] ?? '');
+  }
+
+  const cardMatch = key.match(/^cards\.(\d+)\.(title|text|example)$/);
+  if (cardMatch && Array.isArray(slide.cards)) {
+    const c = slide.cards[Number(cardMatch[1])];
+    return String(c?.[cardMatch[2]] ?? '');
+  }
+
+  const bulletMatch = key.match(/^bullets\.(\d+)\.(title|text|example)$/);
+  if (bulletMatch && Array.isArray(slide.bullets)) {
+    const b = slide.bullets[Number(bulletMatch[1])];
+    if (typeof b === 'object' && b !== null) return String(b[bulletMatch[2]] ?? '');
+    return bulletMatch[2] === 'title' ? String(b ?? '') : '';
+  }
+
+  const colMatch = key.match(/^(leftColumn|rightColumn)\.(badge|title|text|items\.(\d+))$/);
+  if (colMatch) {
+    const col = slide[colMatch[1]] || {};
+    if (colMatch[3] !== undefined) {
+      const items = Array.isArray(col.items) ? col.items : [];
+      return String(items[Number(colMatch[3])] ?? '');
+    }
+    return String(col[colMatch[2]] ?? '');
+  }
+
+  const tblHeaderMatch = key.match(/^table\.header\.(\d+)$/);
+  if (tblHeaderMatch) {
+    const headers = Array.isArray(slide.table?.headers) ? slide.table.headers : [];
+    return String(headers[Number(tblHeaderMatch[1])] ?? '');
+  }
+
+  const tblCellMatch = key.match(/^table\.cell\.(\d+)\.(\d+)$/);
+  if (tblCellMatch) {
+    const rows = getTableRows(slide.table);
+    const r = rows[Number(tblCellMatch[1])];
+    return Array.isArray(r) ? String(r[Number(tblCellMatch[2])] ?? '') : '';
+  }
+
+  const optMatch = key.match(/^options\.(\d+)\.(text|explanation)$/);
+  if (optMatch && Array.isArray(slide.options)) {
+    const opt = slide.options[Number(optMatch[1])];
+    return String(opt?.[optMatch[2]] ?? '');
+  }
+
+  return '';
+};
+
+export const setSlideFieldTextValue = (slide, fieldKey = 'title', newValue = '') => {
+  if (!slide || typeof slide !== 'object' || !fieldKey) return slide;
+  const key = normalizeFieldKey(fieldKey);
+  const val = String(newValue ?? '');
+  const simpleFields = new Set([
+    'title', 'subtitle', 'description', 'badge', 'body',
+    'callout', 'imageCaption', 'statValue', 'quoteText', 'quoteAuthor', 'question'
+  ]);
+  if (simpleFields.has(key)) {
+    return { ...slide, [key]: val };
+  }
+
+  const cardMatch = key.match(/^cards\.(\d+)\.(title|text|example)$/);
+  if (cardMatch && Array.isArray(slide.cards)) {
+    const idx = Number(cardMatch[1]);
+    const prop = cardMatch[2];
+    return {
+      ...slide,
+      cards: slide.cards.map((c, i) => (i === idx ? { ...(c || {}), [prop]: val } : c))
+    };
+  }
+
+  const bulletMatch = key.match(/^bullets\.(\d+)\.(title|text|example)$/);
+  if (bulletMatch && Array.isArray(slide.bullets)) {
+    const idx = Number(bulletMatch[1]);
+    const prop = bulletMatch[2];
+    return {
+      ...slide,
+      bullets: slide.bullets.map((b, i) => {
+        if (i !== idx) return b;
+        const base = typeof b === 'object' && b !== null ? { ...b } : { title: String(b || ''), text: '', example: '' };
+        base[prop] = val;
+        return base;
+      })
+    };
+  }
+
+  const colMatch = key.match(/^(leftColumn|rightColumn)\.(badge|title|text|items\.(\d+))$/);
+  if (colMatch) {
+    const colKey = colMatch[1];
+    const col = { ...(slide[colKey] || { badge: '', title: '', text: '', items: [] }) };
+    if (colMatch[3] !== undefined) {
+      const iIdx = Number(colMatch[3]);
+      const items = Array.isArray(col.items) ? [...col.items] : [];
+      items[iIdx] = val;
+      col.items = items;
+    } else {
+      col[colMatch[2]] = val;
+    }
+    return { ...slide, [colKey]: col };
+  }
+
+  const tblHeaderMatch = key.match(/^table\.header\.(\d+)$/);
+  if (tblHeaderMatch) {
+    const hIdx = Number(tblHeaderMatch[1]);
+    const headers = Array.isArray(slide.table?.headers) ? [...slide.table.headers] : ['Concepto', 'Explicación', 'Ejemplo'];
+    headers[hIdx] = val;
+    return {
+      ...slide,
+      table: {
+        headers,
+        rows: getTableRows(slide.table)
+      }
+    };
+  }
+
+  const tblCellMatch = key.match(/^table\.cell\.(\d+)\.(\d+)$/);
+  if (tblCellMatch) {
+    const rIdx = Number(tblCellMatch[1]);
+    const cIdx = Number(tblCellMatch[2]);
+    const headers = Array.isArray(slide.table?.headers) ? [...slide.table.headers] : ['Concepto', 'Explicación', 'Ejemplo'];
+    const rows = getTableRows(slide.table).map((r, ri) => {
+      if (ri !== rIdx) return r;
+      const copyR = Array.isArray(r) ? [...r] : [];
+      copyR[cIdx] = val;
+      return copyR;
+    });
+    return {
+      ...slide,
+      table: { headers, rows }
+    };
+  }
+
+  const optMatch = key.match(/^options\.(\d+)\.(text|explanation)$/);
+  if (optMatch && Array.isArray(slide.options)) {
+    const oIdx = Number(optMatch[1]);
+    const prop = optMatch[2];
+    return {
+      ...slide,
+      options: slide.options.map((o, i) => (i === oIdx ? { ...(o || {}), [prop]: val } : o))
+    };
+  }
+
+  return slide;
+};
+
+export const listSlideEditableFields = (slide, slideIdx = 0) => {
+  if (!slide || typeof slide !== 'object') return [{ key: 'title', label: 'Título de diapositiva' }];
+  const layout = resolveSlideLayout(slide, slideIdx);
+  const fields = [];
+
+  if (!(layout === 'blank' && slide.hideHeader)) {
+    fields.push({ key: 'badge', label: 'Insignia superior' });
+  }
+  fields.push({ key: 'title', label: 'Título principal' });
+
+  if (layout === 'title' || layout === 'section') {
+    fields.push({ key: 'subtitle', label: 'Subtítulo' });
+  } else if (layout === 'title_body') {
+    fields.push({ key: 'body', label: 'Cuerpo de texto' });
+    fields.push({ key: 'callout', label: 'Nota destacada (Callout)' });
+  } else if (layout === 'image_text') {
+    fields.push({ key: 'body', label: 'Explicación junto a imagen' });
+    fields.push({ key: 'imageCaption', label: 'Pie de imagen' });
+    fields.push({ key: 'callout', label: 'Nota destacada' });
+  } else if (layout === 'quote') {
+    fields.push({ key: 'statValue', label: 'Cifra / Estadística' });
+    fields.push({ key: 'quoteText', label: 'Cita o frase clave' });
+    fields.push({ key: 'quoteAuthor', label: 'Autor / Fuente' });
+  } else if (layout === 'two_columns') {
+    ['leftColumn', 'rightColumn'].forEach((colKey, cIdx) => {
+      const lbl = cIdx === 0 ? 'Col A' : 'Col B';
+      fields.push({ key: `${colKey}.badge`, label: `${lbl} • Etiqueta` });
+      fields.push({ key: `${colKey}.title`, label: `${lbl} • Título` });
+      fields.push({ key: `${colKey}.text`, label: `${lbl} • Descripción` });
+      const items = Array.isArray(slide[colKey]?.items) ? slide[colKey].items : [];
+      items.forEach((_, iIdx) => {
+        fields.push({ key: `${colKey}.items.${iIdx}`, label: `${lbl} • Viñeta ${iIdx + 1}` });
+      });
+    });
+  } else if (layout === 'table') {
+    const headers = Array.isArray(slide.table?.headers) && slide.table.headers.length > 0
+      ? slide.table.headers
+      : ['Concepto', 'Explicación', 'Ejemplo'];
+    const rows = getTableRows(slide.table);
+    headers.forEach((h, hIdx) => {
+      fields.push({ key: `table.header.${hIdx}`, label: `Encabezado ${hIdx + 1} (${h || 'Col'})` });
+    });
+    rows.forEach((_, rIdx) => {
+      headers.forEach((_, cIdx) => {
+        fields.push({ key: `table.cell.${rIdx}.${cIdx}`, label: `Celda Fila ${rIdx + 1}, Col ${cIdx + 1}` });
+      });
+    });
+  } else if (layout === 'bullets') {
+    const bullets = Array.isArray(slide.bullets) ? slide.bullets : [];
+    bullets.forEach((_, bIdx) => {
+      fields.push({ key: `bullets.${bIdx}.title`, label: `Punto ${bIdx + 1} • Título` });
+      fields.push({ key: `bullets.${bIdx}.text`, label: `Punto ${bIdx + 1} • Explicación` });
+      fields.push({ key: `bullets.${bIdx}.example`, label: `Punto ${bIdx + 1} • Ejemplo` });
+    });
+  } else if (layout === 'quiz') {
+    fields.push({ key: 'question', label: 'Pregunta del Quiz' });
+    const opts = Array.isArray(slide.options) ? slide.options : [];
+    opts.forEach((_, oIdx) => {
+      const letter = String.fromCharCode(65 + oIdx);
+      fields.push({ key: `options.${oIdx}.text`, label: `Opción ${letter}` });
+      fields.push({ key: `options.${oIdx}.explanation`, label: `Explicación Opción ${letter}` });
+    });
+  } else if (layout === 'cards') {
+    const cards = Array.isArray(slide.cards) ? slide.cards : [];
+    cards.forEach((_, cIdx) => {
+      fields.push({ key: `cards.${cIdx}.title`, label: `Tarjeta ${cIdx + 1} • Título` });
+      fields.push({ key: `cards.${cIdx}.text`, label: `Tarjeta ${cIdx + 1} • Texto` });
+      fields.push({ key: `cards.${cIdx}.example`, label: `Tarjeta ${cIdx + 1} • Ejemplo` });
+    });
+  }
+
+  fields.push({ key: '*', label: '✨ Todos los textos de la diapositiva' });
+  return fields;
 };
 
 // =========================================================================
@@ -1014,6 +1719,11 @@ export const normalizeSingleSlide = (rawSlide, idx = 0) => {
     speakerNotes: rawSlide.speakerNotes ? String(rawSlide.speakerNotes) : '',
     elements: Array.isArray(rawSlide.elements) ? rawSlide.elements : []
   };
+  if (rawSlide.textStyles && typeof rawSlide.textStyles === 'object' && !Array.isArray(rawSlide.textStyles)) {
+    normalized.textStyles = rawSlide.textStyles;
+  } else {
+    delete normalized.textStyles;
+  }
 
   const normalizeColItems = (colObj) => {
     const rawItems = Array.isArray(colObj?.items)

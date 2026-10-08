@@ -103,6 +103,25 @@ for (const r of resultados) {
   }
 }
 
+// ---------- 3b) Componentes JSX (<Tag) no importados ni declarados en el archivo ----------
+for (const f of srcFiles) {
+  if (!f.endsWith(".jsx")) continue;
+  const raw = fs.readFileSync(f, "utf8");
+  const noComments = raw.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ");
+  const withoutJsxTags = noComments
+    .replace(/<\/?\s*[A-Z][A-Za-z0-9_.]*/g, " ");
+  const usedTags = new Set();
+  for (const m of noComments.matchAll(/<\s*([A-Z][A-Za-z0-9_]*)\b/g)) {
+    usedTags.add(m[1]);
+  }
+  for (const tag of usedTags) {
+    const idRe = new RegExp(`\\b${tag}\\b`);
+    if (!idRe.test(withoutJsxTags)) {
+      errores.push(`${f}: usa el componente JSX <${tag}> pero "${tag}" no está importado ni declarado en ese archivo`);
+    }
+  }
+}
+
 // ---------- 4) Escapes \uXXXX en texto JSX o atributos (no se interpretan) ----------
 for (const f of srcFiles) {
   const lineas = fs.readFileSync(f, "utf8").split("\n");
