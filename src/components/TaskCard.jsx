@@ -21,6 +21,8 @@ import KahootLiveModal from './KahootLiveModal.jsx'
 import KahootBuilder from './KahootBuilder.jsx'
 import { validateKahootConfig, buildKahootLeaderboard, reconcileKahootParticipantsAfterEdit, canAccessKahootReview, buildPublicKahootUrl } from '../utils/kahootEngine.js'
 import { SlideCanvasSurface, SlidePresenterViewer, exportReviewToPresentation } from './ReviewsModule.jsx'
+import Flipbook3DModal from './Flipbook3DModal.jsx'
+import { getBookTheme, normalizeBookRecord } from '../utils/flipbookEngine.js'
 import { useVoiceRecorder } from '../utils/useVoiceRecorder.js'
 import { auth, signInAnonymously, doc, setDoc, updateDoc, deleteDoc } from '../firebase/config.js'
 import { runTransaction } from 'firebase/firestore'
@@ -49,17 +51,21 @@ const TaskCard = React.memo(({
     evaluations = [],
     grades = [],
     reviews = [],
+    books = [],
     onStartEvaluation,
     onOpenEvaluationResults,
     onOpenImmediateFeedback,
     onRetryDemoEvaluation,
     onOpenEvaluationsTab,
-    onOpenReviewsTab
+    onOpenReviewsTab,
+    onOpenBooksTab
 }) => {
     const cardRef = React.useRef(null);
     const editTaskDescRef = React.useRef(null);
     const [isEditingTask, setIsEditingTask] = useState(false);
     const [previewDoc, setPreviewDoc] = useState(null);
+    const [activeFlipbookModal, setActiveFlipbookModal] = useState(null);
+    const [bookPreviewPageIdx, setBookPreviewPageIdx] = useState(0);
     const [editTaskData, setEditTaskData] = useState({ title: task?.title || '', description: task?.description || '', dueDate: task?.dueDate || '', dueTime: task?.dueTime || '', allowLate: task?.allowLate || false, geniallyUrl: task?.geniallyUrl || '', hideDate: !!task?.hideDate });
     const [showKahootLiveModal, setShowKahootLiveModal] = useState(false);
     const [kahootModalStartInReview, setKahootModalStartInReview] = useState(false);
@@ -185,8 +191,22 @@ const TaskCard = React.memo(({
     const isKahoot = task?.type === 'kahoot' || Boolean(task?.kahoot);
     const isEvaluation = task?.type === 'evaluation' || Boolean(task?.evaluationId);
     const isSlides = task?.type === 'slides' || task?.type === 'review' || Boolean(task?.reviewId);
-    const isPost = task?.type === 'post' || (!isTask && !isForum && !isPoll && !isKahoot && !isEvaluation && !isSlides);
+    const isBook3D = task?.type === 'book3d' || Boolean(task?.bookId) || (Array.isArray(task?.bookPages) && task.bookPages.length > 0);
+    const isPost = task?.type === 'post' || (!isTask && !isForum && !isPoll && !isKahoot && !isEvaluation && !isSlides && !isBook3D);
     const isTaskType = isTask || isForum;
+
+    const linkedBook = React.useMemo(() => {
+        if (!isBook3D) return null;
+        const found = (books || []).find(b => String(b?.id) === String(task?.bookId));
+        if (found) {
+            return normalizeBookRecord({
+                ...found,
+                title: task?.title || found.title || 'Libro 3D Interactivo',
+                description: task?.description !== undefined && task?.description !== '' ? task.description : (found.description || '')
+            });
+        }
+        return normalizeBookRecord(task);
+    }, [isBook3D, books, task]);
 
     const linkedEvaluation = React.useMemo(() => {
         if (!isEvaluation) return null;
@@ -319,7 +339,8 @@ const TaskCard = React.memo(({
         task?.isDemoCreated ||
         (task?.id && (String(task.id).startsWith('demo-') || String(task.id).startsWith('demo_'))) ||
         String(task?.evaluationId || '').startsWith('demo') ||
-        String(task?.reviewId || '').startsWith('demo')
+        String(task?.reviewId || '').startsWith('demo') ||
+        String(task?.bookId || '').startsWith('demo')
     );
 
     const updateTaskDoc = async (updates) => {
@@ -1047,7 +1068,7 @@ const TaskCard = React.memo(({
     };
 
     const handleSaveEditedTask = async () => {
-        if (!editTaskData.title.trim() || (!isKahoot && !isPoll && !isEvaluation && !isSlides && !editTaskData.description.trim())) return showMessage("El título y la descripción no pueden estar vacíos.");
+        if (!editTaskData.title.trim() || (!isKahoot && !isPoll && !isEvaluation && !isSlides && !isBook3D && !editTaskData.description.trim())) return showMessage("El título y la descripción no pueden estar vacíos.");
         try {
             const updates = { 
                 title: editTaskData.title.trim(), 
@@ -1055,7 +1076,7 @@ const TaskCard = React.memo(({
                 geniallyUrl: editTaskData.geniallyUrl ? extractGeniallyUrl(editTaskData.geniallyUrl.trim()) : '',
                 hideDate: Boolean(editTaskData.hideDate)
             };
-            if (task.type !== 'post' && task.type !== 'kahoot' && !isSlides) { updates.dueDate = editTaskData.dueDate; updates.dueTime = editTaskData.dueTime; updates.allowLate = editTaskData.allowLate; }
+            if (task.type !== 'post' && task.type !== 'kahoot' && !isSlides && !isBook3D) { updates.dueDate = editTaskData.dueDate; updates.dueTime = editTaskData.dueTime; updates.allowLate = editTaskData.allowLate; }
             if (isKahoot && isEditingKahootQuestions) {
                 const validation = validateKahootConfig(editedKahootQuestions);
                 if (!validation.valid) {
@@ -1421,9 +1442,11 @@ const TaskCard = React.memo(({
                                         ? 'bg-rose-600 dark:bg-rose-500'
                                         : isSlides
                                             ? 'bg-amber-500 dark:bg-amber-400'
-                                            : isTask 
-                                                ? 'bg-[#AD3333] dark:bg-[#c93b3b]' 
-                                                : 'bg-blue-500 dark:bg-blue-600'
+                                            : isBook3D
+                                                ? 'bg-indigo-600 dark:bg-indigo-500'
+                                                : isTask 
+                                                    ? 'bg-[#AD3333] dark:bg-[#c93b3b]' 
+                                                    : 'bg-blue-500 dark:bg-blue-600'
                         }`} 
                     />
                     <button 
@@ -1484,6 +1507,13 @@ const TaskCard = React.memo(({
                                 </span>
                             )}
 
+                            {isBook3D && (
+                                <span className="inline-flex items-center gap-1 text-[9.5px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 shrink-0 whitespace-nowrap">
+                                    <BookOpen size={10} className="shrink-0" />
+                                    Libro 3D
+                                </span>
+                            )}
+
                             {task.isDemoCreated && (
                                 <span className="inline-flex items-center gap-1 text-[9.5px] font-bold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-700/60 shrink-0 whitespace-nowrap">
                                     <span>Demo</span>
@@ -1524,7 +1554,7 @@ const TaskCard = React.memo(({
                                         </button>
                                         <button onClick={() => confirmAction("¿Desea eliminar esta publicación definitivamente?", async () => {
                                             try {
-                                                if (isEvaluation || isSlides) {
+                                                if (isEvaluation || isSlides || isBook3D) {
                                                     await updateTaskDoc({ isDeletedFromWall: true, isPinned: false });
                                                     showMessage("✅ Publicación retirada del muro.");
                                                     return;
@@ -2551,6 +2581,165 @@ const TaskCard = React.memo(({
                 );
             })()}
 
+            {/* Módulo Interactivo de Libro 3D (Publicación de Libro 3D en el Muro) */}
+            {isBook3D && linkedBook && (() => {
+                const bk = linkedBook;
+                const bkTheme = getBookTheme(bk.theme);
+                const pagesArr = Array.isArray(bk.bookPages) ? bk.bookPages : [];
+                const totalPagesCount = pagesArr.length || Number(bk.pageCount) || 1;
+                const safePageIdx = pagesArr.length > 0 ? Math.min(bookPreviewPageIdx, pagesArr.length - 1) : 0;
+                const currentPreviewPage = pagesArr[safePageIdx] || bk.coverUrl || '';
+                const pdfSourceUrl = bk.pdfUrl || bk.fileUrl || task.fileUrl || '';
+
+                return (
+                    <div className="my-3 rounded-2xl border border-indigo-200/80 dark:border-indigo-800/50 bg-gradient-to-br from-indigo-50/50 via-white to-violet-50/30 dark:from-gray-900 dark:via-gray-900/95 dark:to-indigo-950/25 shadow-sm overflow-hidden">
+                        {/* Cabecera del Libro 3D */}
+                        <div className="px-4 py-3 border-b border-indigo-100/80 dark:border-indigo-900/40 flex flex-wrap items-center justify-between gap-2 bg-gradient-to-r from-indigo-500/10 via-transparent to-violet-500/10">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                                    <BookOpen size={16} />
+                                </div>
+                                <span className="inline-flex items-center gap-1 text-[10.5px] font-extrabold px-2.5 py-0.5 rounded-full bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700 shadow-2xs">
+                                    <Layers size={11} className="text-indigo-600 dark:text-indigo-400" />
+                                    {totalPagesCount} {totalPagesCount === 1 ? 'página' : 'páginas'} en 3D
+                                </span>
+                                <span className="inline-flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/60">
+                                    <Sparkles size={11} />
+                                    Flipbook Interactivo
+                                </span>
+                            </div>
+
+                            {pagesArr.length > 0 && (
+                                <span className="text-[10.5px] font-extrabold text-indigo-800 dark:text-indigo-300 bg-indigo-100/70 dark:bg-indigo-950/60 px-2.5 py-0.5 rounded-full border border-indigo-200/80 dark:border-indigo-800/60">
+                                    Hoja {safePageIdx + 1} de {pagesArr.length}
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Escenario 3D de Vista Previa del Libro */}
+                        <div
+                            onClick={() => setActiveFlipbookModal({ book: bk, initialPage: safePageIdx })}
+                            className="relative group/bookcard cursor-pointer overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 p-5 sm:p-7 flex flex-col sm:flex-row items-center justify-center gap-6 border-b border-indigo-100/80 dark:border-gray-800"
+                            title="Haz clic para abrir el Libro 3D interactivo a pantalla completa"
+                        >
+                            {/* Cubierta Física 3D con Lomo y Grosor de Hojas */}
+                            <div
+                                className="relative w-44 sm:w-52 h-60 sm:h-72 shrink-0 select-none"
+                                style={{ perspective: '1200px' }}
+                            >
+                                <div
+                                    className="relative w-full h-full rounded-r-2xl rounded-l-sm shadow-[18px_22px_38px_-8px_rgba(0,0,0,0.75)] transition-transform duration-500 group-hover/bookcard:[transform:rotateY(-18deg)_translateY(-4px)] overflow-hidden border border-white/20"
+                                    style={{
+                                        backgroundColor: bkTheme.coverBg,
+                                        transformStyle: 'preserve-3d'
+                                    }}
+                                >
+                                    <div
+                                        className="absolute inset-y-0 left-0 w-4 z-10 pointer-events-none"
+                                        style={{
+                                            background: 'linear-gradient(90deg, rgba(0,0,0,0.55) 0%, rgba(255,255,255,0.24) 45%, rgba(0,0,0,0.35) 100%)'
+                                        }}
+                                    />
+                                    {currentPreviewPage ? (
+                                        <img
+                                            src={currentPreviewPage}
+                                            alt={`${bk.title} - Hoja ${safePageIdx + 1}`}
+                                            className="w-full h-full object-contain bg-white"
+                                        />
+                                    ) : (
+                                        <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center text-white">
+                                            <BookOpen size={34} className="mb-2 opacity-80" />
+                                            <span className="text-xs font-bold line-clamp-3">{bk.title}</span>
+                                        </div>
+                                    )}
+                                </div>
+                                {/* Canto de hojas derechas */}
+                                <div
+                                    className="absolute top-2 bottom-2 -right-2.5 w-2.5 rounded-r-sm pointer-events-none"
+                                    style={{
+                                        background: 'repeating-linear-gradient(90deg, #f8fafc 0px, #cbd5e1 1.5px, #f1f5f9 3px)',
+                                        boxShadow: '4px 6px 14px rgba(0,0,0,0.45)'
+                                    }}
+                                />
+                            </div>
+
+                            {/* Controles de hojeo rápido en la tarjeta */}
+                            {pagesArr.length > 1 && (
+                                <>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setBookPreviewPageIdx(prev => (prev <= 0 ? pagesArr.length - 1 : prev - 1));
+                                        }}
+                                        className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 hover:bg-indigo-600 text-white border border-white/20 flex items-center justify-center shadow-lg transition-all hover:scale-110 z-20 cursor-pointer"
+                                        title="Hoja anterior"
+                                    >
+                                        <ChevronLeft size={18} />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setBookPreviewPageIdx(prev => (prev >= pagesArr.length - 1 ? 0 : prev + 1));
+                                        }}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 hover:bg-indigo-600 text-white border border-white/20 flex items-center justify-center shadow-lg transition-all hover:scale-110 z-20 cursor-pointer"
+                                        title="Siguiente hoja"
+                                    >
+                                        <ChevronRight size={18} />
+                                    </button>
+                                </>
+                            )}
+
+                            {/* Etiqueta superior derecha */}
+                            <div className="absolute top-3 right-3 px-3 py-1 rounded-xl bg-indigo-600/90 backdrop-blur-md text-white text-[10.5px] font-extrabold border border-indigo-400/40 flex items-center gap-1.5 shadow-lg z-20">
+                                <Maximize2 size={11} />
+                                <span>Abrir lector 3D</span>
+                            </div>
+                        </div>
+
+                        {/* Barra de acciones del Libro 3D */}
+                        <div className="p-3.5 sm:p-4 flex flex-wrap items-center justify-between gap-2.5">
+                            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveFlipbookModal({ book: bk, initialPage: safePageIdx })}
+                                    className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white shadow-sm flex items-center justify-center gap-2 transition-all hover:scale-[1.01] cursor-pointer"
+                                >
+                                    <BookOpen size={14} />
+                                    <span>Abrir Libro 3D</span>
+                                </button>
+
+                                {pdfSourceUrl && (
+                                    <a
+                                        href={pdfSourceUrl}
+                                        download={bk.fileName || `${bk.title || 'libro_3d'}.pdf`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-3.5 py-2.5 rounded-xl text-xs font-extrabold bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                                        title="Descargar documento PDF original"
+                                    >
+                                        <Download size={14} className="text-indigo-600 dark:text-indigo-400" />
+                                        <span>Descargar PDF</span>
+                                    </a>
+                                )}
+
+                                {typeof onOpenBooksTab === 'function' && (
+                                    <button
+                                        type="button"
+                                        onClick={() => onOpenBooksTab(role === 'teacher' ? bk : null)}
+                                        className="px-3.5 py-2.5 rounded-xl text-xs font-bold bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-800 dark:text-indigo-300 border border-indigo-500/25 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                                    >
+                                        {role === 'teacher' ? <Edit3 size={13} /> : <Sparkles size={13} />}
+                                        <span>{role === 'teacher' ? 'Editar en Biblioteca 3D' : 'Biblioteca 3D'}</span>
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
+
             {/* Audio adjunto */}
             {task.audioUrl && (
                 <div className="mt-2.5">
@@ -2592,7 +2781,7 @@ const TaskCard = React.memo(({
             )}
 
             {/* Archivo adjunto o Video directo */}
-            {task.fileUrl && (
+            {task.fileUrl && !isBook3D && (
                 isDirectVideoUrl(task.fileUrl) ? (
                     <div className="mt-3 rounded-2xl overflow-hidden shadow-sm">
                         <CustomVideoPlayer 
@@ -2604,7 +2793,7 @@ const TaskCard = React.memo(({
                 ) : (
                     <div 
                         onClick={() => setPreviewDoc({ url: task.fileUrl, title: task.fileName || 'Documento adjunto' })}
-                        className={`flex items-center gap-3.5 p-3 rounded-2xl border mt-3 w-fit max-w-full transition-all shadow-xs hover:scale-[1.01] cursor-pointer select-none ${
+                        className={`flex flex-wrap items-center gap-3.5 p-3 rounded-2xl border mt-3 w-fit max-w-full transition-all shadow-xs hover:scale-[1.01] cursor-pointer select-none ${
                             isDarkMode ? 'bg-gray-800/90 border-gray-700 hover:bg-gray-750 text-gray-100' : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-900'
                         }`}
                         title="Clic para abrir vista previa"
@@ -2620,6 +2809,31 @@ const TaskCard = React.memo(({
                                 <span className="text-blue-600 dark:text-blue-400 font-bold hover:underline">Abrir</span>
                             </span>
                         </div>
+                        {((task.fileName || '').toLowerCase().endsWith('.pdf') || task.fileUrl.toLowerCase().includes('.pdf')) && (
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveFlipbookModal({
+                                        book: {
+                                            id: `pdf_book_${task.id}`,
+                                            title: task.title || task.fileName || 'Libro 3D PDF',
+                                            description: task.description || '',
+                                            pdfUrl: task.fileUrl,
+                                            fileUrl: task.fileUrl,
+                                            fileName: task.fileName || 'documento.pdf',
+                                            bookPages: Array.isArray(task.bookPages) ? task.bookPages : []
+                                        },
+                                        initialPage: 0
+                                    });
+                                }}
+                                className="px-2.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold flex items-center gap-1.5 shrink-0 shadow-xs transition-all cursor-pointer"
+                                title="Abrir este PDF como Libro 3D interactivo con animación de hojas"
+                            >
+                                <BookOpen size={13} />
+                                <span>Libro 3D</span>
+                            </button>
+                        )}
                         <a 
                             href={task.fileUrl} 
                             download={task.fileName || "documento"}
@@ -3695,6 +3909,20 @@ const TaskCard = React.memo(({
                     } : undefined}
                     role={role}
                     themeMode={themeMode || (isDarkMode ? 'dark' : 'light')}
+                />
+            )}
+
+            {/* VISOR INTERACTIVO DE LIBRO 3D EN PANTALLA COMPLETA DESDE EL MURO */}
+            {activeFlipbookModal && (
+                <Flipbook3DModal
+                    book={activeFlipbookModal.book}
+                    initialPage={activeFlipbookModal.initialPage || 0}
+                    onClose={() => setActiveFlipbookModal(null)}
+                    isTeacher={role === 'teacher'}
+                    onEditBook={role === 'teacher' && typeof onOpenBooksTab === 'function' ? (bk) => {
+                        setActiveFlipbookModal(null);
+                        onOpenBooksTab(bk);
+                    } : null}
                 />
             )}
         </div>

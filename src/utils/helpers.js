@@ -551,3 +551,46 @@ export const speakText = (text) => {
   }
 };
 
+export const generateId = () => {
+  return `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+};
+
+export const handleForceDownload = async (url, fileName = 'documento.pdf') => {
+  if (!url || typeof document === 'undefined') return;
+  try {
+    if (url.startsWith('data:') || url.startsWith('blob:')) {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName || 'documento.pdf';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      return;
+    }
+    const response = await fetch(url);
+    if (response.ok) {
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = fileName || 'documento.pdf';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+      return;
+    }
+  } catch {
+    // Fallback to direct anchor open/download if CORS blocks fetch
+  }
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName || 'documento.pdf';
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+};
+
+

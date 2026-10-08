@@ -1,7 +1,7 @@
 // src/components/TasksTab.jsx
 import React, { useState, useRef } from 'react'
 import {
-  Book, BookOpen, CheckCheck, ChevronRight, Globe, ImageIcon, Mic, NavNotebook, PaperclipIcon, Plus, SearchIcon, Sparkles, Square, Target, Loader2, Undo2, X, Play, Pause, MessageCircle, BarChart2, Vote, Gamepad2, ClipboardList, NavSlides
+  Book, BookOpen, CheckCheck, CheckCircle2, ChevronRight, Globe, ImageIcon, Mic, NavNotebook, PaperclipIcon, Plus, SearchIcon, Sparkles, Square, Target, Loader2, Undo2, UploadCloud, X, Play, Pause, MessageCircle, BarChart2, Vote, Gamepad2, ClipboardList, NavSlides
 } from './Icons.jsx'
 import TaskCard from './TaskCard.jsx'
 import KahootBuilder from './KahootBuilder.jsx'
@@ -10,13 +10,14 @@ import SkeletonCard from './SkeletonCard.jsx'
 import RichTextToolbar from './RichTextToolbar.jsx'
 import RichVisualEditor from './RichVisualEditor.jsx'
 import { useVoiceRecorder } from '../utils/useVoiceRecorder.js'
-import { auth, signInAnonymously, db as defaultDb, appId as defaultAppId, collection, addDoc } from '../firebase/config.js'
+import { auth, signInAnonymously, db as defaultDb, appId as defaultAppId, collection, addDoc, doc, setDoc } from '../firebase/config.js'
 import AudioPlayer, { AudioRecordingVisualizer } from './AudioPlayer.jsx'
 import CustomVideoPlayer from './CustomVideoPlayer.jsx'
 import GeniallyEmbedPlayer, { extractGeniallyUrl } from './GeniallyEmbedPlayer.jsx'
 import { DEMO_TTL_MS, saveDemoSandboxItem } from '../utils/demoData.js'
-import { getItemTeacherId, getTeacherDisplayName } from '../utils/helpers.js'
+import { getCanonicalTeacherId, getItemTeacherId, getTeacherDisplayName, uploadImageToStorage, uploadRawFileToStorage, generateId } from '../utils/helpers.js'
 import { createDefaultKahootQuestion, validateKahootConfig, generateKahootPin } from '../utils/kahootEngine.js'
+import { BOOK_THEMES, renderPdfToBookPages, uploadBookPagesToStorage, sanitizeBookForFirestore, buildFallbackBookPages } from '../utils/flipbookEngine.js'
 
 const TasksTab = React.memo(({
 
@@ -34,9 +35,9 @@ const TasksTab = React.memo(({
     isFormExpanded: propIsFormExpanded, setIsFormExpanded: propSetIsFormExpanded,
     postTargetGroup: propPostTargetGroup, setPostTargetGroup: propSetPostTargetGroup,
     fixedTargetGroup, isGroupChannelMode = false,
-    evaluations = [], grades = [], reviews = [],
+    evaluations = [], grades = [], reviews = [], books = [], setRawBooks,
     onStartEvaluation, onOpenEvaluationResults, onOpenImmediateFeedback,
-    onRetryDemoEvaluation, onOpenEvaluationsTab, onOpenReviewsTab
+    onRetryDemoEvaluation, onOpenEvaluationsTab, onOpenReviewsTab, onOpenBooksTab
 }) => {
 
     // ESTADOS DEL MENÚ LIQUID GLASS
@@ -60,6 +61,57 @@ const TasksTab = React.memo(({
     const [pollOptions, setPollOptions] = useState(["", ""]);
     const [isMultipleChoice, setIsMultipleChoice] = useState(false);
     const [kahootQuestions, setKahootQuestions] = useState(() => [createDefaultKahootQuestion('quiz', 0)]);
+    const [book3dTheme, setBook3dTheme] = useState('royal-indigo');
+    const [book3dPages, setBook3dPages] = useState([]);
+    const [book3dPageTexts, setBook3dPageTexts] = useState([]);
+    const [book3dPdfFile, setBook3dPdfFile] = useState(null);
+    const [book3dAspectRatio, setBook3dAspectRatio] = useState(0.707);
+    const [isRenderingBook3d, setIsRenderingBook3d] = useState(false);
+    const [book3dProgress, setBook3dProgress] = useState({ phase: '', currentPage: 0, totalPages: 0, percent: 0 });
+    const book3dFileInputRef = useRef(null);
+
+    const handleSelectBook3dPdf = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
+            showMessage('⚠️ Selecciona un archivo en formato .PDF para crear el Libro 3D.');
+            return;
+        }
+        setBook3dPdfFile(file);
+        if (!(taskTitle || '').trim() && typeof setTaskTitle === 'function') {
+            setTaskTitle(file.name.replace(/\.pdf$/i, '').replace(/[-_]+/g, ' ').trim());
+        }
+        setIsRenderingBook3d(true);
+        setBook3dProgress({ phase: 'render', currentPage: 0, totalPages: 0, percent: 8 });
+        try {
+            const rendered = await renderPdfToBookPages(file, {
+                maxPages: 60,
+                scale: 1.6,
+                maxDimension: 1350,
+                quality: 0.82,
+                onProgress: (prog) => setBook3dProgress(prog)
+            });
+            if (Array.isArray(rendered?.pages) && rendered.pages.length > 0) {
+                setBook3dPages(rendered.pages);
+                setBook3dPageTexts(rendered.pageTexts || []);
+                setBook3dAspectRatio(rendered.aspectRatio || 0.707);
+                showMessage(`📚 PDF convertido en ${rendered.pages.length} hojas 3D interactivas.`);
+            }
+        } catch (err) {
+            console.error('Error renderizando PDF a Libro 3D:', err);
+            const fallback = buildFallbackBookPages({
+                title: taskTitle || file.name.replace(/\.pdf$/i, ''),
+                description: taskDesc || '',
+                fileName: file.name,
+                author: loggedInName || 'Docente',
+                themeId: book3dTheme
+            });
+            setBook3dPages(fallback);
+        } finally {
+            setIsRenderingBook3d(false);
+        }
+    };
+
     const wallSearchTerm = propWallSearchTerm !== undefined ? propWallSearchTerm : localWallSearchTerm;
     const setWallSearchTerm = propSetWallSearchTerm || setLocalWallSearchTerm;
     const { isRecording: recPub, audioUrl: audioPub, isUploading: upPub, recordingTime: recTimePub, setAudioUrl: setAudioPub, startRecording: startPub, stopRecording: stopPub, cancelRecording: cancelPub } = useVoiceRecorder('tasks_audios', showMessage);
@@ -167,7 +219,8 @@ const TasksTab = React.memo(({
             String(t.id || '').startsWith('demo-') ||
             String(t.id || '').startsWith('demo_') ||
             String(t.evaluationId || '').startsWith('demo') ||
-            String(t.reviewId || '').startsWith('demo')
+            String(t.reviewId || '').startsWith('demo') ||
+            String(t.bookId || '').startsWith('demo')
         );
         if (!fixedTargetGroup && (isDemoTask || String(t.id || '').startsWith('demo-'))) return true;
 
@@ -316,7 +369,7 @@ const TasksTab = React.memo(({
         return result;
     }, []);
 
-    // Combinar publicaciones del muro con evaluaciones activas y presentaciones de diapositivas
+    // Combinar publicaciones del muro con evaluaciones activas, presentaciones de diapositivas y libros 3D
     const combinedTasks = React.useMemo(() => {
         const getTs = (item) => {
             if (!item) return 0;
@@ -332,16 +385,20 @@ const TasksTab = React.memo(({
 
         const evalMap = new Map((evaluations || []).filter(Boolean).map(ev => [String(ev.id), ev]));
         const reviewMap = new Map((reviews || []).filter(Boolean).map(rv => [String(rv.id), rv]));
+        const bookMap = new Map((books || []).filter(Boolean).map(bk => [String(bk.id), bk]));
 
         // Registrar IDs ya presentes en tasks o pinnedTasks (incluso si fueron ocultados del muro con isDeletedFromWall)
         const existingEvalIds = new Set();
         const existingReviewIds = new Set();
+        const existingBookIds = new Set();
         [...(tasks || []), ...(pinnedTasks || [])].forEach(t => {
             if (!t) return;
             if (t.evaluationId) existingEvalIds.add(String(t.evaluationId));
             if (String(t.id || '').startsWith('eval_wall_')) existingEvalIds.add(String(t.id).replace(/^eval_wall_/, ''));
             if (t.reviewId) existingReviewIds.add(String(t.reviewId));
             if (String(t.id || '').startsWith('rev_wall_')) existingReviewIds.add(String(t.id).replace(/^rev_wall_/, ''));
+            if (t.bookId) existingBookIds.add(String(t.bookId));
+            if (String(t.id || '').startsWith('book_wall_')) existingBookIds.add(String(t.id).replace(/^book_wall_/, ''));
         });
 
         const baseList = (tasks || []).filter(t => {
@@ -358,6 +415,12 @@ const TasksTab = React.memo(({
             if (t.type === 'slides' || t.type === 'review' || t.reviewId) {
                 const revId = String(t.reviewId || '').trim();
                 if (revId && Array.isArray(reviews) && !reviewMap.has(revId) && String(t.id || '').startsWith('rev_wall_')) {
+                    return false;
+                }
+            }
+            if (t.type === 'book3d' || t.type === 'book' || t.bookId) {
+                const bkId = String(t.bookId || '').trim();
+                if (bkId && Array.isArray(books) && !bookMap.has(bkId) && String(t.id || '').startsWith('book_wall_')) {
                     return false;
                 }
             }
@@ -440,10 +503,51 @@ const TasksTab = React.memo(({
             });
         });
 
+        (books || []).forEach(bk => {
+            if (!bk || !bk.id) return;
+            if (existingBookIds.has(String(bk.id))) return;
+            const ownerTid = getItemTeacherId(bk);
+            const teacherDisp = bk.authorName || bk.author || getTeacherDisplayName(ownerTid);
+            const rawPages = Array.isArray(bk.bookPages) && bk.bookPages.length > 0 ? bk.bookPages : (Array.isArray(bk.pages) ? bk.pages : []);
+            const pageCountNum = rawPages.length > 0 ? rawPages.length : (Number(bk.pageCount) || 1);
+            const firstPageSrc = rawPages[0] ? (typeof rawPages[0] === 'string' ? rawPages[0] : rawPages[0]?.imageUrl) : '';
+            synthesized.push({
+                id: `book_wall_${bk.id}`,
+                type: 'book3d',
+                bookId: bk.id,
+                title: bk.title || 'Libro Interactivo 3D',
+                description: bk.description || `Libro interactivo 3D con animación de movimiento de hojas (${pageCountNum} páginas).`,
+                category: bk.category || bk.bookCategory || 'textbook',
+                bookCategory: bk.category || bk.bookCategory || 'textbook',
+                theme: bk.theme || bk.bookTheme || 'royal-indigo',
+                bookTheme: bk.theme || bk.bookTheme || 'royal-indigo',
+                aspectRatio: bk.aspectRatio || 0.707,
+                pageCount: pageCountNum,
+                coverUrl: bk.coverUrl || firstPageSrc || '',
+                bookPages: rawPages,
+                pdfUrl: bk.pdfUrl || bk.fileUrl || '',
+                fileUrl: bk.pdfUrl || bk.fileUrl || '',
+                fileName: bk.pdfFileName || bk.fileName || `${bk.title || 'Libro'}.pdf`,
+                targetGroupId: bk.targetGroupId || 'all',
+                targetGroupName: bk.targetGroupName || 'General',
+                author: teacherDisp,
+                authorName: teacherDisp,
+                authorId: ownerTid,
+                authorRole: 'teacher',
+                teacherId: ownerTid,
+                ownerTeacherId: ownerTid,
+                createdAt: bk.createdAt || Date.now(),
+                reactions: {},
+                comments: [],
+                isDemoCreated: Boolean(bk.isDemoCreated),
+                isSynthesizedFeedItem: true
+            });
+        });
+
         const merged = [...baseList, ...synthesized];
         merged.sort((a, b) => getTs(b) - getTs(a));
         return merged;
-    }, [tasks, pinnedTasks, evaluations, reviews]);
+    }, [tasks, pinnedTasks, evaluations, reviews, books]);
 
     // Publicaciones regulares filtradas y deduplicadas
     const visibleTasks = React.useMemo(() => {
@@ -454,6 +558,7 @@ const TasksTab = React.memo(({
     const visiblePinnedTasks = React.useMemo(() => {
         const evalMap = new Map((evaluations || []).filter(Boolean).map(ev => [String(ev.id), ev]));
         const reviewMap = new Map((reviews || []).filter(Boolean).map(rv => [String(rv.id), rv]));
+        const bookMap = new Map((books || []).filter(Boolean).map(bk => [String(bk.id), bk]));
         const tasksById = new Map((tasks || []).filter(Boolean).map(t => [String(t.id), t]));
         const combinedPinned = (combinedTasks || []).filter(t => t && t.isPinned);
         const rawCandidates = [...combinedPinned, ...(pinnedTasks || [])];
@@ -470,10 +575,14 @@ const TasksTab = React.memo(({
                 const revId = String(t.reviewId || '').trim();
                 if (revId && Array.isArray(reviews) && !reviewMap.has(revId) && String(t.id || '').startsWith('rev_wall_')) return false;
             }
+            if (t.type === 'book3d' || t.type === 'book' || t.bookId) {
+                const bkId = String(t.bookId || '').trim();
+                if (bkId && Array.isArray(books) && !bookMap.has(bkId) && String(t.id || '').startsWith('book_wall_')) return false;
+            }
             return isTaskVisibleForUser(t);
         });
         return deduplicateTasks(validPinned);
-    }, [combinedTasks, tasks, pinnedTasks, evaluations, reviews, isTaskVisibleForUser, deduplicateTasks]);
+    }, [combinedTasks, tasks, pinnedTasks, evaluations, reviews, books, isTaskVisibleForUser, deduplicateTasks]);
 
     // Buscador de publicaciones
     const filteredTasks = React.useMemo(() => {
@@ -576,6 +685,13 @@ const TasksTab = React.memo(({
                                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-50 dark:bg-purple-950/30 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-950/60 transition-colors shrink-0 whitespace-nowrap"
                                 >
                                     <Gamepad2 size={15} /> Kahoot
+                                </button>
+                                <button 
+                                    type="button" 
+                                    onClick={(e) => { e.stopPropagation(); setPostType('book3d'); setIsFormExpanded(true); }} 
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-300 hover:bg-orange-100 dark:hover:bg-orange-950/60 transition-colors shrink-0 whitespace-nowrap"
+                                >
+                                    <Book size={15} /> Libro 3D
                                 </button>
                                 {typeof onOpenEvaluationsTab === 'function' && (
                                     <button 
@@ -684,6 +800,13 @@ const TasksTab = React.memo(({
                                     >
                                         <Gamepad2 size={14} /> Kahoot
                                     </button>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setPostType('book3d')} 
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${postType === 'book3d' ? 'bg-white dark:bg-gray-900 shadow-sm text-orange-700 dark:text-orange-300' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'}`}
+                                    >
+                                        <Book size={14} /> Libro 3D
+                                    </button>
                                     {typeof onOpenEvaluationsTab === 'function' && (
                                         <button 
                                             type="button" 
@@ -771,7 +894,7 @@ const TasksTab = React.memo(({
                             <input 
                                 value={taskTitle} 
                                 onChange={(e) => setTaskTitle(e.target.value)} 
-                                placeholder={postType === 'task' ? "Título claro de la tarea..." : postType === 'forum' ? "Tema central del foro de debate..." : postType === 'poll' ? "Pregunta de la encuesta (ej. ¿Cuál es tu horario preferido?)..." : postType === 'kahoot' ? "Título del Kahoot..." : "Título de la publicación..."} 
+                                placeholder={postType === 'task' ? "Título claro de la tarea..." : postType === 'forum' ? "Tema central del foro de debate..." : postType === 'poll' ? "Pregunta de la encuesta (ej. ¿Cuál es tu horario preferido?)..." : postType === 'kahoot' ? "Título del Kahoot..." : postType === 'book3d' ? "Título del Libro 3D interactivo..." : "Título de la publicación..."} 
                                 className="w-full text-base font-bold bg-transparent outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 pb-2 border-b border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100" 
                                 required 
                             />
@@ -780,7 +903,7 @@ const TasksTab = React.memo(({
                                 <RichVisualEditor 
                                     value={taskDesc}
                                     onChange={setTaskDesc}
-                                    placeholder={postType === 'forum' ? "Escribe la pregunta detonante, pautas o tema de discusión para el debate..." : postType === 'poll' ? "Detalles, contexto o indicaciones adicionales de la encuesta (opcional)..." : postType === 'kahoot' ? "Descripción o instrucciones (opcional)..." : "Escribe las instrucciones detalladas, indicaciones o una idea general..."}
+                                    placeholder={postType === 'forum' ? "Escribe la pregunta detonante, pautas o tema de discusión para el debate..." : postType === 'poll' ? "Detalles, contexto o indicaciones adicionales de la encuesta (opcional)..." : postType === 'kahoot' ? "Descripción o instrucciones (opcional)..." : postType === 'book3d' ? "Sinopsis o guía de lectura para los estudiantes..." : "Escribe las instrucciones detalladas, indicaciones o una idea general..."}
                                     isDarkMode={isDarkMode}
                                     minHeight="110px"
                                 />
@@ -1175,6 +1298,114 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                             </div>
                         )}
 
+                        {/* Convertidor de PDF a Libro 3D Interactivo */}
+                        {postType === 'book3d' && (
+                            <div className="p-4 rounded-2xl border border-orange-200 dark:border-orange-800/60 bg-orange-50/40 dark:bg-orange-950/20 space-y-3.5 mt-2 animate-in fade-in duration-200">
+                                <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-orange-200/60 dark:border-orange-800/40">
+                                    <span className="text-xs font-extrabold text-orange-900 dark:text-orange-200 flex items-center gap-1.5">
+                                        <Book size={16} className="text-orange-600 dark:text-orange-400" />
+                                        Convertidor de Documento PDF a Libro 3D con Movimiento de Hojas
+                                    </span>
+                                    {typeof onOpenBooksTab === 'function' && (
+                                        <button
+                                            type="button"
+                                            onClick={() => onOpenBooksTab()}
+                                            className="px-3 py-1 rounded-xl text-[11px] font-bold bg-white dark:bg-gray-900 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-800 hover:bg-orange-100 dark:hover:bg-orange-950/40 transition-colors"
+                                        >
+                                            Abrir Biblioteca 3D
+                                        </button>
+                                    )}
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div
+                                        onClick={() => !isRenderingBook3d && book3dFileInputRef.current?.click()}
+                                        className={`p-4 rounded-xl border-2 border-dashed cursor-pointer transition-all flex flex-col items-center justify-center text-center gap-1.5 ${
+                                            book3dPages.length > 0
+                                                ? 'border-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/20'
+                                                : 'border-orange-300 dark:border-orange-700/70 hover:border-orange-500 bg-white/80 dark:bg-gray-900/60'
+                                        }`}
+                                    >
+                                        <input
+                                            ref={book3dFileInputRef}
+                                            type="file"
+                                            accept=".pdf,application/pdf"
+                                            onChange={handleSelectBook3dPdf}
+                                            className="hidden"
+                                        />
+                                        {isRenderingBook3d ? (
+                                            <>
+                                                <Loader2 size={24} className="animate-spin text-orange-600" />
+                                                <span className="text-xs font-bold text-gray-800 dark:text-gray-200">
+                                                    Renderizando páginas 3D ({book3dProgress.currentPage}/{book3dProgress.totalPages || '?'})...
+                                                </span>
+                                            </>
+                                        ) : book3dPages.length > 0 ? (
+                                            <>
+                                                <UploadCloud size={22} className="text-emerald-600" />
+                                                <span className="text-xs font-extrabold text-emerald-700 dark:text-emerald-300">
+                                                    {book3dPdfFile?.name || 'Documento PDF listo'} ({book3dPages.length} páginas 3D)
+                                                </span>
+                                                <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400">
+                                                    Haz clic para cambiar el archivo PDF
+                                                </span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <UploadCloud size={24} className="text-orange-600 dark:text-orange-400" />
+                                                <span className="text-xs font-extrabold text-gray-800 dark:text-gray-200">
+                                                    Seleccionar archivo .PDF para transformar en Libro 3D
+                                                </span>
+                                                <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400">
+                                                    Cada página tendrá curvatura, sombras y animación 3D de paso de hoja
+                                                </span>
+                                            </>
+                                        )}
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300">
+                                            Acabado de Encuadernación 3D:
+                                        </label>
+                                        <div className="grid grid-cols-3 gap-1.5">
+                                            {Object.values(BOOK_THEMES).map((th) => (
+                                                <button
+                                                    key={th.id}
+                                                    type="button"
+                                                    onClick={() => setBook3dTheme(th.id)}
+                                                    className={`px-2 py-1.5 rounded-lg text-[10px] font-bold border flex items-center gap-1.5 transition-all ${
+                                                        book3dTheme === th.id
+                                                            ? 'border-[#AD3333] bg-red-50 dark:bg-red-950/40 text-[#AD3333] dark:text-red-300 shadow-2xs'
+                                                            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300'
+                                                    }`}
+                                                >
+                                                    <span className="w-3 h-3 rounded-full shrink-0" style={{ background: th.coverBg }} />
+                                                    <span className="truncate">{th.name}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                        {book3dPages.length > 0 && (
+                                            <div className="flex items-center gap-2 pt-1 overflow-x-auto no-scrollbar">
+                                                {book3dPages.slice(0, 5).map((pg, idx) => (
+                                                    <img
+                                                        key={idx}
+                                                        src={typeof pg === 'string' ? pg : (pg?.imageUrl || pg?.thumbUrl || '')}
+                                                        alt={`Pág. ${idx + 1}`}
+                                                        className="w-10 h-14 object-cover rounded border border-gray-300 dark:border-gray-700 shrink-0 shadow-2xs bg-white"
+                                                    />
+                                                ))}
+                                                {book3dPages.length > 5 && (
+                                                    <span className="text-[10px] font-bold text-gray-500 shrink-0">
+                                                        +{book3dPages.length - 5} págs.
+                                                    </span>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Parámetros de Entrega y Cierre (Tareas, Foros y Encuestas) */}
                         {(postType === 'task' || postType === 'forum' || postType === 'poll') && (
                             <div className={`p-4 rounded-2xl border mt-2 space-y-3 ${
@@ -1277,7 +1508,7 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                             </button>
                             <button 
                                 type="button" 
-                                disabled={isPublishing || upPub}
+                                disabled={isPublishing || upPub || isRenderingBook3d}
                                 onClick={async () => {
                                     if (isPublishing || isPublishingRef.current) return;
                                     if (recPub) {
@@ -1291,7 +1522,10 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                     const rawMainImg = (postImageUrls && postImageUrls.length > 0 ? postImageUrls[0] : (postImageUrl || ''));
                                     const hasAttachments = Boolean(rawMainImg || postVideoUrl || postGeniallyUrl || postFileUrl || audioPub);
                                     const currentPostType = postType || 'task';
-                                    if (currentPostType !== 'kahoot' && !cleanTitle && !cleanDesc && !hasAttachments) {
+                                    if (currentPostType === 'book3d' && book3dPages.length === 0) {
+                                        return showMessage("⚠️ Por favor selecciona un archivo .PDF para convertirlo en Libro 3D interactivo.");
+                                    }
+                                    if (currentPostType !== 'kahoot' && currentPostType !== 'book3d' && !cleanTitle && !cleanDesc && !hasAttachments) {
                                         return showMessage("Por favor ingresa al menos un título o descripción para publicar.");
                                     }
 
@@ -1369,6 +1603,113 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                             } catch (authErr) {
                                                 console.warn("Auth initialization note:", authErr);
                                             }
+                                        }
+
+                                        if (currentPostType === 'book3d') {
+                                            const bookId = isDemoMode ? `demo-book-${Date.now()}` : `book_${generateId()}`;
+                                            const uploadedPages = await uploadBookPagesToStorage(
+                                                book3dPages,
+                                                uploadImageToStorage,
+                                                {
+                                                    isDemoMode,
+                                                    folder: 'books'
+                                                }
+                                            );
+                                            let uploadedPdfUrl = postFileUrl || '';
+                                            if (book3dPdfFile && !isDemoMode) {
+                                                try {
+                                                    const rawUrl = await uploadRawFileToStorage(book3dPdfFile, 'books');
+                                                    if (rawUrl) uploadedPdfUrl = rawUrl;
+                                                } catch (e) {
+                                                    console.warn("PDF raw upload fallback:", e);
+                                                }
+                                            }
+                                            const finalBookTitle = cleanTitle || (book3dPdfFile?.name ? book3dPdfFile.name.replace(/\.pdf$/i, '') : 'Libro Interactivo 3D');
+                                            const canonicalOwnerId = getCanonicalTeacherId(myChatId || loggedInName || 'teacher');
+                                            const sanitizedBook = sanitizeBookForFirestore({
+                                                id: bookId,
+                                                title: finalBookTitle,
+                                                subtitle: 'Edición Interactiva 3D',
+                                                description: cleanDesc || `Libro interactivo 3D con animación de movimiento de hojas (${uploadedPages.length} páginas).`,
+                                                category: 'textbook',
+                                                theme: book3dTheme,
+                                                aspectRatio: book3dAspectRatio || 0.707,
+                                                pageCount: uploadedPages.length,
+                                                coverUrl: uploadedPages[0] || '',
+                                                pdfUrl: uploadedPdfUrl,
+                                                fileUrl: uploadedPdfUrl,
+                                                fileName: book3dPdfFile?.name || `${finalBookTitle}.pdf`,
+                                                pdfFileName: book3dPdfFile?.name || `${finalBookTitle}.pdf`,
+                                                bookPages: uploadedPages,
+                                                pages: uploadedPages,
+                                                pageTexts: book3dPageTexts,
+                                                targetGroupId: resolvedTargetGroupId,
+                                                targetGroupName: targetGroupName || 'Global',
+                                                author: loggedInName || getTeacherDisplayName(canonicalOwnerId) || 'Docente',
+                                                authorName: loggedInName || getTeacherDisplayName(canonicalOwnerId) || 'Docente',
+                                                authorId: canonicalOwnerId,
+                                                teacherId: canonicalOwnerId,
+                                                ownerTeacherId: canonicalOwnerId,
+                                                createdAt: Date.now(),
+                                                updatedAt: Date.now(),
+                                                isDemoCreated: Boolean(isDemoMode)
+                                            });
+
+                                            const wallPostId = `book_wall_${bookId}`;
+                                            const wallPostPayload = {
+                                                id: wallPostId,
+                                                type: 'book3d',
+                                                bookId,
+                                                title: sanitizedBook.title,
+                                                description: sanitizedBook.description,
+                                                category: sanitizedBook.category,
+                                                bookCategory: sanitizedBook.category,
+                                                theme: sanitizedBook.theme,
+                                                bookTheme: sanitizedBook.theme,
+                                                aspectRatio: sanitizedBook.aspectRatio,
+                                                pageCount: sanitizedBook.pageCount,
+                                                coverUrl: sanitizedBook.coverUrl,
+                                                bookPages: sanitizedBook.bookPages,
+                                                pdfUrl: sanitizedBook.pdfUrl || '',
+                                                fileUrl: sanitizedBook.pdfUrl || '',
+                                                fileName: sanitizedBook.pdfFileName || `${sanitizedBook.title}.pdf`,
+                                                targetGroupId: sanitizedBook.targetGroupId,
+                                                targetGroupName: sanitizedBook.targetGroupName,
+                                                author: sanitizedBook.authorName,
+                                                authorName: sanitizedBook.authorName,
+                                                authorId: sanitizedBook.authorId,
+                                                authorRole: 'teacher',
+                                                teacherId: sanitizedBook.teacherId,
+                                                ownerTeacherId: sanitizedBook.ownerTeacherId,
+                                                hideDate: Boolean(hidePublicationDate),
+                                                createdAt: Date.now(),
+                                                reactions: {},
+                                                comments: [],
+                                                isDemoCreated: Boolean(isDemoMode)
+                                            };
+
+                                            if (isDemoMode) {
+                                                const savedBook = saveDemoSandboxItem('books', sanitizedBook);
+                                                if (typeof setRawBooks === 'function') {
+                                                    setRawBooks(prev => [savedBook, ...(prev || []).filter(b => String(b.id) !== String(bookId))]);
+                                                }
+                                                const savedWall = saveDemoSandboxItem('tasks', wallPostPayload);
+                                                if (typeof setTasks === 'function') {
+                                                    setTasks(prev => [savedWall, ...(prev || []).filter(t => String(t.id) !== String(wallPostId))]);
+                                                }
+                                            } else {
+                                                await withTimeout(setDoc(doc(effectiveDb, 'artifacts', effectiveAppId, 'public', 'data', 'books', bookId), sanitizedBook, { merge: true }));
+                                                await withTimeout(setDoc(doc(effectiveDb, 'artifacts', effectiveAppId, 'public', 'data', 'tasks', wallPostId), wallPostPayload, { merge: true }));
+                                            }
+
+                                            setBook3dPages([]);
+                                            setBook3dPageTexts([]);
+                                            setBook3dPdfFile(null);
+                                            if (typeof setTaskTitle === 'function') setTaskTitle("");
+                                            if (typeof setTaskDesc === 'function') setTaskDesc("");
+                                            setIsFormExpanded(false);
+                                            showMessage("📚 Libro 3D interactivo publicado en el muro y en la Biblioteca.");
+                                            return;
                                         }
 
                                         const cleanMainImg = typeof rawMainImg === 'string' ? rawMainImg.trim() : '';
@@ -1507,13 +1848,15 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                             ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/30'
                                             : postType === 'kahoot'
                                                 ? 'bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:from-fuchsia-700 hover:to-purple-700 shadow-fuchsia-600/30'
-                                                : postType === 'post'
-                                                    ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/30'
-                                                    : `${redButton} shadow-red-600/30`
+                                                : postType === 'book3d'
+                                                    ? 'bg-gradient-to-r from-orange-600 to-[#AD3333] hover:from-orange-700 hover:to-[#8a2828] shadow-orange-600/30'
+                                                    : postType === 'post'
+                                                        ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/30'
+                                                        : `${redButton} shadow-red-600/30`
                                 }`}
                             >
                                 {isPublishing && <Loader2 size={15} className="animate-spin" />}
-                                <span>{postType === 'forum' ? 'Publicar foro' : postType === 'poll' ? 'Publicar encuesta' : postType === 'kahoot' ? 'Publicar Kahoot' : 'Publicar ahora'}</span>
+                                <span>{postType === 'forum' ? 'Publicar foro' : postType === 'poll' ? 'Publicar encuesta' : postType === 'kahoot' ? 'Publicar Kahoot' : postType === 'book3d' ? 'Publicar Libro 3D' : 'Publicar ahora'}</span>
                             </button>
                         </div>
                     </div>
@@ -1575,12 +1918,14 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                 evaluations={evaluations}
                                 grades={grades}
                                 reviews={reviews}
+                                books={books}
                                 onStartEvaluation={onStartEvaluation}
                                 onOpenEvaluationResults={onOpenEvaluationResults}
                                 onOpenImmediateFeedback={onOpenImmediateFeedback}
                                 onRetryDemoEvaluation={onRetryDemoEvaluation}
                                 onOpenEvaluationsTab={onOpenEvaluationsTab}
                                 onOpenReviewsTab={onOpenReviewsTab}
+                                onOpenBooksTab={onOpenBooksTab}
                             />
                         </div>
                     ))}
@@ -1615,12 +1960,14 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                             evaluations={evaluations}
                             grades={grades}
                             reviews={reviews}
+                            books={books}
                             onStartEvaluation={onStartEvaluation}
                             onOpenEvaluationResults={onOpenEvaluationResults}
                             onOpenImmediateFeedback={onOpenImmediateFeedback}
                             onRetryDemoEvaluation={onRetryDemoEvaluation}
                             onOpenEvaluationsTab={onOpenEvaluationsTab}
                             onOpenReviewsTab={onOpenReviewsTab}
+                            onOpenBooksTab={onOpenBooksTab}
                         />
                     </div>
                 ))}

@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import {
-  Search, FileText, BookOpen, CheckCheck, UsersIcon, UsersGroupIcon, X, ChevronRight, Clock
+  Search, FileText, BookOpen, Book, CheckCheck, UsersIcon, X, ChevronRight
 } from './Icons.jsx';
 import { isTeacherId } from '../utils/helpers.js';
 
@@ -15,7 +15,7 @@ export const CommandPaletteModal = ({
   academicGroups = [],
   evaluations = [],
   userMappings = {},
-  reviews = [],
+  books = [],
   changeTab,
   handleOpenProfileByName,
   setSelectedGroupForFeed,
@@ -86,6 +86,13 @@ export const CommandPaletteModal = ({
           type: 'evaluation',
           item: e
         })),
+        books: (books || []).slice(0, 3).map(b => ({
+          id: b.id,
+          title: b.title || 'Libro 3D',
+          subtitle: `${b.category || 'Material de Clase'} • ${b.pageCount || (Array.isArray(b.pages) ? b.pages.length : 1)} págs.`,
+          type: 'book',
+          item: b
+        })),
         students: role === 'teacher' ? Object.entries(userMappings || {}).filter(([k, u]) => !isTeacherId(k) && u?.role !== 'teacher').slice(0, 3).map(([k, u]) => ({
           id: k,
           title: u.fullName || u.name || k,
@@ -126,6 +133,16 @@ export const CommandPaletteModal = ({
       item: e
     }));
 
+    const filteredBooks = (books || []).filter(b =>
+      norm(b.title).includes(q) || norm(b.description).includes(q) || norm(b.category).includes(q)
+    ).slice(0, 4).map(b => ({
+      id: b.id,
+      title: b.title || 'Libro 3D',
+      subtitle: `${b.category || 'Material de Clase'} • ${b.pageCount || (Array.isArray(b.pages) ? b.pages.length : 1)} págs.`,
+      type: 'book',
+      item: b
+    }));
+
     const filteredStudents = Object.entries(userMappings || {})
       .filter(([uk, ud]) => !isTeacherId(uk) && ud?.role !== 'teacher' && (norm(uk).includes(q) || norm(ud?.fullName).includes(q) || norm(ud?.email).includes(q)))
       .slice(0, 5)
@@ -141,15 +158,16 @@ export const CommandPaletteModal = ({
       tasks: filteredTasks,
       academicGroups: filteredGroups,
       evaluations: filteredEvals,
+      books: filteredBooks,
       students: role === 'teacher' ? filteredStudents : []
     };
-  }, [query, tasks, academicGroups, evaluations, userMappings, role]);
+  }, [query, tasks, academicGroups, evaluations, books, userMappings, role]);
 
-  const totalResultsCount = results.tasks.length + results.academicGroups.length + results.evaluations.length + results.students.length;
+  const totalResultsCount = results.tasks.length + results.academicGroups.length + results.evaluations.length + results.books.length + results.students.length;
 
   if (!isOpen || typeof document === 'undefined' || !document.body) return null;
 
-  const handleSelectTask = (task) => {
+  const handleSelectTask = () => {
     onClose?.();
     if (changeTab) changeTab('tasks');
   };
@@ -160,9 +178,14 @@ export const CommandPaletteModal = ({
     if (changeTab) changeTab('groups');
   };
 
-  const handleSelectEval = (evalItem) => {
+  const handleSelectEval = () => {
     onClose?.();
     if (changeTab) changeTab('evaluations');
+  };
+
+  const handleSelectBook = () => {
+    onClose?.();
+    if (changeTab) changeTab('books');
   };
 
   const handleSelectStudent = (studentData) => {
@@ -189,7 +212,7 @@ export const CommandPaletteModal = ({
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={role === 'teacher' ? "Buscar tareas, materias, evaluaciones o estudiantes..." : "Buscar tareas, materias o evaluaciones..."}
+            placeholder={role === 'teacher' ? "Buscar tareas, libros 3D, materias, evaluaciones o estudiantes..." : "Buscar tareas, libros 3D, materias o evaluaciones..."}
             className="w-full bg-transparent border-none outline-none text-sm font-medium placeholder-gray-400"
           />
           {query ? (
@@ -227,6 +250,33 @@ export const CommandPaletteModal = ({
                       <button
                         key={'task-' + item.id}
                         onClick={() => handleSelectTask(item.item)}
+                        className={`w-full flex items-center justify-between p-2.5 rounded-xl text-left text-xs transition-colors ${
+                          isDarkMode ? 'hover:bg-gray-800/80 text-gray-200' : 'hover:bg-gray-100/80 text-gray-800'
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold truncate">{item.title}</p>
+                          <p className="text-[11px] text-gray-400 truncate">{item.subtitle}</p>
+                        </div>
+                        <ChevronRight size={13} className="text-gray-400 shrink-0 ml-2" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Libros 3D Interactivos */}
+              {results.books.length > 0 && (
+                <div>
+                  <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
+                    <Book size={12} />
+                    <span>Libros 3D Interactivos</span>
+                  </div>
+                  <div className="mt-1 space-y-0.5">
+                    {results.books.map(item => (
+                      <button
+                        key={'book-' + item.id}
+                        onClick={() => handleSelectBook(item.item)}
                         className={`w-full flex items-center justify-between p-2.5 rounded-xl text-left text-xs transition-colors ${
                           isDarkMode ? 'hover:bg-gray-800/80 text-gray-200' : 'hover:bg-gray-100/80 text-gray-800'
                         }`}

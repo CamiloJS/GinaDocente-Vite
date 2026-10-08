@@ -1,23 +1,26 @@
 // src/components/DocumentPreviewModal.jsx
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
-import { X, Download, FileDocIcon, Loader2 } from './Icons.jsx';
+import { X, Download, FileDocIcon, Loader2, BookOpen } from './Icons.jsx';
+import Flipbook3DModal from './Flipbook3DModal.jsx';
 
 export const DocumentPreviewModal = ({
   documentUrl,
   documentTitle = 'Documento PDF',
+  bookPages = null,
   onClose,
   isDarkMode = false
 }) => {
   const [isLoading, setIsLoading] = useState(true);
+  const [show3DMode, setShow3DMode] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape') onClose?.();
+      if (e.key === 'Escape' && !show3DMode) onClose?.();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [onClose, show3DMode]);
 
   useEffect(() => {
     setIsLoading(true);
@@ -28,6 +31,21 @@ export const DocumentPreviewModal = ({
   }, [documentUrl]);
 
   if (!documentUrl || typeof document === 'undefined' || !document.body || typeof documentUrl !== 'string') return null;
+
+  if (show3DMode) {
+    return (
+      <Flipbook3DModal
+        book={{
+          title: documentTitle || 'Documento PDF',
+          pdfUrl: documentUrl,
+          fileUrl: documentUrl,
+          fileName: documentTitle || 'documento.pdf',
+          bookPages: Array.isArray(bookPages) ? bookPages : []
+        }}
+        onClose={onClose}
+      />
+    );
+  }
 
   // Si es URL local (blob/data) se visualiza directamente en el iframe; si es remota se usa el visor de Google Docs
   const isLocalOrData = documentUrl.startsWith('blob:') || documentUrl.startsWith('data:');
@@ -67,6 +85,16 @@ export const DocumentPreviewModal = ({
 
         {/* Acciones */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <button
+            type="button"
+            onClick={() => setShow3DMode(true)}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 active:scale-95 shadow-md transition-all cursor-pointer"
+            title="Ver este PDF como Libro 3D interactivo con movimiento de hojas"
+          >
+            <BookOpen size={15} />
+            <span>Modo Libro 3D</span>
+          </button>
+
           <a
             href={documentUrl}
             download={documentTitle || 'documento.pdf'}
