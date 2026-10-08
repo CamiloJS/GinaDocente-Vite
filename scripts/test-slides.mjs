@@ -22,7 +22,10 @@ import {
   parseDeckAiResponse,
   buildSingleSlideAiPrompt,
   parseSingleSlideAiResponse,
-  buildFallbackAiSlides
+  buildFallbackAiSlides,
+  getTableRows,
+  sanitizeSlidesForFirestore,
+  hydrateSlidesFromFirestore
 } from '../src/utils/slidesEngine.js';
 
 import { DEMO_REVIEWS } from '../src/utils/demoData.js';
@@ -318,6 +321,44 @@ check('App.jsx ignora eliminados/archivados en isTaskForGroup, sincroniza isPinn
   appSrc.includes('if (!t || !groupId || t.isDeletedFromWall || t.isArchived) return false;') &&
   appSrc.includes('? { isArchived: true, isPinned: false }') &&
   appSrc.includes(': { isArchived: false, isDeletedFromWall: false }')
+);
+
+const hasNestedArrayAnywhere = (val, parentIsArray = false) => {
+  if (Array.isArray(val)) {
+    if (parentIsArray) return true;
+    return val.some(item => hasNestedArrayAnywhere(item, true));
+  }
+  if (val && typeof val === 'object') {
+    return Object.values(val).some(v => hasNestedArrayAnywhere(v, false));
+  }
+  return false;
+};
+
+const sanitizedDeck = sanitizeSlidesForFirestore(fallbackSlides);
+const hydratedDeck = hydrateSlidesFromFirestore(sanitizedDeck);
+const tableSlideSanitized = sanitizedDeck.find(s => s.layout === 'table');
+const tableSlideHydrated = hydratedDeck.find(s => s.layout === 'table');
+
+check('sanitizeSlidesForFirestore convierte filas de tabla a objetos { cells } eliminando 100% los arreglos anidados prohibidos por Firestore',
+  !hasNestedArrayAnywhere(sanitizedDeck) &&
+  Array.isArray(tableSlideSanitized?.table?.rows) &&
+  tableSlideSanitized.table.rows.every(r => !Array.isArray(r) && Array.isArray(r.cells))
+);
+
+check('hydrateSlidesFromFirestore y getTableRows restauran filas { cells } a arreglos 2D para el editor y exportador PPTX',
+  Array.isArray(tableSlideHydrated?.table?.rows?.[0]) &&
+  getTableRows(tableSlideSanitized.table).length === 3 &&
+  Array.isArray(getTableRows(tableSlideSanitized.table)[0])
+);
+
+const truncatedAiJson = '[{"id":1,"layout":"title","title":"Prepositions: in, on, at","subtitle":"Time and Place"},{"id":2,"layout":"table","title":"Comparison","table":{"headers":["Preposition","Use","Example"],"rows":[["in","Months","in May"],["on","Days","on Monday"],["at","Time","at 5 PM"]]}},{"id":3,"layout":"cards","title":"Incomplet';
+const recoveredFromTruncated = parseDeckAiResponse(truncatedAiJson);
+check('parseDeckAiResponse recupera diapositivas completas aunque la respuesta JSON de IA se trunque al final',
+  Array.isArray(recoveredFromTruncated) &&
+  recoveredFromTruncated.length === 2 &&
+  recoveredFromTruncated[0].title === 'Prepositions: in, on, at' &&
+  recoveredFromTruncated[1].layout === 'table' &&
+  !hasNestedArrayAnywhere(sanitizeSlidesForFirestore(recoveredFromTruncated))
 );
 
 console.log(`\nRESULTADO SLIDES STUDIO: ${okCount} OK, ${failCount} fallos\n`);

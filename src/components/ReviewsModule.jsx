@@ -47,7 +47,10 @@ import {
   buildSingleSlideAiPrompt,
   parseSingleSlideAiResponse,
   buildFallbackAiSlides,
-  normalizeSingleSlide
+  normalizeSingleSlide,
+  getTableRows,
+  sanitizeSlidesForFirestore,
+  hydrateSlidesFromFirestore
 } from '../utils/slidesEngine.js'
 
 export { resolveSlideLayout }
@@ -247,7 +250,7 @@ export const exportReviewToPresentation = async (review) => {
       const headers = Array.isArray(s.table?.headers) && s.table.headers.length > 0
         ? s.table.headers
         : ['Concepto', 'Explicación', 'Ejemplo'];
-      const rows = Array.isArray(s.table?.rows) ? s.table.rows : [];
+      const rows = getTableRows(s.table);
 
       const pptxRows = [
         headers.map(h => ({
@@ -982,8 +985,9 @@ export const SlideCanvasSurface = ({
               const tableHeaders = Array.isArray(safeSlide.table?.headers) && safeSlide.table.headers.length > 0
                 ? safeSlide.table.headers
                 : ['Concepto', 'Explicación', 'Ejemplo'];
-              const tableRows = Array.isArray(safeSlide.table?.rows) && safeSlide.table.rows.length > 0
-                ? safeSlide.table.rows
+              const extractedRows = getTableRows(safeSlide.table);
+              const tableRows = extractedRows.length > 0
+                ? extractedRows
                 : [['Dato 1', 'Explicación 1', 'Ejemplo 1']];
 
               return (
@@ -1817,11 +1821,9 @@ export const SlidePresenterViewer = ({ presentation, onClose, onEdit, role, them
       }
     } else if (activeLayout === 'table') {
       if (Array.isArray(currentSlide.table?.headers)) spokenParts.push(currentSlide.table.headers.join(', '));
-      if (Array.isArray(currentSlide.table?.rows)) {
-        currentSlide.table.rows.forEach(r => {
-          if (Array.isArray(r)) spokenParts.push(r.join(', '));
-        });
-      }
+      getTableRows(currentSlide.table).forEach(r => {
+        if (Array.isArray(r)) spokenParts.push(r.join(', '));
+      });
     } else if (activeLayout === 'quote') {
       spokenParts.push(currentSlide.statValue, currentSlide.quoteText || currentSlide.body, currentSlide.quoteAuthor);
     } else if (activeLayout === 'quiz') {
@@ -2306,7 +2308,7 @@ export const SlideEditorModal = ({
 
   const [slides, setSlides] = useState(() => {
     try {
-      const initial = JSON.parse(JSON.stringify(presentation?.slides || []));
+      const initial = hydrateSlidesFromFirestore(JSON.parse(JSON.stringify(presentation?.slides || [])));
       return initial.length > 0 ? initial : [createDefaultSlide('title', 0)];
     } catch {
       return [createDefaultSlide('title', 0)];
@@ -2317,9 +2319,7 @@ export const SlideEditorModal = ({
   slidesRef.current = slides;
 
   // Historial Undo / Redo sincronizado con ref para evitar cierres obsoletos y setState anidados
-  const initialSerialized = JSON.stringify(
-    presentation?.slides?.length ? presentation.slides : [createDefaultSlide('title', 0)]
-  );
+  const initialSerialized = JSON.stringify(slides);
   const [history, setHistory] = useState(() => [initialSerialized]);
   const [historyIdx, setHistoryIdx] = useState(0);
   const historyRef = useRef({ entries: [initialSerialized], idx: 0 });
@@ -3729,7 +3729,9 @@ export const SlideEditorModal = ({
                       </div>
                     )}
 
-                    {activeLayout === 'table' && (
+                    {activeLayout === 'table' && (() => {
+                      const inspectorTableRows = getTableRows(activeSlide.table);
+                      return (
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
                           <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
@@ -3740,7 +3742,7 @@ export const SlideEditorModal = ({
                               type="button"
                               onClick={() => {
                                 const curHeaders = activeSlide.table?.headers || ['Col 1', 'Col 2'];
-                                const curRows = activeSlide.table?.rows || [];
+                                const curRows = inspectorTableRows;
                                 if (curHeaders.length >= 5) return;
                                 handleSlideChange('table', {
                                   headers: [...curHeaders, `Col ${curHeaders.length + 1}`],
@@ -3755,7 +3757,7 @@ export const SlideEditorModal = ({
                               type="button"
                               onClick={() => {
                                 const curHeaders = activeSlide.table?.headers || ['Col 1', 'Col 2', 'Col 3'];
-                                const curRows = activeSlide.table?.rows || [];
+                                const curRows = inspectorTableRows;
                                 handleSlideChange('table', {
                                   headers: curHeaders,
                                   rows: [...curRows, curHeaders.map(() => 'Nuevo dato')]
@@ -3780,7 +3782,7 @@ export const SlideEditorModal = ({
                                   onChange={(e) => {
                                     const nextH = [...(activeSlide.table?.headers || [])];
                                     nextH[hIdx] = e.target.value;
-                                    handleSlideChange('table', { ...(activeSlide.table || {}), headers: nextH });
+                                    handleSlideChange('table', { ...(activeSlide.table || {}), headers: nextH, rows: inspectorTableRows });
                                   }}
                                   className={`w-full px-2 py-1 rounded-lg border text-xs font-bold ${inputBg}`}
                                 />
@@ -3789,7 +3791,7 @@ export const SlideEditorModal = ({
                                     type="button"
                                     onClick={() => {
                                       const nextH = (activeSlide.table?.headers || []).filter((_, i) => i !== hIdx);
-                                      const nextR = (activeSlide.table?.rows || []).map(r => (Array.isArray(r) ? r.filter((_, i) => i !== hIdx) : r));
+                                      const nextR = inspectorTableRows.map(r => (Array.isArray(r) ? r.filter((_, i) => i !== hIdx) : r));
                                       handleSlideChange('table', { headers: nextH, rows: nextR });
                                     }}
                                     className="text-gray-400 hover:text-red-500"
@@ -3805,15 +3807,15 @@ export const SlideEditorModal = ({
 
                         {/* Filas */}
                         <div className="space-y-2">
-                          {(activeSlide.table?.rows || []).map((row, rIdx) => (
+                          {inspectorTableRows.map((row, rIdx) => (
                             <div key={rIdx} className="p-2.5 rounded-xl border border-gray-200 dark:border-gray-800 space-y-1.5">
                               <div className="flex items-center justify-between">
                                 <span className="text-[10px] font-bold text-gray-400">Fila #{rIdx + 1}</span>
-                                {(activeSlide.table?.rows || []).length > 1 && (
+                                {inspectorTableRows.length > 1 && (
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      const nextRows = (activeSlide.table?.rows || []).filter((_, i) => i !== rIdx);
+                                      const nextRows = inspectorTableRows.filter((_, i) => i !== rIdx);
                                       handleSlideChange('table', { ...(activeSlide.table || {}), rows: nextRows });
                                     }}
                                     className="text-gray-400 hover:text-red-500"
@@ -3829,7 +3831,7 @@ export const SlideEditorModal = ({
                                     type="text"
                                     value={(Array.isArray(row) ? row[cIdx] : '') || ''}
                                     onChange={(e) => {
-                                      const nextRows = (activeSlide.table?.rows || []).map((r, ri) => {
+                                      const nextRows = inspectorTableRows.map((r, ri) => {
                                         if (ri !== rIdx) return r;
                                         const copyR = Array.isArray(r) ? [...r] : [];
                                         copyR[cIdx] = e.target.value;
@@ -3846,7 +3848,8 @@ export const SlideEditorModal = ({
                           ))}
                         </div>
                       </div>
-                    )}
+                      );
+                    })()}
 
                     {activeLayout === 'image_text' && (
                       <div className="space-y-3">
@@ -4574,8 +4577,12 @@ export const ReviewsModule = ({
 
   const persistNewPresentation = async (docPayload) => {
     const now = Date.now();
+    const hydratedSlides = hydrateSlidesFromFirestore(docPayload.slides || []);
+    const firestoreSlides = sanitizeSlidesForFirestore(hydratedSlides);
     const newDoc = {
       ...docPayload,
+      slides: hydratedSlides,
+      slideCount: hydratedSlides.length,
       author: getTeacherDisplayName(canonicalTeacherId),
       authorId: canonicalTeacherId,
       teacherId: canonicalTeacherId,
@@ -4591,8 +4598,15 @@ export const ReviewsModule = ({
         setReviews(prev => [newDoc, ...(prev || []).filter(r => String(r.id) !== String(newDoc.id))]);
       }
     } else {
-      const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'reviews'), newDoc);
+      const firestorePayload = {
+        ...newDoc,
+        slides: firestoreSlides
+      };
+      const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'reviews'), firestorePayload);
       newDoc.id = docRef.id;
+      if (typeof setReviews === 'function') {
+        setReviews(prev => [newDoc, ...(prev || []).filter(r => String(r.id) !== String(newDoc.id))]);
+      }
     }
 
     // Publicar automáticamente la presentación en el Muro / Publicaciones
@@ -4691,20 +4705,18 @@ export const ReviewsModule = ({
 
       let parsed = null;
       if (typeof callGemini === 'function') {
-        try {
-          const res = await callGemini(prompt);
-          parsed = parseDeckAiResponse(res);
-        } catch (aiErr) {
-          if (!isDemoMode) throw aiErr;
+        for (let attempt = 0; attempt < 2 && (!Array.isArray(parsed) || parsed.length === 0); attempt++) {
+          try {
+            const res = await callGemini(prompt);
+            parsed = parseDeckAiResponse(res);
+          } catch (aiErr) {
+            console.warn('Intento IA diapositivas:', aiErr);
+          }
         }
       }
 
       if (!Array.isArray(parsed) || parsed.length === 0) {
-        if (isDemoMode) {
-          parsed = buildFallbackAiSlides({ topic: topic.trim(), language, slideCount });
-        } else {
-          throw new Error('Formato inválido');
-        }
+        parsed = buildFallbackAiSlides({ topic: topic.trim(), language, slideCount });
       }
 
       const generatedTitle = parsed[0]?.title || topic.trim();
@@ -4767,7 +4779,8 @@ export const ReviewsModule = ({
   const handleSaveEditedPresentation = async (updatedPres) => {
     if (!updatedPres || !updatedPres.id) return false;
     try {
-      const slidesList = updatedPres.slides || [];
+      const slidesList = hydrateSlidesFromFirestore(updatedPres.slides || []);
+      const firestoreSlides = sanitizeSlidesForFirestore(slidesList);
       const updates = {
         slides: slidesList,
         slideCount: slidesList.length,
@@ -4788,7 +4801,10 @@ export const ReviewsModule = ({
         }
         saveDemoSandboxItem('reviews', merged);
       } else {
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reviews', updatedPres.id), updates);
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reviews', updatedPres.id), {
+          ...updates,
+          slides: firestoreSlides
+        });
         if (typeof setReviews === 'function') {
           setReviews(prev => (prev || []).map(r => String(r.id) === String(updatedPres.id) ? { ...r, ...updates } : r));
         }

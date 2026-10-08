@@ -509,7 +509,7 @@ export const convertSlideLayout = (slide, targetLayout, slideIdx = 0) => {
         });
       }
     } else if (sourceType === 'table' && slide.table && Array.isArray(slide.table.rows) && slide.table.rows.length > 0) {
-      slide.table.rows.forEach(r => {
+      getTableRows(slide.table).forEach(r => {
         if (Array.isArray(r) && r.length > 0) {
           items.push({ title: r[0] || '', text: r[1] || '', example: r[2] || '' });
         }
@@ -911,6 +911,95 @@ Diseños ("layout") permitidos y su estructura JSON:
 Devuelve ÚNICAMENTE un array JSON válido de ${count} objetos sin bloques markdown ni texto adicional.`;
 };
 
+export const extractTableRowCells = (r, headers = []) => {
+  if (Array.isArray(r)) {
+    return r.map(cell => String(typeof cell === 'object' && cell !== null ? (cell.text ?? cell.value ?? '') : (cell ?? '')));
+  }
+  if (r && typeof r === 'object' && Array.isArray(r.cells)) {
+    return r.cells.map(cell => String(typeof cell === 'object' && cell !== null ? (cell.text ?? cell.value ?? '') : (cell ?? '')));
+  }
+  if (r && typeof r === 'object') {
+    const safeHeaders = Array.isArray(headers) ? headers : [];
+    const byHeader = safeHeaders.length > 0 && safeHeaders.map(h => r[h]).some(v => v !== undefined);
+    return byHeader
+      ? safeHeaders.map(h => String(r[h] ?? ''))
+      : Object.values(r).map(v => String(v ?? ''));
+  }
+  return [String(r ?? '')];
+};
+
+export const getTableRows = (table) => {
+  if (!table || !Array.isArray(table.rows)) return [];
+  const headers = Array.isArray(table.headers) ? table.headers : [];
+  return table.rows.map(r => extractTableRowCells(r, headers));
+};
+
+const sanitizeValueForFirestore = (val, insideArray = false) => {
+  if (val === undefined) return undefined;
+  if (val === null) return null;
+  if (typeof val === 'number') {
+    return Number.isFinite(val) ? val : 0;
+  }
+  if (typeof val === 'string' || typeof val === 'boolean') {
+    return val;
+  }
+  if (Array.isArray(val)) {
+    const cleanedItems = val
+      .map(item => sanitizeValueForFirestore(item, true))
+      .filter(item => item !== undefined);
+    // Firestore prohíbe estrictamente arreglos anidados directos (Array dentro de Array)
+    if (insideArray) {
+      return { cells: cleanedItems.map(c => (typeof c === 'object' && c !== null ? JSON.stringify(c) : String(c ?? ''))) };
+    }
+    return cleanedItems;
+  }
+  if (typeof val === 'object') {
+    const out = {};
+    for (const [k, v] of Object.entries(val)) {
+      if (v === undefined) continue;
+      if (k === 'table' && v && typeof v === 'object') {
+        const headers = Array.isArray(v.headers)
+          ? v.headers.map(h => String(typeof h === 'object' && h !== null ? (h.text ?? h.title ?? '') : (h ?? '')))
+          : ['Concepto', 'Explicación', 'Ejemplo'];
+        const rawRows = Array.isArray(v.rows) ? v.rows : [];
+        out.table = {
+          headers,
+          rows: rawRows.map(r => ({ cells: extractTableRowCells(r, headers) }))
+        };
+      } else {
+        const cleaned = sanitizeValueForFirestore(v, false);
+        if (cleaned !== undefined) {
+          out[k] = cleaned;
+        }
+      }
+    }
+    return out;
+  }
+  return String(val);
+};
+
+export const sanitizeSlidesForFirestore = (slides = []) => {
+  if (!Array.isArray(slides)) return [];
+  return slides.map((s, idx) => sanitizeValueForFirestore(normalizeSingleSlide(s, idx), false));
+};
+
+export const hydrateSlidesFromFirestore = (slides = []) => {
+  if (!Array.isArray(slides)) return [];
+  return slides.map((s, idx) => {
+    if (!s || typeof s !== 'object') return createDefaultSlide('cards', idx);
+    if (s.table && Array.isArray(s.table.rows)) {
+      return {
+        ...s,
+        table: {
+          ...s.table,
+          rows: getTableRows(s.table)
+        }
+      };
+    }
+    return s;
+  });
+};
+
 export const normalizeSingleSlide = (rawSlide, idx = 0) => {
   if (!rawSlide || typeof rawSlide !== 'object') {
     return createDefaultSlide('cards', idx);
@@ -978,18 +1067,7 @@ export const normalizeSingleSlide = (rawSlide, idx = 0) => {
       ? rawSlide.table.headers.map(h => String(typeof h === 'object' && h !== null ? (h.text || h.title || '') : (h ?? '')))
       : ['Concepto', 'Explicación', 'Ejemplo'];
     const rows = Array.isArray(rawSlide.table?.rows) && rawSlide.table.rows.length > 0
-      ? rawSlide.table.rows.map(r => {
-          if (Array.isArray(r)) {
-            return r.map(cell => String(typeof cell === 'object' && cell !== null ? (cell.text || cell.value || '') : (cell ?? '')));
-          }
-          if (typeof r === 'object' && r !== null) {
-            const byHeader = headers.map(h => r[h]).some(v => v !== undefined);
-            return byHeader
-              ? headers.map(h => String(r[h] ?? ''))
-              : Object.values(r).map(v => String(v ?? ''));
-          }
-          return [String(r || '')];
-        })
+      ? rawSlide.table.rows.map(r => extractTableRowCells(r, headers))
       : [['Elemento 1', 'Detalle 1', 'Ejemplo 1']];
     normalized.table = { headers, rows };
   } else if (layout === 'quote') {
@@ -1079,6 +1157,48 @@ const extractBalancedJson = (text, openChar, closeChar, validator) => {
   return null;
 };
 
+const recoverCompleteSlidesFromTruncatedText = (text) => {
+  const firstBracket = text.indexOf('[');
+  if (firstBracket === -1) return null;
+  const items = [];
+  let i = firstBracket + 1;
+  while (i < text.length) {
+    const objStart = text.indexOf('{', i);
+    if (objStart === -1) break;
+    let depth = 0;
+    let inStr = false;
+    let esc = false;
+    let objEnd = -1;
+    for (let j = objStart; j < text.length; j++) {
+      const ch = text[j];
+      if (esc) { esc = false; continue; }
+      if (ch === '\\' && inStr) { esc = true; continue; }
+      if (ch === '"') { inStr = !inStr; continue; }
+      if (!inStr) {
+        if (ch === '{') depth++;
+        else if (ch === '}') {
+          depth--;
+          if (depth === 0) {
+            objEnd = j;
+            break;
+          }
+        }
+      }
+    }
+    if (objEnd === -1) break;
+    try {
+      const obj = JSON.parse(text.slice(objStart, objEnd + 1));
+      if (obj && typeof obj === 'object' && !Array.isArray(obj) && (obj.title || obj.layout || obj.cards || obj.bullets || obj.question || obj.table || obj.leftColumn || obj.quoteText)) {
+        items.push(obj);
+      }
+    } catch {
+      // objeto corrupto
+    }
+    i = objEnd + 1;
+  }
+  return items.length > 0 ? items : null;
+};
+
 export const parseDeckAiResponse = (rawText) => {
   if (!rawText || typeof rawText !== 'string') return null;
   const clean = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
@@ -1091,9 +1211,9 @@ export const parseDeckAiResponse = (rawText) => {
     (candidate) => Array.isArray(candidate) && candidate.length > 0 && candidate.some(it => it && typeof it === 'object' && !Array.isArray(it))
   );
 
-  // 2. Fallback a objeto JSON { slides: [...] } o diapositiva única {...}
+  // 2. Intentar extraer objeto contenedor { slides: [...] }
   if (!parsed) {
-    const obj = extractBalancedJson(
+    const wrapperObj = extractBalancedJson(
       clean,
       '{',
       '}',
@@ -1101,12 +1221,35 @@ export const parseDeckAiResponse = (rawText) => {
         candidate &&
         typeof candidate === 'object' &&
         !Array.isArray(candidate) &&
-        ((Array.isArray(candidate.slides) && candidate.slides.length > 0) ||
-          candidate.title || candidate.layout || candidate.cards || candidate.bullets || candidate.question)
+        Array.isArray(candidate.slides) &&
+        candidate.slides.length > 0
       )
     );
-    if (obj) {
-      parsed = Array.isArray(obj.slides) && obj.slides.length > 0 ? obj.slides : [obj];
+    if (wrapperObj) {
+      parsed = wrapperObj.slides;
+    }
+  }
+
+  // 3. Fallback si la respuesta JSON es un array que se truncó antes del ']' final pero ya contiene diapositivas completas
+  if (!parsed) {
+    parsed = recoverCompleteSlidesFromTruncatedText(clean);
+  }
+
+  // 4. Fallback a objeto JSON de diapositiva única {...}
+  if (!parsed) {
+    const singleObj = extractBalancedJson(
+      clean,
+      '{',
+      '}',
+      (candidate) => Boolean(
+        candidate &&
+        typeof candidate === 'object' &&
+        !Array.isArray(candidate) &&
+        (candidate.title || candidate.layout || candidate.cards || candidate.bullets || candidate.question)
+      )
+    );
+    if (singleObj) {
+      parsed = [singleObj];
     }
   }
 
