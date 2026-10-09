@@ -31,6 +31,7 @@ import {
     playPageFlipSound,
     renderPdfToBookPages,
     buildFallbackBookPages,
+    buildBookPagesFromOutline,
     buildIllustratedBookPageSvg,
     isCompactedOrFallbackBookPage,
     bookPagesNeedLivePdfRender,
@@ -94,6 +95,13 @@ export default function Flipbook3DModal({
     const bookStageRef = useRef(null);
     const flipTimerRef = useRef(null);
     const hasInitializedPageRef = useRef(false);
+    const activePrimaryPageRef = useRef(0);
+    const prevDoublePageRef = useRef(isDoublePage);
+
+    const bookPagesSignature = useMemo(() => {
+        const arr = Array.isArray(normalizedBook.bookPages) ? normalizedBook.bookPages : [];
+        return `${arr.length}:${String(arr[0] || '').slice(0, 64)}:${String(arr[arr.length - 1] || '').slice(0, 64)}`;
+    }, [normalizedBook.bookPages]);
 
     // Reload bookmarks when book or user changes
     useEffect(() => {
@@ -206,7 +214,7 @@ export default function Flipbook3DModal({
     }, [
         normalizedBook.id,
         normalizedBook.pdfUrl,
-        normalizedBook.bookPages,
+        bookPagesSignature,
         normalizedBook.pageCount,
         normalizedBook.title,
         normalizedBook.description,
@@ -238,8 +246,7 @@ export default function Flipbook3DModal({
     }, [currentSpreadIndex, zoom]);
 
     const effectivePages = useMemo(() => {
-        if (pages.length > 0) return pages;
-        return buildFallbackBookPages({
+        const fallbackPages = buildFallbackBookPages({
             title: normalizedBook.title,
             description: normalizedBook.description,
             fileName: normalizedBook.fileName,
@@ -247,6 +254,43 @@ export default function Flipbook3DModal({
             themeId: normalizedBook.theme,
             customCoverUrl: normalizedBook.customCoverUrl || ''
         });
+        const basePages = pages.length > 0 ? pages : fallbackPages;
+        const expectedCount = Math.max(
+            basePages.length,
+            Number(normalizedBook.pageCount) || 0,
+            Array.isArray(normalizedBook.bookOutline) ? normalizedBook.bookOutline.length : 0,
+            Array.isArray(normalizedBook.pageTexts) ? normalizedBook.pageTexts.length : 0
+        );
+        if (expectedCount > basePages.length) {
+            const outlinePages = Array.isArray(normalizedBook.bookOutline) && normalizedBook.bookOutline.length > 0
+                ? buildBookPagesFromOutline(normalizedBook.bookOutline, {
+                    themeId: normalizedBook.theme,
+                    author: normalizedBook.authorName || 'Docente',
+                    customCoverUrl: normalizedBook.customCoverUrl || ''
+                })
+                : [];
+            return Array.from({ length: expectedCount }, (_, idx) => {
+                if (basePages[idx]) return basePages[idx];
+                if (outlinePages[idx]) return outlinePages[idx];
+                const rawSnippet = String(normalizedBook.pageTexts?.[idx] || '').trim();
+                return buildIllustratedBookPageSvg({
+                    variant: idx === 0 ? 'cover' : idx === expectedCount - 1 && expectedCount >= 3 ? 'back-cover' : 'content',
+                    chapter: idx === 0 ? 'LIBRO' : `PÁGINA ${idx + 1}`,
+                    title: idx === 0 ? normalizedBook.title : `${normalizedBook.title} — Página ${idx + 1}`,
+                    subtitle: '',
+                    body: rawSnippet
+                        ? [rawSnippet]
+                        : [`Vista de la página ${idx + 1} de "${normalizedBook.title}".`],
+                    pageNumber: idx + 1,
+                    totalPages: expectedCount,
+                    themeId: normalizedBook.theme
+                });
+            });
+        }
+        if (basePages.length === 1 && fallbackPages.length > 1) {
+            return [basePages[0], ...fallbackPages.slice(1)];
+        }
+        return basePages;
     }, [pages, normalizedBook]);
 
     const spreads = useMemo(
@@ -254,14 +298,18 @@ export default function Flipbook3DModal({
         [effectivePages, isDoublePage]
     );
 
-    // Jump to initialPage (or user's saved last read page) when spreads initialize
+    // Jump to initialPage (or user's saved last read page) ONLY once when spreads initialize,
+    // and preserve current page when toggling between double-page and single-page modes.
     useEffect(() => {
         if (spreads.length === 0) return;
-        let targetPage = initialPage;
         if (!hasInitializedPageRef.current) {
             hasInitializedPageRef.current = true;
+            prevDoublePageRef.current = isDoublePage;
+            let targetPage = Number.isFinite(Number(initialPage)) && Number(initialPage) > 0
+                ? Number(initialPage)
+                : (Number(book?.initialPage) || 0);
             if (
-                (!initialPage || initialPage === 0) &&
+                (!targetPage || targetPage === 0) &&
                 book?.initialPage === undefined &&
                 !book?.isPreview
             ) {
@@ -270,10 +318,21 @@ export default function Flipbook3DModal({
                     targetPage = saved.lastPage;
                 }
             }
+            activePrimaryPageRef.current = targetPage;
+            const idx = getSpreadIndexForPage(targetPage, isDoublePage, effectivePages.length);
+            setCurrentSpreadIndex(Math.min(idx, Math.max(0, spreads.length - 1)));
+            return;
         }
-        const idx = getSpreadIndexForPage(targetPage, isDoublePage, effectivePages.length);
-        setCurrentSpreadIndex(Math.min(idx, Math.max(0, spreads.length - 1)));
-    }, [initialPage, isDoublePage, effectivePages.length, spreads.length, normalizedBook.id, readerUserKey, book]);
+
+        if (prevDoublePageRef.current !== isDoublePage) {
+            prevDoublePageRef.current = isDoublePage;
+            const idx = getSpreadIndexForPage(activePrimaryPageRef.current, isDoublePage, effectivePages.length);
+            setCurrentSpreadIndex(Math.min(idx, Math.max(0, spreads.length - 1)));
+            return;
+        }
+
+        setCurrentSpreadIndex((prev) => Math.min(prev, Math.max(0, spreads.length - 1)));
+    }, [initialPage, isDoublePage, effectivePages.length, spreads.length, normalizedBook.id, readerUserKey, book?.initialPage, book?.isPreview]);
 
     // Clean up animation timer on unmount
     useEffect(() => {
@@ -301,6 +360,7 @@ export default function Flipbook3DModal({
 
     // Persist last read page per user as they browse the book
     useEffect(() => {
+        activePrimaryPageRef.current = primaryPageIndex;
         if (!normalizedBook?.id || book?.isPreview || effectivePages.length === 0) return;
         saveUserBookLastPage(normalizedBook.id, readerUserKey, primaryPageIndex, {
             totalPages: effectivePages.length
@@ -494,9 +554,21 @@ export default function Flipbook3DModal({
 
         const rect = stage.getBoundingClientRect();
         const relX = e.clientX - rect.left;
+        const isLastSpreadBackCover =
+            isDoublePage &&
+            currentSpreadIndex > 0 &&
+            currentSpreadIndex === spreads.length - 1 &&
+            currentSpread.rightPage === null;
+
         let direction =
             forcedDirection ||
-            (currentSpreadIndex === 0 ? 'next' : relX >= rect.width * 0.5 ? 'next' : 'prev');
+            (currentSpreadIndex === 0
+                ? 'next'
+                : isLastSpreadBackCover
+                    ? 'prev'
+                    : relX >= rect.width * 0.5
+                        ? 'next'
+                        : 'prev');
 
         if (direction === 'next' && currentSpreadIndex >= spreads.length - 1 && !forcedDirection && currentSpreadIndex > 0) {
             direction = 'prev';
@@ -507,31 +579,30 @@ export default function Flipbook3DModal({
         if (direction === 'next' && currentSpreadIndex >= spreads.length - 1) return;
         if (direction === 'prev' && currentSpreadIndex <= 0) return;
 
-        try {
-            stage.setPointerCapture?.(e.pointerId);
-        } catch {
-            // Ignore pointer capture errors
-        }
+        const leafWidth = isDoublePage
+            ? Math.max(180, rect.width * 0.5)
+            : Math.max(180, rect.width);
 
         const initialCurl = calculateDragCurlState({
             startX: e.clientX,
             startY: e.clientY,
             currentX: e.clientX,
             currentY: e.clientY,
-            containerWidth: rect.width,
+            containerWidth: leafWidth,
             containerHeight: rect.height,
             direction
         });
 
         setDragState({
             pointerId: e.pointerId,
+            captured: false,
             forcedDirection: forcedDirection || null,
             startTime: Date.now(),
             startX: e.clientX,
             startY: e.clientY,
             currentX: e.clientX,
             currentY: e.clientY,
-            containerWidth: rect.width,
+            containerWidth: leafWidth,
             containerHeight: rect.height,
             ...initialCurl
         });
@@ -550,14 +621,13 @@ export default function Flipbook3DModal({
         }
 
         if (!dragState) return;
-        const deltaX = e.clientX - dragState.startX;
-        let effectiveDir = dragState.direction;
-
-        if (!dragState.forcedDirection && Math.abs(deltaX) > 10) {
-            if (deltaX < -10 && currentSpreadIndex < spreads.length - 1) {
-                effectiveDir = 'next';
-            } else if (deltaX > 10 && currentSpreadIndex > 0) {
-                effectiveDir = 'prev';
+        const effectiveDir = dragState.direction;
+        const movedDist = Math.hypot(e.clientX - dragState.startX, e.clientY - dragState.startY);
+        if (movedDist > 6 && !dragState.captured && bookStageRef.current) {
+            try {
+                bookStageRef.current.setPointerCapture?.(dragState.pointerId);
+            } catch {
+                // Ignore pointer capture errors
             }
         }
 
@@ -574,6 +644,7 @@ export default function Flipbook3DModal({
             prev
                 ? {
                     ...prev,
+                    captured: prev.captured || movedDist > 6,
                     currentX: e.clientX,
                     currentY: e.clientY,
                     ...curl
@@ -596,22 +667,32 @@ export default function Flipbook3DModal({
 
         if (!dragState) return;
         const stage = bookStageRef.current;
-        try {
-            stage?.releasePointerCapture?.(dragState.pointerId);
-        } catch {
-            // Ignore release errors
+        if (dragState.captured) {
+            try {
+                stage?.releasePointerCapture?.(dragState.pointerId);
+            } catch {
+                // Ignore release errors
+            }
         }
 
+        const hasValidEventCoords =
+            typeof e?.clientX === 'number' &&
+            typeof e?.clientY === 'number' &&
+            e.type !== 'pointercancel' &&
+            (e.clientX !== 0 || e.clientY !== 0);
+        const endX = hasValidEventCoords ? e.clientX : dragState.currentX;
+        const endY = hasValidEventCoords ? e.clientY : dragState.currentY;
+        const dx = endX - dragState.startX;
+        const dy = endY - dragState.startY;
         const elapsedMs = Math.max(1, Date.now() - (dragState.startTime || Date.now()));
-        const totalMove = Math.hypot(
-            (e.clientX || dragState.currentX) - dragState.startX,
-            (e.clientY || dragState.currentY) - dragState.startY
-        );
+        const totalMove = Math.hypot(dx, dy);
         const dir = dragState.direction;
-        const releaseAngle = dragState.shouldComplete ? dragState.angleDeg : 0;
-        const shouldTurn =
-            dragState.shouldComplete ||
-            (totalMove < 10 && elapsedMs < 320); // Quick tap on edge/corner also flips
+        const rawDistance = dir === 'next' ? -dx : dx;
+        const isTap = totalMove < 18 && elapsedMs < 700 || (totalMove < 28 && elapsedMs < 320);
+        const isCoverSwipe = currentSpreadIndex === 0 && totalMove >= 16 && rawDistance >= -12;
+        const isIntentionalDrag = dragState.shouldComplete || rawDistance >= 18 || isCoverSwipe;
+        const shouldTurn = isTap || isIntentionalDrag;
+        const releaseAngle = !isTap && isIntentionalDrag && Math.abs(dragState.angleDeg) > 4 ? dragState.angleDeg : 0;
 
         setDragState(null);
         if (shouldTurn) {

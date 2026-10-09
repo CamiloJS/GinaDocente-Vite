@@ -1496,6 +1496,51 @@ check(
     taskCardSrc.includes('initialPage: primaryPreviewPageIdx')
 );
 
+console.log('\n== 22. Regresión: Pasar de la Primera Página sin Regresarse a Portada (Spread 0 -> Spread 1+) ==');
+const step0State = resolveSpreadDisplayState(spreads60, 0, 60);
+const nextTargetFrom0 = step0State.safeSpreadIdx + 1;
+const step1State = resolveSpreadDisplayState(spreads60, nextTargetFrom0, 60);
+const nextTargetFrom1 = step1State.safeSpreadIdx + 1;
+const step2State = resolveSpreadDisplayState(spreads60, nextTargetFrom1, 60);
+
+check(
+  'resolveSpreadDisplayState expone safeSpreadIdx numérico finito (igual a spreadIndex), canGoPrev y canGoNext para que safeSpreadIdx + 1 nunca sea NaN ni regrese a 0',
+  Number.isInteger(step0State.safeSpreadIdx) &&
+    step0State.safeSpreadIdx === 0 &&
+    step0State.canGoPrev === false &&
+    step0State.canGoNext === true &&
+    nextTargetFrom0 === 1 &&
+    step1State.safeSpreadIdx === 1 &&
+    step1State.isOpenDoubleSpread === true &&
+    step1State.leftPageIdx === 1 &&
+    step1State.rightPageIdx === 2 &&
+    step1State.canGoPrev === true &&
+    step1State.canGoNext === true &&
+    nextTargetFrom1 === 2 &&
+    step2State.safeSpreadIdx === 2 &&
+    step2State.leftPageIdx === 3 &&
+    step2State.rightPageIdx === 4 &&
+    lastSpreadState.safeSpreadIdx === spreads60.length - 1 &&
+    lastSpreadState.canGoPrev === true &&
+    lastSpreadState.canGoNext === false
+);
+
+check(
+  'TaskCard.jsx evita NaN en goToPreviewSpread, suprime clics sintéticos duplicados tras pointerup y no hace wrap-around de vuelta a 0 al avanzar páginas',
+  taskCardSrc.includes('suppressPreviewClickRef') &&
+    taskCardSrc.includes('Number.isInteger(spreadState.safeSpreadIdx)') &&
+    taskCardSrc.includes('goToPreviewSpread(safeSpreadIdx + 1, \'next\')') &&
+    taskCardSrc.includes('goToPreviewSpread(safeSpreadIdx - 1, \'prev\')') &&
+    !taskCardSrc.includes('safeSpreadIdx >= totalSpreads - 1 ? 0 : safeSpreadIdx + 1')
+);
+
+check(
+  'Flipbook3DModal.jsx inicializa initialPage/lastPage una sola vez por apertura y preserva la página actual cuando terminan de renderizar las páginas PDF en segundo plano',
+  flipbookModalSrc.includes('activePrimaryPageRef.current = targetPage;') &&
+    flipbookModalSrc.includes('setCurrentSpreadIndex((prev) => Math.min(prev, Math.max(0, spreads.length - 1)));') &&
+    flipbookModalSrc.includes('bookPagesSignature')
+);
+
 console.log(`\n========================================`);
 console.log(`Total pruebas Flipbook 3D: ${okCount + failCount} | OK: ${okCount} | FAIL: ${failCount}`);
 console.log(`========================================\n`);

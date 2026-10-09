@@ -2690,7 +2690,7 @@ export const sanitizeBookForFirestore = (book = {}) => {
         pageTexts,
         bookOutline,
         coverUrl,
-        pageCount: Math.max(finalPages.length, Number(book.pageCount) || 0),
+        pageCount: Math.max(finalPages.length, rawOutline.length, rawPageTexts.length, Number(book.pageCount) || 0),
         pdfUrl: book.pdfUrl || book.fileUrl || '',
         fileUrl: book.fileUrl || book.pdfUrl || '',
         fileName: book.fileName || '',
@@ -2739,6 +2739,7 @@ export const normalizeBookRecord = (item = {}) => {
     const rawCat = item.category || item.bookCategory;
     const validCat = BOOK_CATEGORIES.some((c) => c.id === rawCat) ? rawCat : 'textbook';
     const bookOutline = Array.isArray(item.bookOutline) ? item.bookOutline : [];
+    const rawPageTexts = Array.isArray(item.pageTexts) ? item.pageTexts : [];
 
     return {
         ...item,
@@ -2749,10 +2750,10 @@ export const normalizeBookRecord = (item = {}) => {
         theme,
         customCoverUrl,
         bookPages: pages,
-        pageTexts: Array.isArray(item.pageTexts) ? item.pageTexts : [],
+        pageTexts: rawPageTexts,
         bookOutline,
         coverUrl: customCoverUrl || pages[0] || item.coverUrl || '',
-        pageCount: Math.max(pages.length, Number(item.pageCount) || 0),
+        pageCount: Math.max(pages.length, bookOutline.length, rawPageTexts.length, Number(item.pageCount) || 0),
         pdfUrl,
         fileUrl: item.fileUrl || pdfUrl,
         fileName: item.fileName || '',
@@ -2888,6 +2889,7 @@ export const resolveSpreadDisplayState = (spreads = [], spreadIndex = 0, totalPa
 
     return {
         spreadIndex: safeSpreadIdx,
+        safeSpreadIdx,
         totalSpreads,
         totalPages: safeTotalPages,
         spread: normalizedSpread,
@@ -2900,6 +2902,8 @@ export const resolveSpreadDisplayState = (spreads = [], spreadIndex = 0, totalPa
         isCoverClosed,
         isBackClosed,
         isOpenDoubleSpread,
+        canGoPrev: safeSpreadIdx > 0,
+        canGoNext: safeSpreadIdx < totalSpreads - 1,
         primaryPageIndex,
         badgeLabel: `Pág. ${formatSpreadPageLabel(normalizedSpread, safeTotalPages)}`
     };

@@ -86,6 +86,7 @@ const TaskCard = React.memo(({
     const [bookRenderProgress, setBookRenderProgress] = useState({ currentPage: 0, totalPages: 0, percent: 0 });
     const bookPreviewStageRef = useRef(null);
     const bookPreviewFlipTimerRef = useRef(null);
+    const suppressPreviewClickRef = useRef(false);
     const [editTaskData, setEditTaskData] = useState({ title: task?.title || '', description: task?.description || '', dueDate: task?.dueDate || '', dueTime: task?.dueTime || '', allowLate: task?.allowLate || false, geniallyUrl: task?.geniallyUrl || '', hideDate: !!task?.hideDate });
     const [showKahootLiveModal, setShowKahootLiveModal] = useState(false);
     const [kahootModalStartInReview, setKahootModalStartInReview] = useState(false);
@@ -246,6 +247,12 @@ const TaskCard = React.memo(({
         return normalizeBookRecord(task);
     }, [isBook3D, books, task]);
 
+    const bookIdentityKey = String(task?.id || task?.bookId || linkedBook?.id || '');
+    const bookPagesSignature = React.useMemo(() => {
+        const arr = Array.isArray(linkedBook?.bookPages) ? linkedBook.bookPages : [];
+        return `${arr.length}:${String(arr[0] || '').slice(0, 64)}:${String(arr[arr.length - 1] || '').slice(0, 64)}`;
+    }, [linkedBook?.bookPages]);
+
     useEffect(() => {
         setBookPreviewSpreadIdx(0);
         setBookPreviewFlipAnim(null);
@@ -253,7 +260,7 @@ const TaskCard = React.memo(({
         return () => {
             if (bookPreviewFlipTimerRef.current) clearTimeout(bookPreviewFlipTimerRef.current);
         };
-    }, [linkedBook?.id]);
+    }, [bookIdentityKey]);
 
     // Cargar / renderizar páginas en vivo desde pdfUrl cuando las páginas en Firestore fueron compactadas o truncadas
     useEffect(() => {
@@ -266,7 +273,9 @@ const TaskCard = React.memo(({
         const expectedCount = Math.max(
             preRendered.length,
             Number(linkedBook.pageCount) || 0,
-            Number(task?.pageCount) || 0
+            Number(task?.pageCount) || 0,
+            Array.isArray(linkedBook.bookOutline) ? linkedBook.bookOutline.length : 0,
+            Array.isArray(linkedBook.pageTexts) ? linkedBook.pageTexts.length : 0
         );
 
         const shouldRenderFromPdf = bookPagesNeedLivePdfRender(preRendered, {
@@ -323,10 +332,10 @@ const TaskCard = React.memo(({
         };
     }, [
         isBook3D,
-        linkedBook?.id,
+        bookIdentityKey,
         linkedBook?.pdfUrl,
         linkedBook?.fileUrl,
-        linkedBook?.bookPages,
+        bookPagesSignature,
         linkedBook?.pageCount,
         linkedBook?.title,
         linkedBook?.theme,
@@ -341,21 +350,24 @@ const TaskCard = React.memo(({
         if (Array.isArray(liveBookPages) && liveBookPages.length > 0) {
             return liveBookPages;
         }
+        const fallbackPages = buildFallbackBookPages({
+            title: linkedBook.title,
+            description: linkedBook.description,
+            fileName: linkedBook.fileName,
+            author: linkedBook.authorName || 'Docente',
+            themeId: linkedBook.theme,
+            customCoverUrl: linkedBook.customCoverUrl || ''
+        });
         const basePages = Array.isArray(linkedBook.bookPages) && linkedBook.bookPages.length > 0
             ? linkedBook.bookPages
-            : buildFallbackBookPages({
-                title: linkedBook.title,
-                description: linkedBook.description,
-                fileName: linkedBook.fileName,
-                author: linkedBook.authorName || 'Docente',
-                themeId: linkedBook.theme,
-                customCoverUrl: linkedBook.customCoverUrl || ''
-            });
+            : fallbackPages;
 
         const expectedCount = Math.max(
             basePages.length,
             Number(linkedBook.pageCount) || 0,
-            Number(task?.pageCount) || 0
+            Number(task?.pageCount) || 0,
+            Array.isArray(linkedBook.bookOutline) ? linkedBook.bookOutline.length : 0,
+            Array.isArray(linkedBook.pageTexts) ? linkedBook.pageTexts.length : 0
         );
 
         if (expectedCount > basePages.length) {
@@ -375,6 +387,9 @@ const TaskCard = React.memo(({
                     themeId: linkedBook.theme
                 });
             });
+        }
+        if (basePages.length === 1 && fallbackPages.length > 1) {
+            return [basePages[0], ...fallbackPages.slice(1)];
         }
         return basePages;
     }, [isBook3D, linkedBook, liveBookPages, task?.pageCount]);
@@ -2764,8 +2779,12 @@ const TaskCard = React.memo(({
                 const pagesArr = effectiveBookPages;
                 const totalPagesCount = pagesArr.length || Number(bk.pageCount) || 1;
                 const spreadState = resolveSpreadDisplayState(bookSpreads, bookPreviewSpreadIdx, totalPagesCount);
-                const safeSpreadIdx = spreadState.safeSpreadIdx;
+                const safeSpreadIdx = Number.isInteger(spreadState.safeSpreadIdx)
+                    ? spreadState.safeSpreadIdx
+                    : spreadState.spreadIndex;
                 const totalSpreads = spreadState.totalSpreads;
+                const canGoPrevPreview = safeSpreadIdx > 0;
+                const canGoNextPreview = safeSpreadIdx < totalSpreads - 1;
                 const currentSpread = spreadState.spread;
                 const leftPageIdx = spreadState.leftPageIdx;
                 const rightPageIdx = spreadState.rightPageIdx;
@@ -2777,16 +2796,26 @@ const TaskCard = React.memo(({
                 const spreadBadgeLabel = spreadState.badgeLabel;
                 const pdfSourceUrl = bk.pdfUrl || bk.fileUrl || task.fileUrl || '';
 
-                const goToPreviewSpread = (targetIdx, direction = 'next') => {
-                    const bounded = Math.max(0, Math.min(totalSpreads - 1, targetIdx));
+                const goToPreviewSpread = (targetIdx, direction = 'next', initialAngleDeg = null) => {
+                    const numericTarget = Number(targetIdx);
+                    if (!Number.isFinite(numericTarget)) return;
+                    const bounded = Math.max(0, Math.min(totalSpreads - 1, Math.floor(numericTarget)));
                     if (bounded === safeSpreadIdx || bookPreviewFlipAnim) return;
                     playPageFlipSound({ muted: false, direction });
                     const targetSpread = bookSpreads[bounded] || currentSpread;
+                    const defaultStartAngle = direction === 'next' ? -8 : 8;
+                    const startAngleDeg = Number.isFinite(initialAngleDeg) && Math.abs(initialAngleDeg) > 4
+                        ? initialAngleDeg
+                        : defaultStartAngle;
+                    const remainingRatio = Math.max(0.28, 1 - Math.min(1, Math.abs(startAngleDeg) / 180));
+                    const durationMs = Math.max(160, Math.round(340 * remainingRatio));
                     if (bookPreviewFlipTimerRef.current) clearTimeout(bookPreviewFlipTimerRef.current);
                     setBookPreviewFlipAnim({
                         direction,
                         fromSpread: currentSpread,
                         toSpread: targetSpread,
+                        startAngleDeg,
+                        durationMs,
                         progress: 0
                     });
                     requestAnimationFrame(() => {
@@ -2797,21 +2826,19 @@ const TaskCard = React.memo(({
                     bookPreviewFlipTimerRef.current = setTimeout(() => {
                         setBookPreviewSpreadIdx(bounded);
                         setBookPreviewFlipAnim(null);
-                    }, 360);
+                    }, durationMs + 20);
                 };
 
                 const handlePrevPreviewSpread = (e) => {
                     if (e) e.stopPropagation();
-                    if (totalSpreads <= 1) return;
-                    const target = safeSpreadIdx <= 0 ? totalSpreads - 1 : safeSpreadIdx - 1;
-                    goToPreviewSpread(target, 'prev');
+                    if (totalSpreads <= 1 || safeSpreadIdx <= 0) return;
+                    goToPreviewSpread(safeSpreadIdx - 1, 'prev');
                 };
 
                 const handleNextPreviewSpread = (e) => {
                     if (e) e.stopPropagation();
-                    if (totalSpreads <= 1) return;
-                    const target = safeSpreadIdx >= totalSpreads - 1 ? 0 : safeSpreadIdx + 1;
-                    goToPreviewSpread(target, 'next');
+                    if (totalSpreads <= 1 || safeSpreadIdx >= totalSpreads - 1) return;
+                    goToPreviewSpread(safeSpreadIdx + 1, 'next');
                 };
 
                 const handlePreviewPointerDown = (e) => {
@@ -2832,11 +2859,17 @@ const TaskCard = React.memo(({
                     }
                     if (!direction) return;
                     const targetIdx = direction === 'next' ? safeSpreadIdx + 1 : safeSpreadIdx - 1;
+                    const leafWidth = isOpenDoubleSpread
+                        ? Math.min(260, Math.max(180, rect.width * 0.42))
+                        : Math.min(220, Math.max(180, rect.width * 0.38));
                     setBookPreviewDragState({
+                        pointerId: e.pointerId,
+                        captured: false,
+                        startTime: Date.now(),
                         direction,
                         startX: e.clientX,
                         currentX: e.clientX,
-                        containerWidth: Math.max(220, rect.width),
+                        containerWidth: leafWidth,
                         containerHeight: Math.max(180, rect.height),
                         fromSpread: currentSpread,
                         toSpread: bookSpreads[targetIdx] || currentSpread,
@@ -2846,33 +2879,65 @@ const TaskCard = React.memo(({
 
                 const handlePreviewPointerMove = (e) => {
                     if (!bookPreviewDragState) return;
-                    setBookPreviewDragState(prev => (prev ? { ...prev, currentX: e.clientX } : null));
+                    const movedPx = Math.abs(e.clientX - bookPreviewDragState.startX);
+                    if (movedPx > 6 && !bookPreviewDragState.captured && bookPreviewStageRef.current) {
+                        try {
+                            bookPreviewStageRef.current.setPointerCapture?.(bookPreviewDragState.pointerId);
+                        } catch {
+                            // Ignore pointer capture errors
+                        }
+                    }
+                    setBookPreviewDragState(prev => (prev ? {
+                        ...prev,
+                        captured: prev.captured || movedPx > 6,
+                        currentX: e.clientX
+                    } : null));
                 };
 
                 const handlePreviewPointerUp = (e) => {
                     if (!bookPreviewDragState) return;
-                    const dx = (e?.clientX ?? bookPreviewDragState.currentX) - bookPreviewDragState.startX;
+                    if (bookPreviewDragState.captured && bookPreviewStageRef.current && bookPreviewDragState.pointerId !== undefined) {
+                        try {
+                            bookPreviewStageRef.current.releasePointerCapture?.(bookPreviewDragState.pointerId);
+                        } catch {
+                            // Ignore release errors
+                        }
+                    }
+                    suppressPreviewClickRef.current = Date.now() + 450;
+
+                    const endX = (typeof e?.clientX === 'number' && e.type !== 'pointercancel' && (e.clientX !== 0 || e.clientY !== 0))
+                        ? e.clientX
+                        : bookPreviewDragState.currentX;
+                    const dx = endX - bookPreviewDragState.startX;
                     const travel = Math.abs(dx);
+                    const elapsedMs = Math.max(1, Date.now() - (bookPreviewDragState.startTime || Date.now()));
                     const { direction, targetIdx } = bookPreviewDragState;
                     setBookPreviewDragState(null);
-                    if (travel < 8) {
+                    const isQuickTap = travel < 16 || (travel < 28 && elapsedMs < 320);
+                    if (isQuickTap) {
                         goToPreviewSpread(targetIdx, direction);
                         return;
                     }
                     const curl = calculateDragCurlState({
                         startX: bookPreviewDragState.startX,
-                        currentX: e?.clientX ?? bookPreviewDragState.currentX,
+                        currentX: endX,
                         containerWidth: bookPreviewDragState.containerWidth,
                         containerHeight: bookPreviewDragState.containerHeight,
                         direction
                     });
-                    if (curl.shouldComplete) {
-                        playPageFlipSound({ muted: false, direction });
-                        setBookPreviewSpreadIdx(targetIdx);
+                    const rawDistance = direction === 'next' ? -dx : dx;
+                    const shouldTurnCover = isCoverClosed && travel >= 14 && rawDistance >= -12;
+                    if (curl.shouldComplete || rawDistance >= 16 || shouldTurnCover) {
+                        if (curl.progress >= 0.82) {
+                            playPageFlipSound({ muted: false, direction });
+                            setBookPreviewSpreadIdx(targetIdx);
+                        } else {
+                            goToPreviewSpread(targetIdx, direction, curl.angleDeg);
+                        }
                     }
                 };
 
-                const activeDragCurl = bookPreviewDragState
+                const activeDragCurl = bookPreviewDragState && Math.abs(bookPreviewDragState.currentX - bookPreviewDragState.startX) > 4
                     ? calculateDragCurlState({
                         startX: bookPreviewDragState.startX,
                         currentX: bookPreviewDragState.currentX,
@@ -3062,6 +3127,7 @@ const TaskCard = React.memo(({
                                     <div
                                         onClick={(e) => {
                                             e.stopPropagation();
+                                            if (Date.now() < Number(suppressPreviewClickRef.current || 0)) return;
                                             handlePrevPreviewSpread(e);
                                         }}
                                         className="relative flex-1 h-full rounded-l-md overflow-hidden border-y border-l border-stone-300/80 z-10 cursor-pointer group/leftpage"
@@ -3086,6 +3152,7 @@ const TaskCard = React.memo(({
                                     <div
                                         onClick={(e) => {
                                             e.stopPropagation();
+                                            if (Date.now() < Number(suppressPreviewClickRef.current || 0)) return;
                                             handleNextPreviewSpread(e);
                                         }}
                                         className="relative flex-1 h-full rounded-r-md overflow-hidden border-y border-r border-stone-300/80 z-10 cursor-pointer group/rightpage"
@@ -3117,9 +3184,13 @@ const TaskCard = React.memo(({
                                     {/* Hoja 3D de doble cara en movimiento durante animación o arrastre con el puntero */}
                                     {(bookPreviewFlipAnim || activeDragCurl) && (() => {
                                         const isNext = activeTurnDirection === 'next';
+                                        const animStartAngle = Number.isFinite(bookPreviewFlipAnim?.startAngleDeg)
+                                            ? bookPreviewFlipAnim.startAngleDeg
+                                            : (isNext ? -8 : 8);
                                         const angle = activeDragCurl
                                             ? activeDragCurl.angleDeg
-                                            : (bookPreviewFlipAnim.progress === 1 ? (isNext ? -176 : 176) : (isNext ? -8 : 8));
+                                            : (bookPreviewFlipAnim.progress === 1 ? (isNext ? -176 : 176) : animStartAngle);
+                                        const animDurationMs = bookPreviewFlipAnim?.durationMs || 340;
                                         const frontLeafPageIdx = isNext
                                             ? (rightPageIdx ?? leftPageIdx)
                                             : (leftPageIdx ?? rightPageIdx);
@@ -3135,13 +3206,13 @@ const TaskCard = React.memo(({
                                                     transformOrigin: isNext ? 'left center' : 'right center',
                                                     transformStyle: 'preserve-3d',
                                                     transform: `rotateY(${angle}deg)`,
-                                                    transition: activeDragCurl ? 'none' : 'transform 340ms cubic-bezier(0.22, 1, 0.36, 1)'
+                                                    transition: activeDragCurl ? 'none' : `transform ${animDurationMs}ms cubic-bezier(0.22, 1, 0.36, 1)`
                                                 }}
                                             >
                                                 {/* Cara frontal de la hoja giratoria */}
                                                 <div
                                                     className="absolute inset-0 overflow-hidden rounded-md"
-                                                    style={{ backfaceVisibility: 'hidden' }}
+                                                    style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
                                                 >
                                                     {renderPreviewPageSurface(frontLeafPageIdx, isNext ? 'right' : 'left')}
                                                 </div>
@@ -3150,6 +3221,7 @@ const TaskCard = React.memo(({
                                                     className="absolute inset-0 overflow-hidden rounded-md"
                                                     style={{
                                                         backfaceVisibility: 'hidden',
+                                                        WebkitBackfaceVisibility: 'hidden',
                                                         transform: 'rotateY(180deg)'
                                                     }}
                                                 >
@@ -3164,6 +3236,7 @@ const TaskCard = React.memo(({
                                 <div
                                     onClick={(e) => {
                                         e.stopPropagation();
+                                        if (Date.now() < Number(suppressPreviewClickRef.current || 0)) return;
                                         if (isCoverClosed && totalSpreads > 1) {
                                             handleNextPreviewSpread(e);
                                         } else if (isBackClosed && totalSpreads > 1) {
@@ -3188,28 +3261,60 @@ const TaskCard = React.memo(({
                                     )}
 
                                     <div
-                                        className={`relative w-full h-full ${isBackClosed ? 'rounded-l-2xl rounded-r-sm group-hover/bookcard:[transform:rotateY(16deg)_translateY(-4px)]' : 'rounded-r-2xl rounded-l-sm group-hover/bookcard:[transform:rotateY(-16deg)_translateY(-4px)]'} shadow-[18px_22px_38px_-8px_rgba(0,0,0,0.75)] transition-transform duration-500 overflow-hidden border border-white/20`}
+                                        className={`relative w-full h-full ${isBackClosed ? 'rounded-l-2xl rounded-r-sm' : 'rounded-r-2xl rounded-l-sm'} ${!(bookPreviewFlipAnim || activeDragCurl) ? (isBackClosed ? 'group-hover/bookcard:[transform:rotateY(14deg)_translateY(-3px)] transition-transform duration-500' : 'group-hover/bookcard:[transform:rotateY(-14deg)_translateY(-3px)] transition-transform duration-500') : ''} shadow-[18px_22px_38px_-8px_rgba(0,0,0,0.75)] border border-white/20`}
                                         style={{
                                             backgroundColor: bkTheme.coverBg,
                                             transformStyle: 'preserve-3d',
                                             transformOrigin: isBackClosed ? 'right center' : 'left center',
-                                            ...((bookPreviewFlipAnim || activeDragCurl) ? {
-                                                transform: `rotateY(${activeDragCurl ? activeDragCurl.angleDeg : (bookPreviewFlipAnim.progress === 1 ? (isBackClosed ? 150 : -150) : (isBackClosed ? 12 : -12))}deg)`,
-                                                transition: activeDragCurl ? 'none' : 'transform 340ms cubic-bezier(0.22, 1, 0.36, 1)'
-                                            } : {})
+                                            ...((bookPreviewFlipAnim || activeDragCurl) ? (() => {
+                                                const animStartAngle = Number.isFinite(bookPreviewFlipAnim?.startAngleDeg)
+                                                    ? bookPreviewFlipAnim.startAngleDeg
+                                                    : (isBackClosed ? 12 : -12);
+                                                const closedAngle = activeDragCurl
+                                                    ? activeDragCurl.angleDeg
+                                                    : (bookPreviewFlipAnim.progress === 1 ? (isBackClosed ? 156 : -156) : animStartAngle);
+                                                const animDurationMs = bookPreviewFlipAnim?.durationMs || 340;
+                                                return {
+                                                    transform: `rotateY(${closedAngle}deg)`,
+                                                    transition: activeDragCurl ? 'none' : `transform ${animDurationMs}ms cubic-bezier(0.22, 1, 0.36, 1)`
+                                                };
+                                            })() : {})
                                         }}
                                     >
-                                        {/* Lomo físico de encuadernación */}
+                                        {/* Cara exterior de la portada / contraportada */}
                                         <div
-                                            className={`absolute inset-y-0 ${isBackClosed ? 'right-0' : 'left-0'} w-4 z-10 pointer-events-none`}
+                                            className={`absolute inset-0 overflow-hidden ${isBackClosed ? 'rounded-l-2xl rounded-r-sm' : 'rounded-r-2xl rounded-l-sm'}`}
+                                            style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
+                                        >
+                                            {/* Lomo físico de encuadernación */}
+                                            <div
+                                                className={`absolute inset-y-0 ${isBackClosed ? 'right-0' : 'left-0'} w-4 z-10 pointer-events-none`}
+                                                style={{
+                                                    background: 'linear-gradient(90deg, rgba(0,0,0,0.55) 0%, rgba(255,255,255,0.24) 45%, rgba(0,0,0,0.35) 100%)'
+                                                }}
+                                            />
+                                            {renderPreviewPageSurface(
+                                                closedPageIdx,
+                                                isBackClosed ? 'left' : 'right'
+                                            )}
+                                        </div>
+
+                                        {/* Cara interior de la tapa al girar más de 90° (muestra la primera o última página interior) */}
+                                        <div
+                                            className={`absolute inset-0 overflow-hidden ${isBackClosed ? 'rounded-r-2xl rounded-l-sm' : 'rounded-l-2xl rounded-r-sm'}`}
                                             style={{
-                                                background: 'linear-gradient(90deg, rgba(0,0,0,0.55) 0%, rgba(255,255,255,0.24) 45%, rgba(0,0,0,0.35) 100%)'
+                                                backfaceVisibility: 'hidden',
+                                                WebkitBackfaceVisibility: 'hidden',
+                                                transform: 'rotateY(180deg)'
                                             }}
-                                        />
-                                        {renderPreviewPageSurface(
-                                            closedPageIdx,
-                                            isBackClosed ? 'left' : 'right'
-                                        )}
+                                        >
+                                            {renderPreviewPageSurface(
+                                                isBackClosed
+                                                    ? (Number.isInteger(activeTargetSpread?.rightPage) ? activeTargetSpread.rightPage : Math.max(0, (closedPageIdx ?? 1) - 1))
+                                                    : (Number.isInteger(activeTargetSpread?.leftPage) ? activeTargetSpread.leftPage : Math.min(totalPagesCount - 1, 1)),
+                                                isBackClosed ? 'right' : 'left'
+                                            )}
+                                        </div>
                                     </div>
 
                                     {/* Canto de hojas derechas cuando está en la portada cerrada */}
@@ -3231,7 +3336,8 @@ const TaskCard = React.memo(({
                                     <button
                                         type="button"
                                         onClick={handlePrevPreviewSpread}
-                                        className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/65 hover:bg-indigo-600 text-white border border-white/20 flex items-center justify-center shadow-lg transition-all hover:scale-110 z-30 cursor-pointer"
+                                        disabled={!canGoPrevPreview}
+                                        className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/65 hover:bg-indigo-600 text-white border border-white/20 flex items-center justify-center shadow-lg transition-all hover:scale-110 z-30 cursor-pointer disabled:opacity-35 disabled:pointer-events-none"
                                         title="Pliego anterior"
                                     >
                                         <ChevronLeft size={18} />
@@ -3239,7 +3345,8 @@ const TaskCard = React.memo(({
                                     <button
                                         type="button"
                                         onClick={handleNextPreviewSpread}
-                                        className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/65 hover:bg-indigo-600 text-white border border-white/20 flex items-center justify-center shadow-lg transition-all hover:scale-110 z-30 cursor-pointer"
+                                        disabled={!canGoNextPreview}
+                                        className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/65 hover:bg-indigo-600 text-white border border-white/20 flex items-center justify-center shadow-lg transition-all hover:scale-110 z-30 cursor-pointer disabled:opacity-35 disabled:pointer-events-none"
                                         title="Siguiente pliego (abrir / pasar hoja)"
                                     >
                                         <ChevronRight size={18} />
