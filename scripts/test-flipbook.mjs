@@ -1526,8 +1526,10 @@ check(
 );
 
 check(
-  'TaskCard.jsx evita NaN en goToPreviewSpread, suprime clics sintéticos duplicados tras pointerup y no hace wrap-around de vuelta a 0 al avanzar páginas',
+  'TaskCard.jsx evita NaN en goToPreviewSpread, suprime clics sintéticos duplicados tras pointerup, protege doble clic rápido en portada centrada (lastPreviewCoverOpenAtRef) y no hace wrap-around de vuelta a 0 al avanzar páginas',
   taskCardSrc.includes('suppressPreviewClickRef') &&
+    taskCardSrc.includes('lastPreviewCoverOpenAtRef') &&
+    taskCardSrc.includes("replace(/^book_wall_/, '')") &&
     taskCardSrc.includes('Number.isInteger(spreadState.safeSpreadIdx)') &&
     taskCardSrc.includes('goToPreviewSpread(safeSpreadIdx + 1, \'next\')') &&
     taskCardSrc.includes('goToPreviewSpread(safeSpreadIdx - 1, \'prev\')') &&
@@ -1535,10 +1537,14 @@ check(
 );
 
 check(
-  'Flipbook3DModal.jsx inicializa initialPage/lastPage una sola vez por apertura y preserva la página actual cuando terminan de renderizar las páginas PDF en segundo plano',
+  'Flipbook3DModal.jsx inicializa initialPage/lastPage una sola vez por apertura, usa leafWidth de media etapa en Spread 0 (rect.width * 0.5), adapta dirección en swipes horizontales y elimina zona muerta entre tap y drag',
   flipbookModalSrc.includes('activePrimaryPageRef.current = targetPage;') &&
     flipbookModalSrc.includes('setCurrentSpreadIndex((prev) => Math.min(prev, Math.max(0, spreads.length - 1)));') &&
-    flipbookModalSrc.includes('bookPagesSignature')
+    flipbookModalSrc.includes('bookPagesSignature') &&
+    flipbookModalSrc.includes('const leafWidth = isDoublePage\n            ? Math.max(180, rect.width * 0.5)') &&
+    flipbookModalSrc.includes("if (e?.type === 'pointercancel')") &&
+    flipbookModalSrc.includes('const isTap = totalMove < 14 && rawDistance >= -6;') &&
+    flipbookModalSrc.includes('const isIntentionalDrag = dragState.shouldComplete || rawDistance >= 14 || isCoverSwipe;')
 );
 
 console.log(`\n========================================`);

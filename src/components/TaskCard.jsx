@@ -31,6 +31,7 @@ import {
     playPageFlipSound,
     renderPdfToBookPages,
     buildFallbackBookPages,
+    buildBookPagesFromOutline,
     buildIllustratedBookPageSvg,
     isCompactedOrFallbackBookPage,
     bookPagesNeedLivePdfRender,
@@ -86,7 +87,8 @@ const TaskCard = React.memo(({
     const [bookRenderProgress, setBookRenderProgress] = useState({ currentPage: 0, totalPages: 0, percent: 0 });
     const bookPreviewStageRef = useRef(null);
     const bookPreviewFlipTimerRef = useRef(null);
-    const suppressPreviewClickRef = useRef(false);
+    const suppressPreviewClickRef = useRef(0);
+    const lastPreviewCoverOpenAtRef = useRef(0);
     const [editTaskData, setEditTaskData] = useState({ title: task?.title || '', description: task?.description || '', dueDate: task?.dueDate || '', dueTime: task?.dueTime || '', allowLate: task?.allowLate || false, geniallyUrl: task?.geniallyUrl || '', hideDate: !!task?.hideDate });
     const [showKahootLiveModal, setShowKahootLiveModal] = useState(false);
     const [kahootModalStartInReview, setKahootModalStartInReview] = useState(false);
@@ -247,7 +249,7 @@ const TaskCard = React.memo(({
         return normalizeBookRecord(task);
     }, [isBook3D, books, task]);
 
-    const bookIdentityKey = String(task?.id || task?.bookId || linkedBook?.id || '');
+    const bookIdentityKey = String(task?.bookId || linkedBook?.id || task?.id || '').replace(/^book_wall_/, '');
     const bookPagesSignature = React.useMemo(() => {
         const arr = Array.isArray(linkedBook?.bookPages) ? linkedBook.bookPages : [];
         return `${arr.length}:${String(arr[0] || '').slice(0, 64)}:${String(arr[arr.length - 1] || '').slice(0, 64)}`;
@@ -257,6 +259,7 @@ const TaskCard = React.memo(({
         setBookPreviewSpreadIdx(0);
         setBookPreviewFlipAnim(null);
         setBookPreviewDragState(null);
+        lastPreviewCoverOpenAtRef.current = 0;
         return () => {
             if (bookPreviewFlipTimerRef.current) clearTimeout(bookPreviewFlipTimerRef.current);
         };
@@ -347,9 +350,6 @@ const TaskCard = React.memo(({
 
     const effectiveBookPages = React.useMemo(() => {
         if (!isBook3D || !linkedBook) return [];
-        if (Array.isArray(liveBookPages) && liveBookPages.length > 0) {
-            return liveBookPages;
-        }
         const fallbackPages = buildFallbackBookPages({
             title: linkedBook.title,
             description: linkedBook.description,
@@ -358,9 +358,11 @@ const TaskCard = React.memo(({
             themeId: linkedBook.theme,
             customCoverUrl: linkedBook.customCoverUrl || ''
         });
-        const basePages = Array.isArray(linkedBook.bookPages) && linkedBook.bookPages.length > 0
-            ? linkedBook.bookPages
-            : fallbackPages;
+        const basePages = Array.isArray(liveBookPages) && liveBookPages.length > 0
+            ? liveBookPages
+            : (Array.isArray(linkedBook.bookPages) && linkedBook.bookPages.length > 0
+                ? linkedBook.bookPages
+                : fallbackPages);
 
         const expectedCount = Math.max(
             basePages.length,
@@ -371,8 +373,16 @@ const TaskCard = React.memo(({
         );
 
         if (expectedCount > basePages.length) {
+            const outlinePages = Array.isArray(linkedBook.bookOutline) && linkedBook.bookOutline.length > 0
+                ? buildBookPagesFromOutline(linkedBook.bookOutline, {
+                    themeId: linkedBook.theme,
+                    author: linkedBook.authorName || 'Docente',
+                    customCoverUrl: linkedBook.customCoverUrl || ''
+                })
+                : [];
             return Array.from({ length: expectedCount }, (_, idx) => {
                 if (basePages[idx]) return basePages[idx];
+                if (outlinePages[idx]) return outlinePages[idx];
                 const rawSnippet = String(linkedBook.pageTexts?.[idx] || '').trim();
                 return buildIllustratedBookPageSvg({
                     variant: idx === 0 ? 'cover' : idx === expectedCount - 1 && expectedCount >= 3 ? 'back-cover' : 'content',
@@ -2809,6 +2819,9 @@ const TaskCard = React.memo(({
                         : defaultStartAngle;
                     const remainingRatio = Math.max(0.28, 1 - Math.min(1, Math.abs(startAngleDeg) / 180));
                     const durationMs = Math.max(160, Math.round(340 * remainingRatio));
+                    if (safeSpreadIdx === 0 && bounded > 0) {
+                        lastPreviewCoverOpenAtRef.current = Date.now() + durationMs + 20;
+                    }
                     if (bookPreviewFlipTimerRef.current) clearTimeout(bookPreviewFlipTimerRef.current);
                     setBookPreviewFlipAnim({
                         direction,
@@ -2847,14 +2860,18 @@ const TaskCard = React.memo(({
                     if (bookPreviewFlipAnim || totalSpreads <= 1 || !bookPreviewStageRef.current) return;
                     const rect = bookPreviewStageRef.current.getBoundingClientRect();
                     const relX = (e.clientX - rect.left) / Math.max(1, rect.width);
+                    const justOpenedCover =
+                        safeSpreadIdx === 1 &&
+                        Date.now() - Number(lastPreviewCoverOpenAtRef.current || 0) < 750 &&
+                        relX >= 0.22;
                     let direction = null;
                     if (isCoverClosed) {
                         direction = safeSpreadIdx < totalSpreads - 1 ? 'next' : null;
                     } else if (isBackClosed) {
                         direction = safeSpreadIdx > 0 ? 'prev' : null;
-                    } else if (relX >= 0.5 && safeSpreadIdx < totalSpreads - 1) {
+                    } else if ((relX >= 0.5 || justOpenedCover) && safeSpreadIdx < totalSpreads - 1) {
                         direction = 'next';
-                    } else if (relX < 0.5 && safeSpreadIdx > 0) {
+                    } else if (relX < 0.5 && !justOpenedCover && safeSpreadIdx > 0) {
                         direction = 'prev';
                     }
                     if (!direction) return;
@@ -2879,7 +2896,17 @@ const TaskCard = React.memo(({
 
                 const handlePreviewPointerMove = (e) => {
                     if (!bookPreviewDragState) return;
-                    const movedPx = Math.abs(e.clientX - bookPreviewDragState.startX);
+                    const dx = e.clientX - bookPreviewDragState.startX;
+                    const movedPx = Math.abs(dx);
+                    let nextDir = bookPreviewDragState.direction;
+                    if (dx <= -14 && safeSpreadIdx < totalSpreads - 1) {
+                        nextDir = 'next';
+                    } else if (dx >= 14 && safeSpreadIdx > 0 && !isCoverClosed) {
+                        nextDir = 'prev';
+                    }
+                    const nextTargetIdx = nextDir === 'next'
+                        ? Math.min(totalSpreads - 1, safeSpreadIdx + 1)
+                        : Math.max(0, safeSpreadIdx - 1);
                     if (movedPx > 6 && !bookPreviewDragState.captured && bookPreviewStageRef.current) {
                         try {
                             bookPreviewStageRef.current.setPointerCapture?.(bookPreviewDragState.pointerId);
@@ -2889,6 +2916,9 @@ const TaskCard = React.memo(({
                     }
                     setBookPreviewDragState(prev => (prev ? {
                         ...prev,
+                        direction: nextDir,
+                        targetIdx: nextTargetIdx,
+                        toSpread: bookSpreads[nextTargetIdx] || currentSpread,
                         captured: prev.captured || movedPx > 6,
                         currentX: e.clientX
                     } : null));
@@ -2903,17 +2933,29 @@ const TaskCard = React.memo(({
                             // Ignore release errors
                         }
                     }
+                    if (e?.type === 'pointercancel') {
+                        setBookPreviewDragState(null);
+                        return;
+                    }
                     suppressPreviewClickRef.current = Date.now() + 450;
 
-                    const endX = (typeof e?.clientX === 'number' && e.type !== 'pointercancel' && (e.clientX !== 0 || e.clientY !== 0))
+                    const endX = (typeof e?.clientX === 'number' && (e.clientX !== 0 || e.clientY !== 0))
                         ? e.clientX
                         : bookPreviewDragState.currentX;
                     const dx = endX - bookPreviewDragState.startX;
                     const travel = Math.abs(dx);
-                    const elapsedMs = Math.max(1, Date.now() - (bookPreviewDragState.startTime || Date.now()));
-                    const { direction, targetIdx } = bookPreviewDragState;
+                    let direction = bookPreviewDragState.direction;
+                    if (dx <= -14 && safeSpreadIdx < totalSpreads - 1) {
+                        direction = 'next';
+                    } else if (dx >= 14 && safeSpreadIdx > 0 && !isCoverClosed) {
+                        direction = 'prev';
+                    }
+                    const targetIdx = direction === 'next'
+                        ? Math.min(totalSpreads - 1, safeSpreadIdx + 1)
+                        : Math.max(0, safeSpreadIdx - 1);
                     setBookPreviewDragState(null);
-                    const isQuickTap = travel < 16 || (travel < 28 && elapsedMs < 320);
+                    const rawDistance = direction === 'next' ? -dx : dx;
+                    const isQuickTap = travel < 14 && rawDistance >= -6;
                     if (isQuickTap) {
                         goToPreviewSpread(targetIdx, direction);
                         return;
@@ -2925,11 +2967,13 @@ const TaskCard = React.memo(({
                         containerHeight: bookPreviewDragState.containerHeight,
                         direction
                     });
-                    const rawDistance = direction === 'next' ? -dx : dx;
                     const shouldTurnCover = isCoverClosed && travel >= 14 && rawDistance >= -12;
-                    if (curl.shouldComplete || rawDistance >= 16 || shouldTurnCover) {
+                    if (curl.shouldComplete || rawDistance >= 14 || shouldTurnCover) {
                         if (curl.progress >= 0.82) {
                             playPageFlipSound({ muted: false, direction });
+                            if (safeSpreadIdx === 0 && targetIdx > 0) {
+                                lastPreviewCoverOpenAtRef.current = Date.now();
+                            }
                             setBookPreviewSpreadIdx(targetIdx);
                         } else {
                             goToPreviewSpread(targetIdx, direction, curl.angleDeg);
@@ -3028,12 +3072,13 @@ const TaskCard = React.memo(({
                 const openModalAtCurrentSpread = (e) => {
                     if (e) e.stopPropagation();
                     const hasFullLivePages = Array.isArray(liveBookPages) && liveBookPages.length >= totalPagesCount;
+                    const resolvedModalPages = hasFullLivePages
+                        ? liveBookPages
+                        : (pagesArr.length >= (Array.isArray(bk.bookPages) ? bk.bookPages.length : 0) ? pagesArr : bk.bookPages);
                     setActiveFlipbookModal({
                         book: {
                             ...bk,
-                            bookPages: hasFullLivePages
-                                ? liveBookPages
-                                : (Array.isArray(bk.bookPages) && bk.bookPages.length > 0 ? bk.bookPages : pagesArr),
+                            bookPages: resolvedModalPages,
                             pageCount: totalPagesCount,
                             initialPage: primaryPreviewPageIdx
                         },
@@ -3128,6 +3173,7 @@ const TaskCard = React.memo(({
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             if (Date.now() < Number(suppressPreviewClickRef.current || 0)) return;
+                                            if (safeSpreadIdx === 1 && Date.now() - Number(lastPreviewCoverOpenAtRef.current || 0) < 750) return;
                                             handlePrevPreviewSpread(e);
                                         }}
                                         className="relative flex-1 h-full rounded-l-md overflow-hidden border-y border-l border-stone-300/80 z-10 cursor-pointer group/leftpage"

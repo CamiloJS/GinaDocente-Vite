@@ -525,6 +525,7 @@ export default function Flipbook3DModal({
 
     // Interactive Pointer Dragging on the 3D Book Stage (Pan when zoomed > 1, 3D Page Curl when zoom <= 1)
     const handlePointerDown = (e, forcedDirection = null) => {
+        if (e.button !== undefined && e.button !== 0) return;
         if (flipAnim) return;
         if (e.target && typeof e.target.closest === 'function' && e.target.closest('[data-bookmark-ribbon]')) {
             return;
@@ -621,8 +622,16 @@ export default function Flipbook3DModal({
         }
 
         if (!dragState) return;
-        const effectiveDir = dragState.direction;
-        const movedDist = Math.hypot(e.clientX - dragState.startX, e.clientY - dragState.startY);
+        const dx = e.clientX - dragState.startX;
+        let effectiveDir = dragState.direction;
+        if (!dragState.forcedDirection) {
+            if (dx <= -14 && currentSpreadIndex < spreads.length - 1) {
+                effectiveDir = 'next';
+            } else if (dx >= 14 && currentSpreadIndex > 0) {
+                effectiveDir = 'prev';
+            }
+        }
+        const movedDist = Math.hypot(dx, e.clientY - dragState.startY);
         if (movedDist > 6 && !dragState.captured && bookStageRef.current) {
             try {
                 bookStageRef.current.setPointerCapture?.(dragState.pointerId);
@@ -675,22 +684,32 @@ export default function Flipbook3DModal({
             }
         }
 
+        if (e?.type === 'pointercancel') {
+            setDragState(null);
+            return;
+        }
+
         const hasValidEventCoords =
             typeof e?.clientX === 'number' &&
             typeof e?.clientY === 'number' &&
-            e.type !== 'pointercancel' &&
             (e.clientX !== 0 || e.clientY !== 0);
         const endX = hasValidEventCoords ? e.clientX : dragState.currentX;
         const endY = hasValidEventCoords ? e.clientY : dragState.currentY;
         const dx = endX - dragState.startX;
         const dy = endY - dragState.startY;
-        const elapsedMs = Math.max(1, Date.now() - (dragState.startTime || Date.now()));
         const totalMove = Math.hypot(dx, dy);
-        const dir = dragState.direction;
+        let dir = dragState.direction;
+        if (!dragState.forcedDirection) {
+            if (dx <= -14 && currentSpreadIndex < spreads.length - 1) {
+                dir = 'next';
+            } else if (dx >= 14 && currentSpreadIndex > 0) {
+                dir = 'prev';
+            }
+        }
         const rawDistance = dir === 'next' ? -dx : dx;
-        const isTap = totalMove < 18 && elapsedMs < 700 || (totalMove < 28 && elapsedMs < 320);
-        const isCoverSwipe = currentSpreadIndex === 0 && totalMove >= 16 && rawDistance >= -12;
-        const isIntentionalDrag = dragState.shouldComplete || rawDistance >= 18 || isCoverSwipe;
+        const isTap = totalMove < 14 && rawDistance >= -6;
+        const isCoverSwipe = currentSpreadIndex === 0 && totalMove >= 14 && rawDistance >= -12;
+        const isIntentionalDrag = dragState.shouldComplete || rawDistance >= 14 || isCoverSwipe;
         const shouldTurn = isTap || isIntentionalDrag;
         const releaseAngle = !isTap && isIntentionalDrag && Math.abs(dragState.angleDeg) > 4 ? dragState.angleDeg : 0;
 
