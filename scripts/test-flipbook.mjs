@@ -9,16 +9,22 @@ import {
   BOOK_CATEGORIES,
   getBookTheme,
   buildIllustratedBookPageSvg,
+  extractSvgExternalImageOverlay,
   buildBookPagesFromOutline,
+  applyCustomCoverToPages,
   buildFallbackBookPages,
   extractBookOutlinePageTexts,
   normalizeBookOutlinePage,
   stripBookHtml,
   syncBookOutlineMetadata,
+  updateBookOutlinePage,
+  insertBookOutlinePage,
+  removeBookOutlinePage,
   buildBookAiPrompt,
   parseBookAiResponse,
   buildFallbackBookOutline,
   generateAiBookPages,
+  computeSmartPdfCompressionProfile,
   uploadBookPagesToStorage,
   compactBookPagesForFirestore,
   sanitizeBookForFirestore,
@@ -29,6 +35,12 @@ import {
   calculateDragCurlState,
   clampBookZoom,
   filterBooksCatalog,
+  resolveBookReaderUserKey,
+  getBookBookmarksStorageKey,
+  loadUserBookBookmarks,
+  saveUserBookBookmarks,
+  toggleUserBookBookmark,
+  saveUserBookLastPage,
   playPageFlipSound
 } from '../src/utils/flipbookEngine.js';
 
@@ -425,6 +437,7 @@ check(
 console.log('\n== 8. Interfaz Minimalista, Nomenclatura "Libros" / "Libro" y Estados Vacíos ==');
 const uiFilesToInspect = [
   'src/components/BooksLibraryModule.jsx',
+  'src/components/BookWordEditor.jsx',
   'src/components/Flipbook3DModal.jsx',
   'src/components/TasksTab.jsx',
   'src/components/TaskCard.jsx',
@@ -720,6 +733,277 @@ check(
     tasksTabSrc.includes('bookOutline: sanitizedBook.bookOutline')
 );
 
+console.log('\n== 11. Scroll Completo al Hacer Zoom y Vista Móvil Cómoda (Flipbook3DModal) ==');
+const flipbookModalSrc = fs.readFileSync(new URL('../src/components/Flipbook3DModal.jsx', import.meta.url), 'utf8');
+check(
+  'Flipbook3DModal usa contenedor scrollable con m-auto shrink-0 y dimensiona el layout por zoom para permitir scroll a todos los bordes sin recortar la parte superior/izquierda',
+  flipbookModalSrc.includes('ref={stageScrollRef}') &&
+    flipbookModalSrc.includes('m-auto shrink-0') &&
+    flipbookModalSrc.includes('* ${zoom}') &&
+    flipbookModalSrc.includes('panState')
+);
+check(
+  'Flipbook3DModal optimiza la vista móvil (92vw/76vh, controles de zoom accesibles en móvil y flechas flotantes ocultas en pantallas pequeñas o con zoom)',
+  flipbookModalSrc.includes('min(92vw, 520px)') &&
+    flipbookModalSrc.includes('min(76vh, 720px)') &&
+    flipbookModalSrc.includes('zoom <= 1.05') &&
+    flipbookModalSrc.includes('hidden sm:flex')
+);
+
+console.log('\n== 12. Editor Tipo Documento Word ("Crear libro") e Imágenes en Páginas ==');
+const wordEditorSrc = fs.readFileSync(new URL('../src/components/BookWordEditor.jsx', import.meta.url), 'utf8');
+check(
+  'BookWordEditor está integrado en BooksLibraryModule y TasksTab para editar páginas e insertar imágenes antes de publicar',
+  booksModuleSrc.includes('<BookWordEditor') &&
+    tasksTabSrc.includes('<BookWordEditor') &&
+    wordEditorSrc.includes('handleFieldChange') &&
+    wordEditorSrc.includes('handleInsertNewPage') &&
+    wordEditorSrc.includes('handleDeletePage') &&
+    wordEditorSrc.includes('triggerImageUpload')
+);
+
+const editedOutline = updateBookOutlinePage(
+  fallbackOutlineEn,
+  1,
+  {
+    title: 'Edited Chapter Title',
+    body: ['Custom paragraph 1', 'Custom paragraph 2'],
+    imageUrl: 'https://example.com/chart.png',
+    imageCaption: 'Figure 1: Revenue Growth'
+  },
+  { defaultTitle: 'Corporate Finance Essentials', author: 'Prof. Camilo' }
+);
+const renderedEditedPages = buildBookPagesFromOutline(editedOutline, {
+  themeId: 'royal-indigo',
+  author: 'Prof. Camilo'
+});
+const decodedEditedPage1 = decodeURIComponent(renderedEditedPages[1].replace(/^data:image\/svg\+xml;charset=utf-8,/, ''));
+check(
+  'updateBookOutlinePage actualiza título, párrafos e imagen de una página y buildBookPagesFromOutline incrusta <image> y pie de foto en el SVG',
+  editedOutline[1].title === 'Edited Chapter Title' &&
+    editedOutline[1].imageUrl === 'https://example.com/chart.png' &&
+    editedOutline[1].imageCaption === 'Figure 1: Revenue Growth' &&
+    decodedEditedPage1.includes('<image href="https://example.com/chart.png"') &&
+    decodedEditedPage1.includes('Figure 1: Revenue Growth')
+);
+
+const outlineWithInsertedPage = insertBookOutlinePage(
+  editedOutline,
+  1,
+  {
+    chapter: 'CHAPTER 2B',
+    title: 'Inserted Case Analysis',
+    body: ['New custom section added by teacher.']
+  },
+  { defaultTitle: 'Corporate Finance Essentials', author: 'Prof. Camilo' }
+);
+check(
+  'insertBookOutlinePage inserta una nueva página editable en la posición indicada manteniendo portada al inicio y contraportada al final',
+  outlineWithInsertedPage.length === editedOutline.length + 1 &&
+    outlineWithInsertedPage[0].variant === 'cover' &&
+    outlineWithInsertedPage[2].title === 'Inserted Case Analysis' &&
+    outlineWithInsertedPage[outlineWithInsertedPage.length - 1].variant === 'back-cover'
+);
+
+const outlineAfterRemove = removeBookOutlinePage(outlineWithInsertedPage, 2, {
+  defaultTitle: 'Corporate Finance Essentials',
+  author: 'Prof. Camilo'
+});
+const minThreeOutline = [
+  { variant: 'cover', title: 'Min Book' },
+  { variant: 'content', title: 'Only Chapter', body: ['Text'] },
+  { variant: 'back-cover', title: 'Min Book' }
+];
+const outlineCannotRemoveBelow3 = removeBookOutlinePage(minThreeOutline, 1, { defaultTitle: 'Min Book' });
+check(
+  'removeBookOutlinePage elimina páginas de contenido pero protege el mínimo de 3 páginas (portada + 1 capítulo + contraportada)',
+  outlineAfterRemove.length === editedOutline.length &&
+    outlineCannotRemoveBelow3.length === 3
+);
+
+console.log('\n== 13. Compresión Ligera e Inteligente de PDF (computeSmartPdfCompressionProfile) ==');
+const lightPdfProfile = computeSmartPdfCompressionProfile({
+  fileSizeBytes: 800 * 1024, // 0.8 MB
+  pageCount: 6,
+  scale: 1.55,
+  maxDimension: 1320,
+  quality: 0.82
+});
+const mediumPdfProfile = computeSmartPdfCompressionProfile({
+  fileSizeBytes: 4.5 * 1024 * 1024, // 4.5 MB
+  pageCount: 16
+});
+const heavyPdfProfile = computeSmartPdfCompressionProfile({
+  fileSizeBytes: 15 * 1024 * 1024, // 15 MB
+  pageCount: 40
+});
+check(
+  'computeSmartPdfCompressionProfile aplica compresión ligera e inteligente según peso/páginas manteniendo nitidez (maxDimension >= 1160 y quality >= 0.70)',
+  lightPdfProfile.tier === 'high-clarity' &&
+    lightPdfProfile.maxDimension >= 1280 &&
+    lightPdfProfile.quality >= 0.80 &&
+    mediumPdfProfile.tier === 'light-balanced' &&
+    mediumPdfProfile.maxDimension >= 1220 &&
+    mediumPdfProfile.quality >= 0.76 &&
+    heavyPdfProfile.tier === 'smart-compact' &&
+    heavyPdfProfile.maxDimension >= 1160 &&
+    heavyPdfProfile.quality >= 0.72 &&
+    heavyPdfProfile.adaptiveStepDownQuality >= 0.70
+);
+
+console.log('\n== 14. Portada Personalizada en "Crear libro" y "Subir libro" ==');
+const customCoverSample = 'https://cdn.example.com/custom-book-cover.jpg';
+const pagesWithCustomCover = applyCustomCoverToPages(renderedEditedPages, customCoverSample);
+const outlinePagesWithCustomCover = buildBookPagesFromOutline(editedOutline, {
+  themeId: 'emerald-ledger',
+  author: 'Prof. Camilo',
+  customCoverUrl: customCoverSample
+});
+const sanitizedCustomCoverBook = sanitizeBookForFirestore({
+  id: 'book_custom_cover',
+  title: 'Custom Cover Book',
+  customCoverUrl: customCoverSample,
+  bookOutline: editedOutline,
+  bookPages: []
+});
+const normalizedCustomCoverBook = normalizeBookRecord(sanitizedCustomCoverBook);
+check(
+  'applyCustomCoverToPages, buildBookPagesFromOutline, sanitizeBookForFirestore y normalizeBookRecord aplican y conservan customCoverUrl en la portada (pages[0] y coverUrl)',
+  pagesWithCustomCover[0] === customCoverSample &&
+    pagesWithCustomCover.length === renderedEditedPages.length &&
+    outlinePagesWithCustomCover[0] === customCoverSample &&
+    sanitizedCustomCoverBook.customCoverUrl === customCoverSample &&
+    sanitizedCustomCoverBook.coverUrl === customCoverSample &&
+    sanitizedCustomCoverBook.bookPages[0] === customCoverSample &&
+    normalizedCustomCoverBook.customCoverUrl === customCoverSample &&
+    normalizedCustomCoverBook.coverUrl === customCoverSample &&
+    booksModuleSrc.includes('Portada personalizada') &&
+    tasksTabSrc.includes('Portada personalizada')
+);
+
+console.log('\n== 15. Marcadores de Página Individuales por Usuario y Progreso de Lectura ==');
+const studentAKey = resolveBookReaderUserKey({ uid: 'student_alpha_123', name: 'Ana' });
+const studentBKey = resolveBookReaderUserKey({ uid: 'student_beta_456', name: 'Carlos' });
+check(
+  'resolveBookReaderUserKey genera claves únicas y estables por usuario y aísla sus claves de almacenamiento por libro',
+  studentAKey !== studentBKey &&
+    getBookBookmarksStorageKey('book_macro_1', studentAKey) !== getBookBookmarksStorageKey('book_macro_1', studentBKey) &&
+    getBookBookmarksStorageKey('book_macro_1', studentAKey) !== getBookBookmarksStorageKey('book_macro_2', studentAKey)
+);
+
+const bmToggle1 = toggleUserBookBookmark('book_macro_1', studentAKey, 2, { totalPages: 8 });
+const bmToggle2 = toggleUserBookBookmark('book_macro_1', studentAKey, 5, { totalPages: 8 });
+const bmStudentB = toggleUserBookBookmark('book_macro_1', studentBKey, 1, { totalPages: 8 });
+saveUserBookLastPage('book_macro_1', studentAKey, 4, { totalPages: 8 });
+saveUserBookLastPage('book_macro_1', studentBKey, 6, { totalPages: 8 });
+
+const loadedStudentA = loadUserBookBookmarks('book_macro_1', studentAKey);
+const loadedStudentB = loadUserBookBookmarks('book_macro_1', studentBKey);
+const bmToggleRemove = toggleUserBookBookmark('book_macro_1', studentAKey, 2, { totalPages: 8 });
+
+check(
+  'toggleUserBookBookmark, saveUserBookLastPage y loadUserBookBookmarks guardan, ordenan, desmarcan y aíslan marcadores y última página por cada usuario y libro',
+  bmToggle1.isBookmarked === true &&
+    bmToggle2.isBookmarked === true &&
+    loadedStudentA.bookmarks.length === 2 &&
+    loadedStudentA.bookmarks[0] === 2 &&
+    loadedStudentA.bookmarks[1] === 5 &&
+    loadedStudentA.lastPage === 4 &&
+    bmStudentB.isBookmarked === true &&
+    loadedStudentB.bookmarks.length === 1 &&
+    loadedStudentB.bookmarks[0] === 1 &&
+    loadedStudentB.lastPage === 6 &&
+    bmToggleRemove.isBookmarked === false &&
+    bmToggleRemove.bookmarks.length === 1 &&
+    bmToggleRemove.bookmarks[0] === 5
+);
+check(
+  'Flipbook3DModal incluye cinta interactiva de marcador en la esquina de cada página y panel desplegable "Mis marcadores"',
+  flipbookModalSrc.includes('data-bookmark-ribbon="true"') &&
+    flipbookModalSrc.includes('handleToggleBookmark') &&
+    flipbookModalSrc.includes('activeBookmarkTargetPageIndex') &&
+    flipbookModalSrc.includes('Mis marcadores')
+);
+
+console.log('\n== 16. Pruebas de Regresión: Edición en Vivo, Contraportada, Portada IA, Deduplicación Firestore y Overlay SVG ==');
+const liveTypingOutline = updateBookOutlinePage(
+  fallbackOutlineEn,
+  1,
+  {
+    title: 'Chapter 1 ',
+    subtitle: '',
+    body: ['First paragraph ', ''],
+    bullets: ['Bullet A ', '']
+  },
+  { defaultTitle: 'Corporate Finance Essentials', author: 'Prof. Camilo' }
+);
+check(
+  'updateBookOutlinePage conserva espacios finales y elementos vacíos durante la escritura en vivo en BookWordEditor',
+  liveTypingOutline[1].title === 'Chapter 1 ' &&
+    liveTypingOutline[1].subtitle === '' &&
+    liveTypingOutline[1].body.length === 2 &&
+    liveTypingOutline[1].body[0] === 'First paragraph ' &&
+    liveTypingOutline[1].body[1] === '' &&
+    liveTypingOutline[1].bullets.length === 2 &&
+    liveTypingOutline[1].bullets[0] === 'Bullet A ' &&
+    liveTypingOutline[1].bullets[1] === ''
+);
+
+const backCoverWithBodySvg = buildIllustratedBookPageSvg({
+  variant: 'back-cover',
+  title: 'Executive Closing',
+  subtitle: 'Subtitle on back cover',
+  body: ['Custom closing note paragraph rendered on the back cover.'],
+  totalPages: 6,
+  themeId: 'royal-indigo'
+});
+check(
+  'buildIllustratedBookPageSvg renderiza párrafos body en la contraportada (variant === "back-cover")',
+  decodeURIComponent(backCoverWithBodySvg).includes('Custom closing note paragraph')
+);
+
+const aiWithCustomCover = await generateAiBookPages({
+  title: 'Custom Cover AI Book',
+  pageCount: 4,
+  customCoverUrl: 'https://cdn.example.com/ai-cover.jpg',
+  callGemini: async () => null
+});
+check(
+  'generateAiBookPages aplica customCoverUrl en pages[0], coverUrl y outline[0].imageUrl',
+  aiWithCustomCover.pages[0] === 'https://cdn.example.com/ai-cover.jpg' &&
+    aiWithCustomCover.coverUrl === 'https://cdn.example.com/ai-cover.jpg' &&
+    aiWithCustomCover.outline[0].imageUrl === 'https://cdn.example.com/ai-cover.jpg'
+);
+
+const externalImgOverlay = extractSvgExternalImageOverlay(renderedEditedPages[1]);
+check(
+  'extractSvgExternalImageOverlay extrae coordenadas porcentuales para imágenes http(s) incrustadas en páginas SVG',
+  externalImgOverlay !== null &&
+    externalImgOverlay.href === 'https://example.com/chart.png' &&
+    externalImgOverlay.widthPct > 50 &&
+    externalImgOverlay.heightPct > 10
+);
+
+const duplicatePayloadBook = sanitizeBookForFirestore({
+  id: 'dup_book',
+  title: 'No Duplicate Pages',
+  bookPages: hugeInlinePages.slice(0, 6),
+  pages: hugeInlinePages.slice(0, 6),
+  rawPdfPages: hugeInlinePages.slice(0, 6),
+  bookOutline: [
+    { variant: 'cover', title: 'No Duplicate Pages', imageUrl: hugeInlinePages[0] },
+    { variant: 'content', title: 'Ch 1', body: ['Text'], imageUrl: `data:image/jpeg;base64,${'B'.repeat(90000)}` },
+    { variant: 'back-cover', title: 'No Duplicate Pages' }
+  ]
+});
+const serializedDupBook = JSON.stringify(duplicatePayloadBook);
+check(
+  'sanitizeBookForFirestore elimina propiedades duplicadas (pages, rawPdfPages) y mantiene el documento serializado bajo el presupuesto de Firestore',
+  !('pages' in duplicatePayloadBook) &&
+    !('rawPdfPages' in duplicatePayloadBook) &&
+    serializedDupBook.length < 900000
+);
+
 console.log(`\n========================================`);
 console.log(`Total pruebas Flipbook 3D: ${okCount + failCount} | OK: ${okCount} | FAIL: ${failCount}`);
 console.log(`========================================\n`);
@@ -727,3 +1011,4 @@ console.log(`========================================\n`);
 if (failCount > 0) {
   process.exit(1);
 }
+

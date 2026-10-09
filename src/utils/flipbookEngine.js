@@ -123,12 +123,17 @@ export const buildIllustratedBookPageSvg = ({
     calloutText = '',
     keyTerms = [],
     stats = [],
+    imageUrl = '',
+    imageCaption = '',
+    customCoverUrl = '',
     author = 'English Tech Faculty',
     pageNumber = 1,
     totalPages = 1,
     themeId = 'royal-indigo'
 } = {}) => {
     const theme = getBookTheme(themeId);
+    const cleanImageUrl = String(imageUrl || customCoverUrl || '').trim();
+    const cleanImageCaption = String(imageCaption || '').trim();
 
     if (variant === 'cover') {
         const titleLines = wrapTextLines(title, 22, 3);
@@ -145,6 +150,29 @@ export const buildIllustratedBookPageSvg = ({
                     `<text x="90" y="${535 + idx * 30}" font-family="system-ui, -apple-system, sans-serif" font-size="20" fill="${theme.textLight}" opacity="0.88">${escapeSvgText(line)}</text>`
             )
             .join('');
+
+        const coverVisualSvg = cleanImageUrl
+            ? `<g transform="translate(90, 650)">
+                <defs>
+                    <clipPath id="covImgClip">
+                        <rect width="620" height="255" rx="20" />
+                    </clipPath>
+                </defs>
+                <rect width="620" height="255" rx="20" fill="#000000" fill-opacity="0.32" stroke="#ffffff" stroke-opacity="0.22" />
+                <image href="${escapeSvgText(cleanImageUrl)}" x="0" y="0" width="620" height="255" preserveAspectRatio="xMidYMid slice" clip-path="url(#covImgClip)" />
+                <rect width="620" height="255" rx="20" fill="none" stroke="${theme.accentColor}" stroke-opacity="0.55" stroke-width="2" />
+            </g>`
+            : `<g transform="translate(90, 665)">
+                <rect width="620" height="230" rx="20" fill="#000000" fill-opacity="0.24" stroke="#ffffff" stroke-opacity="0.14" />
+                <polyline points="45,175 145,130 240,150 350,85 455,105 565,45" fill="none" stroke="${theme.accentColor}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+                <circle cx="145" cy="130" r="6" fill="#ffffff" />
+                <circle cx="240" cy="150" r="6" fill="#ffffff" />
+                <circle cx="350" cy="85" r="6" fill="#ffffff" />
+                <circle cx="455" cy="105" r="6" fill="#ffffff" />
+                <circle cx="565" cy="45" r="8" fill="${theme.accentColor}" stroke="#ffffff" stroke-width="2" />
+                <text x="45" y="48" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="bold" fill="${theme.accentColor}" letter-spacing="1.5">TECHNICAL ENGLISH &amp; GLOBAL MARKETS</text>
+                <text x="45" y="205" font-family="system-ui, -apple-system, sans-serif" font-size="13" fill="#cbd5e1">English Tech</text>
+            </g>`;
 
         const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1130" width="800" height="1130">
             <defs>
@@ -171,17 +199,7 @@ export const buildIllustratedBookPageSvg = ({
             <line x1="90" y1="265" x2="260" y2="265" stroke="${theme.accentColor}" stroke-width="5" stroke-linecap="round" />
             ${titleSvg}
             ${subSvg}
-            <g transform="translate(90, 665)">
-                <rect width="620" height="230" rx="20" fill="#000000" fill-opacity="0.24" stroke="#ffffff" stroke-opacity="0.14" />
-                <polyline points="45,175 145,130 240,150 350,85 455,105 565,45" fill="none" stroke="${theme.accentColor}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
-                <circle cx="145" cy="130" r="6" fill="#ffffff" />
-                <circle cx="240" cy="150" r="6" fill="#ffffff" />
-                <circle cx="350" cy="85" r="6" fill="#ffffff" />
-                <circle cx="455" cy="105" r="6" fill="#ffffff" />
-                <circle cx="565" cy="45" r="8" fill="${theme.accentColor}" stroke="#ffffff" stroke-width="2" />
-                <text x="45" y="48" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="bold" fill="${theme.accentColor}" letter-spacing="1.5">TECHNICAL ENGLISH &amp; GLOBAL MARKETS</text>
-                <text x="45" y="205" font-family="system-ui, -apple-system, sans-serif" font-size="13" fill="#cbd5e1">English Tech</text>
-            </g>
+            ${coverVisualSvg}
             <text x="90" y="995" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="bold" fill="${theme.accentColor}" letter-spacing="1.2">AUTHOR / FACULTY</text>
             <text x="90" y="1024" font-family="Georgia, serif" font-size="22" fill="#ffffff">${escapeSvgText(author)}</text>
             <text x="710" y="1024" text-anchor="end" font-family="system-ui, -apple-system, sans-serif" font-size="15" fill="#cbd5e1">${totalPages} Pages</text>
@@ -191,16 +209,34 @@ export const buildIllustratedBookPageSvg = ({
     }
 
     if (variant === 'back-cover') {
-        const summaryLines = wrapTextLines(
-            subtitle || 'Review key concepts and complete the module activities on the class wall.',
-            44,
-            5
-        );
+        const backBodyText = (Array.isArray(body) ? body : [String(body || '')])
+            .map((p) => String(p || '').trim())
+            .filter(Boolean)
+            .join(' ');
+        const primarySummary =
+            subtitle ||
+            (!backBodyText
+                ? 'Review key concepts and complete the module activities on the class wall.'
+                : '');
+        const summaryLines = primarySummary ? wrapTextLines(primarySummary, 44, 4) : [];
+        const bodyExtraLines = backBodyText ? wrapTextLines(backBodyText, 46, 5) : [];
+        let backTextY = 445;
         const summarySvg = summaryLines
-            .map(
-                (line, idx) =>
-                    `<text x="400" y="${450 + idx * 34}" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="20" fill="${theme.textLight}" opacity="0.9">${escapeSvgText(line)}</text>`
-            )
+            .map((line) => {
+                const el = `<text x="400" y="${backTextY}" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="20" fill="${theme.textLight}" opacity="0.9">${escapeSvgText(line)}</text>`;
+                backTextY += 32;
+                return el;
+            })
+            .join('');
+        if (summaryLines.length > 0 && bodyExtraLines.length > 0) {
+            backTextY += 12;
+        }
+        const backBodySvg = bodyExtraLines
+            .map((line) => {
+                const el = `<text x="400" y="${backTextY}" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="18" fill="#e2e8f0" opacity="0.88">${escapeSvgText(line)}</text>`;
+                backTextY += 28;
+                return el;
+            })
             .join('');
 
         const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1130" width="800" height="1130">
@@ -210,6 +246,7 @@ export const buildIllustratedBookPageSvg = ({
             <text x="400" y="292" text-anchor="middle" font-family="Georgia, serif" font-size="34" font-weight="bold" fill="#ffffff">ET</text>
             <text x="400" y="390" text-anchor="middle" font-family="Georgia, serif" font-size="32" font-weight="bold" fill="#ffffff">${escapeSvgText(title.slice(0, 36))}</text>
             ${summarySvg}
+            ${backBodySvg}
             <rect x="230" y="860" width="340" height="90" rx="14" fill="#ffffff" fill-opacity="0.08" stroke="#ffffff" stroke-opacity="0.15" />
             <text x="400" y="900" text-anchor="middle" font-family="monospace" font-size="16" fill="${theme.accentColor}">ISBN 978-958-8400-3D-${String(totalPages).padStart(2, '0')}</text>
             <text x="400" y="928" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="13" fill="#cbd5e1">English Tech</text>
@@ -220,7 +257,9 @@ export const buildIllustratedBookPageSvg = ({
 
     // Standard interior textbook page
     const headingLines = wrapTextLines(title, 32, 2);
-    const paragraphs = Array.isArray(body) ? body : [String(body || '')];
+    const paragraphs = (Array.isArray(body) ? body : [String(body || '')])
+        .map((p) => String(p || '').trim())
+        .filter(Boolean);
     let currentY = 185;
 
     const headingSvg = headingLines
@@ -240,11 +279,15 @@ export const buildIllustratedBookPageSvg = ({
     if (subtitle) currentY += 36;
     else currentY += 12;
 
+    const hasInlineImage = Boolean(cleanImageUrl);
+    const maxBodyY = hasInlineImage ? 510 : 680;
+    const maxBulletsY = hasInlineImage ? 625 : 820;
+
     let bodySvg = '';
-    for (const para of paragraphs.slice(0, 3)) {
-        const lines = wrapTextLines(para, 58, 5);
+    for (const para of paragraphs.slice(0, 4)) {
+        const lines = wrapTextLines(para, 58, hasInlineImage ? 4 : 5);
         for (const line of lines) {
-            if (currentY > 680) break;
+            if (currentY > maxBodyY) break;
             bodySvg += `<text x="72" y="${currentY}" font-family="Georgia, 'Times New Roman', serif" font-size="19" fill="#334155">${escapeSvgText(line)}</text>`;
             currentY += 29;
         }
@@ -252,12 +295,15 @@ export const buildIllustratedBookPageSvg = ({
     }
 
     let bulletsSvg = '';
-    if (Array.isArray(bullets) && bullets.length > 0 && currentY < 760) {
+    const nonEmptyBullets = Array.isArray(bullets)
+        ? bullets.map((b) => String(b || '').trim()).filter(Boolean)
+        : [];
+    if (nonEmptyBullets.length > 0 && currentY < maxBulletsY - 30) {
         bulletsSvg += `<text x="72" y="${currentY + 6}" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="bold" letter-spacing="1.2" fill="${theme.spineColor}">KEY TAKEAWAYS &amp; STRUCTURES</text>`;
         currentY += 32;
-        for (const item of bullets.slice(0, 4)) {
+        for (const item of nonEmptyBullets.slice(0, hasInlineImage ? 3 : 4)) {
             const bLines = wrapTextLines(item, 52, 2);
-            if (currentY > 820) break;
+            if (currentY > maxBulletsY) break;
             bulletsSvg += `<circle cx="84" cy="${currentY - 6}" r="5" fill="${theme.badgeBg}" />`;
             bLines.forEach((bLine, idx) => {
                 bulletsSvg += `<text x="102" y="${currentY + idx * 25}" font-family="system-ui, -apple-system, sans-serif" font-size="17" fill="#1e293b">${escapeSvgText(bLine)}</text>`;
@@ -266,8 +312,32 @@ export const buildIllustratedBookPageSvg = ({
         }
     }
 
+    let imageSvg = '';
+    if (hasInlineImage && currentY < 835) {
+        const imgY = Math.max(currentY + 6, 420);
+        const hasCalloutBelow = Boolean(calloutTitle || calloutText || (Array.isArray(keyTerms) && keyTerms.length > 0));
+        const maxBottomForImg = hasCalloutBelow ? 820 : 965;
+        const imgHeight = Math.max(155, Math.min(245, maxBottomForImg - imgY - (cleanImageCaption ? 28 : 6)));
+        const clipId = `pageImgClip_${pageNumber}`;
+        const captionSvg = cleanImageCaption
+            ? `<text x="400" y="${imgY + imgHeight + 22}" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-style="italic" fill="#475569">${escapeSvgText(cleanImageCaption.slice(0, 74))}</text>`
+            : '';
+        imageSvg = `<g>
+            <defs>
+                <clipPath id="${clipId}">
+                    <rect x="72" y="${imgY}" width="656" height="${imgHeight}" rx="14" />
+                </clipPath>
+            </defs>
+            <rect x="72" y="${imgY}" width="656" height="${imgHeight}" rx="14" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5" />
+            <image href="${escapeSvgText(cleanImageUrl)}" x="72" y="${imgY}" width="656" height="${imgHeight}" preserveAspectRatio="xMidYMid meet" clip-path="url(#${clipId})" />
+            <rect x="72" y="${imgY}" width="656" height="${imgHeight}" rx="14" fill="none" stroke="#cbd5e1" stroke-width="1.5" />
+            ${captionSvg}
+        </g>`;
+        currentY = imgY + imgHeight + (cleanImageCaption ? 34 : 14);
+    }
+
     let statsSvg = '';
-    if (Array.isArray(stats) && stats.length > 0 && currentY < 850) {
+    if (!hasInlineImage && Array.isArray(stats) && stats.length > 0 && currentY < 850) {
         const cardWidth = 195;
         const gap = 16;
         const boxY = Math.max(currentY + 6, 690);
@@ -301,8 +371,8 @@ export const buildIllustratedBookPageSvg = ({
             <text x="98" y="${boxY + 34}" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="bold" letter-spacing="1" fill="${theme.spineColor}">${escapeSvgText((calloutTitle || 'ECONOMIC ENGLISH FOCUS').toUpperCase())}</text>
             ${cTextSvg}
         </g>`;
-    } else if (Array.isArray(keyTerms) && keyTerms.length > 0) {
-        const boxY = 835;
+    } else if (Array.isArray(keyTerms) && keyTerms.length > 0 && currentY < 955) {
+        const boxY = Math.min(Math.max(currentY + 8, 835), 860);
         const termsSvg = keyTerms
             .slice(0, 3)
             .map(
@@ -328,6 +398,7 @@ export const buildIllustratedBookPageSvg = ({
         ${subtitleSvg}
         ${bodySvg}
         ${bulletsSvg}
+        ${imageSvg}
         ${statsSvg}
         ${calloutSvg}
         <line x1="72" y1="1032" x2="728" y2="1032" stroke="#e2e8f0" stroke-width="1.5" />
@@ -339,15 +410,30 @@ export const buildIllustratedBookPageSvg = ({
 };
 
 /**
+ * Applies a custom cover image URL to an array of book pages (replacing the first cover page).
+ */
+export const applyCustomCoverToPages = (pages = [], customCoverUrl = '') => {
+    const cleanCover = String(customCoverUrl || '').trim();
+    const safePages = Array.isArray(pages) ? [...pages] : [];
+    if (!cleanCover) return safePages;
+    if (safePages.length === 0) return [cleanCover];
+    safePages[0] = cleanCover;
+    return safePages;
+};
+
+/**
  * Builds an array of illustrated SVG book pages from a structured outline array.
  */
-export const buildBookPagesFromOutline = (outline = [], { themeId = 'royal-indigo', author = 'English Tech Faculty' } = {}) => {
+export const buildBookPagesFromOutline = (
+    outline = [],
+    { themeId = 'royal-indigo', author = 'English Tech Faculty', customCoverUrl = '' } = {}
+) => {
     const safeOutline = Array.isArray(outline) && outline.length > 0
         ? outline
         : [{ variant: 'cover', title: 'Libro', subtitle: 'Material de lectura' }];
 
     const totalPages = safeOutline.length;
-    return safeOutline.map((pageSpec, idx) =>
+    const rendered = safeOutline.map((pageSpec, idx) =>
         buildIllustratedBookPageSvg({
             ...pageSpec,
             pageNumber: idx + 1,
@@ -356,6 +442,7 @@ export const buildBookPagesFromOutline = (outline = [], { themeId = 'royal-indig
             author: pageSpec.author || author
         })
     );
+    return customCoverUrl ? applyCustomCoverToPages(rendered, customCoverUrl) : rendered;
 };
 
 /**
@@ -366,7 +453,8 @@ export const buildFallbackBookPages = ({
     description = '',
     fileName = '',
     author = 'Docente',
-    themeId = 'royal-indigo'
+    themeId = 'royal-indigo',
+    customCoverUrl = ''
 } = {}) => {
     const cleanTitle = title || fileName || 'Libro';
     const outline = [
@@ -398,7 +486,7 @@ export const buildFallbackBookPages = ({
         }
     ];
 
-    return buildBookPagesFromOutline(outline, { themeId, author });
+    return buildBookPagesFromOutline(outline, { themeId, author, customCoverUrl });
 };
 
 /**
@@ -414,6 +502,7 @@ export const extractBookOutlinePageTexts = (outline = []) => {
             page.subtitle,
             ...(Array.isArray(page.body) ? page.body : []),
             ...(Array.isArray(page.bullets) ? page.bullets : []),
+            page.imageCaption,
             page.calloutTitle,
             page.calloutText,
             ...(Array.isArray(page.keyTerms)
@@ -481,7 +570,7 @@ export const normalizeBookOutlinePage = (rawPage = {}, idx = 0, totalPages = 6, 
                 : String(p || '').trim()
         )
         .filter(Boolean)
-        .slice(0, 4);
+        .slice(0, 6);
 
     const rawBullets = Array.isArray(safePage.bullets)
         ? safePage.bullets
@@ -501,7 +590,7 @@ export const normalizeBookOutlinePage = (rawPage = {}, idx = 0, totalPages = 6, 
             return String(b || '').trim();
         })
         .filter(Boolean)
-        .slice(0, 5);
+        .slice(0, 6);
 
     const rawKeyTerms = Array.isArray(safePage.keyTerms)
         ? safePage.keyTerms
@@ -542,6 +631,8 @@ export const normalizeBookOutlinePage = (rawPage = {}, idx = 0, totalPages = 6, 
 
     const calloutTitle = String(safePage.calloutTitle || safePage.tipTitle || '').trim();
     const calloutText = String(safePage.calloutText || safePage.callout || safePage.tip || '').trim();
+    const imageUrl = String(safePage.imageUrl || safePage.image || '').trim();
+    const imageCaption = String(safePage.imageCaption || safePage.caption || '').trim();
 
     return {
         variant,
@@ -556,7 +647,9 @@ export const normalizeBookOutlinePage = (rawPage = {}, idx = 0, totalPages = 6, 
         keyTerms,
         stats,
         calloutTitle,
-        calloutText
+        calloutText,
+        imageUrl,
+        imageCaption
     };
 };
 
@@ -601,6 +694,127 @@ export const syncBookOutlineMetadata = (outline = [], { title = '', description 
             if (cleanTitle) nextPage.title = cleanTitle;
         }
         return nextPage;
+    });
+};
+
+const preserveEditableOutlineFields = (merged = {}, normalized = {}, fallbackAuthor = 'Docente') => ({
+    ...normalized,
+    chapter: typeof merged.chapter === 'string' ? merged.chapter : normalized.chapter,
+    title: typeof merged.title === 'string' ? merged.title : normalized.title,
+    subtitle: typeof merged.subtitle === 'string' ? merged.subtitle : normalized.subtitle,
+    body: Array.isArray(merged.body)
+        ? merged.body.slice(0, 6).map((p) =>
+              typeof p === 'object' && p !== null
+                  ? String(p.text ?? p.content ?? '')
+                  : String(p ?? '')
+          )
+        : normalized.body,
+    bullets: Array.isArray(merged.bullets)
+        ? merged.bullets.slice(0, 6).map((b) =>
+              typeof b === 'object' && b !== null
+                  ? String(b.text ?? b.title ?? '')
+                  : String(b ?? '')
+          )
+        : normalized.bullets,
+    calloutTitle: typeof merged.calloutTitle === 'string' ? merged.calloutTitle : normalized.calloutTitle,
+    calloutText: typeof merged.calloutText === 'string' ? merged.calloutText : normalized.calloutText,
+    imageUrl: typeof merged.imageUrl === 'string' ? merged.imageUrl.trim() : normalized.imageUrl,
+    imageCaption: typeof merged.imageCaption === 'string' ? merged.imageCaption : normalized.imageCaption,
+    author: merged.author || fallbackAuthor
+});
+
+/**
+ * Updates a specific page in a book outline (Word-style document editing) and returns the normalized outline.
+ */
+export const updateBookOutlinePage = (
+    outline = [],
+    pageIndex = 0,
+    changes = {},
+    { defaultTitle = 'Libro', author = 'Docente' } = {}
+) => {
+    if (!Array.isArray(outline) || outline.length === 0) return [];
+    const safeIdx = Math.min(Math.max(0, Math.floor(Number(pageIndex) || 0)), outline.length - 1);
+    const total = outline.length;
+    const safeChanges = changes && typeof changes === 'object' ? changes : {};
+
+    return outline.map((page, idx) => {
+        const merged = idx === safeIdx ? { ...page, ...safeChanges } : { ...page };
+        const normalized = normalizeBookOutlinePage(merged, idx, total, defaultTitle);
+        return preserveEditableOutlineFields(merged, normalized, author);
+    });
+};
+
+/**
+ * Inserts a new editable content page into a book outline (before the back-cover by default).
+ */
+export const insertBookOutlinePage = (
+    outline = [],
+    afterIndex = null,
+    newPageSpec = {},
+    { defaultTitle = 'Libro', author = 'Docente' } = {}
+) => {
+    const baseList =
+        Array.isArray(outline) && outline.length > 0
+            ? [...outline]
+            : [
+                  { variant: 'cover', title: defaultTitle, subtitle: '' },
+                  { variant: 'back-cover', title: defaultTitle, subtitle: '' }
+              ];
+
+    const insertPos =
+        afterIndex !== null && afterIndex !== undefined && Number.isFinite(Number(afterIndex))
+            ? Math.min(Math.max(1, Math.floor(Number(afterIndex)) + 1), Math.max(1, baseList.length - 1))
+            : Math.max(1, baseList.length - 1);
+
+    const chapterNum = insertPos;
+    const draftPage = {
+        variant: 'content',
+        chapter: newPageSpec.chapter || `CHAPTER ${chapterNum}`,
+        title: newPageSpec.title || `New Section ${chapterNum}`,
+        subtitle: newPageSpec.subtitle || '',
+        body:
+            Array.isArray(newPageSpec.body) && newPageSpec.body.length > 0
+                ? newPageSpec.body
+                : ['Write the main content of this page here.'],
+        bullets: Array.isArray(newPageSpec.bullets) ? newPageSpec.bullets : [],
+        calloutTitle: newPageSpec.calloutTitle || '',
+        calloutText: newPageSpec.calloutText || '',
+        imageUrl: newPageSpec.imageUrl || '',
+        imageCaption: newPageSpec.imageCaption || '',
+        author: newPageSpec.author || author
+    };
+
+    baseList.splice(insertPos, 0, draftPage);
+    const total = baseList.length;
+    return baseList.map((pg, idx) => {
+        const merged = {
+            ...pg,
+            variant: idx === 0 ? 'cover' : idx === total - 1 ? 'back-cover' : 'content'
+        };
+        const normalized = normalizeBookOutlinePage(merged, idx, total, defaultTitle);
+        return preserveEditableOutlineFields(merged, normalized, author);
+    });
+};
+
+/**
+ * Removes an editable page from a book outline while keeping at least cover + 1 content page + back-cover (min 3 pages).
+ */
+export const removeBookOutlinePage = (
+    outline = [],
+    pageIndex = 1,
+    { defaultTitle = 'Libro', author = 'Docente' } = {}
+) => {
+    if (!Array.isArray(outline) || outline.length <= 3) return Array.isArray(outline) ? [...outline] : [];
+    const safeIdx = Math.min(Math.max(1, Math.floor(Number(pageIndex) || 1)), outline.length - 2);
+    const nextList = outline.filter((_, idx) => idx !== safeIdx);
+    const total = nextList.length;
+    return nextList.map((pg, idx) => {
+        const merged = {
+            ...pg,
+            variant: idx === 0 ? 'cover' : idx === total - 1 ? 'back-cover' : 'content'
+        };
+        const normalized = normalizeBookOutlinePage(merged, idx, total, defaultTitle);
+        return preserveEditableOutlineFields(merged, normalized, author);
     });
 };
 
@@ -1120,11 +1334,13 @@ export const generateAiBookPages = async ({
     themeId = 'royal-indigo',
     author = 'Docente',
     category = 'textbook',
+    customCoverUrl = '',
     callGemini = null
 } = {}) => {
     const cleanTopic = stripBookHtml(topic || title) || 'English for Economics';
     const cleanNotes = stripBookHtml(instructions || description);
     const totalPages = Math.max(3, Math.min(14, Number(pageCount) || 6));
+    const cleanCustomCover = String(customCoverUrl || '').trim();
 
     let outline = null;
     let usedFallback = false;
@@ -1164,7 +1380,17 @@ export const generateAiBookPages = async ({
         });
     }
 
-    const pages = buildBookPagesFromOutline(outline, { themeId, author });
+    if (cleanCustomCover && Array.isArray(outline) && outline.length > 0) {
+        outline = outline.map((page, idx) =>
+            idx === 0 ? { ...page, imageUrl: cleanCustomCover } : page
+        );
+    }
+
+    const pages = buildBookPagesFromOutline(outline, {
+        themeId,
+        author,
+        customCoverUrl: cleanCustomCover
+    });
     const pageTexts = extractBookOutlinePageTexts(outline);
 
     return {
@@ -1176,6 +1402,187 @@ export const generateAiBookPages = async ({
         title: outline[0]?.title || cleanTopic,
         usedFallback
     };
+};
+
+/**
+ * Extracts positioned HTML overlay metadata when an SVG data-URL page embeds an external http(s):// <image>.
+ * Browsers block external network requests inside <img src="data:image/svg+xml,...">, so rendering a positioned
+ * HTML <img> overlay guarantees external image URLs display reliably in both the editor and Flipbook3DModal.
+ */
+export const extractSvgExternalImageOverlay = (pageSrc = '') => {
+    if (typeof pageSrc !== 'string' || !pageSrc.startsWith('data:image/svg+xml')) {
+        return null;
+    }
+    if (!pageSrc.includes('http%3A') && !pageSrc.includes('https%3A') && !pageSrc.includes('http:') && !pageSrc.includes('https:')) {
+        return null;
+    }
+    try {
+        const commaIdx = pageSrc.indexOf(',');
+        if (commaIdx < 0) return null;
+        const rawPayload = pageSrc.slice(commaIdx + 1);
+        const decodedSvg = pageSrc.includes(';base64,')
+            ? (typeof atob === 'function' ? atob(rawPayload) : '')
+            : decodeURIComponent(rawPayload);
+        if (!decodedSvg) return null;
+
+        const match = decodedSvg.match(
+            /<image\s+href="((?:https?:)?\/\/[^"]+)"\s+x="([\d.]+)"\s+y="([\d.]+)"\s+width="([\d.]+)"\s+height="([\d.]+)"/i
+        );
+        if (!match) return null;
+
+        const rawHref = match[1]
+            .replace(/&amp;/g, '&')
+            .replace(/&quot;/g, '"')
+            .replace(/&#39;/g, "'")
+            .trim();
+        let x = Number(match[2]) || 0;
+        let y = Number(match[3]) || 0;
+        const width = Number(match[4]) || 0;
+        const height = Number(match[5]) || 0;
+        if (width <= 0 || height <= 0) return null;
+
+        const isCoverGroup = x === 0 && y === 0 && decodedSvg.includes('transform="translate(90, 650)"');
+        if (isCoverGroup) {
+            x = 90;
+            y = 650;
+        }
+
+        return {
+            href: rawHref,
+            leftPct: Number(((x / 800) * 100).toFixed(3)),
+            topPct: Number(((y / 1130) * 100).toFixed(3)),
+            widthPct: Number(((width / 800) * 100).toFixed(3)),
+            heightPct: Number(((height / 1130) * 100).toFixed(3)),
+            objectFit: isCoverGroup ? 'cover' : 'contain'
+        };
+    } catch {
+        return null;
+    }
+};
+
+/**
+ * Computes an intelligent, gentle PDF compression profile based on file size and page count
+ * so heavy PDFs are lightly compressed without losing text sharpness or image clarity.
+ */
+export const computeSmartPdfCompressionProfile = ({
+    fileSizeBytes = 0,
+    pageCount = 1,
+    scale = 1.55,
+    maxDimension = 1320,
+    quality = 0.80,
+    compressionLevel = 'light'
+} = {}) => {
+    const safeBytes = Math.max(0, Number(fileSizeBytes) || 0);
+    const fileSizeMB = safeBytes / (1024 * 1024);
+    const safePages = Math.max(1, Math.floor(Number(pageCount) || 1));
+    const mode = String(compressionLevel || 'light').toLowerCase().trim();
+
+    if (mode === 'none' || mode === 'off') {
+        return {
+            tier: 'original',
+            scale: Math.max(1.2, Math.min(2.0, Number(scale) || 1.6)),
+            maxDimension: Math.max(1100, Math.min(1600, Number(maxDimension) || 1400)),
+            quality: Math.max(0.75, Math.min(0.92, Number(quality) || 0.86)),
+            maxPageChars: 340000,
+            adaptiveStepDownQuality: 0.80
+        };
+    }
+
+    // Heavy PDF (> 8 MB or > 28 pages): light-smart compression while keeping >= 1160px and >= 0.72 quality
+    if (fileSizeMB > 8 || safePages > 28) {
+        return {
+            tier: 'smart-compact',
+            scale: 1.38,
+            maxDimension: 1160,
+            quality: 0.74,
+            maxPageChars: 145000,
+            adaptiveStepDownQuality: 0.70
+        };
+    }
+
+    // Medium PDF (2 MB - 8 MB or 13 - 28 pages): gentle balanced compression
+    if (fileSizeMB >= 2 || safePages > 12) {
+        return {
+            tier: 'light-balanced',
+            scale: 1.46,
+            maxDimension: 1240,
+            quality: 0.78,
+            maxPageChars: 185000,
+            adaptiveStepDownQuality: 0.73
+        };
+    }
+
+    // Light PDF (< 2 MB and <= 12 pages): high clarity with mild optimization
+    return {
+        tier: 'high-clarity',
+        scale: Math.max(1.35, Math.min(1.65, Number(scale) || 1.55)),
+        maxDimension: Math.max(1160, Math.min(1380, Number(maxDimension) || 1320)),
+        quality: Math.max(0.74, Math.min(0.86, Number(quality) || 0.82)),
+        maxPageChars: 235000,
+        adaptiveStepDownQuality: 0.76
+    };
+};
+
+/**
+ * Lightly compresses an image File, Blob, data URL, or CORS-enabled remote image URL for use as a custom book cover or inline page image.
+ */
+export const compressBookImageDataUrl = async (
+    fileOrDataUrl,
+    { maxDimension = 1080, quality = 0.80 } = {}
+) => {
+    if (!fileOrDataUrl) return '';
+    if (typeof document === 'undefined' || typeof Image === 'undefined') {
+        return typeof fileOrDataUrl === 'string' ? fileOrDataUrl.trim() : '';
+    }
+
+    let rawDataUrl = '';
+    if (typeof fileOrDataUrl === 'string') {
+        rawDataUrl = fileOrDataUrl.trim();
+    } else if (typeof FileReader !== 'undefined') {
+        rawDataUrl = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result || ''));
+            reader.onerror = () => reject(new Error('No se pudo leer la imagen.'));
+            reader.readAsDataURL(fileOrDataUrl);
+        });
+    }
+
+    if (!rawDataUrl || rawDataUrl.startsWith('data:image/svg+xml')) {
+        return rawDataUrl;
+    }
+
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+            try {
+                const origW = img.naturalWidth || img.width || 800;
+                const origH = img.naturalHeight || img.height || 1000;
+                const longest = Math.max(origW, origH, 1);
+                const ratio = longest > maxDimension ? maxDimension / longest : 1;
+                const targetW = Math.max(1, Math.round(origW * ratio));
+                const targetH = Math.max(1, Math.round(origH * ratio));
+
+                const canvas = document.createElement('canvas');
+                canvas.width = targetW;
+                canvas.height = targetH;
+                const ctx = canvas.getContext('2d', { alpha: false });
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, targetW, targetH);
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+                ctx.drawImage(img, 0, 0, targetW, targetH);
+
+                const safeQuality = Math.max(0.68, Math.min(0.92, Number(quality) || 0.80));
+                const compressed = canvas.toDataURL('image/jpeg', safeQuality);
+                resolve(compressed || rawDataUrl);
+            } catch {
+                resolve(rawDataUrl);
+            }
+        };
+        img.onerror = () => resolve(rawDataUrl);
+        img.src = rawDataUrl;
+    });
 };
 
 /**
@@ -1200,15 +1607,17 @@ const getPdfJs = async () => {
 };
 
 /**
- * Renders a PDF (File, Blob, ArrayBuffer, or URL) into an array of compressed JPEG page data URLs.
+ * Renders a PDF (File, Blob, ArrayBuffer, or URL) into an array of lightly compressed JPEG page data URLs.
  */
 export const renderPdfToBookPages = async (
     source,
     {
         maxPages = 60,
-        scale = 1.6,
-        maxDimension = 1350,
-        quality = 0.82,
+        scale = 1.55,
+        maxDimension = 1320,
+        quality = 0.80,
+        compressionLevel = 'light',
+        customCoverUrl = '',
         onProgress
     } = {}
 ) => {
@@ -1219,16 +1628,20 @@ export const renderPdfToBookPages = async (
     const pdfjsLib = await getPdfJs();
     let docParams = null;
     let rawBytes = null;
+    let sourceSizeBytes = Number(source?.size || source?.byteLength || 0);
 
     if (typeof source === 'string') {
         docParams = { url: source, withCredentials: false };
     } else if (source instanceof ArrayBuffer) {
         rawBytes = new Uint8Array(source.slice(0));
+        sourceSizeBytes = rawBytes.byteLength;
     } else if (ArrayBuffer.isView(source)) {
         rawBytes = new Uint8Array(source.buffer.slice(source.byteOffset, source.byteOffset + source.byteLength));
+        sourceSizeBytes = rawBytes.byteLength;
     } else if (source && typeof source.arrayBuffer === 'function') {
         const buffer = await source.arrayBuffer();
         rawBytes = new Uint8Array(buffer);
+        sourceSizeBytes = rawBytes.byteLength;
     } else if (source && source.url) {
         docParams = { url: source.url, withCredentials: false };
     } else {
@@ -1257,6 +1670,15 @@ export const renderPdfToBookPages = async (
 
     const originalPageCount = pdf.numPages || 1;
     const totalPages = Math.min(originalPageCount, Math.max(1, maxPages));
+    const compressionProfile = computeSmartPdfCompressionProfile({
+        fileSizeBytes: sourceSizeBytes,
+        pageCount: totalPages,
+        scale,
+        maxDimension,
+        quality,
+        compressionLevel
+    });
+
     const pages = [];
     const pageTexts = [];
     let aspectRatio = DEFAULT_BOOK_ASPECT_RATIO;
@@ -1268,10 +1690,12 @@ export const renderPdfToBookPages = async (
             aspectRatio = Number((baseViewport.width / baseViewport.height).toFixed(3));
         }
 
-        const longestSide = Math.max(baseViewport.width * scale, baseViewport.height * scale);
-        const effectiveScale = longestSide > maxDimension
-            ? (maxDimension / Math.max(baseViewport.width, baseViewport.height))
-            : scale;
+        const targetScale = compressionProfile.scale;
+        const targetMaxDim = compressionProfile.maxDimension;
+        const longestSide = Math.max(baseViewport.width * targetScale, baseViewport.height * targetScale);
+        const effectiveScale = longestSide > targetMaxDim
+            ? (targetMaxDim / Math.max(baseViewport.width, baseViewport.height))
+            : targetScale;
 
         const viewport = page.getViewport({ scale: effectiveScale });
         const canvas = document.createElement('canvas');
@@ -1281,13 +1705,22 @@ export const renderPdfToBookPages = async (
         const ctx = canvas.getContext('2d', { alpha: false });
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
 
         await page.render({
             canvasContext: ctx,
             viewport
         }).promise;
 
-        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        let dataUrl = canvas.toDataURL('image/jpeg', compressionProfile.quality);
+        // Gentle adaptive step-down if a single page has very heavy dense imagery
+        if (
+            dataUrl.length > compressionProfile.maxPageChars &&
+            compressionProfile.adaptiveStepDownQuality < compressionProfile.quality
+        ) {
+            dataUrl = canvas.toDataURL('image/jpeg', compressionProfile.adaptiveStepDownQuality);
+        }
         pages.push(dataUrl);
 
         try {
@@ -1313,13 +1746,17 @@ export const renderPdfToBookPages = async (
         }
     }
 
+    const finalPages = customCoverUrl ? applyCustomCoverToPages(pages, customCoverUrl) : pages;
+
     return {
-        pages,
+        pages: finalPages,
+        rawPdfPages: pages,
         pageTexts,
-        pageCount: pages.length,
+        pageCount: finalPages.length,
         originalPageCount,
         aspectRatio,
-        coverUrl: pages[0] || ''
+        coverUrl: finalPages[0] || '',
+        compressionProfile
     };
 };
 
@@ -1374,7 +1811,9 @@ export const compactBookPagesForFirestore = (
     {
         maxTotalChars = MAX_TOTAL_FIRESTORE_BOOK_CHARS,
         fallbackTitle = 'Libro',
-        themeId = 'royal-indigo'
+        themeId = 'royal-indigo',
+        bookOutline = [],
+        author = 'Docente'
     } = {}
 ) => {
     if (!Array.isArray(pages) || pages.length === 0) return [];
@@ -1397,19 +1836,28 @@ export const compactBookPagesForFirestore = (
             totalChars += raw.length;
             result.push(raw);
         } else {
-            // Replace overflow inline base64 page with a lightweight SVG page (~2KB)
-            const compactSvg = buildIllustratedBookPageSvg({
-                variant: 'content',
-                chapter: 'CONTENIDO',
-                title: `${fallbackTitle} — Página ${i + 1}`,
-                subtitle: '',
-                body: [
-                    'Usa el botón PDF para abrir el documento completo.'
-                ],
-                pageNumber: i + 1,
-                totalPages: pages.length,
-                themeId
-            });
+            const outlineSpec = Array.isArray(bookOutline) && bookOutline[i] ? bookOutline[i] : null;
+            // Replace overflow inline base64 page with a lightweight SVG page (~2KB) preserving outline text if available
+            const compactSvg = outlineSpec
+                ? buildIllustratedBookPageSvg({
+                      ...outlineSpec,
+                      imageUrl: outlineSpec.imageUrl && !String(outlineSpec.imageUrl).startsWith('data:') ? outlineSpec.imageUrl : '',
+                      customCoverUrl: '',
+                      pageNumber: i + 1,
+                      totalPages: pages.length,
+                      themeId: outlineSpec.themeId || themeId,
+                      author: outlineSpec.author || author
+                  })
+                : buildIllustratedBookPageSvg({
+                      variant: 'content',
+                      chapter: 'CONTENIDO',
+                      title: `${fallbackTitle} — Página ${i + 1}`,
+                      subtitle: '',
+                      body: ['Usa el botón PDF para abrir el documento completo.'],
+                      pageNumber: i + 1,
+                      totalPages: pages.length,
+                      themeId
+                  });
             if (totalChars + compactSvg.length <= maxTotalChars + 40000) {
                 totalChars += compactSvg.length;
                 result.push(compactSvg);
@@ -1424,6 +1872,12 @@ export const compactBookPagesForFirestore = (
  * Normalizes and sanitizes a Book record before saving to Firestore or rendering.
  */
 export const sanitizeBookForFirestore = (book = {}) => {
+    const {
+        pages: _ignoredLegacyPages,
+        rawPdfPages: _ignoredRawPdfPages,
+        ...restBook
+    } = book && typeof book === 'object' ? book : {};
+
     const rawPages = Array.isArray(book.bookPages) && book.bookPages.length > 0
         ? book.bookPages
         : Array.isArray(book.pages) && book.pages.length > 0
@@ -1436,33 +1890,77 @@ export const sanitizeBookForFirestore = (book = {}) => {
     const theme = BOOK_THEMES[rawTheme] ? rawTheme : 'royal-indigo';
     const rawCat = book.category || book.bookCategory;
     const validCat = BOOK_CATEGORIES.some((c) => c.id === rawCat) ? rawCat : 'textbook';
-    const bookOutline = Array.isArray(book.bookOutline)
+    const authorName = book.authorName || book.author || 'Docente';
+    const rawCustomCover = String(book.customCoverUrl || '').trim();
+    const customCoverUrl =
+        rawCustomCover.startsWith('data:') && rawCustomCover.length > 260000
+            ? ''
+            : rawCustomCover;
+
+    const rawOutline = Array.isArray(book.bookOutline)
         ? book.bookOutline.map((p, idx, arr) => ({
               ...normalizeBookOutlinePage(p, idx, arr.length, title),
-              author: p?.author || book.authorName || book.author || 'Docente'
+              author: p?.author || authorName
           }))
         : [];
 
-    const compactedPages = compactBookPagesForFirestore(rawPages, {
-        maxTotalChars: MAX_TOTAL_FIRESTORE_BOOK_CHARS,
+    const pagesBudget = Math.max(
+        240000,
+        MAX_TOTAL_FIRESTORE_BOOK_CHARS - (customCoverUrl.startsWith('data:') ? customCoverUrl.length : 0)
+    );
+
+    const baseSourcePages =
+        rawPages.length > 0
+            ? rawPages
+            : rawOutline.length > 0
+                ? buildBookPagesFromOutline(rawOutline, {
+                      themeId: theme,
+                      author: authorName,
+                      customCoverUrl
+                  })
+                : buildFallbackBookPages({
+                      title,
+                      description: cleanDescription,
+                      fileName: book.fileName || '',
+                      author: authorName,
+                      themeId: theme,
+                      customCoverUrl
+                  });
+
+    const pagesWithCover = customCoverUrl
+        ? applyCustomCoverToPages(baseSourcePages, customCoverUrl)
+        : baseSourcePages;
+
+    const finalPages = compactBookPagesForFirestore(pagesWithCover, {
+        maxTotalChars: pagesBudget,
         fallbackTitle: title,
-        themeId: theme
+        themeId: theme,
+        bookOutline: rawOutline,
+        author: authorName
     });
 
-    const finalPages = compactedPages.length > 0
-        ? compactedPages
-        : bookOutline.length > 0
-            ? buildBookPagesFromOutline(bookOutline, {
-                themeId: theme,
-                author: book.authorName || book.author || 'Docente'
-            })
-            : buildFallbackBookPages({
-                title,
-                description: cleanDescription,
-                fileName: book.fileName || '',
-                author: book.authorName || 'Docente',
-                themeId: theme
-            });
+    // Avoid duplicating large inline data:image/* base64 strings inside bookOutline when finalPages already stores them
+    let runningChars =
+        finalPages.reduce((sum, p) => sum + (typeof p === 'string' ? p.length : 0), 0) +
+        (customCoverUrl.startsWith('data:') ? customCoverUrl.length : 0);
+
+    const bookOutline = rawOutline.map((p) => {
+        const img = String(p?.imageUrl || '');
+        if (img.startsWith('data:') && runningChars + img.length > MAX_TOTAL_FIRESTORE_BOOK_CHARS) {
+            return { ...p, imageUrl: '' };
+        }
+        runningChars += img.length;
+        return p;
+    });
+
+    const resolvedCover = customCoverUrl || finalPages[0] || book.coverUrl || '';
+    const coverUrl =
+        resolvedCover.startsWith('data:') &&
+        runningChars + resolvedCover.length > MAX_TOTAL_FIRESTORE_BOOK_CHARS + 120000 &&
+        finalPages[0] &&
+        !finalPages[0].startsWith('data:image/jpeg')
+            ? finalPages[0]
+            : resolvedCover;
 
     const pageTexts = Array.isArray(book.pageTexts) && book.pageTexts.length > 0
         ? book.pageTexts.slice(0, finalPages.length).map((t) => String(t || '').slice(0, 320))
@@ -1471,15 +1969,16 @@ export const sanitizeBookForFirestore = (book = {}) => {
             : [];
 
     return {
-        ...book,
+        ...restBook,
         title,
         description: cleanDescription,
         category: validCat,
         theme,
+        customCoverUrl,
         bookPages: finalPages,
         pageTexts,
         bookOutline,
-        coverUrl: finalPages[0] || book.coverUrl || '',
+        coverUrl,
         pageCount: Number(book.pageCount) || finalPages.length,
         pdfUrl: book.pdfUrl || book.fileUrl || '',
         fileUrl: book.fileUrl || book.pdfUrl || '',
@@ -1501,6 +2000,7 @@ export const normalizeBookRecord = (item = {}) => {
             description: '',
             category: 'textbook',
             theme: 'royal-indigo',
+            customCoverUrl: '',
             bookPages: fallback,
             pageTexts: [],
             bookOutline: [],
@@ -1513,12 +2013,14 @@ export const normalizeBookRecord = (item = {}) => {
         };
     }
 
-    const pages = Array.isArray(item.bookPages) && item.bookPages.length > 0
+    const rawPages = Array.isArray(item.bookPages) && item.bookPages.length > 0
         ? item.bookPages
         : Array.isArray(item.pages) && item.pages.length > 0
             ? item.pages
             : [];
 
+    const customCoverUrl = String(item.customCoverUrl || '').trim();
+    const pages = customCoverUrl && rawPages.length > 0 ? applyCustomCoverToPages(rawPages, customCoverUrl) : rawPages;
     const pdfUrl = item.pdfUrl || item.fileUrl || item.documentUrl || '';
     const title = stripBookHtml(item.title || item.documentTitle || item.fileName) || 'Libro';
     const rawTheme = item.theme || item.bookTheme;
@@ -1534,10 +2036,11 @@ export const normalizeBookRecord = (item = {}) => {
         description: stripBookHtml(item.description || ''),
         category: validCat,
         theme,
+        customCoverUrl,
         bookPages: pages,
         pageTexts: Array.isArray(item.pageTexts) ? item.pageTexts : [],
         bookOutline,
-        coverUrl: pages[0] || item.coverUrl || '',
+        coverUrl: customCoverUrl || pages[0] || item.coverUrl || '',
         pageCount: pages.length || Number(item.pageCount) || 0,
         pdfUrl,
         fileUrl: item.fileUrl || pdfUrl,
@@ -1702,6 +2205,189 @@ export const filterBooksCatalog = (books = [], { query = '', category = 'all' } 
             .toLowerCase();
         return haystack.includes(cleanQuery);
     });
+};
+
+/**
+ * Per-user (student or teacher) page bookmarks & reading progress manager.
+ * Uses localStorage in the browser with an automatic in-memory fallback for SSR / Node tests.
+ */
+const memoryBookmarksStore = new Map();
+
+export const resolveBookReaderUserKey = (userOrInput = null) => {
+    if (!userOrInput) return 'guest';
+    if (typeof userOrInput === 'string') {
+        const cleaned = userOrInput
+            .trim()
+            .toLowerCase()
+            .replace(/^@+/, '')
+            .replace(/[^a-z0-9_.-]/g, '_');
+        return cleaned || 'guest';
+    }
+    if (typeof userOrInput === 'object') {
+        const raw =
+            userOrInput.myChatId ||
+            userOrInput.userId ||
+            userOrInput.uid ||
+            userOrInput.email ||
+            userOrInput.loggedInName ||
+            userOrInput.displayName ||
+            userOrInput.role ||
+            'guest';
+        return resolveBookReaderUserKey(String(raw));
+    }
+    return 'guest';
+};
+
+export const getBookBookmarksStorageKey = (bookId = 'book_default', userOrKey = 'guest') => {
+    const cleanBookId = String(bookId || 'book_default')
+        .trim()
+        .replace(/[^a-zA-Z0-9_.-]/g, '_');
+    const cleanUser = resolveBookReaderUserKey(userOrKey);
+    return `et_book_bookmarks_v1_${cleanUser}_${cleanBookId}`;
+};
+
+const getEffectiveBookmarkStorage = (explicitStorage = null) => {
+    if (explicitStorage && typeof explicitStorage.getItem === 'function') {
+        return explicitStorage;
+    }
+    try {
+        if (typeof window !== 'undefined' && window.localStorage) {
+            return window.localStorage;
+        }
+    } catch {
+        // Ignore storage security errors
+    }
+    return null;
+};
+
+export const loadUserBookBookmarks = (bookId = 'book_default', userOrKey = 'guest', storage = null) => {
+    const key = getBookBookmarksStorageKey(bookId, userOrKey);
+    const store = getEffectiveBookmarkStorage(storage);
+    let rawJson = null;
+
+    if (store) {
+        try {
+            rawJson = store.getItem(key);
+        } catch {
+            rawJson = null;
+        }
+    }
+    if (!rawJson && memoryBookmarksStore.has(key)) {
+        rawJson = memoryBookmarksStore.get(key);
+    }
+
+    if (!rawJson) {
+        return { bookId: String(bookId || 'book_default'), userKey: resolveBookReaderUserKey(userOrKey), bookmarks: [], lastPage: 0, updatedAt: 0 };
+    }
+
+    try {
+        const parsed = typeof rawJson === 'string' ? JSON.parse(rawJson) : rawJson;
+        const rawList = Array.isArray(parsed?.bookmarks) ? parsed.bookmarks : [];
+        const bookmarks = Array.from(
+            new Set(
+                rawList
+                    .map((n) => Math.floor(Number(n)))
+                    .filter((n) => Number.isFinite(n) && n >= 0)
+            )
+        ).sort((a, b) => a - b);
+        const lastPage = Math.max(0, Math.floor(Number(parsed?.lastPage) || 0));
+        return {
+            bookId: String(bookId || 'book_default'),
+            userKey: resolveBookReaderUserKey(userOrKey),
+            bookmarks,
+            lastPage,
+            updatedAt: Number(parsed?.updatedAt) || 0
+        };
+    } catch {
+        return { bookId: String(bookId || 'book_default'), userKey: resolveBookReaderUserKey(userOrKey), bookmarks: [], lastPage: 0, updatedAt: 0 };
+    }
+};
+
+export const saveUserBookBookmarks = (
+    bookId = 'book_default',
+    userOrKey = 'guest',
+    state = {},
+    storage = null
+) => {
+    const key = getBookBookmarksStorageKey(bookId, userOrKey);
+    const store = getEffectiveBookmarkStorage(storage);
+    const rawList = Array.isArray(state?.bookmarks) ? state.bookmarks : [];
+    const bookmarks = Array.from(
+        new Set(
+            rawList
+                .map((n) => Math.floor(Number(n)))
+                .filter((n) => Number.isFinite(n) && n >= 0)
+        )
+    ).sort((a, b) => a - b);
+    const lastPage = Math.max(0, Math.floor(Number(state?.lastPage) || 0));
+    const record = {
+        bookId: String(bookId || 'book_default'),
+        userKey: resolveBookReaderUserKey(userOrKey),
+        bookmarks,
+        lastPage,
+        updatedAt: Date.now()
+    };
+    const serialized = JSON.stringify(record);
+    memoryBookmarksStore.set(key, serialized);
+    if (store && typeof store.setItem === 'function') {
+        try {
+            store.setItem(key, serialized);
+        } catch {
+            // Ignore quota errors
+        }
+    }
+    return record;
+};
+
+export const toggleUserBookBookmark = (
+    bookId = 'book_default',
+    userOrKey = 'guest',
+    pageIndex = 0,
+    { totalPages = 999, storage = null } = {}
+) => {
+    const maxIdx = Math.max(0, (Number(totalPages) || 999) - 1);
+    const safePage = Math.min(Math.max(0, Math.floor(Number(pageIndex) || 0)), maxIdx);
+    const current = loadUserBookBookmarks(bookId, userOrKey, storage);
+    const exists = current.bookmarks.includes(safePage);
+    const nextBookmarks = exists
+        ? current.bookmarks.filter((p) => p !== safePage)
+        : [...current.bookmarks, safePage].sort((a, b) => a - b);
+
+    const saved = saveUserBookBookmarks(
+        bookId,
+        userOrKey,
+        {
+            bookmarks: nextBookmarks,
+            lastPage: current.lastPage
+        },
+        storage
+    );
+
+    return {
+        ...saved,
+        isBookmarked: !exists,
+        toggledPage: safePage
+    };
+};
+
+export const saveUserBookLastPage = (
+    bookId = 'book_default',
+    userOrKey = 'guest',
+    pageIndex = 0,
+    { totalPages = 999, storage = null } = {}
+) => {
+    const maxIdx = Math.max(0, (Number(totalPages) || 999) - 1);
+    const safePage = Math.min(Math.max(0, Math.floor(Number(pageIndex) || 0)), maxIdx);
+    const current = loadUserBookBookmarks(bookId, userOrKey, storage);
+    return saveUserBookBookmarks(
+        bookId,
+        userOrKey,
+        {
+            bookmarks: current.bookmarks,
+            lastPage: safePage
+        },
+        storage
+    );
 };
 
 /**

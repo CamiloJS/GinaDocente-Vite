@@ -17,8 +17,9 @@ import GeniallyEmbedPlayer, { extractGeniallyUrl } from './GeniallyEmbedPlayer.j
 import { DEMO_TTL_MS, saveDemoSandboxItem } from '../utils/demoData.js'
 import { getCanonicalTeacherId, getItemTeacherId, getTeacherDisplayName, uploadImageToStorage, uploadRawFileToStorage, generateId } from '../utils/helpers.js'
 import { createDefaultKahootQuestion, validateKahootConfig, generateKahootPin } from '../utils/kahootEngine.js'
-import { BOOK_THEMES, renderPdfToBookPages, uploadBookPagesToStorage, sanitizeBookForFirestore, buildFallbackBookPages, buildBookPagesFromOutline, extractBookOutlinePageTexts, syncBookOutlineMetadata, stripBookHtml, generateAiBookPages } from '../utils/flipbookEngine.js'
+import { BOOK_THEMES, renderPdfToBookPages, uploadBookPagesToStorage, sanitizeBookForFirestore, buildFallbackBookPages, buildBookPagesFromOutline, extractBookOutlinePageTexts, syncBookOutlineMetadata, stripBookHtml, generateAiBookPages, applyCustomCoverToPages, compressBookImageDataUrl } from '../utils/flipbookEngine.js'
 import Flipbook3DModal from './Flipbook3DModal.jsx'
+import BookWordEditor from './BookWordEditor.jsx'
 
 const TasksTab = React.memo(({
 
@@ -67,6 +68,8 @@ const TasksTab = React.memo(({
     const [book3dPages, setBook3dPages] = useState([]);
     const [book3dPageTexts, setBook3dPageTexts] = useState([]);
     const [book3dOutline, setBook3dOutline] = useState([]);
+    const [book3dCustomCover, setBook3dCustomCover] = useState('');
+    const [book3dRawPdfFirstPage, setBook3dRawPdfFirstPage] = useState('');
     const [book3dPageCount, setBook3dPageCount] = useState(6);
     const [book3dLanguage, setBook3dLanguage] = useState('Inglés');
     const [isGeneratingBook3d, setIsGeneratingBook3d] = useState(false);
@@ -76,6 +79,7 @@ const TasksTab = React.memo(({
     const [book3dProgress, setBook3dProgress] = useState({ phase: '', currentPage: 0, totalPages: 0, percent: 0 });
     const [book3dPreviewModal, setBook3dPreviewModal] = useState(null);
     const book3dFileInputRef = useRef(null);
+    const book3dCoverInputRef = useRef(null);
 
     const handleSwitchBook3dMode = (nextMode) => {
         if (nextMode === book3dMode) return;
@@ -84,11 +88,13 @@ const TasksTab = React.memo(({
                 setBook3dPages([]);
                 setBook3dPageTexts([]);
                 setBook3dOutline([]);
+                setBook3dRawPdfFirstPage('');
                 setBook3dAspectRatio(0.707);
             }
         } else if (nextMode === 'create') {
             if (book3dPdfFile || book3dOutline.length === 0) {
                 setBook3dPdfFile(null);
+                setBook3dRawPdfFirstPage('');
                 setBook3dPages([]);
                 setBook3dPageTexts([]);
                 setBook3dOutline([]);
@@ -111,9 +117,86 @@ const TasksTab = React.memo(({
             setBook3dPages(
                 buildBookPagesFromOutline(syncedOutline, {
                     themeId: newThemeId,
-                    author: loggedInName || 'Docente'
+                    author: loggedInName || 'Docente',
+                    customCoverUrl: book3dCustomCover
                 })
             );
+        }
+    };
+
+    const handleBook3dOutlineChange = (nextOutline) => {
+        setBook3dOutline(nextOutline);
+        if (Array.isArray(nextOutline) && nextOutline[0]?.title && typeof setTaskTitle === 'function') {
+            setTaskTitle(nextOutline[0].title);
+        }
+        const coverPageImage =
+            Array.isArray(nextOutline) && typeof nextOutline[0]?.imageUrl === 'string'
+                ? nextOutline[0].imageUrl
+                : book3dCustomCover;
+        if (coverPageImage !== book3dCustomCover) {
+            setBook3dCustomCover(coverPageImage);
+        }
+        setBook3dPages(
+            buildBookPagesFromOutline(nextOutline, {
+                themeId: book3dTheme,
+                author: loggedInName || 'Docente',
+                customCoverUrl: coverPageImage
+            })
+        );
+        setBook3dPageTexts(extractBookOutlinePageTexts(nextOutline));
+    };
+
+    const handleSelectBook3dCustomCover = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+            const compressedCover = await compressBookImageDataUrl(file, {
+                maxDimension: 1200,
+                quality: 0.84
+            });
+            if (!compressedCover) return;
+            setBook3dCustomCover(compressedCover);
+            if (Array.isArray(book3dOutline) && book3dOutline.length > 0 && !book3dPdfFile) {
+                const updatedOutline = book3dOutline.map((p, idx) =>
+                    idx === 0 ? { ...p, imageUrl: compressedCover } : p
+                );
+                setBook3dOutline(updatedOutline);
+                setBook3dPages(
+                    buildBookPagesFromOutline(updatedOutline, {
+                        themeId: book3dTheme,
+                        author: loggedInName || 'Docente',
+                        customCoverUrl: compressedCover
+                    })
+                );
+            } else if (book3dPages.length > 0) {
+                setBook3dPages((prev) => {
+                    if (!book3dRawPdfFirstPage && prev[0] && prev[0] !== compressedCover) {
+                        setBook3dRawPdfFirstPage(prev[0]);
+                    }
+                    return applyCustomCoverToPages(prev, compressedCover);
+                });
+            }
+            showMessage('📚 Portada personalizada aplicada.');
+        } catch (err) {
+            console.warn('No se pudo aplicar la portada personalizada:', err);
+        }
+    };
+
+    const handleClearBook3dCustomCover = () => {
+        setBook3dCustomCover('');
+        if (book3dCoverInputRef.current) book3dCoverInputRef.current.value = '';
+        if (Array.isArray(book3dOutline) && book3dOutline.length > 0 && !book3dPdfFile) {
+            const updatedOutline = book3dOutline.map((p, idx) => (idx === 0 ? { ...p, imageUrl: '' } : p));
+            setBook3dOutline(updatedOutline);
+            setBook3dPages(
+                buildBookPagesFromOutline(updatedOutline, {
+                    themeId: book3dTheme,
+                    author: loggedInName || 'Docente',
+                    customCoverUrl: ''
+                })
+            );
+        } else if (book3dRawPdfFirstPage) {
+            setBook3dPages((prev) => applyCustomCoverToPages(prev, book3dRawPdfFirstPage));
         }
     };
 
@@ -136,6 +219,7 @@ const TasksTab = React.memo(({
                 themeId: book3dTheme,
                 author: loggedInName || 'Docente',
                 category: 'textbook',
+                customCoverUrl: book3dCustomCover,
                 callGemini
             });
             setBook3dOutline(generated.outline || []);
@@ -143,6 +227,7 @@ const TasksTab = React.memo(({
             setBook3dPageTexts(generated.pageTexts || []);
             setBook3dAspectRatio(0.707);
             setBook3dPdfFile(null);
+            setBook3dRawPdfFirstPage('');
             showMessage(`📚 Libro listo (${generated.pages.length} págs).`);
             return generated;
         } catch (err) {
@@ -163,6 +248,7 @@ const TasksTab = React.memo(({
         }
         setBook3dPdfFile(file);
         setBook3dOutline([]);
+        setBook3dRawPdfFirstPage('');
         if (!(taskTitle || '').trim() && typeof setTaskTitle === 'function') {
             setTaskTitle(file.name.replace(/\.pdf$/i, '').replace(/[-_]+/g, ' ').trim());
         }
@@ -177,10 +263,14 @@ const TasksTab = React.memo(({
                 onProgress: (prog) => setBook3dProgress(prog)
             });
             if (Array.isArray(rendered?.pages) && rendered.pages.length > 0) {
-                setBook3dPages(rendered.pages);
+                setBook3dRawPdfFirstPage(rendered.pages[0] || '');
+                const finalPages = book3dCustomCover
+                    ? applyCustomCoverToPages(rendered.pages, book3dCustomCover)
+                    : rendered.pages;
+                setBook3dPages(finalPages);
                 setBook3dPageTexts(rendered.pageTexts || []);
                 setBook3dAspectRatio(rendered.aspectRatio || 0.707);
-                showMessage(`📚 PDF listo (${rendered.pages.length} págs).`);
+                showMessage(`📚 PDF listo (${finalPages.length} págs).`);
             }
         } catch (err) {
             console.error('Error renderizando PDF a libro:', err);
@@ -189,8 +279,10 @@ const TasksTab = React.memo(({
                 description: stripBookHtml(taskDesc || ''),
                 fileName: file.name,
                 author: loggedInName || 'Docente',
-                themeId: book3dTheme
+                themeId: book3dTheme,
+                customCoverUrl: book3dCustomCover
             });
+            setBook3dRawPdfFirstPage(fallback[0] || '');
             setBook3dPages(fallback);
         } finally {
             setIsRenderingBook3d(false);
@@ -608,8 +700,11 @@ const TasksTab = React.memo(({
                 bookTheme: bk.theme || bk.bookTheme || 'royal-indigo',
                 aspectRatio: bk.aspectRatio || 0.707,
                 pageCount: pageCountNum,
+                customCoverUrl: bk.customCoverUrl || '',
                 coverUrl: bk.coverUrl || firstPageSrc || '',
                 bookPages: rawPages,
+                pageTexts: Array.isArray(bk.pageTexts) ? bk.pageTexts : [],
+                bookOutline: Array.isArray(bk.bookOutline) ? bk.bookOutline : [],
                 pdfUrl: bk.pdfUrl || bk.fileUrl || '',
                 fileUrl: bk.pdfUrl || bk.fileUrl || '',
                 fileName: bk.pdfFileName || bk.fileName || `${bk.title || 'Libro'}.pdf`,
@@ -1525,6 +1620,38 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                     )}
 
                                     <div className="space-y-2">
+                                        <input
+                                            ref={book3dCoverInputRef}
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleSelectBook3dCustomCover}
+                                            className="hidden"
+                                        />
+                                        <div className="flex items-center justify-between gap-2">
+                                            <span className="text-[11px] font-bold text-gray-700 dark:text-gray-300">
+                                                Portada personalizada
+                                            </span>
+                                            <div className="flex items-center gap-1.5">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => book3dCoverInputRef.current?.click()}
+                                                    className="px-2.5 py-1 rounded-lg bg-white dark:bg-gray-900 border border-orange-200 dark:border-orange-800 text-orange-700 dark:text-orange-300 text-[11px] font-bold inline-flex items-center gap-1 hover:bg-orange-50 transition-colors cursor-pointer"
+                                                >
+                                                    <ImageIcon size={12} />
+                                                    <span>{book3dCustomCover ? 'Cambiar portada' : 'Subir portada'}</span>
+                                                </button>
+                                                {book3dCustomCover && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleClearBook3dCustomCover}
+                                                        className="p-1 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer"
+                                                        title="Quitar portada personalizada"
+                                                    >
+                                                        <X size={12} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
                                         <div className="flex items-center justify-between gap-2">
                                             <span className="text-[11px] font-bold text-gray-700 dark:text-gray-300">
                                                 Color
@@ -1584,6 +1711,35 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                         )}
                                     </div>
                                 </div>
+
+                                {book3dMode === 'create' && book3dOutline.length > 0 && (
+                                    <div className="pt-2">
+                                        <BookWordEditor
+                                            outline={book3dOutline}
+                                            pages={book3dPages}
+                                            themeId={book3dTheme}
+                                            onChangeOutline={handleBook3dOutlineChange}
+                                            uploadImageFn={uploadImageToStorage}
+                                            isDemoMode={isDemoMode}
+                                            onOpenPagePreview={(pageIdx) =>
+                                                setBook3dPreviewModal({
+                                                    book: {
+                                                        id: 'wall_preview_book',
+                                                        title: (taskTitle || '').trim() || 'Vista previa',
+                                                        description: stripBookHtml(taskDesc || ''),
+                                                        theme: book3dTheme,
+                                                        category: 'textbook',
+                                                        aspectRatio: book3dAspectRatio || 0.707,
+                                                        bookPages: book3dPages,
+                                                        pageTexts: book3dPageTexts,
+                                                        pageCount: book3dPages.length
+                                                    },
+                                                    initialPage: pageIdx
+                                                })
+                                            }
+                                        />
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -1812,6 +1968,7 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                                     themeId: book3dTheme,
                                                     author: authorDisplay,
                                                     category: 'textbook',
+                                                    customCoverUrl: book3dCustomCover,
                                                     callGemini
                                                 });
                                                 pagesToPublish = generated.pages || [];
@@ -1825,9 +1982,14 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                                 });
                                                 pagesToPublish = buildBookPagesFromOutline(outlineToPublish, {
                                                     themeId: book3dTheme,
-                                                    author: authorDisplay
+                                                    author: authorDisplay,
+                                                    customCoverUrl: book3dCustomCover
                                                 });
                                                 pageTextsToPublish = extractBookOutlinePageTexts(outlineToPublish);
+                                            }
+
+                                            if (book3dCustomCover) {
+                                                pagesToPublish = applyCustomCoverToPages(pagesToPublish, book3dCustomCover);
                                             }
 
                                             const uploadedPages = await uploadBookPagesToStorage(
@@ -1857,13 +2019,13 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                                 theme: book3dTheme,
                                                 aspectRatio: book3dAspectRatio || 0.707,
                                                 pageCount: uploadedPages.length,
+                                                customCoverUrl: book3dCustomCover ? uploadedPages[0] || book3dCustomCover : '',
                                                 coverUrl: uploadedPages[0] || '',
                                                 pdfUrl: uploadedPdfUrl,
                                                 fileUrl: uploadedPdfUrl,
                                                 fileName: book3dPdfFile?.name || (uploadedPdfUrl ? `${finalBookTitle}.pdf` : ''),
                                                 pdfFileName: book3dPdfFile?.name || (uploadedPdfUrl ? `${finalBookTitle}.pdf` : ''),
                                                 bookPages: uploadedPages,
-                                                pages: uploadedPages,
                                                 pageTexts: pageTextsToPublish,
                                                 bookOutline: Array.isArray(outlineToPublish) && outlineToPublish.length > 0 ? outlineToPublish : [],
                                                 targetGroupId: resolvedTargetGroupId,
@@ -1891,6 +2053,7 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                                 bookTheme: sanitizedBook.theme,
                                                 aspectRatio: sanitizedBook.aspectRatio,
                                                 pageCount: sanitizedBook.pageCount,
+                                                customCoverUrl: sanitizedBook.customCoverUrl || '',
                                                 coverUrl: sanitizedBook.coverUrl,
                                                 bookPages: sanitizedBook.bookPages,
                                                 pageTexts: sanitizedBook.pageTexts || [],
@@ -1936,6 +2099,8 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                             setBook3dPages([]);
                                             setBook3dPageTexts([]);
                                             setBook3dOutline([]);
+                                            setBook3dCustomCover('');
+                                            setBook3dRawPdfFirstPage('');
                                             setBook3dPdfFile(null);
                                             setBook3dPreviewModal(null);
                                             if (typeof setTaskTitle === 'function') setTaskTitle("");
@@ -2218,6 +2383,7 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                     onClose={() => setBook3dPreviewModal(null)}
                     isTeacher={role === 'teacher'}
                     onEditBook={null}
+                    userId={myChatId || user?.uid || user?.email || loggedInName || role}
                 />
             )}
         </div>

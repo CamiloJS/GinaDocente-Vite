@@ -17,7 +17,8 @@ import {
     X,
     Loader2,
     Edit3,
-    FileText
+    FileText,
+    Bookmark
 } from './Icons';
 import {
     normalizeBookRecord,
@@ -29,7 +30,12 @@ import {
     clampBookZoom,
     playPageFlipSound,
     renderPdfToBookPages,
-    buildFallbackBookPages
+    buildFallbackBookPages,
+    extractSvgExternalImageOverlay,
+    resolveBookReaderUserKey,
+    loadUserBookBookmarks,
+    toggleUserBookBookmark,
+    saveUserBookLastPage
 } from '../utils/flipbookEngine';
 import { handleForceDownload } from '../utils/helpers';
 
@@ -38,10 +44,17 @@ export default function Flipbook3DModal({
     onClose,
     initialPage = 0,
     isTeacher = false,
-    onEditBook = null
+    onEditBook = null,
+    userId = null,
+    userKey = null
 }) {
     const normalizedBook = useMemo(() => normalizeBookRecord(book), [book]);
     const theme = useMemo(() => getBookTheme(normalizedBook.theme), [normalizedBook.theme]);
+
+    const readerUserKey = useMemo(
+        () => resolveBookReaderUserKey(userId || userKey || (isTeacher ? 'teacher' : 'student')),
+        [userId, userKey, isTeacher]
+    );
 
     const [pages, setPages] = useState(() =>
         Array.isArray(normalizedBook.bookPages) && normalizedBook.bookPages.length > 0
@@ -59,17 +72,32 @@ export default function Flipbook3DModal({
     const [zoom, setZoom] = useState(1);
     const [soundMuted, setSoundMuted] = useState(false);
     const [showThumbnails, setShowThumbnails] = useState(false);
+    const [showBookmarksPanel, setShowBookmarksPanel] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
 
-    // 3D Page Turn Animation & Drag State
-    // flipAnim: { direction: 'next' | 'prev', targetSpread: number, phase: 'start' | 'turning' } | null
+    // Per-user Bookmarks & Last Read Page
+    const [bookmarks, setBookmarks] = useState(() => {
+        const saved = loadUserBookBookmarks(normalizedBook.id, readerUserKey);
+        return saved.bookmarks || [];
+    });
+
+    // 3D Page Turn Animation, Curl Drag State & Zoom Pan State
     const [flipAnim, setFlipAnim] = useState(null);
-    // dragState: { direction: 'next' | 'prev', startX, startY, currentX, currentY, angleDeg, progress, shadowOpacity, highlightOpacity, cornerTiltDeg, shouldComplete } | null
     const [dragState, setDragState] = useState(null);
+    const [panState, setPanState] = useState(null);
 
     const modalRootRef = useRef(null);
+    const stageScrollRef = useRef(null);
     const bookStageRef = useRef(null);
     const flipTimerRef = useRef(null);
+    const hasInitializedPageRef = useRef(false);
+
+    // Reload bookmarks when book or user changes
+    useEffect(() => {
+        const saved = loadUserBookBookmarks(normalizedBook.id, readerUserKey);
+        setBookmarks(saved.bookmarks || []);
+        hasInitializedPageRef.current = false;
+    }, [normalizedBook.id, readerUserKey]);
 
     // Sync pages when book prop changes or load from PDF URL on-the-fly
     useEffect(() => {
@@ -95,8 +123,10 @@ export default function Flipbook3DModal({
             renderPdfToBookPages(normalizedBook.pdfUrl, {
                 maxPages: 50,
                 scale: 1.55,
-                maxDimension: 1350,
-                quality: 0.82,
+                maxDimension: 1320,
+                quality: 0.80,
+                compressionLevel: 'light',
+                customCoverUrl: normalizedBook.customCoverUrl || '',
                 onProgress: (prog) => {
                     if (!cancelled) setRenderProgress(prog);
                 }
@@ -113,7 +143,8 @@ export default function Flipbook3DModal({
                                 description: normalizedBook.description,
                                 fileName: normalizedBook.fileName,
                                 author: normalizedBook.authorName || 'Docente',
-                                themeId: normalizedBook.theme
+                                themeId: normalizedBook.theme,
+                                customCoverUrl: normalizedBook.customCoverUrl || ''
                             })
                         );
                     }
@@ -128,7 +159,8 @@ export default function Flipbook3DModal({
                             description: normalizedBook.description,
                             fileName: normalizedBook.fileName,
                             author: normalizedBook.authorName || 'Docente',
-                            themeId: normalizedBook.theme
+                            themeId: normalizedBook.theme,
+                            customCoverUrl: normalizedBook.customCoverUrl || ''
                         })
                     );
                     setLoadingPdf(false);
@@ -140,7 +172,8 @@ export default function Flipbook3DModal({
                     description: normalizedBook.description,
                     fileName: normalizedBook.fileName,
                     author: normalizedBook.authorName || 'Docente',
-                    themeId: normalizedBook.theme
+                    themeId: normalizedBook.theme,
+                    customCoverUrl: normalizedBook.customCoverUrl || ''
                 })
             );
             setLoadingPdf(false);
@@ -157,19 +190,30 @@ export default function Flipbook3DModal({
         normalizedBook.description,
         normalizedBook.fileName,
         normalizedBook.authorName,
-        normalizedBook.theme
+        normalizedBook.theme,
+        normalizedBook.customCoverUrl
     ]);
 
     // Responsive resize listener for double/single page mode
     useEffect(() => {
         const handleResize = () => {
-            if (window.innerWidth < 760) {
+            if (window.innerWidth < 920) {
                 setIsDoublePage(false);
             }
         };
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
+
+    // Reset stage scroll to top-left when turning spreads or resetting zoom to 100%
+    useEffect(() => {
+        const scroller = stageScrollRef.current;
+        if (!scroller) return;
+        scroller.scrollTop = 0;
+        if (zoom <= 1) {
+            scroller.scrollLeft = 0;
+        }
+    }, [currentSpreadIndex, zoom]);
 
     const effectivePages = useMemo(() => {
         if (pages.length > 0) return pages;
@@ -178,7 +222,8 @@ export default function Flipbook3DModal({
             description: normalizedBook.description,
             fileName: normalizedBook.fileName,
             author: normalizedBook.authorName || 'Docente',
-            themeId: normalizedBook.theme
+            themeId: normalizedBook.theme,
+            customCoverUrl: normalizedBook.customCoverUrl || ''
         });
     }, [pages, normalizedBook]);
 
@@ -187,11 +232,26 @@ export default function Flipbook3DModal({
         [effectivePages, isDoublePage]
     );
 
-    // Jump to initialPage when spreads initialize
+    // Jump to initialPage (or user's saved last read page) when spreads initialize
     useEffect(() => {
-        const idx = getSpreadIndexForPage(initialPage, isDoublePage, effectivePages.length);
+        if (spreads.length === 0) return;
+        let targetPage = initialPage;
+        if (!hasInitializedPageRef.current) {
+            hasInitializedPageRef.current = true;
+            if (
+                (!initialPage || initialPage === 0) &&
+                book?.initialPage === undefined &&
+                !book?.isPreview
+            ) {
+                const saved = loadUserBookBookmarks(normalizedBook.id, readerUserKey);
+                if (saved.lastPage > 0 && saved.lastPage < effectivePages.length) {
+                    targetPage = saved.lastPage;
+                }
+            }
+        }
+        const idx = getSpreadIndexForPage(targetPage, isDoublePage, effectivePages.length);
         setCurrentSpreadIndex(Math.min(idx, Math.max(0, spreads.length - 1)));
-    }, [initialPage, isDoublePage, effectivePages.length, spreads.length]);
+    }, [initialPage, isDoublePage, effectivePages.length, spreads.length, normalizedBook.id, readerUserKey, book]);
 
     // Clean up animation timer on unmount
     useEffect(() => {
@@ -199,6 +259,55 @@ export default function Flipbook3DModal({
             if (flipTimerRef.current) clearTimeout(flipTimerRef.current);
         };
     }, []);
+
+    const currentSpread = spreads[currentSpreadIndex] || spreads[0] || {
+        index: 0,
+        leftPage: null,
+        rightPage: 0,
+        pages: [0]
+    };
+
+    const primaryPageIndex = useMemo(() => {
+        if (currentSpread.rightPage !== null && currentSpread.rightPage !== undefined) {
+            return currentSpread.rightPage;
+        }
+        if (currentSpread.leftPage !== null && currentSpread.leftPage !== undefined) {
+            return currentSpread.leftPage;
+        }
+        return 0;
+    }, [currentSpread]);
+
+    // Persist last read page per user as they browse the book
+    useEffect(() => {
+        if (!normalizedBook?.id || book?.isPreview || effectivePages.length === 0) return;
+        saveUserBookLastPage(normalizedBook.id, readerUserKey, primaryPageIndex, {
+            totalPages: effectivePages.length
+        });
+    }, [normalizedBook?.id, book?.isPreview, readerUserKey, primaryPageIndex, effectivePages.length]);
+
+    const activeBookmarkTargetPageIndex = useMemo(() => {
+        const spreadPages = Array.isArray(currentSpread.pages) ? currentSpread.pages : [];
+        const markedOnSpread = spreadPages.find((pIdx) => bookmarks.includes(pIdx));
+        return markedOnSpread !== undefined ? markedOnSpread : primaryPageIndex;
+    }, [currentSpread.pages, bookmarks, primaryPageIndex]);
+
+    const handleToggleBookmark = useCallback(
+        (targetPageIdx = activeBookmarkTargetPageIndex, e = null) => {
+            if (e && typeof e.stopPropagation === 'function') {
+                e.stopPropagation();
+            }
+            const res = toggleUserBookBookmark(normalizedBook.id, readerUserKey, targetPageIdx, {
+                totalPages: effectivePages.length
+            });
+            setBookmarks(res.bookmarks || []);
+        },
+        [normalizedBook.id, readerUserKey, activeBookmarkTargetPageIndex, effectivePages.length]
+    );
+
+    const isCurrentSpreadBookmarked = useMemo(
+        () => (currentSpread.pages || []).some((pIdx) => bookmarks.includes(pIdx)),
+        [currentSpread.pages, bookmarks]
+    );
 
     const canGoPrev = currentSpreadIndex > 0 && !flipAnim;
     const canGoNext = currentSpreadIndex < spreads.length - 1 && !flipAnim;
@@ -299,11 +408,14 @@ export default function Flipbook3DModal({
             } else if (e.key === 'm' || e.key === 'M') {
                 e.preventDefault();
                 setSoundMuted((m) => !m);
+            } else if (e.key === 'b' || e.key === 'B') {
+                e.preventDefault();
+                handleToggleBookmark(activeBookmarkTargetPageIndex);
             }
         };
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
-    }, [onClose, handleNext, handlePrev, jumpToPage, effectivePages.length]);
+    }, [onClose, handleNext, handlePrev, jumpToPage, effectivePages.length, handleToggleBookmark, activeBookmarkTargetPageIndex]);
 
     // Sync fullscreen state with browser fullscreenchange event
     useEffect(() => {
@@ -329,11 +441,34 @@ export default function Flipbook3DModal({
         }
     };
 
-    // Interactive Pointer Dragging on the 3D Book Stage
+    // Interactive Pointer Dragging on the 3D Book Stage (Pan when zoomed > 1, 3D Page Curl when zoom <= 1)
     const handlePointerDown = (e, forcedDirection = null) => {
-        if (flipAnim || zoom > 1.25) return;
+        if (flipAnim) return;
+        if (e.target && typeof e.target.closest === 'function' && e.target.closest('[data-bookmark-ribbon]')) {
+            return;
+        }
         const stage = bookStageRef.current;
         if (!stage) return;
+
+        // When zoomed in (zoom > 1), allow free 2D drag-panning across the entire scroll area (including top/bottom/left/right)
+        if (zoom > 1) {
+            if (e.pointerType === 'touch') return; // Let native touch pan/scroll work smoothly
+            const scroller = stageScrollRef.current;
+            if (!scroller) return;
+            try {
+                stage.setPointerCapture?.(e.pointerId);
+            } catch {
+                // Ignore capture error
+            }
+            setPanState({
+                pointerId: e.pointerId,
+                startX: e.clientX,
+                startY: e.clientY,
+                startScrollLeft: scroller.scrollLeft,
+                startScrollTop: scroller.scrollTop
+            });
+            return;
+        }
 
         const rect = stage.getBoundingClientRect();
         const relX = e.clientX - rect.left;
@@ -381,6 +516,17 @@ export default function Flipbook3DModal({
     };
 
     const handlePointerMove = (e) => {
+        if (panState) {
+            const scroller = stageScrollRef.current;
+            if (scroller) {
+                const dx = e.clientX - panState.startX;
+                const dy = e.clientY - panState.startY;
+                scroller.scrollLeft = panState.startScrollLeft - dx;
+                scroller.scrollTop = panState.startScrollTop - dy;
+            }
+            return;
+        }
+
         if (!dragState) return;
         const deltaX = e.clientX - dragState.startX;
         let effectiveDir = dragState.direction;
@@ -415,6 +561,17 @@ export default function Flipbook3DModal({
     };
 
     const handlePointerUp = (e) => {
+        if (panState) {
+            const stage = bookStageRef.current;
+            try {
+                stage?.releasePointerCapture?.(panState.pointerId);
+            } catch {
+                // Ignore release errors
+            }
+            setPanState(null);
+            return;
+        }
+
         if (!dragState) return;
         const stage = bookStageRef.current;
         try {
@@ -438,13 +595,6 @@ export default function Flipbook3DModal({
         if (shouldTurn) {
             triggerAnimatedFlip(dir, null, releaseAngle);
         }
-    };
-
-    const currentSpread = spreads[currentSpreadIndex] || spreads[0] || {
-        index: 0,
-        leftPage: null,
-        rightPage: 0,
-        pages: [0]
     };
 
     // Determine active turning state (either from drag or button/keyboard animation)
@@ -529,6 +679,9 @@ export default function Flipbook3DModal({
         }
 
         const pageSrc = effectivePages[pageIdx];
+        const isPageBookmarked = bookmarks.includes(pageIdx);
+        const extImgOverlay = extractSvgExternalImageOverlay(pageSrc);
+
         return (
             <div
                 className="relative w-full h-full overflow-hidden select-none"
@@ -540,6 +693,23 @@ export default function Flipbook3DModal({
                     draggable={false}
                     className="w-full h-full object-contain pointer-events-none select-none"
                 />
+                {extImgOverlay && (
+                    <img
+                        src={extImgOverlay.href}
+                        alt=""
+                        draggable={false}
+                        className="pointer-events-none select-none"
+                        style={{
+                            position: 'absolute',
+                            left: `${extImgOverlay.leftPct}%`,
+                            top: `${extImgOverlay.topPct}%`,
+                            width: `${extImgOverlay.widthPct}%`,
+                            height: `${extImgOverlay.heightPct}%`,
+                            objectFit: extImgOverlay.objectFit || 'contain',
+                            borderRadius: '6px'
+                        }}
+                    />
+                )}
                 {/* Realistic inner spine shading */}
                 <div
                     className="absolute inset-0 pointer-events-none"
@@ -550,6 +720,38 @@ export default function Flipbook3DModal({
                                 : 'linear-gradient(90deg, rgba(15,23,42,0.22) 0%, rgba(15,23,42,0) 16%, rgba(15,23,42,0) 86%, rgba(15,23,42,0.04) 100%)'
                     }}
                 />
+                {/* Interactive Page Bookmark Ribbon (Cinta separadora) */}
+                {!isBackFace && (
+                    <button
+                        type="button"
+                        data-bookmark-ribbon="true"
+                        onClick={(e) => handleToggleBookmark(pageIdx, e)}
+                        title={
+                            isPageBookmarked
+                                ? `Quitar marcador de la página ${pageIdx + 1}`
+                                : `Marcar página ${pageIdx + 1}`
+                        }
+                        className={`absolute top-0 ${
+                            side === 'left' ? 'left-3 sm:left-5' : 'right-3 sm:right-5'
+                        } z-20 flex flex-col items-center transition-all duration-200 cursor-pointer ${
+                            isPageBookmarked
+                                ? 'w-7 sm:w-8 h-12 sm:h-14 opacity-100 hover:h-15'
+                                : 'w-6 sm:w-7 h-7 sm:h-8 opacity-35 hover:opacity-90 hover:h-10'
+                        }`}
+                        style={{
+                            background: isPageBookmarked
+                                ? 'linear-gradient(180deg, #e11d48 0%, #be123c 100%)'
+                                : 'linear-gradient(180deg, rgba(15,23,42,0.45) 0%, rgba(15,23,42,0.25) 100%)',
+                            clipPath: 'polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%)',
+                            boxShadow: isPageBookmarked ? '0 4px 10px rgba(190,18,60,0.45)' : 'none'
+                        }}
+                    >
+                        <Bookmark
+                            size={12}
+                            className={`mt-1.5 ${isPageBookmarked ? 'text-white fill-white' : 'text-white/90'}`}
+                        />
+                    </button>
+                )}
                 {/* Page corner curl hint when idle */}
                 {!isBackFace && !activeTurn && (
                     <div
@@ -588,94 +790,136 @@ export default function Flipbook3DModal({
                 }}
             />
 
-            {/* Top Navigation & Controls Bar */}
-            <div className="relative z-20 flex flex-wrap items-center justify-between gap-3 px-4 md:px-6 py-3.5 bg-slate-900/80 border-b border-white/10 backdrop-blur-md">
-                <div className="flex items-center gap-3 min-w-0">
+            {/* Top Navigation & Controls Bar (Compact & Touch-Friendly on Mobile) */}
+            <div className="relative z-20 shrink-0 flex flex-wrap items-center justify-between gap-2 sm:gap-3 px-2.5 sm:px-5 md:px-6 py-2 sm:py-3 bg-slate-900/85 border-b border-white/10 backdrop-blur-md">
+                <div className="flex items-center gap-2.5 min-w-0">
                     <div
-                        className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg shrink-0 border border-white/15"
+                        className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-white shadow-lg shrink-0 border border-white/15"
                         style={{ backgroundColor: theme.badgeBg }}
                     >
-                        <BookOpen size={20} />
+                        <BookOpen size={18} />
                     </div>
                     <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                            <h2 className="text-white font-bold text-sm md:text-base truncate max-w-[220px] sm:max-w-[360px] md:max-w-[480px]">
+                            <h2 className="text-white font-bold text-xs sm:text-sm md:text-base truncate max-w-[145px] sm:max-w-[300px] md:max-w-[440px]">
                                 {normalizedBook.title}
                             </h2>
                         </div>
-                        <p className="text-[11px] text-slate-400 truncate">
-                            {formatSpreadPageLabel(currentSpread, effectivePages.length)}
+                        <p className="text-[10px] sm:text-[11px] text-slate-400 truncate">
+                            Pág. {formatSpreadPageLabel(currentSpread, effectivePages.length)}
+                            {bookmarks.length > 0 ? ` • ${bookmarks.length} marc.` : ''}
                         </p>
                     </div>
                 </div>
 
                 {/* Action Controls */}
-                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap justify-end">
                     {/* Single / Double Page View Toggle */}
                     <button
                         type="button"
                         onClick={() => setIsDoublePage((v) => !v)}
-                        className="px-2.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95"
+                        className="hidden sm:flex px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold items-center gap-1.5 transition-all active:scale-95"
                         title={isDoublePage ? 'Cambiar a vista de 1 página' : 'Cambiar a vista de libro abierto (2 páginas)'}
                     >
-                        {isDoublePage ? <BookOpen size={16} /> : <Book size={16} />}
-                        <span className="hidden md:inline">{isDoublePage ? '2 Páginas' : '1 Página'}</span>
+                        {isDoublePage ? <BookOpen size={15} /> : <Book size={15} />}
+                        <span className="hidden lg:inline">{isDoublePage ? '2 Páginas' : '1 Página'}</span>
                     </button>
 
-                    {/* Sound Toggle */}
-                    <button
-                        type="button"
-                        onClick={() => setSoundMuted((m) => !m)}
-                        className={`p-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 ${
-                            soundMuted
-                                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                                : 'bg-white/10 hover:bg-white/20 text-emerald-300'
-                        }`}
-                        title={soundMuted ? 'Activar sonido de hojas' : 'Silenciar sonido de hojas'}
-                    >
-                        {soundMuted ? <VolumeX size={17} /> : <Volume2 size={17} />}
-                    </button>
-
-                    {/* Zoom Controls */}
-                    <div className="hidden sm:flex items-center bg-white/10 rounded-xl p-0.5 border border-white/10">
+                    {/* Zoom Controls (Visible on Mobile AND Desktop) */}
+                    <div className="flex items-center bg-white/10 rounded-xl p-0.5 border border-white/10">
                         <button
                             type="button"
                             onClick={() => setZoom((z) => clampBookZoom(z - 0.15))}
-                            className="p-1.5 text-slate-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                            className="p-1 sm:p-1.5 text-slate-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
                             title="Alejar zoom"
                         >
-                            <Minus size={15} />
+                            <Minus size={14} />
                         </button>
                         <button
                             type="button"
                             onClick={() => setZoom(1)}
-                            className="px-2 text-[11px] font-bold text-white hover:text-indigo-300 transition-colors"
-                            title="Restablecer zoom"
+                            className="px-1.5 sm:px-2 text-[10px] sm:text-[11px] font-bold text-white hover:text-indigo-300 transition-colors"
+                            title="Restablecer zoom (100%)"
                         >
                             {Math.round(zoom * 100)}%
                         </button>
                         <button
                             type="button"
                             onClick={() => setZoom((z) => clampBookZoom(z + 0.15))}
-                            className="p-1.5 text-slate-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                            className="p-1 sm:p-1.5 text-slate-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
                             title="Acercar zoom"
                         >
-                            <Plus size={15} />
+                            <Plus size={14} />
                         </button>
                     </div>
+
+                    {/* Bookmark Current Page + Bookmarks Drawer Toggle */}
+                    <div className="flex items-center bg-white/10 rounded-xl p-0.5 border border-white/10">
+                        <button
+                            type="button"
+                            onClick={() => handleToggleBookmark(activeBookmarkTargetPageIndex)}
+                            className={`px-2 py-1 sm:py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all active:scale-95 ${
+                                isCurrentSpreadBookmarked
+                                    ? 'bg-rose-600 text-white shadow-sm'
+                                    : 'text-slate-200 hover:text-white hover:bg-white/10'
+                            }`}
+                            title={
+                                isCurrentSpreadBookmarked
+                                    ? `Quitar marcador de página ${activeBookmarkTargetPageIndex + 1} (B)`
+                                    : `Guardar marcador en página ${activeBookmarkTargetPageIndex + 1} (B)`
+                            }
+                        >
+                            <Bookmark size={14} className={isCurrentSpreadBookmarked ? 'fill-white' : ''} />
+                            <span className="hidden md:inline">
+                                {isCurrentSpreadBookmarked ? 'Marcada' : 'Marcar'}
+                            </span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setShowBookmarksPanel((v) => !v);
+                                setShowThumbnails(false);
+                            }}
+                            className={`px-1.5 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-[11px] font-extrabold transition-colors ${
+                                showBookmarksPanel
+                                    ? 'bg-amber-500 text-slate-950'
+                                    : 'text-amber-300 hover:bg-white/10'
+                            }`}
+                            title="Ver mis marcadores guardados"
+                        >
+                            {bookmarks.length}
+                        </button>
+                    </div>
+
+                    {/* Sound Toggle */}
+                    <button
+                        type="button"
+                        onClick={() => setSoundMuted((m) => !m)}
+                        className={`p-1.5 sm:p-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 ${
+                            soundMuted
+                                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                                : 'bg-white/10 hover:bg-white/20 text-emerald-300'
+                        }`}
+                        title={soundMuted ? 'Activar sonido de hojas' : 'Silenciar sonido de hojas'}
+                    >
+                        {soundMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                    </button>
 
                     {/* Thumbnails Drawer Button */}
                     <button
                         type="button"
-                        onClick={() => setShowThumbnails((s) => !s)}
-                        className={`p-2 rounded-xl transition-all active:scale-95 ${
+                        onClick={() => {
+                            setShowThumbnails((s) => !s);
+                            setShowBookmarksPanel(false);
+                        }}
+                        className={`p-1.5 sm:p-2 rounded-xl transition-all active:scale-95 ${
                             showThumbnails
                                 ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30'
                                 : 'bg-white/10 hover:bg-white/20 text-white'
                         }`}
                         title="Ver miniaturas de páginas"
                     >
-                        <Grid size={17} />
+                        <Grid size={16} />
                     </button>
 
                     {/* Fullscreen Toggle */}
@@ -685,7 +929,7 @@ export default function Flipbook3DModal({
                         className="hidden sm:flex p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all active:scale-95"
                         title="Pantalla completa"
                     >
-                        {isFullscreen ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
+                        {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
                     </button>
 
                     {/* Teacher Edit Button */}
@@ -693,10 +937,10 @@ export default function Flipbook3DModal({
                         <button
                             type="button"
                             onClick={() => onEditBook(normalizedBook)}
-                            className="px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-400/30 text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95"
+                            className="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-400/30 text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95"
                             title="Editar"
                         >
-                            <Edit3 size={15} />
+                            <Edit3 size={14} />
                             <span className="hidden lg:inline">Editar</span>
                         </button>
                     )}
@@ -712,10 +956,10 @@ export default function Flipbook3DModal({
                                     e
                                 )
                             }
-                            className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-indigo-600/30 transition-all active:scale-95"
+                            className="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-indigo-600/30 transition-all active:scale-95"
                             title="Descargar PDF"
                         >
-                            <Download size={15} />
+                            <Download size={14} />
                             <span className="hidden md:inline">PDF</span>
                         </button>
                     )}
@@ -724,17 +968,17 @@ export default function Flipbook3DModal({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="p-2 rounded-xl bg-white/10 hover:bg-rose-500/80 text-white transition-all active:scale-95"
+                        className="p-1.5 sm:p-2 rounded-xl bg-white/10 hover:bg-rose-500/80 text-white transition-all active:scale-95"
                         title="Cerrar (Esc)"
                     >
-                        <X size={18} />
+                        <X size={17} />
                     </button>
                 </div>
             </div>
 
             {/* Optional CORS Notice Banner */}
             {corsFallbackNotice && normalizedBook.pdfUrl && (
-                <div className="relative z-20 mx-auto mt-2 px-4 py-1.5 rounded-full bg-amber-500/20 border border-amber-400/30 text-amber-200 text-xs flex items-center gap-2">
+                <div className="relative z-20 shrink-0 mx-auto mt-1.5 px-4 py-1 rounded-full bg-amber-500/20 border border-amber-400/30 text-amber-200 text-xs flex items-center gap-2">
                     <FileText size={14} />
                     <span>Vista previa rápida.</span>
                     <button
@@ -753,39 +997,56 @@ export default function Flipbook3DModal({
                 </div>
             )}
 
-            {/* Main Interactive Book Stage */}
-            <div className="relative z-10 flex-1 flex items-center justify-center p-3 sm:p-6 md:p-10 overflow-auto">
-                {/* Side Navigation Floating Buttons */}
-                <button
-                    type="button"
-                    onClick={handlePrev}
-                    disabled={!canGoPrev}
-                    className={`fixed left-3 md:left-6 top-1/2 -translate-y-1/2 z-30 w-11 h-11 md:w-13 md:h-13 rounded-full flex items-center justify-center transition-all shadow-2xl border ${
-                        canGoPrev
-                            ? 'bg-slate-900/85 hover:bg-indigo-600 text-white border-white/20 hover:scale-105 active:scale-95 cursor-pointer'
-                            : 'bg-slate-900/40 text-slate-600 border-white/5 cursor-not-allowed opacity-40'
-                    }`}
-                    title="Página anterior (Flecha izquierda)"
-                >
-                    <ChevronLeft size={24} />
-                </button>
+            {/* Main Interactive Book Stage (Full-range scrollable in all directions when zoomed > 100%) */}
+            <div
+                ref={stageScrollRef}
+                onWheel={(e) => {
+                    if (e.ctrlKey || e.metaKey) {
+                        e.preventDefault();
+                        const delta = e.deltaY < 0 ? 0.12 : -0.12;
+                        setZoom((z) => clampBookZoom(z + delta));
+                    }
+                }}
+                className="relative z-10 flex-1 min-h-0 min-w-0 flex overflow-auto custom-scrollbar"
+                style={{
+                    WebkitOverflowScrolling: 'touch'
+                }}
+            >
+                {/* Side Navigation Floating Buttons (Hidden on mobile or when zoomed in so they never block page text) */}
+                {zoom <= 1.05 && (
+                    <>
+                        <button
+                            type="button"
+                            onClick={handlePrev}
+                            disabled={!canGoPrev}
+                            className={`hidden sm:flex fixed left-3 md:left-6 top-1/2 -translate-y-1/2 z-30 w-11 h-11 md:w-12 md:h-12 rounded-full items-center justify-center transition-all shadow-2xl border ${
+                                canGoPrev
+                                    ? 'bg-slate-900/85 hover:bg-indigo-600 text-white border-white/20 hover:scale-105 active:scale-95 cursor-pointer'
+                                    : 'bg-slate-900/40 text-slate-600 border-white/5 cursor-not-allowed opacity-40'
+                            }`}
+                            title="Página anterior (Flecha izquierda)"
+                        >
+                            <ChevronLeft size={22} />
+                        </button>
 
-                <button
-                    type="button"
-                    onClick={handleNext}
-                    disabled={!canGoNext}
-                    className={`fixed right-3 md:right-6 top-1/2 -translate-y-1/2 z-30 w-11 h-11 md:w-13 md:h-13 rounded-full flex items-center justify-center transition-all shadow-2xl border ${
-                        canGoNext
-                            ? 'bg-slate-900/85 hover:bg-indigo-600 text-white border-white/20 hover:scale-105 active:scale-95 cursor-pointer'
-                            : 'bg-slate-900/40 text-slate-600 border-white/5 cursor-not-allowed opacity-40'
-                    }`}
-                    title="Página siguiente (Flecha derecha)"
-                >
-                    <ChevronRight size={24} />
-                </button>
+                        <button
+                            type="button"
+                            onClick={handleNext}
+                            disabled={!canGoNext}
+                            className={`hidden sm:flex fixed right-3 md:right-6 top-1/2 -translate-y-1/2 z-30 w-11 h-11 md:w-12 md:h-12 rounded-full items-center justify-center transition-all shadow-2xl border ${
+                                canGoNext
+                                    ? 'bg-slate-900/85 hover:bg-indigo-600 text-white border-white/20 hover:scale-105 active:scale-95 cursor-pointer'
+                                    : 'bg-slate-900/40 text-slate-600 border-white/5 cursor-not-allowed opacity-40'
+                            }`}
+                            title="Página siguiente (Flecha derecha)"
+                        >
+                            <ChevronRight size={22} />
+                        </button>
+                    </>
+                )}
 
                 {loadingPdf ? (
-                    <div className="flex flex-col items-center justify-center bg-slate-900/90 border border-white/15 rounded-3xl p-8 md:p-12 text-center max-w-md shadow-2xl">
+                    <div className="m-auto flex flex-col items-center justify-center bg-slate-900/90 border border-white/15 rounded-3xl p-8 md:p-12 text-center max-w-md shadow-2xl">
                         <div className="w-16 h-16 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-400 mb-4">
                             <Loader2 size={32} className="animate-spin" />
                         </div>
@@ -805,12 +1066,12 @@ export default function Flipbook3DModal({
                         </div>
                     </div>
                 ) : (
+                    /* Safe m-auto shrink-0 wrapper with padding on all 4 edges: centers when smaller than viewport, starts at top-left (0,0) when zoomed > 1 so top/bottom/left/right are NEVER clipped */
                     <div
-                        className="relative flex items-center justify-center transition-transform duration-200"
+                        className="relative m-auto shrink-0 flex items-center justify-center p-2.5 sm:p-6 md:p-10"
                         style={{
-                            transform: `scale(${zoom})`,
-                            transformOrigin: 'center center',
-                            perspective: '2400px'
+                            perspective: '2400px',
+                            transformOrigin: 'top left'
                         }}
                     >
                         {/* Hardcover Outer Binding Frame */}
@@ -820,12 +1081,12 @@ export default function Flipbook3DModal({
                             onPointerMove={handlePointerMove}
                             onPointerUp={handlePointerUp}
                             onPointerCancel={handlePointerUp}
-                            className="group/book relative rounded-2xl p-2 sm:p-3.5 shadow-[0_35px_90px_-15px_rgba(0,0,0,0.85)] cursor-grab active:cursor-grabbing select-none"
+                            className="group/book relative rounded-xl sm:rounded-2xl p-1.5 sm:p-3.5 shadow-[0_35px_90px_-15px_rgba(0,0,0,0.85)] cursor-grab active:cursor-grabbing select-none"
                             style={{
                                 background: `linear-gradient(145deg, ${theme.coverBg} 0%, ${theme.spineColor} 50%, ${theme.coverBg} 100%)`,
                                 border: `2px solid ${theme.accentColor}44`,
                                 transformStyle: 'preserve-3d',
-                                touchAction: 'none'
+                                touchAction: zoom > 1 ? 'pan-x pan-y pinch-zoom' : 'manipulation'
                             }}
                         >
                             {/* Left Paper Stack Edge Effect */}
@@ -854,13 +1115,13 @@ export default function Flipbook3DModal({
                                 }}
                             />
 
-                            {/* Inner Book Spread Container */}
+                            {/* Inner Book Spread Container (Layout dimensions scale directly with zoom for full top-to-bottom scrolling) */}
                             {isDoublePage ? (
                                 <div
-                                    className="relative flex items-stretch overflow-visible rounded-lg"
+                                    className="relative flex items-stretch overflow-visible rounded-lg transition-[width,height] duration-150"
                                     style={{
-                                        width: 'min(86vw, 1020px)',
-                                        height: 'min(74vh, 720px)',
+                                        width: `calc(min(86vw, 1020px) * ${zoom})`,
+                                        height: `calc(min(74vh, 720px) * ${zoom})`,
                                         transformStyle: 'preserve-3d'
                                     }}
                                 >
@@ -1029,12 +1290,12 @@ export default function Flipbook3DModal({
                                     )}
                                 </div>
                             ) : (
-                                /* Single-Page 3D Flip Mode (Mobile & Compact View) */
+                                /* Single-Page 3D Flip Mode (Mobile & Compact View — maximized screen comfort) */
                                 <div
-                                    className="relative overflow-visible rounded-lg"
+                                    className="relative overflow-visible rounded-lg transition-[width,height] duration-150"
                                     style={{
-                                        width: 'min(86vw, 520px)',
-                                        height: 'min(74vh, 720px)',
+                                        width: `calc(min(92vw, 520px) * ${zoom})`,
+                                        height: `calc(min(76vh, 720px) * ${zoom})`,
                                         transformStyle: 'preserve-3d'
                                     }}
                                 >
@@ -1126,12 +1387,95 @@ export default function Flipbook3DModal({
                 )}
             </div>
 
+            {/* Collapsible User Bookmarks Quick List Drawer */}
+            {showBookmarksPanel && (
+                <div className="relative z-20 shrink-0 px-4 py-3 bg-slate-900/95 border-t border-white/10 backdrop-blur-md">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-2 text-xs font-bold text-white">
+                            <Bookmark size={14} className="text-rose-400 fill-rose-400" />
+                            <span>Mis marcadores ({bookmarks.length})</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => handleToggleBookmark(activeBookmarkTargetPageIndex)}
+                                className="px-2.5 py-1 rounded-lg bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/30 text-rose-200 text-[11px] font-bold transition-colors cursor-pointer"
+                            >
+                                {bookmarks.includes(activeBookmarkTargetPageIndex)
+                                    ? `Quitar pág. ${activeBookmarkTargetPageIndex + 1}`
+                                    : `+ Marcar pág. ${activeBookmarkTargetPageIndex + 1}`}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setShowBookmarksPanel(false)}
+                                className="p-1 text-slate-400 hover:text-white rounded-lg"
+                            >
+                                <X size={14} />
+                            </button>
+                        </div>
+                    </div>
+
+                    {bookmarks.length === 0 ? (
+                        <p className="text-xs text-slate-400 py-2">
+                            Aún no tienes páginas marcadas en este libro. Toca el icono de marcador o la cinta en la esquina superior de cualquier hoja para guardarla.
+                        </p>
+                    ) : (
+                        <div className="flex items-center gap-2.5 overflow-x-auto pb-1 custom-scrollbar">
+                            {bookmarks.map((bPageIdx) => {
+                                const isCurrent = currentSpread.pages.includes(bPageIdx);
+                                const thumbSrc = effectivePages[bPageIdx] || '';
+                                const snippet = normalizedBook.pageTexts?.[bPageIdx] || '';
+                                return (
+                                    <div
+                                        key={`bm_${bPageIdx}`}
+                                        className={`group relative shrink-0 flex items-center gap-2.5 p-2 rounded-xl border transition-all cursor-pointer ${
+                                            isCurrent
+                                                ? 'bg-indigo-600/25 border-indigo-400 text-white'
+                                                : 'bg-white/5 hover:bg-white/10 border-white/15 text-slate-200'
+                                        }`}
+                                        onClick={() => jumpToPage(bPageIdx)}
+                                    >
+                                        {thumbSrc && (
+                                            <img
+                                                src={thumbSrc}
+                                                alt={`Pág. ${bPageIdx + 1}`}
+                                                className="w-10 h-14 object-cover rounded border border-white/20 bg-white shrink-0"
+                                            />
+                                        )}
+                                        <div className="min-w-0 max-w-[140px]">
+                                            <div className="text-xs font-extrabold flex items-center gap-1">
+                                                <Bookmark size={11} className="text-rose-400 fill-rose-400 shrink-0" />
+                                                <span>Página {bPageIdx + 1}</span>
+                                            </div>
+                                            {snippet && (
+                                                <p className="text-[10px] text-slate-400 line-clamp-2 mt-0.5">
+                                                    {snippet}
+                                                </p>
+                                            )}
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={(e) => handleToggleBookmark(bPageIdx, e)}
+                                            className="p-1 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-white/10"
+                                            title="Quitar marcador"
+                                        >
+                                            <X size={12} />
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* Collapsible Thumbnail Drawer */}
             {showThumbnails && (
-                <div className="relative z-20 px-4 py-3 bg-slate-900/95 border-t border-white/10 backdrop-blur-md">
+                <div className="relative z-20 shrink-0 px-4 py-3 bg-slate-900/95 border-t border-white/10 backdrop-blur-md">
                     <div className="flex items-center gap-3 overflow-x-auto pb-1 custom-scrollbar">
                         {effectivePages.map((thumbUrl, idx) => {
                             const isCurrent = currentSpread.pages.includes(idx);
+                            const isMarked = bookmarks.includes(idx);
                             return (
                                 <button
                                     key={`thumb_${idx}`}
@@ -1148,6 +1492,9 @@ export default function Flipbook3DModal({
                                         alt={`Miniatura ${idx + 1}`}
                                         className="w-full h-full object-cover bg-white"
                                     />
+                                    {isMarked && (
+                                        <span className="absolute top-0 right-1.5 w-3.5 h-5 bg-rose-600 flex items-center justify-center shadow" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%)' }} />
+                                    )}
                                     <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-slate-950/80 text-[10px] font-bold text-white">
                                         {idx + 1}
                                     </span>
@@ -1158,21 +1505,21 @@ export default function Flipbook3DModal({
                 </div>
             )}
 
-            {/* Bottom Page Slider & Status Bar */}
-            <div className="relative z-20 flex items-center justify-between gap-4 px-4 md:px-8 py-3 bg-slate-900/85 border-t border-white/10 backdrop-blur-md">
+            {/* Bottom Page Slider & Status Bar (Optimized for Mobile & Desktop) */}
+            <div className="relative z-20 shrink-0 flex items-center justify-between gap-2 sm:gap-4 px-2.5 sm:px-6 md:px-8 py-2.5 sm:py-3 bg-slate-900/85 border-t border-white/10 backdrop-blur-md">
                 <button
                     type="button"
                     onClick={() => jumpToPage(0)}
                     disabled={currentSpreadIndex === 0}
-                    className="px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-40 text-white text-xs font-semibold flex items-center gap-1 transition-all"
+                    className="px-2 sm:px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-40 text-white text-xs font-semibold flex items-center gap-1 transition-all shrink-0"
                     title="Volver a la portada"
                 >
                     <RotateCcw size={14} />
                     <span className="hidden sm:inline">Portada</span>
                 </button>
 
-                <div className="flex-1 max-w-xl flex items-center gap-3">
-                    <span className="text-[11px] font-bold text-slate-400 shrink-0">
+                <div className="flex-1 max-w-xl flex items-center gap-2 sm:gap-3 min-w-0">
+                    <span className="hidden xs:inline text-[11px] font-bold text-slate-400 shrink-0">
                         Pág. {formatSpreadPageLabel(currentSpread, effectivePages.length)}
                     </span>
                     <input
@@ -1192,12 +1539,12 @@ export default function Flipbook3DModal({
                     />
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                     <button
                         type="button"
                         onClick={handlePrev}
                         disabled={!canGoPrev}
-                        className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-40 text-white text-xs font-bold transition-all"
+                        className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-40 text-white text-xs font-bold transition-all"
                     >
                         Anterior
                     </button>
@@ -1205,7 +1552,7 @@ export default function Flipbook3DModal({
                         type="button"
                         onClick={handleNext}
                         disabled={!canGoNext}
-                        className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/30"
+                        className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/30"
                     >
                         Siguiente
                     </button>

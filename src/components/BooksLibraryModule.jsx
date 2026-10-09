@@ -12,7 +12,8 @@ import {
     Eye,
     X,
     CheckCircle2,
-    RotateCcw
+    RotateCcw,
+    ImageIcon
 } from './Icons';
 import {
     BOOK_THEMES,
@@ -22,10 +23,13 @@ import {
     sanitizeBookForFirestore,
     filterBooksCatalog,
     buildFallbackBookPages,
+    buildFallbackBookOutline,
     buildBookPagesFromOutline,
     extractBookOutlinePageTexts,
     syncBookOutlineMetadata,
-    generateAiBookPages
+    generateAiBookPages,
+    applyCustomCoverToPages,
+    compressBookImageDataUrl
 } from '../utils/flipbookEngine';
 import {
     db,
@@ -48,6 +52,7 @@ import {
     deleteDemoSandboxItem
 } from '../utils/demoData';
 import Flipbook3DModal from './Flipbook3DModal';
+import BookWordEditor from './BookWordEditor';
 
 const withTimeout = (promise, ms = 12000) =>
     Promise.race([
@@ -138,6 +143,8 @@ export default function BooksLibraryModule({
     const [aiPageCount, setAiPageCount] = useState(6);
     const [aiLanguage, setAiLanguage] = useState('Inglés');
     const [previewOutline, setPreviewOutline] = useState([]);
+    const [customCoverUrl, setCustomCoverUrl] = useState('');
+    const [rawPdfFirstPage, setRawPdfFirstPage] = useState('');
     const [isGeneratingBook, setIsGeneratingBook] = useState(false);
     const [pdfFile, setPdfFile] = useState(null);
     const [existingPdfUrl, setExistingPdfUrl] = useState('');
@@ -150,10 +157,16 @@ export default function BooksLibraryModule({
     const [progressInfo, setProgressInfo] = useState({ phase: '', currentPage: 0, totalPages: 0, percent: 0 });
 
     const fileInputRef = useRef(null);
+    const coverInputRef = useRef(null);
 
     const canonicalTeacherId = useMemo(
         () => getCanonicalTeacherId(myChatId || loggedInName || user?.displayName || user?.email),
         [myChatId, loggedInName, user]
+    );
+
+    const currentReaderUserId = useMemo(
+        () => myChatId || user?.uid || user?.email || loggedInName || role || 'guest',
+        [myChatId, user, loggedInName, role]
     );
 
     // Teacher's own academic groups for assignment selector
@@ -277,6 +290,8 @@ export default function BooksLibraryModule({
         setAiPageCount(6);
         setAiLanguage('Inglés');
         setPreviewOutline([]);
+        setCustomCoverUrl('');
+        setRawPdfFirstPage('');
         setIsGeneratingBook(false);
         setPdfFile(null);
         setExistingPdfUrl('');
@@ -315,6 +330,7 @@ export default function BooksLibraryModule({
                     setPdfFile(null);
                     setExistingPdfUrl('');
                     setExistingFileName('');
+                    setRawPdfFirstPage('');
                     if (previewOutline.length === 0) {
                         setPreviewPages([]);
                         setPreviewPageTexts([]);
@@ -335,21 +351,43 @@ export default function BooksLibraryModule({
         setEditingBookId(bookItem.id);
         const hasOutline = Array.isArray(bookItem.bookOutline) && bookItem.bookOutline.length > 0;
         const hasPdf = Boolean(bookItem.pdfUrl || bookItem.fileUrl);
-        setCreationMode(hasOutline && !hasPdf ? 'create' : hasPdf || bookItem.fileName || bookItem.pdfFileName ? 'upload' : 'create');
+        const isUploadBook = !hasOutline && (hasPdf || Boolean(bookItem.fileName || bookItem.pdfFileName));
+        const mode = isUploadBook ? 'upload' : 'create';
+        setCreationMode(mode);
         setTitle(bookItem.title || '');
         setDescription(bookItem.description || '');
         setCategory(bookItem.category || bookItem.bookCategory || 'textbook');
         setTheme(bookItem.theme || bookItem.bookTheme || 'royal-indigo');
         setTargetGroupId(bookItem.targetGroupId || 'all');
-        setPreviewOutline(hasOutline ? bookItem.bookOutline : []);
-        if (hasOutline) {
-            setAiPageCount([5, 6, 8, 10].includes(bookItem.bookOutline.length) ? bookItem.bookOutline.length : 6);
-        }
-        if (bookItem.aiLanguage || bookItem.language) {
-            const rawLang = String(bookItem.aiLanguage || bookItem.language);
-            setAiLanguage(
-                rawLang === 'ES' ? 'Español' : rawLang === 'BI' ? 'Bilingüe' : rawLang === 'EN' ? 'Inglés' : rawLang
-            );
+
+        const rawLang = String(bookItem.aiLanguage || bookItem.language || 'Inglés');
+        const resolvedLang =
+            rawLang === 'ES' ? 'Español' : rawLang === 'BI' ? 'Bilingüe' : rawLang === 'EN' ? 'Inglés' : rawLang;
+        setAiLanguage(resolvedLang);
+
+        const initialOutline = hasOutline
+            ? bookItem.bookOutline
+            : mode === 'create'
+                ? buildFallbackBookOutline({
+                      topic: bookItem.title || 'Libro',
+                      title: bookItem.title || 'Libro',
+                      description: bookItem.description || '',
+                      language: resolvedLang,
+                      pageCount: Number(bookItem.pageCount) || 6,
+                      author: bookItem.authorName || bookItem.author || 'Docente',
+                      category: bookItem.category || bookItem.bookCategory || 'textbook'
+                  })
+                : [];
+
+        setPreviewOutline(initialOutline);
+        setCustomCoverUrl(bookItem.customCoverUrl || '');
+        setRawPdfFirstPage(
+            isUploadBook && Array.isArray(bookItem.bookPages) && bookItem.bookPages[0] && !bookItem.customCoverUrl
+                ? bookItem.bookPages[0]
+                : ''
+        );
+        if (initialOutline.length > 0) {
+            setAiPageCount([5, 6, 8, 10].includes(initialOutline.length) ? initialOutline.length : 6);
         }
         setPdfFile(null);
         setExistingPdfUrl(bookItem.pdfUrl || bookItem.fileUrl || '');
@@ -390,9 +428,114 @@ export default function BooksLibraryModule({
             setPreviewPages(
                 buildBookPagesFromOutline(syncedOutline, {
                     themeId: newThemeId,
-                    author: authorName
+                    author: authorName,
+                    customCoverUrl
                 })
             );
+        }
+    };
+
+    const handleOutlineChange = useCallback(
+        (nextOutline) => {
+            const authorName =
+                loggedInName || user?.displayName || getTeacherDisplayName(canonicalTeacherId) || 'Docente';
+            const prevCoverImg = String(previewOutline[0]?.imageUrl || '').trim();
+            const nextCoverImg = String(nextOutline?.[0]?.imageUrl || '').trim();
+            let effectiveCoverUrl = customCoverUrl;
+            if (prevCoverImg !== nextCoverImg) {
+                if (!nextCoverImg) {
+                    effectiveCoverUrl = '';
+                    setCustomCoverUrl('');
+                } else if (customCoverUrl) {
+                    effectiveCoverUrl = nextCoverImg;
+                    setCustomCoverUrl(nextCoverImg);
+                } else {
+                    effectiveCoverUrl = '';
+                }
+            }
+            setPreviewOutline(nextOutline);
+            if (Array.isArray(nextOutline) && typeof nextOutline[0]?.title === 'string' && nextOutline[0].title.trim() && nextOutline[0].title !== title) {
+                setTitle(nextOutline[0].title);
+            }
+            setPreviewPages(
+                buildBookPagesFromOutline(nextOutline, {
+                    themeId: theme,
+                    author: authorName,
+                    customCoverUrl: effectiveCoverUrl
+                })
+            );
+            setPreviewPageTexts(extractBookOutlinePageTexts(nextOutline));
+        },
+        [loggedInName, user, canonicalTeacherId, theme, customCoverUrl, title, previewOutline]
+    );
+
+    const handleSelectCustomCover = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+            const compressedCover = await compressBookImageDataUrl(file, {
+                maxDimension: 1200,
+                quality: 0.84
+            });
+            if (!compressedCover) return;
+            setCustomCoverUrl(compressedCover);
+            if (Array.isArray(previewOutline) && previewOutline.length > 0 && !pdfFile) {
+                const authorName =
+                    loggedInName || user?.displayName || getTeacherDisplayName(canonicalTeacherId) || 'Docente';
+                const updatedOutline = previewOutline.map((p, idx) =>
+                    idx === 0 ? { ...p, imageUrl: compressedCover } : p
+                );
+                setPreviewOutline(updatedOutline);
+                setPreviewPages(
+                    buildBookPagesFromOutline(updatedOutline, {
+                        themeId: theme,
+                        author: authorName,
+                        customCoverUrl: compressedCover
+                    })
+                );
+            } else if (previewPages.length > 0) {
+                if (!rawPdfFirstPage && previewPages[0] && previewPages[0] !== customCoverUrl) {
+                    setRawPdfFirstPage(previewPages[0]);
+                }
+                setPreviewPages((prev) => applyCustomCoverToPages(prev, compressedCover));
+            }
+            notify('Portada lista', 'Se aplicó la portada personalizada.');
+        } catch (err) {
+            console.warn('No se pudo procesar la portada personalizada:', err);
+        }
+    };
+
+    const handleClearCustomCover = () => {
+        setCustomCoverUrl('');
+        if (coverInputRef.current) coverInputRef.current.value = '';
+        if (Array.isArray(previewOutline) && previewOutline.length > 0 && !pdfFile) {
+            const authorName =
+                loggedInName || user?.displayName || getTeacherDisplayName(canonicalTeacherId) || 'Docente';
+            const updatedOutline = previewOutline.map((p, idx) => (idx === 0 ? { ...p, imageUrl: '' } : p));
+            setPreviewOutline(updatedOutline);
+            setPreviewPages(
+                buildBookPagesFromOutline(updatedOutline, {
+                    themeId: theme,
+                    author: authorName,
+                    customCoverUrl: ''
+                })
+            );
+        } else if (previewPages.length > 0) {
+            if (rawPdfFirstPage) {
+                setPreviewPages((prev) => [rawPdfFirstPage, ...prev.slice(1)]);
+            } else {
+                const fallbackCover = buildFallbackBookPages({
+                    title: title || existingFileName || 'Libro',
+                    description,
+                    fileName: existingFileName,
+                    author: loggedInName || getTeacherDisplayName(canonicalTeacherId) || 'Docente',
+                    themeId: theme,
+                    customCoverUrl: ''
+                })[0];
+                if (fallbackCover) {
+                    setPreviewPages((prev) => [fallbackCover, ...prev.slice(1)]);
+                }
+            }
         }
     };
 
@@ -415,6 +558,7 @@ export default function BooksLibraryModule({
                 themeId: theme,
                 author: authorName,
                 category,
+                customCoverUrl,
                 callGemini
             });
             setPreviewOutline(generated.outline || []);
@@ -424,6 +568,7 @@ export default function BooksLibraryModule({
             setPdfFile(null);
             setExistingPdfUrl('');
             setExistingFileName('');
+            setRawPdfFirstPage('');
             return generated;
         } catch (err) {
             console.error('Error creando páginas del libro:', err);
@@ -463,7 +608,12 @@ export default function BooksLibraryModule({
             });
 
             if (Array.isArray(rendered.pages) && rendered.pages.length > 0) {
-                setPreviewPages(rendered.pages);
+                const origFirst = rendered.rawPdfPages?.[0] || rendered.pages[0] || '';
+                setRawPdfFirstPage(origFirst);
+                const finalPages = customCoverUrl
+                    ? applyCustomCoverToPages(rendered.pages, customCoverUrl)
+                    : rendered.pages;
+                setPreviewPages(finalPages);
                 setPreviewPageTexts(rendered.pageTexts || []);
                 setAspectRatio(rendered.aspectRatio || 0.707);
             }
@@ -474,7 +624,8 @@ export default function BooksLibraryModule({
                 description,
                 fileName: file.name,
                 author: loggedInName || getTeacherDisplayName(canonicalTeacherId) || 'Docente',
-                themeId: theme
+                themeId: theme,
+                customCoverUrl
             });
             setPreviewPages(fallback);
         } finally {
@@ -525,6 +676,7 @@ export default function BooksLibraryModule({
                             themeId: theme,
                             author: authorName,
                             category,
+                            customCoverUrl,
                             callGemini
                         });
                         pagesToSave = generated.pages || [];
@@ -544,7 +696,8 @@ export default function BooksLibraryModule({
                     });
                     pagesToSave = buildBookPagesFromOutline(outlineToSave, {
                         themeId: theme,
-                        author: authorName
+                        author: authorName,
+                        customCoverUrl
                     });
                     pageTextsToSave = extractBookOutlinePageTexts(outlineToSave);
                     setPreviewOutline(outlineToSave);
@@ -559,8 +712,13 @@ export default function BooksLibraryModule({
                     description: description.trim(),
                     fileName: pdfFile?.name || existingFileName,
                     author: authorName,
-                    themeId: theme
+                    themeId: theme,
+                    customCoverUrl
                 });
+            }
+
+            if (customCoverUrl) {
+                pagesToSave = applyCustomCoverToPages(pagesToSave, customCoverUrl);
             }
 
             // Upload rendered JPEG pages to Firebase Storage (in live mode)
@@ -606,9 +764,9 @@ export default function BooksLibraryModule({
                 aiLanguage,
                 aiPageCount,
                 bookPages: uploadedPages,
-                pages: uploadedPages,
                 pageTexts: pageTextsToSave,
                 bookOutline: Array.isArray(outlineToSave) && outlineToSave.length > 0 ? outlineToSave : [],
+                customCoverUrl: customCoverUrl ? uploadedPages[0] || customCoverUrl : '',
                 coverUrl: uploadedPages[0] || '',
                 pageCount: uploadedPages.length,
                 pdfUrl: finalPdfUrl || '',
@@ -662,6 +820,7 @@ export default function BooksLibraryModule({
                 bookPages: sanitizedBook.bookPages,
                 pageTexts: sanitizedBook.pageTexts || [],
                 bookOutline: sanitizedBook.bookOutline || [],
+                customCoverUrl: sanitizedBook.customCoverUrl || '',
                 coverUrl: sanitizedBook.coverUrl,
                 pageCount: sanitizedBook.pageCount,
                 pdfUrl: sanitizedBook.pdfUrl,
@@ -902,6 +1061,13 @@ export default function BooksLibraryModule({
                                 onChange={handleSelectPdfFile}
                                 className="hidden"
                             />
+                            <input
+                                ref={coverInputRef}
+                                type="file"
+                                accept="image/*"
+                                onChange={handleSelectCustomCover}
+                                className="hidden"
+                            />
 
                             {creationMode === 'upload' ? (
                                 <div
@@ -1041,13 +1207,20 @@ export default function BooksLibraryModule({
                                                     background: `linear-gradient(135deg, ${getBookTheme(theme).coverBg}, ${getBookTheme(theme).spineColor})`
                                                 }}
                                             >
-                                                <span className="text-[8px] font-bold uppercase tracking-widest opacity-75">
+                                                {customCoverUrl && (
+                                                    <img
+                                                        src={customCoverUrl}
+                                                        alt="Portada personalizada"
+                                                        className="absolute inset-0 w-full h-full object-cover"
+                                                    />
+                                                )}
+                                                <span className="relative z-10 text-[8px] font-bold uppercase tracking-widest opacity-85">
                                                     Libro
                                                 </span>
-                                                <p className="text-xs font-bold leading-snug line-clamp-4">
+                                                <p className="relative z-10 text-xs font-bold leading-snug line-clamp-4 drop-shadow-xs">
                                                     {title.trim() || 'Título del libro'}
                                                 </p>
-                                                <span className="text-[9px] opacity-80">
+                                                <span className="relative z-10 text-[9px] opacity-85">
                                                     {aiPageCount} págs • {aiLanguage}
                                                 </span>
                                             </div>
@@ -1062,6 +1235,33 @@ export default function BooksLibraryModule({
                                     )}
                                 </div>
                             )}
+
+                            {/* Custom Cover Upload Control */}
+                            <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                    Portada personalizada
+                                </span>
+                                <div className="flex items-center gap-1.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => coverInputRef.current?.click()}
+                                        className="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-slate-700 dark:text-slate-200 text-[11px] font-bold inline-flex items-center gap-1.5 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
+                                    >
+                                        <ImageIcon size={12} className="text-indigo-500" />
+                                        <span>{customCoverUrl ? 'Cambiar portada' : 'Subir portada'}</span>
+                                    </button>
+                                    {customCoverUrl && (
+                                        <button
+                                            type="button"
+                                            onClick={handleClearCustomCover}
+                                            className="p-1 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                                            title="Quitar portada personalizada"
+                                        >
+                                            <X size={13} />
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
 
                             {/* Compact Color Swatches */}
                             <div className="flex items-center justify-between gap-3 px-1">
@@ -1200,65 +1400,170 @@ export default function BooksLibraryModule({
                                 )}
                             </div>
 
-                            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-end gap-2.5">
-                                {previewPages.length > 0 && (
+                            {creationMode === 'create' && previewOutline.length === 0 && (
+                                <div className="pt-2">
                                     <button
                                         type="button"
-                                        onClick={() =>
-                                            setActiveBookModal({
-                                                id: editingBookId || 'preview_book',
-                                                title: title || 'Vista previa',
-                                                description,
-                                                theme,
-                                                category,
-                                                bookPages: previewPages,
-                                                pageCount: previewPages.length,
-                                                pdfUrl: existingPdfUrl
-                                            })
-                                        }
-                                        className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 transition-all"
+                                        onClick={handleGenerateBookPages}
+                                        disabled={isGeneratingBook}
+                                        className="w-full py-2.5 px-4 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
                                     >
-                                        <Eye size={14} />
-                                        <span>Vista previa</span>
+                                        <BookOpen size={14} />
+                                        <span>Crear documento editable de páginas</span>
                                     </button>
-                                )}
+                                </div>
+                            )}
 
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setIsCreating(false);
-                                        resetForm();
-                                    }}
-                                    className="px-3.5 py-2 rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold transition-colors"
-                                >
-                                    Cancelar
-                                </button>
-
-                                <button
-                                    type="submit"
-                                    disabled={isSaving || isProcessingPdf || isGeneratingBook}
-                                    className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
-                                >
-                                    {isSaving || isGeneratingBook ? (
-                                        <>
-                                            <Loader2 size={14} className="animate-spin" />
-                                            <span>
-                                                {isGeneratingBook
-                                                    ? 'Creando libro...'
-                                                    : progressInfo.phase === 'upload'
-                                                    ? `Subiendo ${progressInfo.currentPage}/${progressInfo.totalPages}...`
-                                                    : 'Guardando...'}
-                                            </span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <BookOpen size={14} />
-                                            <span>{editingBookId ? 'Guardar' : 'Publicar'}</span>
-                                        </>
+                            {creationMode !== 'create' || previewOutline.length === 0 ? (
+                                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-end gap-2.5">
+                                    {previewPages.length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setActiveBookModal({
+                                                    id: editingBookId || 'preview_book',
+                                                    isPreview: true,
+                                                    title: title || 'Vista previa',
+                                                    description,
+                                                    theme,
+                                                    category,
+                                                    bookPages: previewPages,
+                                                    pageCount: previewPages.length,
+                                                    pdfUrl: existingPdfUrl
+                                                })
+                                            }
+                                            className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 transition-all"
+                                        >
+                                            <Eye size={14} />
+                                            <span>Vista previa</span>
+                                        </button>
                                     )}
-                                </button>
-                            </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsCreating(false);
+                                            resetForm();
+                                        }}
+                                        className="px-3.5 py-2 rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold transition-colors"
+                                    >
+                                        Cancelar
+                                    </button>
+
+                                    <button
+                                        type="submit"
+                                        disabled={isSaving || isProcessingPdf || isGeneratingBook}
+                                        className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                                    >
+                                        {isSaving || isGeneratingBook ? (
+                                            <>
+                                                <Loader2 size={14} className="animate-spin" />
+                                                <span>
+                                                    {isGeneratingBook
+                                                        ? 'Creando libro...'
+                                                        : progressInfo.phase === 'upload'
+                                                        ? `Subiendo ${progressInfo.currentPage}/${progressInfo.totalPages}...`
+                                                        : 'Guardando...'}
+                                                </span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <BookOpen size={14} />
+                                                <span>{editingBookId ? 'Guardar' : 'Publicar'}</span>
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            ) : null}
                         </div>
+
+                        {/* Word-style Editable Document Preview for "Crear libro" */}
+                        {creationMode === 'create' && previewOutline.length > 0 && (
+                            <div className="lg:col-span-12 space-y-4 pt-2 border-t border-slate-100 dark:border-slate-800">
+                                <BookWordEditor
+                                    outline={previewOutline}
+                                    pages={previewPages}
+                                    themeId={theme}
+                                    onChangeOutline={handleOutlineChange}
+                                    uploadImageFn={uploadImageFn}
+                                    isDemoMode={isDemoMode}
+                                    onOpenPagePreview={(pageIdx) =>
+                                        setActiveBookModal({
+                                            id: editingBookId || 'preview_book',
+                                            isPreview: true,
+                                            initialPage: pageIdx,
+                                            title: title || 'Vista previa',
+                                            description,
+                                            theme,
+                                            category,
+                                            bookPages: previewPages,
+                                            pageCount: previewPages.length,
+                                            pdfUrl: existingPdfUrl
+                                        })
+                                    }
+                                />
+
+                                <div className="flex flex-wrap items-center justify-end gap-2.5 pt-2">
+                                    {previewPages.length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setActiveBookModal({
+                                                    id: editingBookId || 'preview_book',
+                                                    isPreview: true,
+                                                    title: title || 'Vista previa',
+                                                    description,
+                                                    theme,
+                                                    category,
+                                                    bookPages: previewPages,
+                                                    pageCount: previewPages.length,
+                                                    pdfUrl: existingPdfUrl
+                                                })
+                                            }
+                                            className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                                        >
+                                            <Eye size={14} />
+                                            <span>Vista previa</span>
+                                        </button>
+                                    )}
+
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsCreating(false);
+                                            resetForm();
+                                        }}
+                                        className="px-3.5 py-2 rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold transition-colors"
+                                    >
+                                        Cancelar
+                                    </button>
+
+                                    <button
+                                        type="submit"
+                                        disabled={isSaving || isProcessingPdf || isGeneratingBook}
+                                        className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                                    >
+                                        {isSaving || isGeneratingBook ? (
+                                            <>
+                                                <Loader2 size={14} className="animate-spin" />
+                                                <span>
+                                                    {isGeneratingBook
+                                                        ? 'Creando libro...'
+                                                        : progressInfo.phase === 'upload'
+                                                        ? `Subiendo ${progressInfo.currentPage}/${progressInfo.totalPages}...`
+                                                        : 'Guardando...'}
+                                                </span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <BookOpen size={14} />
+                                                <span>{editingBookId ? 'Guardar' : 'Publicar'}</span>
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </form>
                 </div>
             )}
@@ -1441,6 +1746,7 @@ export default function BooksLibraryModule({
                     initialPage={activeBookModal.initialPage || 0}
                     onClose={() => setActiveBookModal(null)}
                     isTeacher={isTeacher}
+                    userId={currentReaderUserId}
                     onEditBook={isTeacher && !activeBookModal.isPreview ? handleOpenEdit : null}
                 />
             )}

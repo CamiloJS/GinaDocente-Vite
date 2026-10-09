@@ -3901,7 +3901,7 @@ const TaskCard = React.memo(({
                 />
             )}
 
-            {/* VISOR INTERACTIVO DE LIBRO 3D EN PANTALLA COMPLETA DESDE EL MURO */}
+            {/* VISOR INTERACTIVO DE LIBRO EN PANTALLA COMPLETA DESDE EL MURO */}
             {activeFlipbookModal && (
                 <Flipbook3DModal
                     book={activeFlipbookModal.book}
@@ -3912,6 +3912,7 @@ const TaskCard = React.memo(({
                         setActiveFlipbookModal(null);
                         onOpenBooksTab(bk);
                     } : null}
+                    userId={myChatId || currentUser?.uid || currentUser?.email || loggedInName || currentUserId || role}
                 />
             )}
         </div>
