@@ -756,130 +756,134 @@ export const DEMO_REVIEWS = [
   }
 ];
 
+const DEMO_BOOK_1_OUTLINE = [
+  {
+    variant: 'cover',
+    chapter: 'TEXTBOOK',
+    title: 'Macroeconomic Indicators & Global Markets Handbook',
+    subtitle: 'Essential English for GDP Analysis, Inflation Forecasting, Central Banking & Exchange Rate Trends.',
+    author: 'Gina Marcela Quintana'
+  },
+  {
+    variant: 'content',
+    chapter: 'CHAPTER 1 • NATIONAL OUTPUT & GDP',
+    title: 'Measuring Economic Performance',
+    subtitle: 'Gross Domestic Product (GDP), Real vs. Nominal Growth & Per Capita Income',
+    body: [
+      'Gross Domestic Product (GDP) represents the total monetary value of all final goods and services produced within a country during a specific period, typically measured quarterly or annually.',
+      'Economists distinguish between Nominal GDP (measured at current market prices) and Real GDP (adjusted for inflation to reflect true production volume).'
+    ],
+    stats: [
+      { label: 'REAL GDP GROWTH', value: '+3.2% YoY' },
+      { label: 'INFLATION (CPI)', value: '4.1% Annual' },
+      { label: 'POLICY RATE', value: '5.25% Central' }
+    ],
+    calloutTitle: 'GRAMMAR FOR ECONOMIC REPORTS',
+    calloutText: 'Use Present Perfect ("GDP has expanded by 3.2% this year") for ongoing trends, and Past Simple ("Exports rose sharply in Q3") for completed periods.'
+  },
+  {
+    variant: 'content',
+    chapter: 'CHAPTER 2 • INFLATION & MONETARY POLICY',
+    title: 'Price Stability & Central Bank Decisions',
+    subtitle: 'How interest rates and money supply shape purchasing power',
+    body: [
+      'Inflation measures the rate at which the general level of prices for goods and services is rising, eroding purchasing power. Central banks monitor the Consumer Price Index (CPI) to guide monetary policy.',
+      'When inflationary pressures intensify, central banks adopt a hawkish stance by raising benchmark interest rates to cool down credit expansion.'
+    ],
+    bullets: [
+      'First Conditional Forecast: "If core inflation remains above target, the central bank will tighten monetary policy."',
+      'Second Conditional Scenario: "If borrowing costs were lower, small enterprises would invest more in machinery."',
+      'Cause & Effect Connectors: Consequently, Therefore, As a result of, Due to.'
+    ],
+    keyTerms: [
+      { term: 'Purchasing Power', definition: 'The amount of goods or services that one unit of money can buy.' },
+      { term: 'Hawkish vs. Dovish', definition: 'Favoring higher interest rates (hawkish) vs. stimulus (dovish).' },
+      { term: 'Benchmark Rate', definition: 'Reference interest rate set by the central bank.' }
+    ]
+  },
+  {
+    variant: 'content',
+    chapter: 'CHAPTER 3 • DESCRIBING FINANCIAL CHARTS',
+    title: 'Precision Verbs & Adverbs for Market Trends',
+    subtitle: 'Communicating upward, downward, and volatile movements with clarity',
+    body: [
+      'In international briefings, economists pair precise movement verbs with degree adverbs to describe how rapidly an indicator changed over a fiscal period.',
+      'Avoid repeating basic verbs like "go up" or "go down". Select verbs that convey magnitude and momentum.'
+    ],
+    bullets: [
+      'Upward Momentum: To surge, to climb, to rally, to soar, to peak at.',
+      'Downward Correction: To plummet, to plunge, to decline moderately, to dip.',
+      'Stability & Recovery: To level off, to stabilize, to rebound, to fluctuate narrowly.'
+    ],
+    calloutTitle: 'EXECUTIVE PRESENTATION TIP',
+    calloutText: 'Combine Verb + Adverb ("Export revenues climbed steadily") or Adjective + Noun ("The market experienced a steady climb in Q4").'
+  },
+  {
+    variant: 'back-cover',
+    title: 'Macroeconomic Indicators Handbook',
+    subtitle: 'Complete the Workshop 1 & Unit 2 activities on the Class Wall.'
+  }
+];
+
 const DEMO_BOOK_1_PAGES = buildBookPagesFromOutline(
-  [
-    {
-      variant: 'cover',
-      chapter: 'TEXTBOOK',
-      title: 'Macroeconomic Indicators & Global Markets Handbook',
-      subtitle: 'Essential English for GDP Analysis, Inflation Forecasting, Central Banking & Exchange Rate Trends.',
-      author: 'Gina Marcela Quintana'
-    },
-    {
-      variant: 'content',
-      chapter: 'CHAPTER 1 • NATIONAL OUTPUT & GDP',
-      title: 'Measuring Economic Performance',
-      subtitle: 'Gross Domestic Product (GDP), Real vs. Nominal Growth & Per Capita Income',
-      body: [
-        'Gross Domestic Product (GDP) represents the total monetary value of all final goods and services produced within a country during a specific period, typically measured quarterly or annually.',
-        'Economists distinguish between Nominal GDP (measured at current market prices) and Real GDP (adjusted for inflation to reflect true production volume).'
-      ],
-      stats: [
-        { label: 'REAL GDP GROWTH', value: '+3.2% YoY' },
-        { label: 'INFLATION (CPI)', value: '4.1% Annual' },
-        { label: 'POLICY RATE', value: '5.25% Central' }
-      ],
-      calloutTitle: 'GRAMMAR FOR ECONOMIC REPORTS',
-      calloutText: 'Use Present Perfect ("GDP has expanded by 3.2% this year") for ongoing trends, and Past Simple ("Exports rose sharply in Q3") for completed periods.'
-    },
-    {
-      variant: 'content',
-      chapter: 'CHAPTER 2 • INFLATION & MONETARY POLICY',
-      title: 'Price Stability & Central Bank Decisions',
-      subtitle: 'How interest rates and money supply shape purchasing power',
-      body: [
-        'Inflation measures the rate at which the general level of prices for goods and services is rising, eroding purchasing power. Central banks monitor the Consumer Price Index (CPI) to guide monetary policy.',
-        'When inflationary pressures intensify, central banks adopt a hawkish stance by raising benchmark interest rates to cool down credit expansion.'
-      ],
-      bullets: [
-        'First Conditional Forecast: "If core inflation remains above target, the central bank will tighten monetary policy."',
-        'Second Conditional Scenario: "If borrowing costs were lower, small enterprises would invest more in machinery."',
-        'Cause & Effect Connectors: Consequently, Therefore, As a result of, Due to.'
-      ],
-      keyTerms: [
-        { term: 'Purchasing Power', definition: 'The amount of goods or services that one unit of money can buy.' },
-        { term: 'Hawkish vs. Dovish', definition: 'Favoring higher interest rates (hawkish) vs. stimulus (dovish).' },
-        { term: 'Benchmark Rate', definition: 'Reference interest rate set by the central bank.' }
-      ]
-    },
-    {
-      variant: 'content',
-      chapter: 'CHAPTER 3 • DESCRIBING FINANCIAL CHARTS',
-      title: 'Precision Verbs & Adverbs for Market Trends',
-      subtitle: 'Communicating upward, downward, and volatile movements with clarity',
-      body: [
-        'In international briefings, economists pair precise movement verbs with degree adverbs to describe how rapidly an indicator changed over a fiscal period.',
-        'Avoid repeating basic verbs like "go up" or "go down". Select verbs that convey magnitude and momentum.'
-      ],
-      bullets: [
-        'Upward Momentum: To surge, to climb, to rally, to soar, to peak at.',
-        'Downward Correction: To plummet, to plunge, to decline moderately, to dip.',
-        'Stability & Recovery: To level off, to stabilize, to rebound, to fluctuate narrowly.'
-      ],
-      calloutTitle: 'EXECUTIVE PRESENTATION TIP',
-      calloutText: 'Combine Verb + Adverb ("Export revenues climbed steadily") or Adjective + Noun ("The market experienced a steady climb in Q4").'
-    },
-    {
-      variant: 'back-cover',
-      title: 'Macroeconomic Indicators Handbook',
-      subtitle: 'Complete the Workshop 1 & Unit 2 activities on the Class Wall.'
-    }
-  ],
+  DEMO_BOOK_1_OUTLINE,
   { themeId: 'royal-indigo', author: 'Gina Marcela Quintana' }
 );
 
+const DEMO_BOOK_2_OUTLINE = [
+  {
+    variant: 'cover',
+    chapter: 'CASE STUDY & GLOSSARY',
+    title: 'International Trade, Tariffs & Financial Statements',
+    subtitle: 'Bilingual Technical Guide for Balance Sheets, Income Statements & Free Trade Agreements.',
+    author: 'Gina Marcela Quintana'
+  },
+  {
+    variant: 'content',
+    chapter: 'SECTION 1 • CORPORATE FINANCIAL STATEMENTS',
+    title: 'Reading Balance Sheets & Income Statements',
+    subtitle: 'Assets, Liabilities, Shareholder Equity, Revenue & Net Profit',
+    body: [
+      'A Balance Sheet provides a snapshot of a company’s financial position at a specific point in time, following the fundamental accounting equation: Assets = Liabilities + Shareholders’ Equity.',
+      'An Income Statement (Profit & Loss Statement) measures operational performance over a period, showing Gross Revenue, Operating Expenses (OPEX), EBITDA, and Net Income.'
+    ],
+    stats: [
+      { label: 'GROSS MARGIN', value: '42.8%' },
+      { label: 'OPERATING CASH', value: '$1.85M USD' },
+      { label: 'DEBT-TO-EQUITY', value: '0.64 Ratio' }
+    ],
+    keyTerms: [
+      { term: 'Current Assets', definition: 'Cash, accounts receivable, and inventory convertible within 1 year.' },
+      { term: 'Liabilities', definition: 'Financial obligations and debts owed to external creditors.' },
+      { term: 'Net Profit Margin', definition: 'Percentage of revenue remaining after all expenses and taxes.' }
+    ]
+  },
+  {
+    variant: 'content',
+    chapter: 'SECTION 2 • GLOBAL TRADE & TARIFFS',
+    title: 'Trade Balance, Quotas & Free Trade Agreements',
+    subtitle: 'Negotiating export contracts and analyzing comparative advantage',
+    body: [
+      'International trade allows nations to specialize in goods where they hold a comparative advantage. When a country’s exports exceed its imports, it records a Trade Surplus; otherwise, it faces a Trade Deficit.',
+      'Governments use tariffs (taxes on imports) and quotas (physical limits) to protect domestic industries, or sign Free Trade Agreements (FTAs) to reduce barriers.'
+    ],
+    bullets: [
+      'FOB (Free On Board) vs. CIF (Cost, Insurance, and Freight) in international shipping.',
+      'Letter of Credit (L/C): Bank guarantee ensuring payment upon delivery of export documents.',
+      'Exchange Rate Hedging: Protecting export margins against currency depreciation.'
+    ],
+    calloutTitle: 'CASE STUDY DISCUSSION',
+    calloutText: 'How does a 10% currency depreciation affect agricultural exporters vs. technology importers? Share your analysis in the Class Forum!'
+  },
+  {
+    variant: 'back-cover',
+    title: 'International Trade & Financial Statements',
+    subtitle: 'English Tech • Universidad de Pamplona.'
+  }
+];
+
 const DEMO_BOOK_2_PAGES = buildBookPagesFromOutline(
-  [
-    {
-      variant: 'cover',
-      chapter: 'CASE STUDY & GLOSSARY',
-      title: 'International Trade, Tariffs & Financial Statements',
-      subtitle: 'Bilingual Technical Guide for Balance Sheets, Income Statements & Free Trade Agreements.',
-      author: 'Gina Marcela Quintana'
-    },
-    {
-      variant: 'content',
-      chapter: 'SECTION 1 • CORPORATE FINANCIAL STATEMENTS',
-      title: 'Reading Balance Sheets & Income Statements',
-      subtitle: 'Assets, Liabilities, Shareholder Equity, Revenue & Net Profit',
-      body: [
-        'A Balance Sheet provides a snapshot of a company’s financial position at a specific point in time, following the fundamental accounting equation: Assets = Liabilities + Shareholders’ Equity.',
-        'An Income Statement (Profit & Loss Statement) measures operational performance over a period, showing Gross Revenue, Operating Expenses (OPEX), EBITDA, and Net Income.'
-      ],
-      stats: [
-        { label: 'GROSS MARGIN', value: '42.8%' },
-        { label: 'OPERATING CASH', value: '$1.85M USD' },
-        { label: 'DEBT-TO-EQUITY', value: '0.64 Ratio' }
-      ],
-      keyTerms: [
-        { term: 'Current Assets', definition: 'Cash, accounts receivable, and inventory convertible within 1 year.' },
-        { term: 'Liabilities', definition: 'Financial obligations and debts owed to external creditors.' },
-        { term: 'Net Profit Margin', definition: 'Percentage of revenue remaining after all expenses and taxes.' }
-      ]
-    },
-    {
-      variant: 'content',
-      chapter: 'SECTION 2 • GLOBAL TRADE & TARIFFS',
-      title: 'Trade Balance, Quotas & Free Trade Agreements',
-      subtitle: 'Negotiating export contracts and analyzing comparative advantage',
-      body: [
-        'International trade allows nations to specialize in goods where they hold a comparative advantage. When a country’s exports exceed its imports, it records a Trade Surplus; otherwise, it faces a Trade Deficit.',
-        'Governments use tariffs (taxes on imports) and quotas (physical limits) to protect domestic industries, or sign Free Trade Agreements (FTAs) to reduce barriers.'
-      ],
-      bullets: [
-        'FOB (Free On Board) vs. CIF (Cost, Insurance, and Freight) in international shipping.',
-        'Letter of Credit (L/C): Bank guarantee ensuring payment upon delivery of export documents.',
-        'Exchange Rate Hedging: Protecting export margins against currency depreciation.'
-      ],
-      calloutTitle: 'CASE STUDY DISCUSSION',
-      calloutText: 'How does a 10% currency depreciation affect agricultural exporters vs. technology importers? Share your analysis in the Class Forum!'
-    },
-    {
-      variant: 'back-cover',
-      title: 'International Trade & Financial Statements',
-      subtitle: 'English Tech • Universidad de Pamplona.'
-    }
-  ],
+  DEMO_BOOK_2_OUTLINE,
   { themeId: 'emerald-ledger', author: 'Gina Marcela Quintana' }
 );
 
@@ -890,6 +894,7 @@ export const DEMO_BOOKS = [
     description: 'Fundamentos de PIB (GDP), inflación (CPI), política monetaria y estructuras gramaticales para reportes económicos en inglés.',
     category: 'textbook',
     theme: 'royal-indigo',
+    bookOutline: DEMO_BOOK_1_OUTLINE,
     bookPages: DEMO_BOOK_1_PAGES,
     coverUrl: DEMO_BOOK_1_PAGES[0],
     pageCount: DEMO_BOOK_1_PAGES.length,
@@ -915,6 +920,7 @@ export const DEMO_BOOKS = [
     description: 'Manual práctico sobre estados financieros (Balance Sheet, Income Statement), aranceles, balanza comercial y términos de comercio exterior.',
     category: 'glossary',
     theme: 'emerald-ledger',
+    bookOutline: DEMO_BOOK_2_OUTLINE,
     bookPages: DEMO_BOOK_2_PAGES,
     coverUrl: DEMO_BOOK_2_PAGES[0],
     pageCount: DEMO_BOOK_2_PAGES.length,

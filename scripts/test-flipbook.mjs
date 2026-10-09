@@ -11,6 +11,14 @@ import {
   buildIllustratedBookPageSvg,
   buildBookPagesFromOutline,
   buildFallbackBookPages,
+  extractBookOutlinePageTexts,
+  normalizeBookOutlinePage,
+  stripBookHtml,
+  syncBookOutlineMetadata,
+  buildBookAiPrompt,
+  parseBookAiResponse,
+  buildFallbackBookOutline,
+  generateAiBookPages,
   uploadBookPagesToStorage,
   compactBookPagesForFirestore,
   sanitizeBookForFirestore,
@@ -431,24 +439,31 @@ const forbiddenCopyTerms = [
   'Leer en 3D',
   'Subir PDF como Libro 3D',
   'Publicar Libro 3D',
-  'Convertir PDF a Libro 3D'
+  'Convertir PDF a Libro 3D',
+  'Crear libro con IA',
+  'Generar libro con IA',
+  'Libro con IA'
 ];
 const hasForbiddenCopy = uiFilesToInspect.some((relPath) => {
   const content = fs.readFileSync(new URL(`../${relPath}`, import.meta.url), 'utf8');
   return forbiddenCopyTerms.some((term) => content.includes(term));
 });
+const booksModuleSrc = fs.readFileSync(new URL('../src/components/BooksLibraryModule.jsx', import.meta.url), 'utf8');
+const tasksTabSrc = fs.readFileSync(new URL('../src/components/TasksTab.jsx', import.meta.url), 'utf8');
 check(
-  'Ningún componente ni dato demo usa "Libros 3D", "Libro 3D", "Leer en 3D" ni "Subir PDF como Libro 3D"',
-  !hasForbiddenCopy
+  'Ningún componente ni dato demo usa "Libros 3D", "Libro 3D", "Crear libro con IA" ni "Generar libro con IA"',
+  !hasForbiddenCopy && !booksModuleSrc.includes('Generar con IA')
 );
 
-const booksModuleSrc = fs.readFileSync(new URL('../src/components/BooksLibraryModule.jsx', import.meta.url), 'utf8');
 check(
-  'BooksLibraryModule usa "Subir libro" / "Cerrar", distingue estado vacío ("No hay libros publicados aún") de filtrado ("No se encontraron libros") y no duplica botones inferiores',
-  booksModuleSrc.includes("'Cerrar' : 'Subir libro'") &&
+  'BooksLibraryModule usa "Crear libro" y "Subir libro" / "Cerrar", distingue estado vacío ("No hay libros publicados aún") de filtrado ("No se encontraron libros") y no duplica botones inferiores',
+  booksModuleSrc.includes("'Cerrar' : 'Crear libro'") &&
+    booksModuleSrc.includes("'Cerrar' : 'Subir libro'") &&
     booksModuleSrc.includes("'No hay libros publicados aún'") &&
     booksModuleSrc.includes("'No se encontraron libros'") &&
-    !booksModuleSrc.includes('Publicar primer libro')
+    !booksModuleSrc.includes('Publicar primer libro') &&
+    tasksTabSrc.includes('Crear libro') &&
+    tasksTabSrc.includes('Subir libro')
 );
 
 check(
@@ -458,6 +473,251 @@ check(
     BOOK_THEMES['crimson-oxford'].name === 'Carmesí' &&
     BOOK_THEMES['amber-executive'].name === 'Ámbar' &&
     BOOK_THEMES['slate-modern'].name === 'Pizarra'
+);
+
+console.log('\n== 9. Generación de Libros ("Crear libro": Prompt, Parser JSON, Fallback y SVG) ==');
+const aiPromptSample = buildBookAiPrompt({
+  title: 'Supply Chain & Logistics',
+  description: 'Include maritime shipping KPIs and customs vocabulary',
+  category: 'case-study',
+  pageCount: 6,
+  language: 'Bilingüe (EN/ES)',
+  author: 'Prof. Camilo'
+});
+check(
+  'buildBookAiPrompt incluye título, descripción, idioma, cantidad de páginas y formato JSON esperado',
+  typeof aiPromptSample === 'string' &&
+    aiPromptSample.includes('Supply Chain & Logistics') &&
+    aiPromptSample.includes('maritime shipping KPIs') &&
+    aiPromptSample.includes('6 páginas') &&
+    aiPromptSample.includes('Bilingüe') &&
+    aiPromptSample.includes('array JSON')
+);
+
+const parsedWrapperJson = parseBookAiResponse(
+  `\`\`\`json
+  {
+    "title": "Supply Chain Excellence",
+    "description": "Global trade & logistics",
+    "pages": [
+      { "variant": "cover", "title": "Supply Chain Excellence", "subtitle": "Global Logistics Guide" },
+      {
+        "variant": "content",
+        "chapter": "Chapter 1",
+        "title": "Container Shipping & Incoterms",
+        "subtitle": "FOB, CIF and DDP rules",
+        "body": ["Incoterms define responsibilities of buyers and sellers in international transactions."],
+        "bullets": ["FOB: Free On Board", "CIF: Cost, Insurance and Freight"],
+        "stats": [{ "label": "Global Trade by Sea", "value": "80%+" }],
+        "calloutTitle": "Key Term",
+        "calloutText": "Bill of Lading (B/L) is the legal contract of carriage."
+      },
+      { "variant": "back-cover", "title": "Supply Chain Excellence", "subtitle": "End of guide" }
+    ]
+  }
+  \`\`\``,
+  { fallbackTitle: 'Default Title', author: 'Prof. Camilo' }
+);
+check(
+  'parseBookAiResponse parsea JSON envuelto en markdown con portada, contenido enriquecido y contraportada',
+  Array.isArray(parsedWrapperJson) &&
+    parsedWrapperJson.length === 3 &&
+    parsedWrapperJson[0].variant === 'cover' &&
+    parsedWrapperJson[0].title === 'Supply Chain Excellence' &&
+    parsedWrapperJson[1].variant === 'content' &&
+    parsedWrapperJson[1].stats.length === 1 &&
+    parsedWrapperJson[2].variant === 'back-cover'
+);
+
+const parsedDirectArray = parseBookAiResponse(
+  JSON.stringify([
+    { title: 'Direct Array Book', subtitle: 'Sub' },
+    { title: 'Unit 1: Basics', body: ['Paragraph 1', 'Paragraph 2'], bullets: ['Point A'] },
+    { title: 'Closing' }
+  ]),
+  { fallbackTitle: 'Fallback' }
+);
+check(
+  'parseBookAiResponse acepta un arreglo JSON directo de páginas y asigna cover/content/back-cover',
+  Array.isArray(parsedDirectArray) &&
+    parsedDirectArray.length === 3 &&
+    parsedDirectArray[0].variant === 'cover' &&
+    parsedDirectArray[1].variant === 'content' &&
+    parsedDirectArray[2].variant === 'back-cover'
+);
+
+const parsedTruncated = parseBookAiResponse(
+  `{"title": "Truncated Book", "pages": [
+    {"variant": "cover", "title": "Truncated Book", "subtitle": "Part 1"},
+    {"variant": "content", "title": "Chapter 1", "body": ["Complete object before truncation"]},
+    {"variant": "content", "title": "Unfinished chapter", "body": ["Cut off in the middle`,
+  { fallbackTitle: 'Truncated' }
+);
+check(
+  'parseBookAiResponse recupera páginas válidas cuando la respuesta JSON se trunca y añade contraportada automática',
+  Array.isArray(parsedTruncated) &&
+    parsedTruncated.length === 3 &&
+    parsedTruncated[0].variant === 'cover' &&
+    parsedTruncated[1].title === 'Chapter 1' &&
+    parsedTruncated[2].variant === 'back-cover'
+);
+
+check(
+  'parseBookAiResponse devuelve null ante entradas vacías o texto sin JSON válido',
+  parseBookAiResponse('') === null &&
+    parseBookAiResponse(null) === null &&
+    parseBookAiResponse('Lo siento, no pude generar el JSON solicitado.') === null
+);
+
+const normalizedPageEdge = normalizeBookOutlinePage(
+  {
+    title: '  Page Title  ',
+    body: 'Single string body instead of array',
+    bullets: ['Bullet 1', '', null, 'Bullet 2'],
+    stats: [{ label: 'Metric', value: 99 }]
+  },
+  1,
+  4,
+  { fallbackTitle: 'Book', author: 'Author' }
+);
+check(
+  'normalizeBookOutlinePage convierte body string en arreglo, filtra viñetas vacías y normaliza stats',
+  normalizedPageEdge.variant === 'content' &&
+    normalizedPageEdge.title === 'Page Title' &&
+    Array.isArray(normalizedPageEdge.body) &&
+    normalizedPageEdge.body[0] === 'Single string body instead of array' &&
+    normalizedPageEdge.bullets.length === 2 &&
+    normalizedPageEdge.stats[0].value === '99'
+);
+
+const fallbackOutlineEn = buildFallbackBookOutline({
+  title: 'Corporate Finance Essentials',
+  description: 'Cash flow, EBITDA and valuation ratios',
+  pageCount: 6,
+  language: 'Inglés',
+  author: 'Prof. Camilo'
+});
+const fallbackOutlineEs = buildFallbackBookOutline({
+  title: 'Fundamentos de Comercio Exterior',
+  pageCount: 5,
+  language: 'Español',
+  author: 'Prof. Camilo'
+});
+check(
+  'buildFallbackBookOutline genera la cantidad exacta de páginas solicitadas (portada + capítulos + contraportada) en inglés o español',
+  fallbackOutlineEn.length === 6 &&
+    fallbackOutlineEn[0].variant === 'cover' &&
+    fallbackOutlineEn[5].variant === 'back-cover' &&
+    fallbackOutlineEs.length === 5 &&
+    fallbackOutlineEs[0].variant === 'cover' &&
+    fallbackOutlineEs[4].variant === 'back-cover'
+);
+
+const extractedTexts = extractBookOutlinePageTexts(fallbackOutlineEn);
+check(
+  'extractBookOutlinePageTexts extrae textos indexables por página para el buscador de la biblioteca',
+  Array.isArray(extractedTexts) &&
+    extractedTexts.length === 6 &&
+    extractedTexts[0].includes('Corporate Finance Essentials')
+);
+
+const generatedWithMockAi = await generateAiBookPages({
+  title: 'Monetary Policy & Central Banks',
+  description: 'Interest rates and inflation targeting',
+  category: 'textbook',
+  pageCount: 5,
+  language: 'Inglés',
+  themeId: 'emerald-ledger',
+  author: 'Prof. Camilo',
+  callGemini: async () =>
+    JSON.stringify({
+      title: 'Monetary Policy & Central Banks',
+      description: 'Interest rates and inflation targeting',
+      pages: [
+        { variant: 'cover', title: 'Monetary Policy & Central Banks', subtitle: 'Executive Edition' },
+        { variant: 'content', chapter: 'Unit 1', title: 'Interest Rates', body: ['Central banks adjust benchmark rates.'] },
+        { variant: 'content', chapter: 'Unit 2', title: 'Open Market Operations', body: ['Buying and selling government bonds.'] },
+        { variant: 'content', chapter: 'Unit 3', title: 'Reserve Requirements', body: ['Liquidity ratios for commercial banks.'] },
+        { variant: 'back-cover', title: 'Monetary Policy & Central Banks', subtitle: 'End of book' }
+      ]
+    })
+});
+check(
+  'generateAiBookPages usa callGemini cuando está disponible y construye páginas SVG ilustradas + pageTexts',
+  generatedWithMockAi.usedFallback === false &&
+    generatedWithMockAi.pages.length === 5 &&
+    generatedWithMockAi.pageTexts.length === 5 &&
+    generatedWithMockAi.pages.every((p) => p.startsWith('data:image/svg+xml;charset=utf-8,'))
+);
+
+const generatedWithFallback = await generateAiBookPages({
+  title: 'Fallback AI Book',
+  pageCount: 6,
+  language: 'Bilingüe',
+  themeId: 'crimson-oxford',
+  callGemini: async () => {
+    throw new Error('Simulated network error');
+  }
+});
+check(
+  'generateAiBookPages hace fallback automático a buildFallbackBookOutline si callGemini falla o no retorna JSON válido',
+  generatedWithFallback.usedFallback === true &&
+    generatedWithFallback.pages.length === 6 &&
+    generatedWithFallback.pageTexts.length === 6 &&
+    generatedWithFallback.pages.every((p) => p.startsWith('data:image/svg+xml;charset=utf-8,'))
+);
+
+console.log('\n== 10. Limpieza HTML (RichVisualEditor), Sincronización de Outline y Persistencia ==');
+check(
+  'stripBookHtml elimina etiquetas HTML y decodifica entidades (&nbsp;, &amp;, &quot;, &#39;)',
+  stripBookHtml('<p>Focus on <strong>KPIs</strong> &amp; cash&nbsp;flow</p>') === 'Focus on KPIs & cash flow' &&
+    stripBookHtml('<div>Line 1<br/>Line 2 &quot;quoted&quot; &#39;ok&#39;</div>') === 'Line 1 Line 2 "quoted" \'ok\''
+);
+
+const syncedOutline = syncBookOutlineMetadata(fallbackOutlineEn, {
+  title: 'Updated Finance Title 2026',
+  description: '<p>Updated executive summary</p>',
+  author: 'Prof. New'
+});
+check(
+  'syncBookOutlineMetadata actualiza título, subtítulo limpio y autor en portada y contraportada',
+  syncedOutline.length === fallbackOutlineEn.length &&
+    syncedOutline[0].title === 'Updated Finance Title 2026' &&
+    syncedOutline[0].subtitle === 'Updated executive summary' &&
+    syncedOutline[0].author === 'Prof. New' &&
+    syncedOutline[syncedOutline.length - 1].title === 'Updated Finance Title 2026'
+);
+
+const sanitizedWithOutline = sanitizeBookForFirestore({
+  id: 'book_outline_test',
+  title: 'Outline Driven Book',
+  description: '<p>Rich text <b>description</b> &nbsp;cleaned</p>',
+  theme: 'amber-executive',
+  bookPages: [],
+  bookOutline: syncedOutline
+});
+check(
+  'sanitizeBookForFirestore limpia HTML en description, conserva bookOutline y reconstruye bookPages desde bookOutline si bookPages está vacío',
+  sanitizedWithOutline.description === 'Rich text description cleaned' &&
+    Array.isArray(sanitizedWithOutline.bookOutline) &&
+    sanitizedWithOutline.bookOutline.length === 6 &&
+    sanitizedWithOutline.bookPages.length === 6 &&
+    sanitizedWithOutline.pageTexts.length === 6 &&
+    decodeURIComponent(sanitizedWithOutline.bookPages[0]).includes('Updated Finance Title') &&
+    decodeURIComponent(sanitizedWithOutline.bookPages[0]).includes('2026')
+);
+
+check(
+  'DEMO_BOOKS incluye bookOutline en los libros demo para permitir edición de tema y título en vivo',
+  DEMO_BOOKS.every((b) => Array.isArray(b.bookOutline) && b.bookOutline.length === b.bookPages.length)
+);
+
+check(
+  'BooksLibraryModule y TasksTab aíslan el cambio de modo (handleSwitchCreationMode / handleSwitchBook3dMode) y persisten bookOutline',
+  booksModuleSrc.includes('handleSwitchCreationMode') &&
+    tasksTabSrc.includes('handleSwitchBook3dMode') &&
+    booksModuleSrc.includes('bookOutline: sanitizedBook.bookOutline') &&
+    tasksTabSrc.includes('bookOutline: sanitizedBook.bookOutline')
 );
 
 console.log(`\n========================================`);

@@ -11,7 +11,8 @@ import {
     Loader2,
     Eye,
     X,
-    CheckCircle2
+    CheckCircle2,
+    RotateCcw
 } from './Icons';
 import {
     BOOK_THEMES,
@@ -20,7 +21,11 @@ import {
     uploadBookPagesToStorage,
     sanitizeBookForFirestore,
     filterBooksCatalog,
-    buildFallbackBookPages
+    buildFallbackBookPages,
+    buildBookPagesFromOutline,
+    extractBookOutlinePageTexts,
+    syncBookOutlineMetadata,
+    generateAiBookPages
 } from '../utils/flipbookEngine';
 import {
     db,
@@ -71,6 +76,7 @@ export default function BooksLibraryModule({
     showAlert,
     confirmAction,
     showConfirm,
+    callGemini,
     uploadImageToStorage: uploadImgProp,
     uploadRawFileToStorage: uploadRawProp,
     initialEditingBook = null,
@@ -122,12 +128,17 @@ export default function BooksLibraryModule({
 
     // Teacher Studio Modal / Form state
     const [isCreating, setIsCreating] = useState(false);
+    const [creationMode, setCreationMode] = useState('create'); // 'create' | 'upload'
     const [editingBookId, setEditingBookId] = useState(null);
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [category, setCategory] = useState('textbook');
     const [theme, setTheme] = useState('royal-indigo');
     const [targetGroupId, setTargetGroupId] = useState('all');
+    const [aiPageCount, setAiPageCount] = useState(6);
+    const [aiLanguage, setAiLanguage] = useState('Inglés');
+    const [previewOutline, setPreviewOutline] = useState([]);
+    const [isGeneratingBook, setIsGeneratingBook] = useState(false);
     const [pdfFile, setPdfFile] = useState(null);
     const [existingPdfUrl, setExistingPdfUrl] = useState('');
     const [existingFileName, setExistingFileName] = useState('');
@@ -257,11 +268,16 @@ export default function BooksLibraryModule({
 
     const resetForm = useCallback(() => {
         setEditingBookId(null);
+        setCreationMode('create');
         setTitle('');
         setDescription('');
         setCategory('textbook');
         setTheme('royal-indigo');
         setTargetGroupId('all');
+        setAiPageCount(6);
+        setAiLanguage('Inglés');
+        setPreviewOutline([]);
+        setIsGeneratingBook(false);
         setPdfFile(null);
         setExistingPdfUrl('');
         setExistingFileName('');
@@ -273,20 +289,68 @@ export default function BooksLibraryModule({
         setProgressInfo({ phase: '', currentPage: 0, totalPages: 0, percent: 0 });
     }, []);
 
-    const handleOpenCreate = () => {
-        resetForm();
-        setIsCreating(true);
-    };
+    const handleOpenCreate = useCallback(
+        (mode = 'create') => {
+            resetForm();
+            setCreationMode(mode === 'upload' ? 'upload' : 'create');
+            setIsCreating(true);
+        },
+        [resetForm]
+    );
+
+    const handleSwitchCreationMode = useCallback(
+        (nextMode) => {
+            const resolved = nextMode === 'upload' ? 'upload' : 'create';
+            setCreationMode(resolved);
+            if (resolved === 'upload') {
+                // Clear AI-generated preview pages so they don't appear as a ready PDF
+                if (previewOutline.length > 0 || (!pdfFile && !existingPdfUrl)) {
+                    setPreviewOutline([]);
+                    setPreviewPages([]);
+                    setPreviewPageTexts([]);
+                }
+            } else {
+                // Clear uploaded PDF state when switching to "Crear libro"
+                if (pdfFile || existingPdfUrl || existingFileName) {
+                    setPdfFile(null);
+                    setExistingPdfUrl('');
+                    setExistingFileName('');
+                    if (previewOutline.length === 0) {
+                        setPreviewPages([]);
+                        setPreviewPageTexts([]);
+                    }
+                }
+            }
+        },
+        [previewOutline.length, pdfFile, existingPdfUrl, existingFileName]
+    );
 
     const handleOpenEdit = useCallback((bookItem) => {
         if (!bookItem) return;
+        if (bookItem.isPreview || bookItem.id === 'preview_book') {
+            setActiveBookModal(null);
+            return;
+        }
         setActiveBookModal(null);
         setEditingBookId(bookItem.id);
+        const hasOutline = Array.isArray(bookItem.bookOutline) && bookItem.bookOutline.length > 0;
+        const hasPdf = Boolean(bookItem.pdfUrl || bookItem.fileUrl);
+        setCreationMode(hasOutline && !hasPdf ? 'create' : hasPdf || bookItem.fileName || bookItem.pdfFileName ? 'upload' : 'create');
         setTitle(bookItem.title || '');
         setDescription(bookItem.description || '');
         setCategory(bookItem.category || bookItem.bookCategory || 'textbook');
         setTheme(bookItem.theme || bookItem.bookTheme || 'royal-indigo');
         setTargetGroupId(bookItem.targetGroupId || 'all');
+        setPreviewOutline(hasOutline ? bookItem.bookOutline : []);
+        if (hasOutline) {
+            setAiPageCount([5, 6, 8, 10].includes(bookItem.bookOutline.length) ? bookItem.bookOutline.length : 6);
+        }
+        if (bookItem.aiLanguage || bookItem.language) {
+            const rawLang = String(bookItem.aiLanguage || bookItem.language);
+            setAiLanguage(
+                rawLang === 'ES' ? 'Español' : rawLang === 'BI' ? 'Bilingüe' : rawLang === 'EN' ? 'Inglés' : rawLang
+            );
+        }
         setPdfFile(null);
         setExistingPdfUrl(bookItem.pdfUrl || bookItem.fileUrl || '');
         setExistingFileName(bookItem.fileName || bookItem.pdfFileName || '');
@@ -298,15 +362,77 @@ export default function BooksLibraryModule({
 
     // Support opening a specific book in edit mode when navigated from the Wall
     useEffect(() => {
-        if (initialEditingBook && initialEditingBook.id) {
-            if (isTeacher) {
-                handleOpenEdit(initialEditingBook);
-            } else {
-                setActiveBookModal(initialEditingBook);
+        if (initialEditingBook) {
+            if (initialEditingBook.id) {
+                if (isTeacher) {
+                    handleOpenEdit(initialEditingBook);
+                } else {
+                    setActiveBookModal(initialEditingBook);
+                }
+            } else if (isTeacher && (initialEditingBook.openCreate || initialEditingBook.mode)) {
+                handleOpenCreate(initialEditingBook.mode === 'upload' ? 'upload' : 'create');
             }
             onClearInitialEditingBook?.();
         }
-    }, [initialEditingBook, isTeacher, handleOpenEdit, onClearInitialEditingBook]);
+    }, [initialEditingBook, isTeacher, handleOpenEdit, handleOpenCreate, onClearInitialEditingBook]);
+
+    const handleSelectTheme = (newThemeId) => {
+        setTheme(newThemeId);
+        if (Array.isArray(previewOutline) && previewOutline.length > 0 && !pdfFile) {
+            const authorName =
+                loggedInName || user?.displayName || getTeacherDisplayName(canonicalTeacherId) || 'Docente';
+            const syncedOutline = syncBookOutlineMetadata(previewOutline, {
+                title: title.trim(),
+                description: description.trim(),
+                author: authorName
+            });
+            setPreviewOutline(syncedOutline);
+            setPreviewPages(
+                buildBookPagesFromOutline(syncedOutline, {
+                    themeId: newThemeId,
+                    author: authorName
+                })
+            );
+        }
+    };
+
+    const handleGenerateBookPages = async () => {
+        if (!title.trim()) {
+            notify('Título requerido', 'Escribe el título o tema del libro.', 'warning');
+            return null;
+        }
+        setIsGeneratingBook(true);
+        try {
+            const authorName =
+                loggedInName || user?.displayName || getTeacherDisplayName(canonicalTeacherId) || 'Docente';
+            const generated = await generateAiBookPages({
+                topic: title.trim(),
+                title: title.trim(),
+                instructions: description.trim(),
+                description: description.trim(),
+                language: aiLanguage,
+                pageCount: aiPageCount,
+                themeId: theme,
+                author: authorName,
+                category,
+                callGemini
+            });
+            setPreviewOutline(generated.outline || []);
+            setPreviewPages(generated.pages || []);
+            setPreviewPageTexts(generated.pageTexts || []);
+            setAspectRatio(0.707);
+            setPdfFile(null);
+            setExistingPdfUrl('');
+            setExistingFileName('');
+            return generated;
+        } catch (err) {
+            console.error('Error creando páginas del libro:', err);
+            notify('Error al crear páginas', 'No se pudieron generar las páginas del libro.', 'error');
+            return null;
+        } finally {
+            setIsGeneratingBook(false);
+        }
+    };
 
     const handleSelectPdfFile = async (e) => {
         const file = e.target.files?.[0];
@@ -317,6 +443,7 @@ export default function BooksLibraryModule({
         }
 
         setPdfFile(file);
+        setPreviewOutline([]);
         setExistingFileName(file.name);
         if (!title.trim()) {
             const cleanName = file.name.replace(/\.pdf$/i, '').replace(/[-_]+/g, ' ').trim();
@@ -361,7 +488,13 @@ export default function BooksLibraryModule({
             notify('Título requerido', 'Escribe un título para el libro.', 'warning');
             return;
         }
-        if (previewPages.length === 0 && !pdfFile && !existingPdfUrl) {
+        if (
+            creationMode === 'upload' &&
+            (previewPages.length === 0 || previewOutline.length > 0) &&
+            !pdfFile &&
+            !existingPdfUrl &&
+            !existingFileName
+        ) {
             notify('Archivo PDF requerido', 'Selecciona un archivo PDF.', 'warning');
             return;
         }
@@ -375,6 +508,51 @@ export default function BooksLibraryModule({
             const authorName = loggedInName || user?.displayName || getTeacherDisplayName(ownerTid) || 'Docente';
 
             let pagesToSave = previewPages;
+            let pageTextsToSave = previewPageTexts;
+            let outlineToSave = previewOutline;
+
+            if (creationMode === 'create' && !pdfFile) {
+                if (pagesToSave.length === 0 && (!Array.isArray(outlineToSave) || outlineToSave.length === 0)) {
+                    setIsGeneratingBook(true);
+                    try {
+                        const generated = await generateAiBookPages({
+                            topic: title.trim(),
+                            title: title.trim(),
+                            instructions: description.trim(),
+                            description: description.trim(),
+                            language: aiLanguage,
+                            pageCount: aiPageCount,
+                            themeId: theme,
+                            author: authorName,
+                            category,
+                            callGemini
+                        });
+                        pagesToSave = generated.pages || [];
+                        pageTextsToSave = generated.pageTexts || [];
+                        outlineToSave = generated.outline || [];
+                        setPreviewOutline(outlineToSave);
+                        setPreviewPages(pagesToSave);
+                        setPreviewPageTexts(pageTextsToSave);
+                    } finally {
+                        setIsGeneratingBook(false);
+                    }
+                } else if (Array.isArray(outlineToSave) && outlineToSave.length > 0) {
+                    outlineToSave = syncBookOutlineMetadata(outlineToSave, {
+                        title: title.trim(),
+                        description: description.trim(),
+                        author: authorName
+                    });
+                    pagesToSave = buildBookPagesFromOutline(outlineToSave, {
+                        themeId: theme,
+                        author: authorName
+                    });
+                    pageTextsToSave = extractBookOutlinePageTexts(outlineToSave);
+                    setPreviewOutline(outlineToSave);
+                    setPreviewPages(pagesToSave);
+                    setPreviewPageTexts(pageTextsToSave);
+                }
+            }
+
             if (pagesToSave.length === 0) {
                 pagesToSave = buildFallbackBookPages({
                     title: title.trim(),
@@ -425,15 +603,18 @@ export default function BooksLibraryModule({
                 description: description.trim(),
                 category,
                 theme,
+                aiLanguage,
+                aiPageCount,
                 bookPages: uploadedPages,
                 pages: uploadedPages,
-                pageTexts: previewPageTexts,
+                pageTexts: pageTextsToSave,
+                bookOutline: Array.isArray(outlineToSave) && outlineToSave.length > 0 ? outlineToSave : [],
                 coverUrl: uploadedPages[0] || '',
                 pageCount: uploadedPages.length,
                 pdfUrl: finalPdfUrl || '',
                 fileUrl: finalPdfUrl || '',
-                fileName: finalFileName || `${title.trim()}.pdf`,
-                pdfFileName: finalFileName || `${title.trim()}.pdf`,
+                fileName: finalPdfUrl ? finalFileName || `${title.trim()}.pdf` : finalFileName || '',
+                pdfFileName: finalPdfUrl ? finalFileName || `${title.trim()}.pdf` : finalFileName || '',
                 aspectRatio,
                 targetGroupId: resolvedGroupId,
                 targetGroupName: resolvedGroupName,
@@ -479,6 +660,8 @@ export default function BooksLibraryModule({
                 theme: sanitizedBook.theme,
                 bookTheme: sanitizedBook.theme,
                 bookPages: sanitizedBook.bookPages,
+                pageTexts: sanitizedBook.pageTexts || [],
+                bookOutline: sanitizedBook.bookOutline || [],
                 coverUrl: sanitizedBook.coverUrl,
                 pageCount: sanitizedBook.pageCount,
                 pdfUrl: sanitizedBook.pdfUrl,
@@ -590,25 +773,47 @@ export default function BooksLibraryModule({
                 </h1>
 
                 {isTeacher && (
-                    <button
-                        type="button"
-                        onClick={() => {
-                            if (isCreating) {
-                                setIsCreating(false);
-                                resetForm();
-                            } else {
-                                handleOpenCreate();
-                            }
-                        }}
-                        className={`shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs shadow-sm transition-all active:scale-95 cursor-pointer ${
-                            isCreating
-                                ? 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-700'
-                                : 'bg-indigo-600 hover:bg-indigo-500 text-white'
-                        }`}
-                    >
-                        {isCreating ? <X size={16} /> : <Plus size={16} />}
-                        <span>{isCreating ? 'Cerrar' : 'Subir libro'}</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (isCreating && creationMode === 'create' && !editingBookId) {
+                                    setIsCreating(false);
+                                    resetForm();
+                                } else {
+                                    handleOpenCreate('create');
+                                }
+                            }}
+                            className={`shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs shadow-sm transition-all active:scale-95 cursor-pointer ${
+                                isCreating && creationMode === 'create'
+                                    ? 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-700'
+                                    : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                            }`}
+                        >
+                            {isCreating && creationMode === 'create' ? <X size={16} /> : <Plus size={16} />}
+                            <span>{isCreating && creationMode === 'create' ? 'Cerrar' : 'Crear libro'}</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (isCreating && creationMode === 'upload' && !editingBookId) {
+                                    setIsCreating(false);
+                                    resetForm();
+                                } else {
+                                    handleOpenCreate('upload');
+                                }
+                            }}
+                            className={`shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs shadow-sm transition-all active:scale-95 cursor-pointer ${
+                                isCreating && creationMode === 'upload'
+                                    ? 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-700'
+                                    : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800'
+                            }`}
+                        >
+                            {isCreating && creationMode === 'upload' ? <X size={16} /> : <UploadCloud size={16} />}
+                            <span>{isCreating && creationMode === 'upload' ? 'Cerrar' : 'Subir libro'}</span>
+                        </button>
+                    </div>
                 )}
             </div>
 
@@ -632,29 +837,63 @@ export default function BooksLibraryModule({
             {/* Teacher Creation / Edit Panel */}
             {isTeacher && isCreating && (
                 <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-lg animate-fade-in">
-                    <div className="flex items-center justify-between gap-4 mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
+                    <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
                         <div className="flex items-center gap-2.5">
                             <div className="w-9 h-9 rounded-xl bg-indigo-600/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
                                 <BookOpen size={18} />
                             </div>
                             <h2 className="text-base font-extrabold text-slate-900 dark:text-white">
-                                {editingBookId ? 'Editar libro' : 'Subir libro'}
+                                {editingBookId
+                                    ? 'Editar libro'
+                                    : creationMode === 'create'
+                                    ? 'Crear libro'
+                                    : 'Subir libro'}
                             </h2>
                         </div>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setIsCreating(false);
-                                resetForm();
-                            }}
-                            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                        >
-                            <X size={18} />
-                        </button>
+
+                        <div className="flex items-center gap-2">
+                            {!editingBookId && (
+                                <div className="inline-flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleSwitchCreationMode('create')}
+                                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                            creationMode === 'create'
+                                                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs'
+                                                : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'
+                                        }`}
+                                    >
+                                        Crear libro
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleSwitchCreationMode('upload')}
+                                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                            creationMode === 'upload'
+                                                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs'
+                                                : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'
+                                        }`}
+                                    >
+                                        Subir libro
+                                    </button>
+                                </div>
+                            )}
+
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setIsCreating(false);
+                                    resetForm();
+                                }}
+                                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
                     </div>
 
                     <form onSubmit={handleSaveBook} className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-                        {/* Left Column: PDF Upload & Cover Preview */}
+                        {/* Left Column: Cover Preview or PDF Upload */}
                         <div className="lg:col-span-5 flex flex-col gap-4">
                             <input
                                 ref={fileInputRef}
@@ -664,63 +903,165 @@ export default function BooksLibraryModule({
                                 className="hidden"
                             />
 
-                            <div
-                                onClick={() => !isProcessingPdf && fileInputRef.current?.click()}
-                                className={`relative rounded-2xl border-2 border-dashed p-5 text-center transition-all cursor-pointer ${
-                                    previewPages.length > 0
-                                        ? 'border-emerald-500/50 bg-emerald-50/40 dark:bg-emerald-950/20'
-                                        : 'border-indigo-300 dark:border-indigo-500/40 bg-indigo-50/40 dark:bg-slate-800/50 hover:border-indigo-500'
-                                }`}
-                            >
-                                {isProcessingPdf ? (
-                                    <div className="py-5 flex flex-col items-center">
-                                        <Loader2 size={28} className="animate-spin text-indigo-600 dark:text-indigo-400 mb-2" />
-                                        <p className="text-xs font-bold text-slate-800 dark:text-white">
-                                            Procesando PDF...
-                                        </p>
-                                        {progressInfo.totalPages > 0 && (
-                                            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                                                {progressInfo.currentPage} / {progressInfo.totalPages} ({progressInfo.percent}%)
+                            {creationMode === 'upload' ? (
+                                <div
+                                    onClick={() => !isProcessingPdf && fileInputRef.current?.click()}
+                                    className={`relative rounded-2xl border-2 border-dashed p-5 text-center transition-all cursor-pointer ${
+                                        previewPages.length > 0
+                                            ? 'border-emerald-500/50 bg-emerald-50/40 dark:bg-emerald-950/20'
+                                            : 'border-indigo-300 dark:border-indigo-500/40 bg-indigo-50/40 dark:bg-slate-800/50 hover:border-indigo-500'
+                                    }`}
+                                >
+                                    {isProcessingPdf ? (
+                                        <div className="py-5 flex flex-col items-center">
+                                            <Loader2 size={28} className="animate-spin text-indigo-600 dark:text-indigo-400 mb-2" />
+                                            <p className="text-xs font-bold text-slate-800 dark:text-white">
+                                                Procesando PDF...
                                             </p>
-                                        )}
-                                        <div className="w-full max-w-xs h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden mt-2.5">
+                                            {progressInfo.totalPages > 0 && (
+                                                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                                    {progressInfo.currentPage} / {progressInfo.totalPages} ({progressInfo.percent}%)
+                                                </p>
+                                            )}
+                                            <div className="w-full max-w-xs h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden mt-2.5">
+                                                <div
+                                                    className="h-full bg-indigo-600 transition-all duration-300"
+                                                    style={{ width: `${Math.max(8, progressInfo.percent || 12)}%` }}
+                                                />
+                                            </div>
+                                        </div>
+                                    ) : previewPages.length > 0 ? (
+                                        <div className="space-y-2.5">
+                                            <div className="mx-auto w-32 h-44 rounded-xl overflow-hidden shadow-md border border-white dark:border-slate-700 relative bg-slate-900">
+                                                <img
+                                                    src={previewPages[0]}
+                                                    alt="Portada"
+                                                    className="w-full h-full object-cover"
+                                                />
+                                                <span className="absolute bottom-1.5 right-1.5 px-2 py-0.5 rounded-full bg-slate-900/85 text-white text-[10px] font-bold">
+                                                    {previewPages.length} págs
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center justify-center gap-1.5 text-emerald-600 dark:text-emerald-400 text-xs font-bold">
+                                                <CheckCircle2 size={14} />
+                                                <span className="truncate max-w-[220px]">{existingFileName || 'PDF listo'}</span>
+                                            </div>
+                                            <p className="text-[11px] text-slate-400">
+                                                Cambiar PDF
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div className="py-6 flex flex-col items-center">
+                                            <div className="w-12 h-12 rounded-2xl bg-indigo-600/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-2.5">
+                                                <UploadCloud size={24} />
+                                            </div>
+                                            <p className="text-xs font-bold text-slate-800 dark:text-white">
+                                                Seleccionar PDF
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 p-5 text-center">
+                                    {isGeneratingBook ? (
+                                        <div className="py-8 flex flex-col items-center">
+                                            <Loader2 size={28} className="animate-spin text-indigo-600 dark:text-indigo-400 mb-2.5" />
+                                            <p className="text-xs font-bold text-slate-800 dark:text-white">
+                                                Creando páginas del libro...
+                                            </p>
+                                        </div>
+                                    ) : previewPages.length > 0 ? (
+                                        <div className="space-y-3">
                                             <div
-                                                className="h-full bg-indigo-600 transition-all duration-300"
-                                                style={{ width: `${Math.max(8, progressInfo.percent || 12)}%` }}
-                                            />
+                                                onClick={() =>
+                                                    setActiveBookModal({
+                                                        id: editingBookId || 'preview_book',
+                                                        isPreview: true,
+                                                        initialPage: 0,
+                                                        title: title || 'Vista previa',
+                                                        description,
+                                                        theme,
+                                                        category,
+                                                        bookPages: previewPages,
+                                                        pageCount: previewPages.length,
+                                                        pdfUrl: existingPdfUrl
+                                                    })
+                                                }
+                                                className="mx-auto w-32 h-44 rounded-xl overflow-hidden shadow-md border border-white dark:border-slate-700 relative bg-slate-900 cursor-pointer group"
+                                            >
+                                                <img
+                                                    src={previewPages[0]}
+                                                    alt="Portada"
+                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                                />
+                                                <span className="absolute bottom-1.5 right-1.5 px-2 py-0.5 rounded-full bg-slate-900/85 text-white text-[10px] font-bold">
+                                                    {previewPages.length} págs
+                                                </span>
+                                            </div>
+
+                                            <div className="flex items-center justify-center gap-1.5 overflow-x-auto py-1">
+                                                {previewPages.slice(0, 5).map((pg, idx) => (
+                                                    <img
+                                                        key={idx}
+                                                        src={pg}
+                                                        alt={`Página ${idx + 1}`}
+                                                        onClick={() =>
+                                                            setActiveBookModal({
+                                                                id: editingBookId || 'preview_book',
+                                                                isPreview: true,
+                                                                initialPage: idx,
+                                                                title: title || 'Vista previa',
+                                                                description,
+                                                                theme,
+                                                                category,
+                                                                bookPages: previewPages,
+                                                                pageCount: previewPages.length,
+                                                                pdfUrl: existingPdfUrl
+                                                            })
+                                                        }
+                                                        className="w-9 h-12 rounded object-cover border border-slate-200 dark:border-slate-700 shadow-2xs cursor-pointer hover:ring-2 hover:ring-indigo-500 transition-all"
+                                                    />
+                                                ))}
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                onClick={handleGenerateBookPages}
+                                                className="inline-flex items-center gap-1.5 text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                                            >
+                                                <RotateCcw size={12} />
+                                                <span>Actualizar páginas</span>
+                                            </button>
                                         </div>
-                                    </div>
-                                ) : previewPages.length > 0 ? (
-                                    <div className="space-y-2.5">
-                                        <div className="mx-auto w-32 h-44 rounded-xl overflow-hidden shadow-md border border-white dark:border-slate-700 relative bg-slate-900">
-                                            <img
-                                                src={previewPages[0]}
-                                                alt="Portada"
-                                                className="w-full h-full object-cover"
-                                            />
-                                            <span className="absolute bottom-1.5 right-1.5 px-2 py-0.5 rounded-full bg-slate-900/85 text-white text-[10px] font-bold">
-                                                {previewPages.length} págs
-                                            </span>
+                                    ) : (
+                                        <div className="py-4 flex flex-col items-center space-y-3">
+                                            <div
+                                                className="w-28 h-40 rounded-r-xl rounded-l-sm shadow-md border border-white/20 flex flex-col justify-between p-3 text-left text-white relative overflow-hidden"
+                                                style={{
+                                                    background: `linear-gradient(135deg, ${getBookTheme(theme).coverBg}, ${getBookTheme(theme).spineColor})`
+                                                }}
+                                            >
+                                                <span className="text-[8px] font-bold uppercase tracking-widest opacity-75">
+                                                    Libro
+                                                </span>
+                                                <p className="text-xs font-bold leading-snug line-clamp-4">
+                                                    {title.trim() || 'Título del libro'}
+                                                </p>
+                                                <span className="text-[9px] opacity-80">
+                                                    {aiPageCount} págs • {aiLanguage}
+                                                </span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={handleGenerateBookPages}
+                                                className="px-3.5 py-1.5 rounded-xl bg-indigo-600/10 dark:bg-indigo-500/20 hover:bg-indigo-600/20 text-indigo-600 dark:text-indigo-300 text-xs font-bold transition-colors cursor-pointer"
+                                            >
+                                                Vista previa de páginas
+                                            </button>
                                         </div>
-                                        <div className="flex items-center justify-center gap-1.5 text-emerald-600 dark:text-emerald-400 text-xs font-bold">
-                                            <CheckCircle2 size={14} />
-                                            <span className="truncate max-w-[220px]">{existingFileName || 'PDF listo'}</span>
-                                        </div>
-                                        <p className="text-[11px] text-slate-400">
-                                            Cambiar PDF
-                                        </p>
-                                    </div>
-                                ) : (
-                                    <div className="py-6 flex flex-col items-center">
-                                        <div className="w-12 h-12 rounded-2xl bg-indigo-600/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-2.5">
-                                            <UploadCloud size={24} />
-                                        </div>
-                                        <p className="text-xs font-bold text-slate-800 dark:text-white">
-                                            Seleccionar PDF
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
+                                    )}
+                                </div>
+                            )}
 
                             {/* Compact Color Swatches */}
                             <div className="flex items-center justify-between gap-3 px-1">
@@ -732,7 +1073,7 @@ export default function BooksLibraryModule({
                                         <button
                                             key={th.id}
                                             type="button"
-                                            onClick={() => setTheme(th.id)}
+                                            onClick={() => handleSelectTheme(th.id)}
                                             title={th.name}
                                             aria-label={th.name}
                                             className={`w-6 h-6 rounded-full border transition-all cursor-pointer ${
@@ -754,48 +1095,109 @@ export default function BooksLibraryModule({
                             <div className="space-y-3.5">
                                 <div>
                                     <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1">
-                                        Título *
+                                        {creationMode === 'create' ? 'Título o tema *' : 'Título *'}
                                     </label>
                                     <input
                                         type="text"
                                         required
                                         value={title}
                                         onChange={(e) => setTitle(e.target.value)}
-                                        placeholder="Título del libro"
+                                        placeholder={
+                                            creationMode === 'create'
+                                                ? 'Ej. International Trade & Tariffs, Modal Verbs in Finance...'
+                                                : 'Título del libro'
+                                        }
                                         className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                     />
                                 </div>
 
                                 <div>
                                     <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1">
-                                        Descripción (opcional)
+                                        {creationMode === 'create' ? 'Indicaciones (opcional)' : 'Descripción (opcional)'}
                                     </label>
                                     <textarea
                                         rows={2}
                                         value={description}
                                         onChange={(e) => setDescription(e.target.value)}
-                                        placeholder="Descripción breve..."
+                                        placeholder={
+                                            creationMode === 'create'
+                                                ? 'Capítulos, vocabulario, nivel o ejemplos que quieras incluir...'
+                                                : 'Descripción breve...'
+                                        }
                                         className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                     />
                                 </div>
 
-                                <div>
-                                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1">
-                                        Grupo
-                                    </label>
-                                    <select
-                                        value={targetGroupId}
-                                        onChange={(e) => setTargetGroupId(e.target.value)}
-                                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                    >
-                                        <option value="all">🌍 Todos los grupos</option>
-                                        {teacherOwnedGroups.map((grp) => (
-                                            <option key={grp.id} value={grp.id}>
-                                                👥 {grp.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
+                                {creationMode === 'create' ? (
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                        <div>
+                                            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1">
+                                                Páginas
+                                            </label>
+                                            <select
+                                                value={aiPageCount}
+                                                onChange={(e) => setAiPageCount(Number(e.target.value) || 6)}
+                                                className="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                            >
+                                                <option value={5}>5 páginas</option>
+                                                <option value={6}>6 páginas</option>
+                                                <option value={8}>8 páginas</option>
+                                                <option value={10}>10 páginas</option>
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1">
+                                                Idioma
+                                            </label>
+                                            <select
+                                                value={aiLanguage}
+                                                onChange={(e) => setAiLanguage(e.target.value)}
+                                                className="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                            >
+                                                <option value="Inglés">Inglés</option>
+                                                <option value="Bilingüe">Bilingüe</option>
+                                                <option value="Español">Español</option>
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1">
+                                                Grupo
+                                            </label>
+                                            <select
+                                                value={targetGroupId}
+                                                onChange={(e) => setTargetGroupId(e.target.value)}
+                                                className="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                            >
+                                                <option value="all">🌍 Todos los grupos</option>
+                                                {teacherOwnedGroups.map((grp) => (
+                                                    <option key={grp.id} value={grp.id}>
+                                                        👥 {grp.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1">
+                                            Grupo
+                                        </label>
+                                        <select
+                                            value={targetGroupId}
+                                            onChange={(e) => setTargetGroupId(e.target.value)}
+                                            className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        >
+                                            <option value="all">🌍 Todos los grupos</option>
+                                            {teacherOwnedGroups.map((grp) => (
+                                                <option key={grp.id} value={grp.id}>
+                                                    👥 {grp.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-end gap-2.5">
@@ -834,14 +1236,16 @@ export default function BooksLibraryModule({
 
                                 <button
                                     type="submit"
-                                    disabled={isSaving || isProcessingPdf}
+                                    disabled={isSaving || isProcessingPdf || isGeneratingBook}
                                     className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
                                 >
-                                    {isSaving ? (
+                                    {isSaving || isGeneratingBook ? (
                                         <>
                                             <Loader2 size={14} className="animate-spin" />
                                             <span>
-                                                {progressInfo.phase === 'upload'
+                                                {isGeneratingBook
+                                                    ? 'Creando libro...'
+                                                    : progressInfo.phase === 'upload'
                                                     ? `Subiendo ${progressInfo.currentPage}/${progressInfo.totalPages}...`
                                                     : 'Guardando...'}
                                             </span>
@@ -1034,9 +1438,10 @@ export default function BooksLibraryModule({
             {activeBookModal && (
                 <Flipbook3DModal
                     book={activeBookModal}
+                    initialPage={activeBookModal.initialPage || 0}
                     onClose={() => setActiveBookModal(null)}
                     isTeacher={isTeacher}
-                    onEditBook={isTeacher ? handleOpenEdit : null}
+                    onEditBook={isTeacher && !activeBookModal.isPreview ? handleOpenEdit : null}
                 />
             )}
         </div>

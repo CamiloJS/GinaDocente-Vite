@@ -402,6 +402,783 @@ export const buildFallbackBookPages = ({
 };
 
 /**
+ * Extracts searchable plain text snippets for each page of a structured book outline.
+ */
+export const extractBookOutlinePageTexts = (outline = []) => {
+    if (!Array.isArray(outline)) return [];
+    return outline.map((page) => {
+        if (!page || typeof page !== 'object') return '';
+        const parts = [
+            page.chapter,
+            page.title,
+            page.subtitle,
+            ...(Array.isArray(page.body) ? page.body : []),
+            ...(Array.isArray(page.bullets) ? page.bullets : []),
+            page.calloutTitle,
+            page.calloutText,
+            ...(Array.isArray(page.keyTerms)
+                ? page.keyTerms.map((kt) => `${kt?.term || ''} ${kt?.definition || ''}`)
+                : []),
+            ...(Array.isArray(page.stats)
+                ? page.stats.map((st) => `${st?.label || ''} ${st?.value || ''}`)
+                : [])
+        ];
+        return parts
+            .filter(Boolean)
+            .join(' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 320);
+    });
+};
+
+/**
+ * Normalizes a single page object inside a book outline.
+ */
+export const normalizeBookOutlinePage = (rawPage = {}, idx = 0, totalPages = 6, defaultTitle = 'Libro') => {
+    const safePage = rawPage && typeof rawPage === 'object' ? rawPage : {};
+    let variant = String(safePage.variant || safePage.type || '').toLowerCase().trim();
+    if (variant === 'back_cover' || variant === 'backcover') variant = 'back-cover';
+    if (!['cover', 'content', 'back-cover'].includes(variant)) {
+        if (idx === 0 && totalPages >= 2) variant = 'cover';
+        else if (idx === totalPages - 1 && totalPages >= 3) variant = 'back-cover';
+        else variant = 'content';
+    }
+
+    const resolvedDefaultTitle =
+        defaultTitle && typeof defaultTitle === 'object'
+            ? defaultTitle.fallbackTitle || defaultTitle.defaultTitle || defaultTitle.title || 'Libro'
+            : defaultTitle;
+    const cleanDefaultTitle = String(resolvedDefaultTitle || 'Libro').trim();
+    const title = String(
+        safePage.title ||
+            safePage.heading ||
+            (variant === 'cover' || variant === 'back-cover' ? cleanDefaultTitle : `Chapter ${idx}`)
+    ).trim();
+
+    const subtitle = String(safePage.subtitle || safePage.description || safePage.summary || '').trim();
+    const chapter = String(
+        safePage.chapter ||
+            safePage.badge ||
+            safePage.section ||
+            (variant === 'cover' ? 'LIBRO' : variant === 'back-cover' ? '' : `CHAPTER ${idx}`)
+    ).trim();
+
+    const rawBody = Array.isArray(safePage.body)
+        ? safePage.body
+        : Array.isArray(safePage.paragraphs)
+        ? safePage.paragraphs
+        : typeof safePage.body === 'string' && safePage.body.trim()
+        ? safePage.body.split(/\n+/).map((s) => s.trim()).filter(Boolean)
+        : typeof safePage.content === 'string' && safePage.content.trim()
+        ? safePage.content.split(/\n+/).map((s) => s.trim()).filter(Boolean)
+        : [];
+
+    const body = rawBody
+        .map((p) =>
+            typeof p === 'object' && p !== null
+                ? String(p.text || p.content || '').trim()
+                : String(p || '').trim()
+        )
+        .filter(Boolean)
+        .slice(0, 4);
+
+    const rawBullets = Array.isArray(safePage.bullets)
+        ? safePage.bullets
+        : Array.isArray(safePage.items)
+        ? safePage.items
+        : Array.isArray(safePage.examples)
+        ? safePage.examples
+        : [];
+
+    const bullets = rawBullets
+        .map((b) => {
+            if (typeof b === 'object' && b !== null) {
+                const bTitle = String(b.title || b.term || '').trim();
+                const bText = String(b.text || b.description || b.example || '').trim();
+                return bTitle && bText ? `${bTitle}: ${bText}` : bTitle || bText;
+            }
+            return String(b || '').trim();
+        })
+        .filter(Boolean)
+        .slice(0, 5);
+
+    const rawKeyTerms = Array.isArray(safePage.keyTerms)
+        ? safePage.keyTerms
+        : Array.isArray(safePage.vocabulary)
+        ? safePage.vocabulary
+        : Array.isArray(safePage.glossary)
+        ? safePage.glossary
+        : [];
+
+    const keyTerms = rawKeyTerms
+        .map((kt) => {
+            if (typeof kt === 'object' && kt !== null) {
+                const term = String(kt.term || kt.word || kt.title || '').trim();
+                const definition = String(kt.definition || kt.meaning || kt.text || '').trim();
+                return term ? { term, definition } : null;
+            }
+            if (typeof kt === 'string' && kt.includes(':')) {
+                const [t, ...rest] = kt.split(':');
+                return { term: t.trim(), definition: rest.join(':').trim() };
+            }
+            return null;
+        })
+        .filter(Boolean)
+        .slice(0, 4);
+
+    const rawStats = Array.isArray(safePage.stats) ? safePage.stats : [];
+    const stats = rawStats
+        .map((st) => {
+            if (typeof st === 'object' && st !== null) {
+                const label = String(st.label || st.title || st.name || '').trim();
+                const value = String(st.value ?? st.stat ?? '').trim();
+                return label && value ? { label, value } : null;
+            }
+            return null;
+        })
+        .filter(Boolean)
+        .slice(0, 3);
+
+    const calloutTitle = String(safePage.calloutTitle || safePage.tipTitle || '').trim();
+    const calloutText = String(safePage.calloutText || safePage.callout || safePage.tip || '').trim();
+
+    return {
+        variant,
+        chapter,
+        title,
+        subtitle,
+        body:
+            variant === 'content' && body.length === 0
+                ? [subtitle || `Key concepts and practical analysis of ${title}.`]
+                : body,
+        bullets,
+        keyTerms,
+        stats,
+        calloutTitle,
+        calloutText
+    };
+};
+
+/**
+ * Strips HTML tags and decodes common HTML entities so rich-text descriptions
+ * never leak raw markup (<p>, &nbsp;, etc.) into SVG book pages or metadata.
+ */
+export const stripBookHtml = (value = '') =>
+    String(value ?? '')
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/&nbsp;/gi, ' ')
+        .replace(/&amp;/gi, '&')
+        .replace(/&lt;/gi, '<')
+        .replace(/&gt;/gi, '>')
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;/gi, "'")
+        .replace(/\s+/g, ' ')
+        .trim();
+
+/**
+ * Synchronizes the cover and back-cover title/subtitle of an existing book outline
+ * when the teacher edits the title or description in the form before saving.
+ */
+export const syncBookOutlineMetadata = (outline = [], { title = '', description = '', author = '' } = {}) => {
+    if (!Array.isArray(outline) || outline.length === 0) return [];
+    const cleanTitle = stripBookHtml(title);
+    const cleanDesc = stripBookHtml(description);
+    const cleanAuthor = stripBookHtml(author);
+
+    return outline.map((page, idx) => {
+        if (!page || typeof page !== 'object') return page;
+        const isCover = idx === 0 || page.variant === 'cover';
+        const isBackCover = idx === outline.length - 1 || page.variant === 'back-cover';
+        const nextPage = {
+            ...page,
+            ...(cleanAuthor ? { author: cleanAuthor } : {})
+        };
+        if (isCover) {
+            if (cleanTitle) nextPage.title = cleanTitle;
+            if (cleanDesc) nextPage.subtitle = cleanDesc;
+        } else if (isBackCover) {
+            if (cleanTitle) nextPage.title = cleanTitle;
+        }
+        return nextPage;
+    });
+};
+
+/**
+ * Builds the structured prompt to generate a complete educational book outline with Gemini.
+ */
+export const buildBookAiPrompt = ({
+    topic = '',
+    title = '',
+    instructions = '',
+    description = '',
+    language = 'Inglés',
+    pageCount = 6,
+    category = 'textbook',
+    author = 'Docente'
+} = {}) => {
+    const cleanTopic = stripBookHtml(topic || title) || 'English for Economics & Global Markets';
+    const cleanNotes = stripBookHtml(instructions || description);
+    const totalPages = Math.max(3, Math.min(14, Number(pageCount) || 6));
+    const contentPagesCount = Math.max(1, totalPages - 2);
+    const langLabel = String(language || 'Inglés').trim();
+
+    return `Actúa como autor académico universitario y diseñador editorial experto.
+Escribe el contenido estructurado completo de un libro educativo sobre el tema: "${cleanTopic}".
+${cleanNotes ? `\nIndicaciones o contenidos adicionales solicitados por el docente:\n"""\n${cleanNotes}\n"""\n` : ''}
+IDIOMA OBLIGATORIO DEL LIBRO: "${langLabel}".
+Si el idioma es "Inglés", redacta todo el libro en inglés académico claro. Si es "Bilingüe", combina conceptos y ejemplos en inglés con explicaciones o definiciones clave en español. Si es "Español", redacta todo el libro en español.
+Categoría editorial: "${category}". Autor/Docente: "${author}".
+
+El libro debe tener EXACTAMENTE ${totalPages} páginas en un array JSON:
+1. Página 1 (índice 0): Portada con:
+   { "variant": "cover", "chapter": "ETIQUETA EDITORIAL BREVE", "title": "Título del libro", "subtitle": "Subtítulo descriptivo y claro" }
+2. Páginas 2 a ${totalPages - 1} (${contentPagesCount} páginas interiores): Cada una con "variant": "content", desarrollando un capítulo progresivo sobre "${cleanTopic}" con:
+   {
+     "variant": "content",
+     "chapter": "CHAPTER X • SUBTEMA",
+     "title": "Título claro del capítulo",
+     "subtitle": "Subtítulo pedagógico",
+     "body": ["Párrafo 1 con explicación clara y rigurosa (2-3 oraciones).", "Párrafo 2 con aplicación práctica, contexto real o estructuras clave (2-3 oraciones)."],
+     "bullets": ["Punto clave o ejemplo aplicado 1", "Punto clave o ejemplo aplicado 2", "Punto clave o ejemplo aplicado 3"],
+     "stats": [{"label": "Indicador / Concepto", "value": "Valor / Regla"}],
+     "keyTerms": [{"term": "Término 1", "definition": "Definición concisa"}, {"term": "Término 2", "definition": "Definición concisa"}],
+     "calloutTitle": "Título breve del recuadro de enfoque",
+     "calloutText": "Síntesis práctica, ejemplo modelo o actividad breve."
+   }
+3. Página ${totalPages} (última página): Contraportada con:
+   { "variant": "back-cover", "title": "Título del libro", "subtitle": "Síntesis final del libro" }
+
+Devuelve ÚNICAMENTE un array JSON válido de ${totalPages} objetos sin bloques markdown ni texto adicional.`;
+};
+
+const extractBalancedBookJson = (text, openChar, closeChar, validator) => {
+    let searchFrom = 0;
+    while (searchFrom < text.length) {
+        const startIdx = text.indexOf(openChar, searchFrom);
+        if (startIdx === -1) break;
+
+        let depth = 0;
+        let inString = false;
+        let escape = false;
+        let matchedEnd = -1;
+
+        for (let i = startIdx; i < text.length; i++) {
+            const ch = text[i];
+            if (escape) {
+                escape = false;
+                continue;
+            }
+            if (ch === '\\' && inString) {
+                escape = true;
+                continue;
+            }
+            if (ch === '"') {
+                inString = !inString;
+                continue;
+            }
+            if (!inString) {
+                if (ch === openChar) depth++;
+                else if (ch === closeChar) {
+                    depth--;
+                    if (depth === 0) {
+                        matchedEnd = i;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (matchedEnd !== -1) {
+            try {
+                const candidate = JSON.parse(text.substring(startIdx, matchedEnd + 1));
+                if (validator(candidate)) {
+                    return candidate;
+                }
+            } catch {
+                // Continue searching
+            }
+        }
+        searchFrom = startIdx + 1;
+    }
+    return null;
+};
+
+const recoverTruncatedBookPages = (text) => {
+    const firstBracket = text.indexOf('[');
+    if (firstBracket === -1) return null;
+    const items = [];
+    let i = firstBracket + 1;
+    while (i < text.length) {
+        const objStart = text.indexOf('{', i);
+        if (objStart === -1) break;
+        let depth = 0;
+        let inStr = false;
+        let esc = false;
+        let objEnd = -1;
+        for (let j = objStart; j < text.length; j++) {
+            const ch = text[j];
+            if (esc) {
+                esc = false;
+                continue;
+            }
+            if (ch === '\\' && inStr) {
+                esc = true;
+                continue;
+            }
+            if (ch === '"') {
+                inStr = !inStr;
+                continue;
+            }
+            if (!inStr) {
+                if (ch === '{') depth++;
+                else if (ch === '}') {
+                    depth--;
+                    if (depth === 0) {
+                        objEnd = j;
+                        break;
+                    }
+                }
+            }
+        }
+        if (objEnd === -1) break;
+        try {
+            const obj = JSON.parse(text.slice(objStart, objEnd + 1));
+            if (
+                obj &&
+                typeof obj === 'object' &&
+                !Array.isArray(obj) &&
+                (obj.title || obj.variant || obj.body || obj.bullets || obj.chapter)
+            ) {
+                items.push(obj);
+            }
+        } catch {
+            // Skip malformed object
+        }
+        i = objEnd + 1;
+    }
+    return items.length > 0 ? items : null;
+};
+
+/**
+ * Parses and normalizes an AI response into a valid book outline array (cover + content chapters + back-cover).
+ */
+export const parseBookAiResponse = (rawText, { fallbackTitle = 'Libro', author = 'Docente' } = {}) => {
+    if (!rawText) return null;
+
+    let rawList = null;
+    let wrapperTitle = '';
+    let wrapperSubtitle = '';
+
+    if (Array.isArray(rawText)) {
+        rawList = rawText;
+    } else if (typeof rawText === 'object') {
+        wrapperTitle = String(rawText.title || '').trim();
+        wrapperSubtitle = String(rawText.description || rawText.subtitle || '').trim();
+        rawList = Array.isArray(rawText.pages)
+            ? rawText.pages
+            : Array.isArray(rawText.outline)
+            ? rawText.outline
+            : Array.isArray(rawText.chapters)
+            ? rawText.chapters
+            : null;
+    } else if (typeof rawText === 'string') {
+        const clean = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+        if (!clean) return null;
+
+        const wrapperObj = extractBalancedBookJson(
+            clean,
+            '{',
+            '}',
+            (candidate) =>
+                Boolean(
+                    candidate &&
+                        typeof candidate === 'object' &&
+                        !Array.isArray(candidate) &&
+                        (Array.isArray(candidate.pages) ||
+                            Array.isArray(candidate.outline) ||
+                            Array.isArray(candidate.chapters))
+                )
+        );
+        if (wrapperObj) {
+            wrapperTitle = String(wrapperObj.title || '').trim();
+            wrapperSubtitle = String(wrapperObj.description || wrapperObj.subtitle || '').trim();
+            rawList = wrapperObj.pages || wrapperObj.outline || wrapperObj.chapters;
+        }
+
+        if (!rawList) {
+            rawList = extractBalancedBookJson(
+                clean,
+                '[',
+                ']',
+                (candidate) =>
+                    Array.isArray(candidate) &&
+                    candidate.length > 0 &&
+                    candidate.some((it) => it && typeof it === 'object' && !Array.isArray(it))
+            );
+        }
+
+        if (!rawList) {
+            rawList = recoverTruncatedBookPages(clean);
+        }
+    }
+
+    if (!Array.isArray(rawList) || rawList.length === 0) return null;
+
+    const validObjects = rawList.filter((item) => item && typeof item === 'object' && !Array.isArray(item));
+    if (validObjects.length === 0) return null;
+
+    const inferredTitle = String(
+        wrapperTitle ||
+            validObjects.find((p) => String(p.variant || '').toLowerCase() === 'cover')?.title ||
+            fallbackTitle ||
+            validObjects[0]?.title ||
+            'Libro'
+    ).trim();
+
+    const workingList = [...validObjects];
+
+    const firstVariant = String(workingList[0]?.variant || '').toLowerCase().trim();
+    const firstHasContentBody =
+        Array.isArray(workingList[0]?.body) && workingList[0].body.length > 0;
+    if (firstVariant !== 'cover' && (workingList.length < 3 || firstHasContentBody)) {
+        workingList.unshift({
+            variant: 'cover',
+            chapter: 'LIBRO',
+            title: inferredTitle,
+            subtitle: wrapperSubtitle,
+            author
+        });
+    }
+
+    const lastItem = workingList[workingList.length - 1];
+    const lastVariant = String(lastItem?.variant || '').toLowerCase().trim();
+    const lastHasContentBody = Array.isArray(lastItem?.body) && lastItem.body.length > 0;
+    if (
+        lastVariant !== 'back-cover' &&
+        lastVariant !== 'back_cover' &&
+        lastVariant !== 'backcover' &&
+        (workingList.length < 3 || lastHasContentBody)
+    ) {
+        workingList.push({
+            variant: 'back-cover',
+            title: inferredTitle,
+            subtitle: wrapperSubtitle
+        });
+    }
+
+    const total = workingList.length;
+    return workingList.map((page, idx) => ({
+        ...normalizeBookOutlinePage(page, idx, total, inferredTitle),
+        author: page.author || author
+    }));
+};
+
+/**
+ * Generates a structured multi-page book outline when offline, in demo mode, or if the AI API fails.
+ */
+export const buildFallbackBookOutline = ({
+    topic = '',
+    title = '',
+    instructions = '',
+    description = '',
+    language = 'Inglés',
+    pageCount = 6,
+    author = 'Docente',
+    category = 'textbook'
+} = {}) => {
+    const cleanTopic = stripBookHtml(topic || title) || 'English for Economics & Global Markets';
+    const cleanNotes = stripBookHtml(instructions || description);
+    const totalPages = Math.max(3, Math.min(14, Number(pageCount) || 6));
+    const contentPagesCount = Math.max(1, totalPages - 2);
+    const langLower = String(language || 'Inglés').toLowerCase();
+    const isEs = langLower.includes('espa') && !langLower.includes('biling');
+    const isBi = langLower.includes('biling');
+
+    const categoryBadge =
+        {
+            textbook: isEs ? 'GUÍA DE ESTUDIO' : 'STUDY HANDBOOK',
+            'case-study': isEs ? 'CASO DE ESTUDIO' : 'CASE STUDY',
+            glossary: isEs ? 'GLOSARIO TÉCNICO' : 'TECHNICAL GLOSSARY',
+            magazine: isEs ? 'EDICIÓN ESPECIAL' : 'SPECIAL ISSUE',
+            workbook: isEs ? 'CUADERNO PRÁCTICO' : 'PRACTICE WORKBOOK'
+        }[category] || (isEs ? 'LIBRO' : 'ACADEMIC EDITION');
+
+    const chapterPool = [
+        {
+            variant: 'content',
+            chapter: isEs ? 'CAPÍTULO 1 • FUNDAMENTOS' : 'CHAPTER 1 • CORE FOUNDATIONS',
+            title: isEs
+                ? `Conceptos Esenciales: ${cleanTopic}`
+                : `Core Principles of ${cleanTopic}`,
+            subtitle: isEs
+                ? cleanNotes || `Definiciones clave, contexto académico y alcance práctico`
+                : cleanNotes || `Essential definitions, academic context, and practical scope`,
+            body: isEs
+                ? [
+                      `El estudio de ${cleanTopic} permite comprender cómo interactúan las estructuras clave y la terminología especializada dentro de escenarios reales y académicos.`,
+                      `Dominar estos principios facilita analizar información con precisión, estructurar argumentos sólidos y comunicar hallazgos de manera clara.`
+                  ]
+                : isBi
+                ? [
+                      `Understanding ${cleanTopic} is essential for analyzing technical reports, global contexts, and professional communication (comprender este tema es clave para el análisis práctico).`,
+                      `Students should identify core patterns, specialized terminology, and real-world applications in every scenario.`
+                  ]
+                : [
+                      `Understanding ${cleanTopic} provides the analytical foundation required to interpret technical texts, professional reports, and real-world scenarios with accuracy.`,
+                      `Mastering these core concepts enables clear communication, structured reasoning, and effective decision-making in academic and professional contexts.`
+                  ],
+            bullets: isEs
+                ? [
+                      `Definición precisa y contexto de aplicación de ${cleanTopic}.`,
+                      `Identificación de patrones principales y vocabulario clave.`,
+                      `Ejemplos prácticos aplicados a situaciones reales de clase.`
+                  ]
+                : [
+                      `Core definition and contextual scope of ${cleanTopic}.`,
+                      `Recognition of key grammatical and lexical patterns in context.`,
+                      `Applied examples for academic writing and professional discussion.`
+                  ],
+            keyTerms: isEs
+                ? [
+                      { term: 'Concepto Base', definition: `Principio fundamental que estructura ${cleanTopic}.` },
+                      { term: 'Contexto Aplicado', definition: 'Escenario real donde se emplea el concepto.' },
+                      { term: 'Estructura Clave', definition: 'Fórmula o patrón recomendado para su uso.' }
+                  ]
+                : [
+                      { term: 'Core Concept', definition: `Fundamental principle underlying ${cleanTopic}.` },
+                      { term: 'Applied Context', definition: 'Real-world scenario where the structure operates.' },
+                      { term: 'Key Pattern', definition: 'Standard academic phrasing and usage structure.' }
+                  ]
+        },
+        {
+            variant: 'content',
+            chapter: isEs ? 'CAPÍTULO 2 • ESTRUCTURA Y USO' : 'CHAPTER 2 • STRUCTURES & USAGE',
+            title: isEs
+                ? `Estructuras y Patrones en ${cleanTopic}`
+                : `Key Structures & Patterns in ${cleanTopic}`,
+            subtitle: isEs
+                ? 'Cómo construir enunciados claros, comparaciones y explicaciones'
+                : 'Building accurate statements, comparisons, and analytical explanations',
+            body: isEs
+                ? [
+                      `Al desarrollar ideas sobre ${cleanTopic}, es fundamental emplear conectores lógicos y vocabulario preciso que expresen causa, efecto y contraste.`,
+                      `Observa cómo cambian los matices de significado según el registro formal o práctico que requiera la situación comunicativa.`
+                  ]
+                : [
+                      `When communicating ideas related to ${cleanTopic}, combining accurate terminology with logical connectors ensures clarity and coherence.`,
+                      `Pay close attention to register, collocations, and sentence structure when contrasting data or presenting arguments.`
+                  ],
+            bullets: isEs
+                ? [
+                      'Conectores de causa y efecto: por lo tanto, en consecuencia, debido a.',
+                      'Contraste de ideas: sin embargo, mientras que, por el contrario.',
+                      'Presentación de evidencia: de acuerdo con los datos, como se observa en.'
+                  ]
+                : [
+                      'Cause & Effect: Therefore, consequently, as a result of, due to.',
+                      'Contrast & Comparison: Whereas, however, on the other hand, in contrast.',
+                      'Evidence & Analysis: According to the data, this illustrates that.'
+                  ],
+            calloutTitle: isEs ? 'ENFOQUE PRÁCTICO' : 'PRACTICAL FOCUS',
+            calloutText: isEs
+                ? `Combina siempre el concepto técnico de ${cleanTopic} con un ejemplo concreto para reforzar la comprensión.`
+                : `Always pair technical terms from ${cleanTopic} with a concrete contextual example to strengthen comprehension.`
+        },
+        {
+            variant: 'content',
+            chapter: isEs ? 'CAPÍTULO 3 • ANÁLISIS Y DATOS' : 'CHAPTER 3 • CASE ANALYSIS & DATA',
+            title: isEs
+                ? `Aplicación Práctica y Estudio de Casos`
+                : `Applied Case Study & Practical Scenarios`,
+            subtitle: isEs
+                ? `Interpretación de indicadores y escenarios sobre ${cleanTopic}`
+                : `Interpreting real-world indicators and scenarios in ${cleanTopic}`,
+            body: isEs
+                ? [
+                      `En el análisis de casos reales vinculados a ${cleanTopic}, se evalúan tanto las variables cuantitativas como los factores cualitativos del entorno.`,
+                      `Revisa los indicadores clave y discute cómo cada decisión impacta los resultados a corto y mediano plazo.`
+                  ]
+                : [
+                      `In real-world case studies involving ${cleanTopic}, analysts evaluate both quantitative indicators and qualitative contextual drivers.`,
+                      `Review the key benchmarks below and consider how strategic decisions influence short-term and long-term outcomes.`
+                  ],
+            stats: isEs
+                ? [
+                      { label: 'COMPRENSIÓN', value: '100% Clave' },
+                      { label: 'ENFOQUE', value: 'Práctico' },
+                      { label: 'NIVEL', value: 'Académico' }
+                  ]
+                : [
+                      { label: 'CORE FOCUS', value: 'Applied' },
+                      { label: 'ACCURACY', value: 'High Impact' },
+                      { label: 'LEVEL', value: 'Academic' }
+                  ],
+            bullets: isEs
+                ? [
+                      'Identificar el problema central y las variables principales del caso.',
+                      'Comparar alternativas de solución con argumentos estructurados.',
+                      'Redactar una conclusión clara basada en la evidencia analizada.'
+                  ]
+                : [
+                      'Identify the central question and primary variables of the case.',
+                      'Compare alternative solutions using structured academic arguments.',
+                      'Formulate a concise conclusion supported by clear evidence.'
+                  ]
+        },
+        {
+            variant: 'content',
+            chapter: isEs ? 'CAPÍTULO 4 • SÍNTESIS Y PRÁCTICA' : 'CHAPTER 4 • REVIEW & APPLICATION',
+            title: isEs
+                ? `Guía de Repaso y Ejercicios sobre ${cleanTopic}`
+                : `Synthesis, Key Takeaways & Class Practice`,
+            subtitle: isEs
+                ? 'Resumen ejecutivo y pautas de autoevaluación'
+                : 'Executive summary and self-assessment guidelines',
+            body: isEs
+                ? [
+                      `Para consolidar el dominio de ${cleanTopic}, sintetiza las ideas principales de cada sección y ponlas en práctica mediante ejemplos propios.`,
+                      `Utiliza las preguntas guía y el vocabulario estudiado para participar activamente en las actividades de la clase.`
+                  ]
+                : [
+                      `To consolidate your mastery of ${cleanTopic}, review the main takeaways from each chapter and practice writing your own original examples.`,
+                      `Use the key terminology and analytical structures from this book when participating in class discussions and assignments.`
+                  ],
+            bullets: isEs
+                ? [
+                      `Resume con tus propias palabras los 3 pilares de ${cleanTopic}.`,
+                      'Escribe ejemplos aplicados utilizando el vocabulario técnico del libro.',
+                      'Comparte tus conclusiones y dudas en las actividades del curso.'
+                  ]
+                : [
+                      `Summarize the 3 main pillars of ${cleanTopic} in your own words.`,
+                      'Write original sentences applying the key vocabulary from this guide.',
+                      'Share your analysis and examples during the class session.'
+                  ],
+            calloutTitle: isEs ? 'ACTIVIDAD SUGERIDA' : 'CLASS ACTIVITY',
+            calloutText: isEs
+                ? `Elabora un breve ejemplo práctico sobre ${cleanTopic} aplicando al menos tres términos clave de esta lectura.`
+                : `Draft a short practical example about ${cleanTopic} incorporating at least three key terms from this book.`
+        }
+    ];
+
+    const selectedContentPages = [];
+    for (let i = 0; i < contentPagesCount; i++) {
+        const template = chapterPool[i % chapterPool.length];
+        if (i < chapterPool.length) {
+            selectedContentPages.push({ ...template });
+        } else {
+            const chapNum = i + 1;
+            selectedContentPages.push({
+                ...template,
+                chapter: isEs ? `CAPÍTULO ${chapNum} • PROFUNDIZACIÓN` : `CHAPTER ${chapNum} • ADVANCED FOCUS`,
+                title: isEs
+                    ? `${cleanTopic} — Sección ${chapNum}`
+                    : `${cleanTopic} — Advanced Section ${chapNum}`
+            });
+        }
+    }
+
+    const outline = [
+        {
+            variant: 'cover',
+            chapter: categoryBadge,
+            title: cleanTopic,
+            subtitle:
+                cleanNotes ||
+                (isEs
+                    ? `Guía estructurada de estudio, conceptos clave y ejemplos aplicados`
+                    : `Structured academic guide, key concepts, and practical examples`),
+            author
+        },
+        ...selectedContentPages,
+        {
+            variant: 'back-cover',
+            title: cleanTopic,
+            subtitle: isEs
+                ? 'Repasa los conceptos clave y aplica lo aprendido en las actividades de clase.'
+                : 'Review the key concepts and apply what you learned in the class activities.'
+        }
+    ];
+
+    return outline.map((page, idx) => ({
+        ...normalizeBookOutlinePage(page, idx, outline.length, cleanTopic),
+        author: page.author || author
+    }));
+};
+
+/**
+ * Generates a complete set of illustrated SVG book pages using Gemini AI with automatic structured fallback.
+ */
+export const generateAiBookPages = async ({
+    topic = '',
+    title = '',
+    instructions = '',
+    description = '',
+    language = 'Inglés',
+    pageCount = 6,
+    themeId = 'royal-indigo',
+    author = 'Docente',
+    category = 'textbook',
+    callGemini = null
+} = {}) => {
+    const cleanTopic = stripBookHtml(topic || title) || 'English for Economics';
+    const cleanNotes = stripBookHtml(instructions || description);
+    const totalPages = Math.max(3, Math.min(14, Number(pageCount) || 6));
+
+    let outline = null;
+    let usedFallback = false;
+    if (typeof callGemini === 'function') {
+        try {
+            const prompt = buildBookAiPrompt({
+                topic: cleanTopic,
+                title: cleanTopic,
+                instructions: cleanNotes,
+                description: cleanNotes,
+                language,
+                pageCount: totalPages,
+                category,
+                author
+            });
+            const rawResponse = await callGemini(prompt, 90000);
+            outline = parseBookAiResponse(rawResponse, {
+                fallbackTitle: cleanTopic,
+                author
+            });
+        } catch (err) {
+            console.warn('Error generando libro con IA, usando esquema estructurado:', err);
+        }
+    }
+
+    if (!Array.isArray(outline) || outline.length === 0) {
+        usedFallback = true;
+        outline = buildFallbackBookOutline({
+            topic: cleanTopic,
+            title: cleanTopic,
+            instructions: cleanNotes,
+            description: cleanNotes,
+            language,
+            pageCount: totalPages,
+            author,
+            category
+        });
+    }
+
+    const pages = buildBookPagesFromOutline(outline, { themeId, author });
+    const pageTexts = extractBookOutlinePageTexts(outline);
+
+    return {
+        outline,
+        pages,
+        pageTexts,
+        pageCount: pages.length,
+        coverUrl: pages[0] || '',
+        title: outline[0]?.title || cleanTopic,
+        usedFallback
+    };
+};
+
+/**
  * Dynamically loads pdfjs-dist and configures its worker.
  */
 let cachedPdfJsPromise = null;
@@ -653,11 +1430,18 @@ export const sanitizeBookForFirestore = (book = {}) => {
             ? book.pages
             : [];
 
-    const title = String(book.title || book.fileName || 'Libro').trim();
+    const title = stripBookHtml(book.title || book.fileName) || 'Libro';
+    const cleanDescription = stripBookHtml(book.description || '');
     const rawTheme = book.theme || book.bookTheme;
     const theme = BOOK_THEMES[rawTheme] ? rawTheme : 'royal-indigo';
     const rawCat = book.category || book.bookCategory;
     const validCat = BOOK_CATEGORIES.some((c) => c.id === rawCat) ? rawCat : 'textbook';
+    const bookOutline = Array.isArray(book.bookOutline)
+        ? book.bookOutline.map((p, idx, arr) => ({
+              ...normalizeBookOutlinePage(p, idx, arr.length, title),
+              author: p?.author || book.authorName || book.author || 'Docente'
+          }))
+        : [];
 
     const compactedPages = compactBookPagesForFirestore(rawPages, {
         maxTotalChars: MAX_TOTAL_FIRESTORE_BOOK_CHARS,
@@ -667,26 +1451,34 @@ export const sanitizeBookForFirestore = (book = {}) => {
 
     const finalPages = compactedPages.length > 0
         ? compactedPages
-        : buildFallbackBookPages({
-            title,
-            description: book.description || '',
-            fileName: book.fileName || '',
-            author: book.authorName || 'Docente',
-            themeId: theme
-        });
+        : bookOutline.length > 0
+            ? buildBookPagesFromOutline(bookOutline, {
+                themeId: theme,
+                author: book.authorName || book.author || 'Docente'
+            })
+            : buildFallbackBookPages({
+                title,
+                description: cleanDescription,
+                fileName: book.fileName || '',
+                author: book.authorName || 'Docente',
+                themeId: theme
+            });
 
-    const pageTexts = Array.isArray(book.pageTexts)
+    const pageTexts = Array.isArray(book.pageTexts) && book.pageTexts.length > 0
         ? book.pageTexts.slice(0, finalPages.length).map((t) => String(t || '').slice(0, 320))
-        : [];
+        : bookOutline.length > 0
+            ? extractBookOutlinePageTexts(bookOutline).slice(0, finalPages.length)
+            : [];
 
     return {
         ...book,
         title,
-        description: String(book.description || '').trim(),
+        description: cleanDescription,
         category: validCat,
         theme,
         bookPages: finalPages,
         pageTexts,
+        bookOutline,
         coverUrl: finalPages[0] || book.coverUrl || '',
         pageCount: Number(book.pageCount) || finalPages.length,
         pdfUrl: book.pdfUrl || book.fileUrl || '',
@@ -711,6 +1503,7 @@ export const normalizeBookRecord = (item = {}) => {
             theme: 'royal-indigo',
             bookPages: fallback,
             pageTexts: [],
+            bookOutline: [],
             coverUrl: fallback[0],
             pageCount: fallback.length,
             pdfUrl: '',
@@ -727,21 +1520,23 @@ export const normalizeBookRecord = (item = {}) => {
             : [];
 
     const pdfUrl = item.pdfUrl || item.fileUrl || item.documentUrl || '';
-    const title = String(item.title || item.documentTitle || item.fileName || 'Libro').trim();
+    const title = stripBookHtml(item.title || item.documentTitle || item.fileName) || 'Libro';
     const rawTheme = item.theme || item.bookTheme;
     const theme = BOOK_THEMES[rawTheme] ? rawTheme : 'royal-indigo';
     const rawCat = item.category || item.bookCategory;
     const validCat = BOOK_CATEGORIES.some((c) => c.id === rawCat) ? rawCat : 'textbook';
+    const bookOutline = Array.isArray(item.bookOutline) ? item.bookOutline : [];
 
     return {
         ...item,
         id: item.id || item.bookId || 'book_preview',
         title,
-        description: String(item.description || '').trim(),
+        description: stripBookHtml(item.description || ''),
         category: validCat,
         theme,
         bookPages: pages,
         pageTexts: Array.isArray(item.pageTexts) ? item.pageTexts : [],
+        bookOutline,
         coverUrl: pages[0] || item.coverUrl || '',
         pageCount: pages.length || Number(item.pageCount) || 0,
         pdfUrl,
