@@ -88,7 +88,7 @@ export const CommandPaletteModal = ({
         })),
         books: (books || []).slice(0, 3).map(b => ({
           id: b.id,
-          title: b.title || 'Libro 3D',
+          title: b.title || 'Libro',
           subtitle: `${b.category || 'Material de Clase'} • ${b.pageCount || (Array.isArray(b.pages) ? b.pages.length : 1)} págs.`,
           type: 'book',
           item: b
@@ -137,7 +137,7 @@ export const CommandPaletteModal = ({
       norm(b.title).includes(q) || norm(b.description).includes(q) || norm(b.category).includes(q)
     ).slice(0, 4).map(b => ({
       id: b.id,
-      title: b.title || 'Libro 3D',
+      title: b.title || 'Libro',
       subtitle: `${b.category || 'Material de Clase'} • ${b.pageCount || (Array.isArray(b.pages) ? b.pages.length : 1)} págs.`,
       type: 'book',
       item: b
@@ -212,7 +212,7 @@ export const CommandPaletteModal = ({
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={role === 'teacher' ? "Buscar tareas, libros 3D, materias, evaluaciones o estudiantes..." : "Buscar tareas, libros 3D, materias o evaluaciones..."}
+            placeholder={role === 'teacher' ? "Buscar tareas, libros, materias, evaluaciones o estudiantes..." : "Buscar tareas, libros, materias o evaluaciones..."}
             className="w-full bg-transparent border-none outline-none text-sm font-medium placeholder-gray-400"
           />
           {query ? (
@@ -265,12 +265,12 @@ export const CommandPaletteModal = ({
                 </div>
               )}
 
-              {/* Libros 3D Interactivos */}
+              {/* Libros */}
               {results.books.length > 0 && (
                 <div>
                   <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
                     <Book size={12} />
-                    <span>Libros 3D Interactivos</span>
+                    <span>Libros</span>
                   </div>
                   <div className="mt-1 space-y-0.5">
                     {results.books.map(item => (

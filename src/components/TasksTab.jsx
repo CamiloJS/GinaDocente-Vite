@@ -74,7 +74,7 @@ const TasksTab = React.memo(({
         const file = e.target.files?.[0];
         if (!file) return;
         if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
-            showMessage('⚠️ Selecciona un archivo en formato .PDF para crear el Libro 3D.');
+            showMessage('⚠️ Selecciona un archivo PDF.');
             return;
         }
         setBook3dPdfFile(file);
@@ -95,10 +95,10 @@ const TasksTab = React.memo(({
                 setBook3dPages(rendered.pages);
                 setBook3dPageTexts(rendered.pageTexts || []);
                 setBook3dAspectRatio(rendered.aspectRatio || 0.707);
-                showMessage(`📚 PDF convertido en ${rendered.pages.length} hojas 3D interactivas.`);
+                showMessage(`📚 PDF listo (${rendered.pages.length} págs).`);
             }
         } catch (err) {
-            console.error('Error renderizando PDF a Libro 3D:', err);
+            console.error('Error renderizando PDF a libro:', err);
             const fallback = buildFallbackBookPages({
                 title: taskTitle || file.name.replace(/\.pdf$/i, ''),
                 description: taskDesc || '',
@@ -515,8 +515,8 @@ const TasksTab = React.memo(({
                 id: `book_wall_${bk.id}`,
                 type: 'book3d',
                 bookId: bk.id,
-                title: bk.title || 'Libro Interactivo 3D',
-                description: bk.description || `Libro interactivo 3D con animación de movimiento de hojas (${pageCountNum} páginas).`,
+                title: bk.title || 'Libro',
+                description: bk.description || '',
                 category: bk.category || bk.bookCategory || 'textbook',
                 bookCategory: bk.category || bk.bookCategory || 'textbook',
                 theme: bk.theme || bk.bookTheme || 'royal-indigo',
@@ -691,7 +691,7 @@ const TasksTab = React.memo(({
                                     onClick={(e) => { e.stopPropagation(); setPostType('book3d'); setIsFormExpanded(true); }} 
                                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-300 hover:bg-orange-100 dark:hover:bg-orange-950/60 transition-colors shrink-0 whitespace-nowrap"
                                 >
-                                    <Book size={15} /> Libro 3D
+                                    <Book size={15} /> Libro
                                 </button>
                                 {typeof onOpenEvaluationsTab === 'function' && (
                                     <button 
@@ -805,7 +805,7 @@ const TasksTab = React.memo(({
                                         onClick={() => setPostType('book3d')} 
                                         className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${postType === 'book3d' ? 'bg-white dark:bg-gray-900 shadow-sm text-orange-700 dark:text-orange-300' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'}`}
                                     >
-                                        <Book size={14} /> Libro 3D
+                                        <Book size={14} /> Libro
                                     </button>
                                     {typeof onOpenEvaluationsTab === 'function' && (
                                         <button 
@@ -894,7 +894,7 @@ const TasksTab = React.memo(({
                             <input 
                                 value={taskTitle} 
                                 onChange={(e) => setTaskTitle(e.target.value)} 
-                                placeholder={postType === 'task' ? "Título claro de la tarea..." : postType === 'forum' ? "Tema central del foro de debate..." : postType === 'poll' ? "Pregunta de la encuesta (ej. ¿Cuál es tu horario preferido?)..." : postType === 'kahoot' ? "Título del Kahoot..." : postType === 'book3d' ? "Título del Libro 3D interactivo..." : "Título de la publicación..."} 
+                                placeholder={postType === 'task' ? "Título claro de la tarea..." : postType === 'forum' ? "Tema central del foro de debate..." : postType === 'poll' ? "Pregunta de la encuesta (ej. ¿Cuál es tu horario preferido?)..." : postType === 'kahoot' ? "Título del Kahoot..." : postType === 'book3d' ? "Título del libro..." : "Título de la publicación..."} 
                                 className="w-full text-base font-bold bg-transparent outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 pb-2 border-b border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100" 
                                 required 
                             />
@@ -903,7 +903,7 @@ const TasksTab = React.memo(({
                                 <RichVisualEditor 
                                     value={taskDesc}
                                     onChange={setTaskDesc}
-                                    placeholder={postType === 'forum' ? "Escribe la pregunta detonante, pautas o tema de discusión para el debate..." : postType === 'poll' ? "Detalles, contexto o indicaciones adicionales de la encuesta (opcional)..." : postType === 'kahoot' ? "Descripción o instrucciones (opcional)..." : postType === 'book3d' ? "Sinopsis o guía de lectura para los estudiantes..." : "Escribe las instrucciones detalladas, indicaciones o una idea general..."}
+                                    placeholder={postType === 'forum' ? "Escribe la pregunta detonante, pautas o tema de discusión para el debate..." : postType === 'poll' ? "Detalles, contexto o indicaciones adicionales de la encuesta (opcional)..." : postType === 'kahoot' ? "Descripción o instrucciones (opcional)..." : postType === 'book3d' ? "Descripción (opcional)..." : "Escribe las instrucciones detalladas, indicaciones o una idea general..."}
                                     isDarkMode={isDarkMode}
                                     minHeight="110px"
                                 />
@@ -1298,13 +1298,13 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                             </div>
                         )}
 
-                        {/* Convertidor de PDF a Libro 3D Interactivo */}
+                        {/* Subir libro */}
                         {postType === 'book3d' && (
                             <div className="p-4 rounded-2xl border border-orange-200 dark:border-orange-800/60 bg-orange-50/40 dark:bg-orange-950/20 space-y-3.5 mt-2 animate-in fade-in duration-200">
                                 <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-orange-200/60 dark:border-orange-800/40">
                                     <span className="text-xs font-extrabold text-orange-900 dark:text-orange-200 flex items-center gap-1.5">
                                         <Book size={16} className="text-orange-600 dark:text-orange-400" />
-                                        Convertidor de Documento PDF a Libro 3D con Movimiento de Hojas
+                                        Subir libro
                                     </span>
                                     {typeof onOpenBooksTab === 'function' && (
                                         <button
@@ -1312,7 +1312,7 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                             onClick={() => onOpenBooksTab()}
                                             className="px-3 py-1 rounded-xl text-[11px] font-bold bg-white dark:bg-gray-900 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-800 hover:bg-orange-100 dark:hover:bg-orange-950/40 transition-colors"
                                         >
-                                            Abrir Biblioteca 3D
+                                            Ver libros
                                         </button>
                                     )}
                                 </div>
@@ -1337,52 +1337,53 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                             <>
                                                 <Loader2 size={24} className="animate-spin text-orange-600" />
                                                 <span className="text-xs font-bold text-gray-800 dark:text-gray-200">
-                                                    Renderizando páginas 3D ({book3dProgress.currentPage}/{book3dProgress.totalPages || '?'})...
+                                                    Procesando PDF ({book3dProgress.currentPage}/{book3dProgress.totalPages || '?'})...
                                                 </span>
                                             </>
                                         ) : book3dPages.length > 0 ? (
                                             <>
                                                 <UploadCloud size={22} className="text-emerald-600" />
                                                 <span className="text-xs font-extrabold text-emerald-700 dark:text-emerald-300">
-                                                    {book3dPdfFile?.name || 'Documento PDF listo'} ({book3dPages.length} páginas 3D)
+                                                    {book3dPdfFile?.name || 'PDF listo'} ({book3dPages.length} págs)
                                                 </span>
                                                 <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400">
-                                                    Haz clic para cambiar el archivo PDF
+                                                    Cambiar archivo PDF
                                                 </span>
                                             </>
                                         ) : (
                                             <>
                                                 <UploadCloud size={24} className="text-orange-600 dark:text-orange-400" />
                                                 <span className="text-xs font-extrabold text-gray-800 dark:text-gray-200">
-                                                    Seleccionar archivo .PDF para transformar en Libro 3D
-                                                </span>
-                                                <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400">
-                                                    Cada página tendrá curvatura, sombras y animación 3D de paso de hoja
+                                                    Seleccionar archivo PDF
                                                 </span>
                                             </>
                                         )}
                                     </div>
 
                                     <div className="space-y-2">
-                                        <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300">
-                                            Acabado de Encuadernación 3D:
-                                        </label>
-                                        <div className="grid grid-cols-3 gap-1.5">
-                                            {Object.values(BOOK_THEMES).map((th) => (
-                                                <button
-                                                    key={th.id}
-                                                    type="button"
-                                                    onClick={() => setBook3dTheme(th.id)}
-                                                    className={`px-2 py-1.5 rounded-lg text-[10px] font-bold border flex items-center gap-1.5 transition-all ${
-                                                        book3dTheme === th.id
-                                                            ? 'border-[#AD3333] bg-red-50 dark:bg-red-950/40 text-[#AD3333] dark:text-red-300 shadow-2xs'
-                                                            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300'
-                                                    }`}
-                                                >
-                                                    <span className="w-3 h-3 rounded-full shrink-0" style={{ background: th.coverBg }} />
-                                                    <span className="truncate">{th.name}</span>
-                                                </button>
-                                            ))}
+                                        <div className="flex items-center justify-between gap-2">
+                                            <span className="text-[11px] font-bold text-gray-700 dark:text-gray-300">
+                                                Color
+                                            </span>
+                                            <div className="flex items-center gap-2">
+                                                {Object.values(BOOK_THEMES).map((th) => (
+                                                    <button
+                                                        key={th.id}
+                                                        type="button"
+                                                        onClick={() => setBook3dTheme(th.id)}
+                                                        title={th.name}
+                                                        aria-label={th.name}
+                                                        className={`w-6 h-6 rounded-full border transition-all cursor-pointer ${
+                                                            book3dTheme === th.id
+                                                                ? 'border-white ring-2 ring-[#AD3333] scale-110'
+                                                                : 'border-gray-300 dark:border-gray-700 opacity-75 hover:opacity-100'
+                                                        }`}
+                                                        style={{
+                                                            background: `linear-gradient(135deg, ${th.coverBg}, ${th.accentColor})`
+                                                        }}
+                                                    />
+                                                ))}
+                                            </div>
                                         </div>
                                         {book3dPages.length > 0 && (
                                             <div className="flex items-center gap-2 pt-1 overflow-x-auto no-scrollbar">
@@ -1523,7 +1524,7 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                     const hasAttachments = Boolean(rawMainImg || postVideoUrl || postGeniallyUrl || postFileUrl || audioPub);
                                     const currentPostType = postType || 'task';
                                     if (currentPostType === 'book3d' && book3dPages.length === 0) {
-                                        return showMessage("⚠️ Por favor selecciona un archivo .PDF para convertirlo en Libro 3D interactivo.");
+                                        return showMessage("⚠️ Selecciona un archivo PDF.");
                                     }
                                     if (currentPostType !== 'kahoot' && currentPostType !== 'book3d' && !cleanTitle && !cleanDesc && !hasAttachments) {
                                         return showMessage("Por favor ingresa al menos un título o descripción para publicar.");
@@ -1624,13 +1625,13 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                                     console.warn("PDF raw upload fallback:", e);
                                                 }
                                             }
-                                            const finalBookTitle = cleanTitle || (book3dPdfFile?.name ? book3dPdfFile.name.replace(/\.pdf$/i, '') : 'Libro Interactivo 3D');
+                                            const finalBookTitle = cleanTitle || (book3dPdfFile?.name ? book3dPdfFile.name.replace(/\.pdf$/i, '') : 'Libro');
                                             const canonicalOwnerId = getCanonicalTeacherId(myChatId || loggedInName || 'teacher');
                                             const sanitizedBook = sanitizeBookForFirestore({
                                                 id: bookId,
                                                 title: finalBookTitle,
-                                                subtitle: 'Edición Interactiva 3D',
-                                                description: cleanDesc || `Libro interactivo 3D con animación de movimiento de hojas (${uploadedPages.length} páginas).`,
+                                                subtitle: '',
+                                                description: cleanDesc,
                                                 category: 'textbook',
                                                 theme: book3dTheme,
                                                 aspectRatio: book3dAspectRatio || 0.707,
@@ -1700,6 +1701,12 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                             } else {
                                                 await withTimeout(setDoc(doc(effectiveDb, 'artifacts', effectiveAppId, 'public', 'data', 'books', bookId), sanitizedBook, { merge: true }));
                                                 await withTimeout(setDoc(doc(effectiveDb, 'artifacts', effectiveAppId, 'public', 'data', 'tasks', wallPostId), wallPostPayload, { merge: true }));
+                                                if (typeof setRawBooks === 'function') {
+                                                    setRawBooks(prev => [sanitizedBook, ...(prev || []).filter(b => String(b.id) !== String(bookId))]);
+                                                }
+                                                if (typeof setTasks === 'function') {
+                                                    setTasks(prev => [wallPostPayload, ...(prev || []).filter(t => String(t.id) !== String(wallPostId))]);
+                                                }
                                             }
 
                                             setBook3dPages([]);
@@ -1708,7 +1715,7 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                             if (typeof setTaskTitle === 'function') setTaskTitle("");
                                             if (typeof setTaskDesc === 'function') setTaskDesc("");
                                             setIsFormExpanded(false);
-                                            showMessage("📚 Libro 3D interactivo publicado en el muro y en la Biblioteca.");
+                                            showMessage("📚 Libro publicado.");
                                             return;
                                         }
 
@@ -1856,7 +1863,7 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                 }`}
                             >
                                 {isPublishing && <Loader2 size={15} className="animate-spin" />}
-                                <span>{postType === 'forum' ? 'Publicar foro' : postType === 'poll' ? 'Publicar encuesta' : postType === 'kahoot' ? 'Publicar Kahoot' : postType === 'book3d' ? 'Publicar Libro 3D' : 'Publicar ahora'}</span>
+                                <span>{postType === 'forum' ? 'Publicar foro' : postType === 'poll' ? 'Publicar encuesta' : postType === 'kahoot' ? 'Publicar Kahoot' : postType === 'book3d' ? 'Publicar libro' : 'Publicar ahora'}</span>
                             </button>
                         </div>
                     </div>

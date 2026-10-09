@@ -2328,7 +2328,7 @@ function App() {
     const tabNames = {
       tasks: 'Anuncios',
       reviews: 'Diapositivas',
-      books: 'Libros 3D',
+      books: 'Libros',
       syllabus: 'Contenidos',
       evaluations: 'Evaluaciones',
       directory: 'Directorio',
@@ -13204,7 +13204,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                   <NavSlides size={18} className="text-purple-500" /> Diapositivas
                               </button>
                               <button onClick={() => changeTab('books')} className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-bold rounded-xl transition-colors ${activeTab === 'books' ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' : isDarkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-100 text-gray-700'}`}>
-                                  <Book size={18} className="text-amber-500" /> Libros 3D
+                                  <Book size={18} className="text-amber-500" /> Libros
                               </button>
                               <button onClick={() => changeTab('syllabus')} className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-bold rounded-xl transition-colors ${activeTab === 'syllabus' ? 'bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400' : isDarkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-100 text-gray-700'}`}>
                                   <NavFile size={18} className="text-green-500" /> Contenidos
@@ -15783,7 +15783,7 @@ Bot:`;
                                           </div>
                                       </button>
 
-                                      {/* Libros 3D */}
+                                      {/* Libros */}
                                       <button
                                           type="button"
                                           onClick={() => { setIsMobileMenuOpen(false); changeTab('books'); }}
@@ -15797,8 +15797,8 @@ Bot:`;
                                               <Book size={18} />
                                           </div>
                                           <div>
-                                              <p className="font-extrabold text-xs text-gray-900 dark:text-gray-100">Libros 3D</p>
-                                              <p className="text-[10px] text-gray-500 truncate">Lectura interactiva 3D</p>
+                                              <p className="font-extrabold text-xs text-gray-900 dark:text-gray-100">Libros</p>
+                                              <p className="text-[10px] text-gray-500 truncate">Lecturas y PDF</p>
                                           </div>
                                       </button>
 

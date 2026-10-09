@@ -1,6 +1,7 @@
 // scripts/test-flipbook.mjs
-// Pruebas unitarias exhaustivas para el Motor de Libros 3D Interactivos (flipbookEngine.js y demoData.js)
+// Pruebas unitarias exhaustivas para el Motor de Libros (flipbookEngine.js, demoData.js y componentes UI)
 
+import fs from 'node:fs';
 import {
   MAX_TOTAL_FIRESTORE_BOOK_CHARS,
   DEFAULT_BOOK_ASPECT_RATIO,
@@ -411,6 +412,52 @@ check(
   DEMO_SANDBOX_CATEGORIES.includes('books') &&
     Boolean(DEMO_TAB_INFO.books) &&
     Boolean(DEMO_TEACHER_TAB_INFO.books)
+);
+
+console.log('\n== 8. Interfaz Minimalista, Nomenclatura "Libros" / "Libro" y Estados Vacíos ==');
+const uiFilesToInspect = [
+  'src/components/BooksLibraryModule.jsx',
+  'src/components/Flipbook3DModal.jsx',
+  'src/components/TasksTab.jsx',
+  'src/components/TaskCard.jsx',
+  'src/components/DocumentPreviewModal.jsx',
+  'src/components/CommandPaletteModal.jsx',
+  'src/utils/demoData.js',
+  'src/App.jsx'
+];
+const forbiddenCopyTerms = [
+  'Libros 3D',
+  'Libro 3D',
+  'Leer en 3D',
+  'Subir PDF como Libro 3D',
+  'Publicar Libro 3D',
+  'Convertir PDF a Libro 3D'
+];
+const hasForbiddenCopy = uiFilesToInspect.some((relPath) => {
+  const content = fs.readFileSync(new URL(`../${relPath}`, import.meta.url), 'utf8');
+  return forbiddenCopyTerms.some((term) => content.includes(term));
+});
+check(
+  'Ningún componente ni dato demo usa "Libros 3D", "Libro 3D", "Leer en 3D" ni "Subir PDF como Libro 3D"',
+  !hasForbiddenCopy
+);
+
+const booksModuleSrc = fs.readFileSync(new URL('../src/components/BooksLibraryModule.jsx', import.meta.url), 'utf8');
+check(
+  'BooksLibraryModule usa "Subir libro" / "Cerrar", distingue estado vacío ("No hay libros publicados aún") de filtrado ("No se encontraron libros") y no duplica botones inferiores',
+  booksModuleSrc.includes("'Cerrar' : 'Subir libro'") &&
+    booksModuleSrc.includes("'No hay libros publicados aún'") &&
+    booksModuleSrc.includes("'No se encontraron libros'") &&
+    !booksModuleSrc.includes('Publicar primer libro')
+);
+
+check(
+  'BOOK_THEMES usa nombres concisos en español (Índigo, Esmeralda, Carmesí, Ámbar, Pizarra)',
+  BOOK_THEMES['royal-indigo'].name === 'Índigo' &&
+    BOOK_THEMES['emerald-ledger'].name === 'Esmeralda' &&
+    BOOK_THEMES['crimson-oxford'].name === 'Carmesí' &&
+    BOOK_THEMES['amber-executive'].name === 'Ámbar' &&
+    BOOK_THEMES['slate-modern'].name === 'Pizarra'
 );
 
 console.log(`\n========================================`);

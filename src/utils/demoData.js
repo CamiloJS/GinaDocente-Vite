@@ -760,7 +760,7 @@ const DEMO_BOOK_1_PAGES = buildBookPagesFromOutline(
   [
     {
       variant: 'cover',
-      chapter: 'INTERACTIVE 3D TEXTBOOK',
+      chapter: 'TEXTBOOK',
       title: 'Macroeconomic Indicators & Global Markets Handbook',
       subtitle: 'Essential English for GDP Analysis, Inflation Forecasting, Central Banking & Exchange Rate Trends.',
       author: 'Gina Marcela Quintana'
@@ -822,7 +822,7 @@ const DEMO_BOOK_1_PAGES = buildBookPagesFromOutline(
     {
       variant: 'back-cover',
       title: 'Macroeconomic Indicators Handbook',
-      subtitle: 'Complete the Workshop 1 & Unit 2 activities on the Class Wall after reviewing this interactive 3D edition.'
+      subtitle: 'Complete the Workshop 1 & Unit 2 activities on the Class Wall.'
     }
   ],
   { themeId: 'royal-indigo', author: 'Gina Marcela Quintana' }
@@ -832,7 +832,7 @@ const DEMO_BOOK_2_PAGES = buildBookPagesFromOutline(
   [
     {
       variant: 'cover',
-      chapter: 'CASE STUDY & GLOSSARY 3D',
+      chapter: 'CASE STUDY & GLOSSARY',
       title: 'International Trade, Tariffs & Financial Statements',
       subtitle: 'Bilingual Technical Guide for Balance Sheets, Income Statements & Free Trade Agreements.',
       author: 'Gina Marcela Quintana'
@@ -877,7 +877,7 @@ const DEMO_BOOK_2_PAGES = buildBookPagesFromOutline(
     {
       variant: 'back-cover',
       title: 'International Trade & Financial Statements',
-      subtitle: 'English Tech Interactive 3D Library • Universidad de Pamplona.'
+      subtitle: 'English Tech • Universidad de Pamplona.'
     }
   ],
   { themeId: 'emerald-ledger', author: 'Gina Marcela Quintana' }
@@ -886,8 +886,8 @@ const DEMO_BOOK_2_PAGES = buildBookPagesFromOutline(
 export const DEMO_BOOKS = [
   {
     id: 'demo-book-1',
-    title: 'Macroeconomic Indicators & Global Markets Handbook (3D Edition)',
-    description: 'Libro interactivo 3D con los fundamentos de PIB (GDP), inflación (CPI), política monetaria y estructuras gramaticales para reportes económicos en inglés.',
+    title: 'Macroeconomic Indicators & Global Markets Handbook',
+    description: 'Fundamentos de PIB (GDP), inflación (CPI), política monetaria y estructuras gramaticales para reportes económicos en inglés.',
     category: 'textbook',
     theme: 'royal-indigo',
     bookPages: DEMO_BOOK_1_PAGES,
@@ -898,9 +898,9 @@ export const DEMO_BOOKS = [
       'Chapter 1 Measuring Economic Performance Gross Domestic Product Real vs Nominal GDP',
       'Chapter 2 Price Stability & Central Bank Decisions Consumer Price Index Hawkish Dovish',
       'Chapter 3 Precision Verbs & Adverbs for Market Trends Surge Plummet Fluctuate',
-      'Macroeconomic Indicators Handbook Interactive 3D Edition'
+      'Macroeconomic Indicators Handbook'
     ],
-    fileName: 'Macroeconomic_Indicators_Handbook_3D.pdf',
+    fileName: 'Macroeconomic_Indicators_Handbook.pdf',
     aspectRatio: 0.707,
     targetGroupId: DEMO_SUBJECT_ID,
     targetGroupName: DEMO_SUBJECT_NAME,
@@ -912,7 +912,7 @@ export const DEMO_BOOKS = [
   {
     id: 'demo-book-2',
     title: 'International Trade, Tariffs & Financial Statements Glossary',
-    description: 'Manual práctico en formato Libro 3D sobre estados financieros (Balance Sheet, Income Statement), aranceles, balanza comercial y términos de comercio exterior.',
+    description: 'Manual práctico sobre estados financieros (Balance Sheet, Income Statement), aranceles, balanza comercial y términos de comercio exterior.',
     category: 'glossary',
     theme: 'emerald-ledger',
     bookPages: DEMO_BOOK_2_PAGES,
@@ -922,9 +922,9 @@ export const DEMO_BOOKS = [
       'International Trade Tariffs & Financial Statements Bilingual Technical Guide',
       'Section 1 Reading Balance Sheets & Income Statements Assets Liabilities Equity EBITDA',
       'Section 2 Global Trade & Tariffs Trade Surplus Deficit FOB CIF Free Trade Agreements',
-      'International Trade & Financial Statements Interactive 3D Library'
+      'International Trade & Financial Statements'
     ],
-    fileName: 'International_Trade_Financial_Glossary_3D.pdf',
+    fileName: 'International_Trade_Financial_Glossary.pdf',
     aspectRatio: 0.707,
     targetGroupId: DEMO_SUBJECT_ID,
     targetGroupName: DEMO_SUBJECT_NAME,
@@ -939,12 +939,12 @@ export const DEMO_GUIDE_TOUR = [
   {
     title: 'Muro de Clase',
     badge: 'Publicaciones',
-    description: 'Publicaciones de la materia: talleres, foros, encuestas, libros 3D y actividades interactivas de Kahoot.'
+    description: 'Publicaciones de la materia: talleres, foros, encuestas, libros y actividades interactivas de Kahoot.'
   },
   {
-    title: 'Libros 3D',
-    badge: 'Biblioteca 3D',
-    description: 'Libros interactivos con animación 3D de paso de hojas y conversión automática desde archivos PDF.'
+    title: 'Libros',
+    badge: 'Lecturas',
+    description: 'Libros y lecturas del curso en formato PDF.'
   },
   {
     title: 'Evaluaciones',
@@ -969,18 +969,18 @@ export const DEMO_GUIDE_TOUR = [
   {
     title: 'Gestión Docente',
     badge: 'Docente',
-    description: 'Herramientas para crear actividades, libros 3D desde PDF, evaluaciones, presentaciones y reportes en Excel.'
+    description: 'Herramientas para crear actividades, libros, evaluaciones, presentaciones y reportes en Excel.'
   }
 ];
 
 export const DEMO_TAB_INFO = {
   tasks: {
     title: 'Muro de Clase',
-    summary: 'Publicaciones, talleres, libros 3D, encuestas, foros y actividades de la materia.'
+    summary: 'Publicaciones, talleres, libros, encuestas, foros y actividades de la materia.'
   },
   books: {
-    title: 'Biblioteca de Libros 3D',
-    summary: 'Lecturas interactivas con animación física 3D de movimiento de hojas.'
+    title: 'Libros',
+    summary: 'Libros y material de lectura del curso.'
   },
   evaluaciones: {
     title: 'Evaluaciones',
@@ -1019,11 +1019,11 @@ export const DEMO_TAB_INFO = {
 export const DEMO_TEACHER_TAB_INFO = {
   tasks: {
     title: 'Muro de Clase',
-    summary: 'Crea publicaciones, tareas, libros 3D, encuestas, foros o actividades de Kahoot.'
+    summary: 'Crea publicaciones, tareas, libros, encuestas, foros o actividades de Kahoot.'
   },
   books: {
-    title: 'Libros 3D',
-    summary: 'Sube archivos PDF para convertirlos en libros interactivos con paso de hojas en 3D.'
+    title: 'Libros',
+    summary: 'Sube y gestiona libros en PDF para tus estudiantes.'
   },
   evaluaciones: {
     title: 'Evaluaciones',

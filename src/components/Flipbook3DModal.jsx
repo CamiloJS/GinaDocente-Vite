@@ -602,12 +602,9 @@ export default function Flipbook3DModal({
                             <h2 className="text-white font-bold text-sm md:text-base truncate max-w-[220px] sm:max-w-[360px] md:max-w-[480px]">
                                 {normalizedBook.title}
                             </h2>
-                            <span className="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">
-                                Libro 3D
-                            </span>
                         </div>
                         <p className="text-[11px] text-slate-400 truncate">
-                            {formatSpreadPageLabel(currentSpread, effectivePages.length)} • Arrastra las esquinas o usa las flechas
+                            {formatSpreadPageLabel(currentSpread, effectivePages.length)}
                         </p>
                     </div>
                 </div>
@@ -697,7 +694,7 @@ export default function Flipbook3DModal({
                             type="button"
                             onClick={() => onEditBook(normalizedBook)}
                             className="px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-400/30 text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95"
-                            title="Editar Libro 3D"
+                            title="Editar"
                         >
                             <Edit3 size={15} />
                             <span className="hidden lg:inline">Editar</span>
@@ -716,7 +713,7 @@ export default function Flipbook3DModal({
                                 )
                             }
                             className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-indigo-600/30 transition-all active:scale-95"
-                            title="Descargar o abrir PDF original"
+                            title="Descargar PDF"
                         >
                             <Download size={15} />
                             <span className="hidden md:inline">PDF</span>
@@ -728,7 +725,7 @@ export default function Flipbook3DModal({
                         type="button"
                         onClick={onClose}
                         className="p-2 rounded-xl bg-white/10 hover:bg-rose-500/80 text-white transition-all active:scale-95"
-                        title="Cerrar Libro 3D (Esc)"
+                        title="Cerrar (Esc)"
                     >
                         <X size={18} />
                     </button>
@@ -739,7 +736,7 @@ export default function Flipbook3DModal({
             {corsFallbackNotice && normalizedBook.pdfUrl && (
                 <div className="relative z-20 mx-auto mt-2 px-4 py-1.5 rounded-full bg-amber-500/20 border border-amber-400/30 text-amber-200 text-xs flex items-center gap-2">
                     <FileText size={14} />
-                    <span>Vista rápida 3D activada.</span>
+                    <span>Vista previa rápida.</span>
                     <button
                         type="button"
                         onClick={(e) =>
@@ -751,12 +748,12 @@ export default function Flipbook3DModal({
                         }
                         className="underline font-bold hover:text-white"
                     >
-                        Abrir PDF original completo
+                        Abrir PDF
                     </button>
                 </div>
             )}
 
-            {/* Main 3D Interactive Book Stage */}
+            {/* Main Interactive Book Stage */}
             <div className="relative z-10 flex-1 flex items-center justify-center p-3 sm:p-6 md:p-10 overflow-auto">
                 {/* Side Navigation Floating Buttons */}
                 <button
@@ -793,12 +790,11 @@ export default function Flipbook3DModal({
                             <Loader2 size={32} className="animate-spin" />
                         </div>
                         <h3 className="text-white font-bold text-lg mb-1">
-                            Preparando hojas del Libro 3D...
+                            Cargando libro...
                         </h3>
                         <p className="text-slate-400 text-xs mb-5">
-                            Renderizando páginas con geometría 3D e iluminación de papel
                             {renderProgress.totalPages > 0
-                                ? ` (${renderProgress.currentPage} de ${renderProgress.totalPages})`
+                                ? `Página ${renderProgress.currentPage} de ${renderProgress.totalPages}`
                                 : ''}
                         </p>
                         <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
@@ -817,7 +813,7 @@ export default function Flipbook3DModal({
                             perspective: '2400px'
                         }}
                     >
-                        {/* 3D Hardcover Outer Binding Frame */}
+                        {/* Hardcover Outer Binding Frame */}
                         <div
                             ref={bookStageRef}
                             onPointerDown={(e) => handlePointerDown(e)}
@@ -882,11 +878,8 @@ export default function Flipbook3DModal({
                                                 <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center text-white/75 mb-3">
                                                     <BookOpen size={26} />
                                                 </div>
-                                                <p className="text-xs font-bold uppercase tracking-widest text-white/80 mb-1">
+                                                <p className="text-xs font-bold uppercase tracking-widest text-white/80">
                                                     {normalizedBook.title}
-                                                </p>
-                                                <p className="text-[11px] text-white/55 max-w-[220px]">
-                                                    Portada del Libro 3D • Haz clic o arrastra la hoja derecha para abrir el libro
                                                 </p>
                                             </div>
                                         )}

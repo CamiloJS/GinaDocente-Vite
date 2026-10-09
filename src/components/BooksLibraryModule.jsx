@@ -9,14 +9,12 @@ import {
     UploadCloud,
     Download,
     Loader2,
-    Sparkles,
     Eye,
     X,
     CheckCircle2
 } from './Icons';
 import {
     BOOK_THEMES,
-    BOOK_CATEGORIES,
     getBookTheme,
     renderPdfToBookPages,
     uploadBookPagesToStorage,
@@ -120,7 +118,6 @@ export default function BooksLibraryModule({
     );
 
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedCategory, setSelectedCategory] = useState('all');
     const [activeBookModal, setActiveBookModal] = useState(null);
 
     // Teacher Studio Modal / Form state
@@ -252,11 +249,11 @@ export default function BooksLibraryModule({
     const visibleBooks = useMemo(() => {
         const filtered = filterBooksCatalog(accessibleBooks, {
             query: searchQuery,
-            category: selectedCategory
+            category: 'all'
         });
 
         return [...filtered].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-    }, [accessibleBooks, searchQuery, selectedCategory]);
+    }, [accessibleBooks, searchQuery]);
 
     const resetForm = useCallback(() => {
         setEditingBookId(null);
@@ -315,7 +312,7 @@ export default function BooksLibraryModule({
         const file = e.target.files?.[0];
         if (!file) return;
         if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
-            notify('Archivo no válido', 'Por favor selecciona un documento en formato .PDF para convertirlo en Libro 3D.', 'error');
+            notify('Archivo no válido', 'Selecciona un archivo en formato PDF.', 'error');
             return;
         }
 
@@ -344,7 +341,7 @@ export default function BooksLibraryModule({
                 setAspectRatio(rendered.aspectRatio || 0.707);
             }
         } catch (err) {
-            console.error('Error procesando PDF para Libro 3D:', err);
+            console.error('Error procesando PDF:', err);
             const fallback = buildFallbackBookPages({
                 title: title || file.name.replace(/\.pdf$/i, ''),
                 description,
@@ -361,11 +358,11 @@ export default function BooksLibraryModule({
     const handleSaveBook = async (e) => {
         e?.preventDefault?.();
         if (!title.trim()) {
-            notify('Título requerido', 'Escribe un título para el Libro 3D antes de publicarlo.', 'warning');
+            notify('Título requerido', 'Escribe un título para el libro.', 'warning');
             return;
         }
         if (previewPages.length === 0 && !pdfFile && !existingPdfUrl) {
-            notify('Archivo PDF requerido', 'Sube un archivo PDF para generar las hojas interactivas del Libro 3D.', 'warning');
+            notify('Archivo PDF requerido', 'Selecciona un archivo PDF.', 'warning');
             return;
         }
 
@@ -476,9 +473,7 @@ export default function BooksLibraryModule({
                 type: 'book3d',
                 bookId: bookId,
                 title: sanitizedBook.title,
-                description:
-                    sanitizedBook.description ||
-                    `📚 Libro 3D interactivo (${sanitizedBook.pageCount} páginas). Haz clic en "Abrir Libro 3D" para pasar las hojas en 3D.`,
+                description: sanitizedBook.description || '',
                 category: sanitizedBook.category,
                 bookCategory: sanitizedBook.category,
                 theme: sanitizedBook.theme,
@@ -535,12 +530,12 @@ export default function BooksLibraryModule({
                 ]);
             }
 
-            notify('📚 El Libro 3D interactivo se ha publicado en la Biblioteca y en el Muro.');
+            notify('📚 Libro publicado.');
             setIsCreating(false);
             resetForm();
         } catch (err) {
-            console.error('Error guardando Libro 3D:', err);
-            notify('Error al guardar', 'No se pudo publicar el Libro 3D. Intenta nuevamente.', 'error');
+            console.error('Error guardando libro:', err);
+            notify('Error al guardar', 'No se pudo publicar el libro.', 'error');
         } finally {
             setIsSaving(false);
         }
@@ -564,7 +559,7 @@ export default function BooksLibraryModule({
             if (isDemoMode || bookItem.isDemoCreated || String(bookItem.id).startsWith('demo')) {
                 deleteDemoSandboxItem('books', bookItem.id);
                 deleteDemoSandboxItem('tasks', `book_wall_${bookItem.id}`);
-                notify('🗑️ Libro 3D eliminado de la Biblioteca y del Muro.');
+                notify('🗑️ Libro eliminado.');
                 return;
             }
             try {
@@ -572,115 +567,79 @@ export default function BooksLibraryModule({
                 await deleteDoc(
                     doc(effectiveDb, 'artifacts', effectiveAppId, 'public', 'data', 'tasks', `book_wall_${bookItem.id}`)
                 ).catch(() => {});
-                notify('🗑️ Libro 3D eliminado de la Biblioteca y del Muro.');
+                notify('🗑️ Libro eliminado.');
             } catch (err) {
-                console.error('Error eliminando Libro 3D:', err);
-                notify('Error al eliminar', 'No se pudo eliminar el Libro 3D completamente.', 'error');
+                console.error('Error eliminando libro:', err);
+                notify('Error al eliminar', 'No se pudo eliminar el libro.', 'error');
             }
         };
 
         requestConfirm(
-            'Eliminar Libro 3D',
-            `¿Estás seguro de eliminar "${bookItem.title}" de la Biblioteca 3D y del Muro?`,
+            'Eliminar libro',
+            `¿Eliminar "${bookItem.title}"?`,
             performDelete
         );
     };
 
     return (
-        <div className="space-y-6 pb-20">
-            {/* Hero Header */}
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-950 via-slate-900 to-indigo-900 p-6 md:p-8 text-white shadow-xl border border-indigo-500/20">
-                <div className="absolute -top-20 -right-20 w-72 h-72 rounded-full bg-indigo-500/15 blur-3xl pointer-events-none" />
-                <div className="absolute -bottom-20 -left-20 w-72 h-72 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
+        <div className="space-y-5 pb-20">
+            {/* Minimalist Header */}
+            <div className="flex items-center justify-between gap-3">
+                <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                    Libros
+                </h1>
 
-                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
-                    <div className="space-y-2 max-w-2xl">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/15 text-indigo-200 text-xs font-bold uppercase tracking-wider">
-                            <Sparkles size={14} />
-                            <span>Biblioteca Interactiva 3D</span>
-                        </div>
-                        <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">
-                            Libros 3D y Lecturas Interactivas
-                        </h1>
-                        <p className="text-sm text-indigo-100/80 leading-relaxed">
-                            Explora libros académicos, casos de estudio y guías técnicas con animación física de hojas en 3D, sonido de papel y lectura fluida desde cualquier dispositivo.
-                        </p>
-                    </div>
-
-                    {isTeacher && (
-                        <button
-                            type="button"
-                            onClick={handleOpenCreate}
-                            className="shrink-0 inline-flex items-center justify-center gap-2.5 px-5 py-3.5 rounded-2xl bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500 text-white font-bold text-sm shadow-lg shadow-indigo-500/30 transition-all hover:scale-[1.02] active:scale-95 cursor-pointer"
-                        >
-                            <Plus size={18} />
-                            <span>Subir PDF como Libro 3D</span>
-                        </button>
-                    )}
-                </div>
-
-                {/* Search & Category Filter Bar */}
-                <div className="relative z-10 mt-6 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                    <div className="relative flex-1">
-                        <Search
-                            size={18}
-                            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-indigo-300/70 pointer-events-none"
-                        />
-                        <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Buscar libro por título, tema o vocabulario..."
-                            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/10 border border-white/15 text-white placeholder-indigo-200/60 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                        />
-                    </div>
-
-                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-                        <button
-                            type="button"
-                            onClick={() => setSelectedCategory('all')}
-                            className={`px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-                                selectedCategory === 'all'
-                                    ? 'bg-white text-indigo-950 shadow-md'
-                                    : 'bg-white/10 text-indigo-100 hover:bg-white/20'
-                            }`}
-                        >
-                            Todos ({accessibleBooks.length})
-                        </button>
-                        {BOOK_CATEGORIES.map((cat) => (
-                            <button
-                                key={cat.id}
-                                type="button"
-                                onClick={() => setSelectedCategory(cat.id)}
-                                className={`px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-                                    selectedCategory === cat.id
-                                        ? 'bg-white text-indigo-950 shadow-md'
-                                        : 'bg-white/10 text-indigo-100 hover:bg-white/20'
-                                }`}
-                            >
-                                {cat.label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
+                {isTeacher && (
+                    <button
+                        type="button"
+                        onClick={() => {
+                            if (isCreating) {
+                                setIsCreating(false);
+                                resetForm();
+                            } else {
+                                handleOpenCreate();
+                            }
+                        }}
+                        className={`shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs shadow-sm transition-all active:scale-95 cursor-pointer ${
+                            isCreating
+                                ? 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-700'
+                                : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                        }`}
+                    >
+                        {isCreating ? <X size={16} /> : <Plus size={16} />}
+                        <span>{isCreating ? 'Cerrar' : 'Subir libro'}</span>
+                    </button>
+                )}
             </div>
+
+            {/* Search Bar */}
+            {(accessibleBooks.length > 1 || Boolean(searchQuery)) && (
+                <div className="relative max-w-md">
+                    <Search
+                        size={16}
+                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                    />
+                    <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Buscar libro..."
+                        className="w-full pl-9 pr-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                </div>
+            )}
 
             {/* Teacher Creation / Edit Panel */}
             {isTeacher && isCreating && (
-                <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 md:p-8 shadow-xl animate-fade-in">
-                    <div className="flex items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100 dark:border-slate-800">
-                        <div className="flex items-center gap-3">
-                            <div className="w-11 h-11 rounded-2xl bg-indigo-600/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-                                <BookOpen size={22} />
+                <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-lg animate-fade-in">
+                    <div className="flex items-center justify-between gap-4 mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
+                        <div className="flex items-center gap-2.5">
+                            <div className="w-9 h-9 rounded-xl bg-indigo-600/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                                <BookOpen size={18} />
                             </div>
-                            <div>
-                                <h2 className="text-lg font-extrabold text-slate-900 dark:text-white">
-                                    {editingBookId ? 'Editar Libro 3D' : 'Crear Nuevo Libro 3D desde PDF'}
-                                </h2>
-                                <p className="text-xs text-slate-500 dark:text-slate-400">
-                                    Convierte automáticamente cualquier archivo PDF en un libro interactivo con paso de hojas en 3D y publícalo en el Muro.
-                                </p>
-                            </div>
+                            <h2 className="text-base font-extrabold text-slate-900 dark:text-white">
+                                {editingBookId ? 'Editar libro' : 'Subir libro'}
+                            </h2>
                         </div>
                         <button
                             type="button"
@@ -688,14 +647,14 @@ export default function BooksLibraryModule({
                                 setIsCreating(false);
                                 resetForm();
                             }}
-                            className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                         >
                             <X size={18} />
                         </button>
                     </div>
 
-                    <form onSubmit={handleSaveBook} className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                        {/* Left Column: PDF Upload & 3D Cover Preview */}
+                    <form onSubmit={handleSaveBook} className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                        {/* Left Column: PDF Upload & Cover Preview */}
                         <div className="lg:col-span-5 flex flex-col gap-4">
                             <input
                                 ref={fileInputRef}
@@ -707,24 +666,24 @@ export default function BooksLibraryModule({
 
                             <div
                                 onClick={() => !isProcessingPdf && fileInputRef.current?.click()}
-                                className={`relative rounded-2xl border-2 border-dashed p-6 text-center transition-all cursor-pointer ${
+                                className={`relative rounded-2xl border-2 border-dashed p-5 text-center transition-all cursor-pointer ${
                                     previewPages.length > 0
                                         ? 'border-emerald-500/50 bg-emerald-50/40 dark:bg-emerald-950/20'
                                         : 'border-indigo-300 dark:border-indigo-500/40 bg-indigo-50/40 dark:bg-slate-800/50 hover:border-indigo-500'
                                 }`}
                             >
                                 {isProcessingPdf ? (
-                                    <div className="py-6 flex flex-col items-center">
-                                        <Loader2 size={32} className="animate-spin text-indigo-600 dark:text-indigo-400 mb-3" />
-                                        <p className="text-sm font-bold text-slate-800 dark:text-white">
-                                            Convirtiendo páginas a hojas 3D...
+                                    <div className="py-5 flex flex-col items-center">
+                                        <Loader2 size={28} className="animate-spin text-indigo-600 dark:text-indigo-400 mb-2" />
+                                        <p className="text-xs font-bold text-slate-800 dark:text-white">
+                                            Procesando PDF...
                                         </p>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                                            {progressInfo.totalPages > 0
-                                                ? `Página ${progressInfo.currentPage} de ${progressInfo.totalPages} (${progressInfo.percent}%)`
-                                                : 'Extrayendo páginas en alta definición'}
-                                        </p>
-                                        <div className="w-full max-w-xs h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden mt-3">
+                                        {progressInfo.totalPages > 0 && (
+                                            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                                {progressInfo.currentPage} / {progressInfo.totalPages} ({progressInfo.percent}%)
+                                            </p>
+                                        )}
+                                        <div className="w-full max-w-xs h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden mt-2.5">
                                             <div
                                                 className="h-full bg-indigo-600 transition-all duration-300"
                                                 style={{ width: `${Math.max(8, progressInfo.percent || 12)}%` }}
@@ -732,67 +691,59 @@ export default function BooksLibraryModule({
                                         </div>
                                     </div>
                                 ) : previewPages.length > 0 ? (
-                                    <div className="space-y-3">
-                                        <div className="mx-auto w-36 h-48 rounded-xl overflow-hidden shadow-xl border-2 border-white dark:border-slate-700 relative bg-slate-900">
+                                    <div className="space-y-2.5">
+                                        <div className="mx-auto w-32 h-44 rounded-xl overflow-hidden shadow-md border border-white dark:border-slate-700 relative bg-slate-900">
                                             <img
                                                 src={previewPages[0]}
-                                                alt="Portada del Libro 3D"
+                                                alt="Portada"
                                                 className="w-full h-full object-cover"
                                             />
-                                            <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded-full bg-slate-900/85 text-white text-[10px] font-bold">
+                                            <span className="absolute bottom-1.5 right-1.5 px-2 py-0.5 rounded-full bg-slate-900/85 text-white text-[10px] font-bold">
                                                 {previewPages.length} págs
                                             </span>
                                         </div>
                                         <div className="flex items-center justify-center gap-1.5 text-emerald-600 dark:text-emerald-400 text-xs font-bold">
-                                            <CheckCircle2 size={15} />
-                                            <span>{existingFileName || 'PDF procesado'} listo en 3D</span>
+                                            <CheckCircle2 size={14} />
+                                            <span className="truncate max-w-[220px]">{existingFileName || 'PDF listo'}</span>
                                         </div>
-                                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                                            Haz clic aquí si deseas reemplazar el archivo PDF
+                                        <p className="text-[11px] text-slate-400">
+                                            Cambiar PDF
                                         </p>
                                     </div>
                                 ) : (
                                     <div className="py-6 flex flex-col items-center">
-                                        <div className="w-14 h-14 rounded-2xl bg-indigo-600/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-3">
-                                            <UploadCloud size={28} />
+                                        <div className="w-12 h-12 rounded-2xl bg-indigo-600/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-2.5">
+                                            <UploadCloud size={24} />
                                         </div>
-                                        <p className="text-sm font-bold text-slate-800 dark:text-white">
-                                            Haz clic para seleccionar un archivo .PDF
-                                        </p>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xs">
-                                            Sus páginas se transformarán automáticamente en hojas interactivas con efecto 3D para móviles y PC.
+                                        <p className="text-xs font-bold text-slate-800 dark:text-white">
+                                            Seleccionar PDF
                                         </p>
                                     </div>
                                 )}
                             </div>
 
-                            {/* Color / Binding Theme Selector */}
-                            <div>
-                                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
-                                    Acabado de Pasta y Lomo 3D
-                                </label>
-                                <div className="grid grid-cols-5 gap-2">
+                            {/* Compact Color Swatches */}
+                            <div className="flex items-center justify-between gap-3 px-1">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                    Color
+                                </span>
+                                <div className="flex items-center gap-2">
                                     {Object.values(BOOK_THEMES).map((th) => (
                                         <button
                                             key={th.id}
                                             type="button"
                                             onClick={() => setTheme(th.id)}
-                                            className={`p-2 rounded-xl border text-center transition-all ${
+                                            title={th.name}
+                                            aria-label={th.name}
+                                            className={`w-6 h-6 rounded-full border transition-all cursor-pointer ${
                                                 theme === th.id
-                                                    ? 'border-indigo-500 ring-2 ring-indigo-500/30 scale-105'
-                                                    : 'border-slate-200 dark:border-slate-700 opacity-75 hover:opacity-100'
+                                                    ? 'border-white ring-2 ring-indigo-500 scale-110'
+                                                    : 'border-slate-300 dark:border-slate-700 opacity-75 hover:opacity-100'
                                             }`}
-                                        >
-                                            <div
-                                                className="w-full h-6 rounded-lg mb-1 shadow-inner"
-                                                style={{
-                                                    background: `linear-gradient(135deg, ${th.coverBg}, ${th.accentColor})`
-                                                }}
-                                            />
-                                            <span className="block text-[10px] font-bold text-slate-700 dark:text-slate-300 truncate">
-                                                {th.name.split(' ')[1] || th.name}
-                                            </span>
-                                        </button>
+                                            style={{
+                                                background: `linear-gradient(135deg, ${th.coverBg}, ${th.accentColor})`
+                                            }}
+                                        />
                                     ))}
                                 </div>
                             </div>
@@ -800,80 +751,61 @@ export default function BooksLibraryModule({
 
                         {/* Right Column: Book Metadata */}
                         <div className="lg:col-span-7 flex flex-col justify-between space-y-4">
-                            <div className="space-y-4">
+                            <div className="space-y-3.5">
                                 <div>
-                                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1.5">
-                                        Título del Libro 3D *
+                                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1">
+                                        Título *
                                     </label>
                                     <input
                                         type="text"
                                         required
                                         value={title}
                                         onChange={(e) => setTitle(e.target.value)}
-                                        placeholder="Ej: Macroeconomic Indicators & Financial Markets Handbook"
-                                        className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        placeholder="Título del libro"
+                                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1.5">
-                                        Descripción o Instrucciones de Lectura
+                                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1">
+                                        Descripción (opcional)
                                     </label>
                                     <textarea
-                                        rows={3}
+                                        rows={2}
                                         value={description}
                                         onChange={(e) => setDescription(e.target.value)}
-                                        placeholder="Describe qué capítulos deben leer los estudiantes o qué actividades realizarán a partir de este libro..."
-                                        className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        placeholder="Descripción breve..."
+                                        className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                     />
                                 </div>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1.5">
-                                            Categoría
-                                        </label>
-                                        <select
-                                            value={category}
-                                            onChange={(e) => setCategory(e.target.value)}
-                                            className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                        >
-                                            {BOOK_CATEGORIES.map((cat) => (
-                                                <option key={cat.id} value={cat.id}>
-                                                    {cat.label}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1.5">
-                                            Destinatarios (Grupo)
-                                        </label>
-                                        <select
-                                            value={targetGroupId}
-                                            onChange={(e) => setTargetGroupId(e.target.value)}
-                                            className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                        >
-                                            <option value="all">🌍 Todos los grupos</option>
-                                            {teacherOwnedGroups.map((grp) => (
-                                                <option key={grp.id} value={grp.id}>
-                                                    👥 {grp.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
+                                <div>
+                                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1">
+                                        Grupo
+                                    </label>
+                                    <select
+                                        value={targetGroupId}
+                                        onChange={(e) => setTargetGroupId(e.target.value)}
+                                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    >
+                                        <option value="all">🌍 Todos los grupos</option>
+                                        {teacherOwnedGroups.map((grp) => (
+                                            <option key={grp.id} value={grp.id}>
+                                                👥 {grp.name}
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
                             </div>
 
-                            <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-end gap-3">
+                            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-end gap-2.5">
                                 {previewPages.length > 0 && (
                                     <button
                                         type="button"
                                         onClick={() =>
                                             setActiveBookModal({
                                                 id: editingBookId || 'preview_book',
-                                                title: title || 'Vista Previa Libro 3D',
+                                                title: title || 'Vista previa',
                                                 description,
                                                 theme,
                                                 category,
@@ -882,10 +814,10 @@ export default function BooksLibraryModule({
                                                 pdfUrl: existingPdfUrl
                                             })
                                         }
-                                        className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 transition-all"
+                                        className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 transition-all"
                                     >
-                                        <Eye size={15} />
-                                        <span>Probar Animación 3D</span>
+                                        <Eye size={14} />
+                                        <span>Vista previa</span>
                                     </button>
                                 )}
 
@@ -895,7 +827,7 @@ export default function BooksLibraryModule({
                                         setIsCreating(false);
                                         resetForm();
                                     }}
-                                    className="px-4 py-2.5 rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold transition-colors"
+                                    className="px-3.5 py-2 rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold transition-colors"
                                 >
                                     Cancelar
                                 </button>
@@ -903,21 +835,21 @@ export default function BooksLibraryModule({
                                 <button
                                     type="submit"
                                     disabled={isSaving || isProcessingPdf}
-                                    className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-indigo-600/25 transition-all cursor-pointer"
+                                    className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
                                 >
                                     {isSaving ? (
                                         <>
-                                            <Loader2 size={15} className="animate-spin" />
+                                            <Loader2 size={14} className="animate-spin" />
                                             <span>
                                                 {progressInfo.phase === 'upload'
-                                                    ? `Subiendo hoja ${progressInfo.currentPage}/${progressInfo.totalPages}...`
-                                                    : 'Publicando Libro 3D...'}
+                                                    ? `Subiendo ${progressInfo.currentPage}/${progressInfo.totalPages}...`
+                                                    : 'Guardando...'}
                                             </span>
                                         </>
                                     ) : (
                                         <>
-                                            <BookOpen size={15} />
-                                            <span>{editingBookId ? 'Guardar Cambios' : 'Publicar en Biblioteca y Muro'}</span>
+                                            <BookOpen size={14} />
+                                            <span>{editingBookId ? 'Guardar' : 'Publicar'}</span>
                                         </>
                                     )}
                                 </button>
@@ -927,67 +859,59 @@ export default function BooksLibraryModule({
                 </div>
             )}
 
-            {/* 3D Bookshelf Grid */}
+            {/* Books Grid / Minimalist Empty State */}
             {visibleBooks.length === 0 ? (
-                <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-12 text-center shadow-sm">
-                    <div className="w-16 h-16 mx-auto rounded-2xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center mb-4">
-                        <BookOpen size={30} />
+                !(isCreating && accessibleBooks.length === 0) && (
+                    <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 py-14 px-6 text-center shadow-xs">
+                        <div className="w-12 h-12 mx-auto rounded-2xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center mb-3">
+                            <BookOpen size={24} />
+                        </div>
+                        <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                            {accessibleBooks.length === 0
+                                ? 'No hay libros publicados aún'
+                                : 'No se encontraron libros'}
+                        </h3>
                     </div>
-                    <h3 className="text-lg font-extrabold text-slate-800 dark:text-white mb-1">
-                        No hay Libros 3D publicados aún
-                    </h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto mb-5">
-                        {isTeacher
-                            ? 'Sube cualquier documento PDF para transformarlo en un libro interactivo con hojas 3D y compartirlo en el muro del curso.'
-                            : 'Tu docente aún no ha publicado libros interactivos en esta categoría.'}
-                    </p>
-                    {isTeacher && !isCreating && (
-                        <button
-                            type="button"
-                            onClick={handleOpenCreate}
-                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/20 transition-all"
-                        >
-                            <Plus size={16} />
-                            <span>Subir primer Libro 3D</span>
-                        </button>
-                    )}
-                </div>
+                )
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                     {visibleBooks.map((bk) => {
                         const bkTheme = getBookTheme(bk.theme);
                         const coverImg = bk.coverUrl || bk.bookPages?.[0] || '';
                         const pageCount = bk.pageCount || bk.bookPages?.length || 1;
-                        const catLabel =
-                            BOOK_CATEGORIES.find((c) => c.id === bk.category)?.label ||
-                            'Libro Académico 3D';
                         const groupObj =
                             bk.targetGroupId && bk.targetGroupId !== 'all'
                                 ? effectiveGroups.find((g) => String(g?.id) === String(bk.targetGroupId))
                                 : null;
+                        const groupBadgeText =
+                            groupObj?.name ||
+                            (bk.targetGroupName &&
+                            bk.targetGroupName !== 'Global' &&
+                            bk.targetGroupName !== 'General'
+                                ? bk.targetGroupName
+                                : '');
 
                         return (
                             <div
                                 key={bk.id}
-                                className="group relative rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-5 shadow-sm hover:shadow-2xl transition-all duration-300 flex flex-col justify-between overflow-hidden"
+                                className="group relative rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-4 shadow-xs hover:shadow-lg transition-all duration-200 flex flex-col justify-between overflow-hidden"
                             >
-                                <div className="flex gap-5">
-                                    {/* Realistic 3D Standing Book Cover Thumbnail */}
+                                <div className="flex gap-4">
+                                    {/* Book Cover Thumbnail */}
                                     <div
                                         onClick={() => setActiveBookModal(bk)}
-                                        className="relative shrink-0 w-28 sm:w-32 h-40 sm:h-44 cursor-pointer select-none"
+                                        className="relative shrink-0 w-24 sm:w-28 h-36 sm:h-40 cursor-pointer select-none"
                                         style={{ perspective: '900px' }}
                                     >
                                         <div
-                                            className="relative w-full h-full rounded-r-xl rounded-l-sm shadow-[10px_14px_24px_-6px_rgba(15,23,42,0.45)] transition-transform duration-500 group-hover:[transform:rotateY(-18deg)_translateY(-4px)] overflow-hidden border border-white/15"
+                                            className="relative w-full h-full rounded-r-xl rounded-l-sm shadow-md transition-transform duration-300 group-hover:[transform:rotateY(-14deg)_translateY(-2px)] overflow-hidden border border-white/15"
                                             style={{
                                                 backgroundColor: bkTheme.coverBg,
                                                 transformStyle: 'preserve-3d'
                                             }}
                                         >
-                                            {/* Left Spine Highlight */}
                                             <div
-                                                className="absolute inset-y-0 left-0 w-3.5 z-10 pointer-events-none"
+                                                className="absolute inset-y-0 left-0 w-3 z-10 pointer-events-none"
                                                 style={{
                                                     background:
                                                         'linear-gradient(90deg, rgba(0,0,0,0.5) 0%, rgba(255,255,255,0.22) 45%, rgba(0,0,0,0.35) 100%)'
@@ -1000,21 +924,19 @@ export default function BooksLibraryModule({
                                                     className="w-full h-full object-cover"
                                                 />
                                             ) : (
-                                                <div className="w-full h-full flex flex-col items-center justify-center p-3 text-center text-white">
-                                                    <Book size={28} className="mb-2 opacity-80" />
-                                                    <span className="text-[11px] font-bold line-clamp-3">
+                                                <div className="w-full h-full flex flex-col items-center justify-center p-2.5 text-center text-white">
+                                                    <Book size={24} className="mb-1.5 opacity-80" />
+                                                    <span className="text-[10px] font-bold line-clamp-3">
                                                         {bk.title}
                                                     </span>
                                                 </div>
                                             )}
-                                            {/* Page count pill */}
-                                            <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-slate-950/80 backdrop-blur-sm text-white text-[10px] font-extrabold shadow">
+                                            <span className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded bg-slate-950/80 text-white text-[10px] font-bold">
                                                 {pageCount} págs
                                             </span>
                                         </div>
-                                        {/* Paper block edge on right */}
                                         <div
-                                            className="absolute top-1.5 bottom-1.5 -right-2 w-2 rounded-r-sm pointer-events-none"
+                                            className="absolute top-1.5 bottom-1.5 -right-1.5 w-1.5 rounded-r-sm pointer-events-none"
                                             style={{
                                                 background:
                                                     'repeating-linear-gradient(90deg, #f8fafc 0px, #cbd5e1 1.5px, #f1f5f9 3px)'
@@ -1025,50 +947,43 @@ export default function BooksLibraryModule({
                                     {/* Book Info */}
                                     <div className="flex-1 min-w-0 flex flex-col justify-between">
                                         <div>
-                                            <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
-                                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
-                                                    {catLabel}
-                                                </span>
-                                                {(groupObj?.name || (bk.targetGroupName && bk.targetGroupName !== 'Global' && bk.targetGroupName !== 'General')) && (
+                                            {groupBadgeText && (
+                                                <div className="mb-1">
                                                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                                                        {groupObj?.name || bk.targetGroupName}
+                                                        {groupBadgeText}
                                                     </span>
-                                                )}
-                                            </div>
+                                                </div>
+                                            )}
 
                                             <h3
                                                 onClick={() => setActiveBookModal(bk)}
-                                                className="text-base font-extrabold text-slate-900 dark:text-white line-clamp-2 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer transition-colors"
+                                                className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white line-clamp-2 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer transition-colors"
                                             >
                                                 {bk.title}
                                             </h3>
 
-                                            <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400 line-clamp-3 leading-relaxed">
-                                                {bk.description ||
-                                                    'Edición interactiva 3D con simulación de hojas y lectura inmersiva.'}
-                                            </p>
+                                            {bk.description && (
+                                                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
+                                                    {bk.description}
+                                                </p>
+                                            )}
                                         </div>
 
-                                        <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
-                                            <span className="truncate">
-                                                Por {bk.authorName || bk.author || getTeacherDisplayName(getItemTeacherId(bk))}
-                                            </span>
-                                            <span className="font-semibold text-indigo-500">
-                                                3D Flipbook
-                                            </span>
+                                        <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/80 text-[11px] text-slate-400 truncate">
+                                            {bk.authorName || bk.author || getTeacherDisplayName(getItemTeacherId(bk))}
                                         </div>
                                     </div>
                                 </div>
 
                                 {/* Card Footer Actions */}
-                                <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+                                <div className="mt-3.5 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
                                     <button
                                         type="button"
                                         onClick={() => setActiveBookModal(bk)}
-                                        className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-indigo-600/20 transition-all active:scale-95 cursor-pointer"
+                                        className="flex-1 py-2 px-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer"
                                     >
-                                        <BookOpen size={15} />
-                                        <span>Abrir Libro 3D</span>
+                                        <BookOpen size={14} />
+                                        <span>Abrir libro</span>
                                     </button>
 
                                     {(bk.pdfUrl || bk.fileUrl) && (
@@ -1081,8 +996,8 @@ export default function BooksLibraryModule({
                                                     e
                                                 )
                                             }
-                                            className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors"
-                                            title="Descargar archivo PDF original"
+                                            className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors"
+                                            title="Descargar PDF"
                                         >
                                             <Download size={15} />
                                         </button>
@@ -1093,16 +1008,16 @@ export default function BooksLibraryModule({
                                             <button
                                                 type="button"
                                                 onClick={() => handleOpenEdit(bk)}
-                                                className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-amber-500/20 text-slate-600 dark:text-slate-300 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
-                                                title="Editar Libro 3D"
+                                                className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-amber-500/20 text-slate-600 dark:text-slate-300 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+                                                title="Editar"
                                             >
                                                 <Edit3 size={15} />
                                             </button>
                                             <button
                                                 type="button"
                                                 onClick={() => handleDeleteBook(bk)}
-                                                className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-500/20 text-slate-600 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
-                                                title="Eliminar Libro 3D"
+                                                className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-500/20 text-slate-600 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
+                                                title="Eliminar"
                                             >
                                                 <Trash2 size={15} />
                                             </button>
@@ -1115,7 +1030,7 @@ export default function BooksLibraryModule({
                 </div>
             )}
 
-            {/* Interactive 3D Book Viewer Modal */}
+            {/* Book Viewer Modal */}
             {activeBookModal && (
                 <Flipbook3DModal
                     book={activeBookModal}

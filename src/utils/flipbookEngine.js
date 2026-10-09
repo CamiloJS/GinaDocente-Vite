@@ -11,7 +11,7 @@ export const DEFAULT_BOOK_ASPECT_RATIO = 0.707; // Standard A4 / Academic textbo
 export const BOOK_THEMES = {
     'royal-indigo': {
         id: 'royal-indigo',
-        name: 'Royal Indigo',
+        name: 'Índigo',
         spineColor: '#312e81',
         coverBg: '#1e1b4b',
         coverSecondary: '#3730a3',
@@ -22,7 +22,7 @@ export const BOOK_THEMES = {
     },
     'emerald-ledger': {
         id: 'emerald-ledger',
-        name: 'Emerald Ledger',
+        name: 'Esmeralda',
         spineColor: '#064e3b',
         coverBg: '#022c22',
         coverSecondary: '#065f46',
@@ -33,7 +33,7 @@ export const BOOK_THEMES = {
     },
     'crimson-oxford': {
         id: 'crimson-oxford',
-        name: 'Oxford Crimson',
+        name: 'Carmesí',
         spineColor: '#7f1d1d',
         coverBg: '#450a0a',
         coverSecondary: '#991b1b',
@@ -44,7 +44,7 @@ export const BOOK_THEMES = {
     },
     'amber-executive': {
         id: 'amber-executive',
-        name: 'Executive Gold',
+        name: 'Ámbar',
         spineColor: '#78350f',
         coverBg: '#451a03',
         coverSecondary: '#92400e',
@@ -55,7 +55,7 @@ export const BOOK_THEMES = {
     },
     'slate-modern': {
         id: 'slate-modern',
-        name: 'Modern Slate',
+        name: 'Pizarra',
         spineColor: '#0f172a',
         coverBg: '#020617',
         coverSecondary: '#1e293b',
@@ -67,11 +67,11 @@ export const BOOK_THEMES = {
 };
 
 export const BOOK_CATEGORIES = [
-    { id: 'textbook', label: 'Libro / Guía Académica' },
-    { id: 'case-study', label: 'Caso de Estudio Económico' },
-    { id: 'glossary', label: 'Glosario / Manual Técnico' },
-    { id: 'magazine', label: 'Revista / Reporte Financiero' },
-    { id: 'workbook', label: 'Cuaderno de Ejercicios' }
+    { id: 'textbook', label: 'Guía' },
+    { id: 'case-study', label: 'Caso de estudio' },
+    { id: 'glossary', label: 'Glosario' },
+    { id: 'magazine', label: 'Revista' },
+    { id: 'workbook', label: 'Cuaderno' }
 ];
 
 export const getBookTheme = (themeId) => {
@@ -167,7 +167,7 @@ export const buildIllustratedBookPageSvg = ({
             <circle cx="650" cy="210" r="160" fill="${theme.accentColor}" fill-opacity="0.08" />
             <circle cx="610" cy="840" r="210" fill="${theme.accentColor}" fill-opacity="0.07" />
             <rect x="90" y="130" width="260" height="40" rx="20" fill="${theme.badgeBg}" stroke="${theme.accentColor}" stroke-opacity="0.6" stroke-width="1.5" />
-            <text x="220" y="156" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="bold" letter-spacing="2" fill="#ffffff">${escapeSvgText((chapter || 'INTERACTIVE 3D BOOK').toUpperCase().slice(0, 26))}</text>
+            <text x="220" y="156" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="bold" letter-spacing="2" fill="#ffffff">${escapeSvgText((chapter || 'LIBRO').toUpperCase().slice(0, 26))}</text>
             <line x1="90" y1="265" x2="260" y2="265" stroke="${theme.accentColor}" stroke-width="5" stroke-linecap="round" />
             ${titleSvg}
             ${subSvg}
@@ -180,7 +180,7 @@ export const buildIllustratedBookPageSvg = ({
                 <circle cx="455" cy="105" r="6" fill="#ffffff" />
                 <circle cx="565" cy="45" r="8" fill="${theme.accentColor}" stroke="#ffffff" stroke-width="2" />
                 <text x="45" y="48" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="bold" fill="${theme.accentColor}" letter-spacing="1.5">TECHNICAL ENGLISH &amp; GLOBAL MARKETS</text>
-                <text x="45" y="205" font-family="system-ui, -apple-system, sans-serif" font-size="13" fill="#cbd5e1">Interactive 3D Edition • Flip pages with mouse, touch or keyboard</text>
+                <text x="45" y="205" font-family="system-ui, -apple-system, sans-serif" font-size="13" fill="#cbd5e1">English Tech</text>
             </g>
             <text x="90" y="995" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="bold" fill="${theme.accentColor}" letter-spacing="1.2">AUTHOR / FACULTY</text>
             <text x="90" y="1024" font-family="Georgia, serif" font-size="22" fill="#ffffff">${escapeSvgText(author)}</text>
@@ -192,7 +192,7 @@ export const buildIllustratedBookPageSvg = ({
 
     if (variant === 'back-cover') {
         const summaryLines = wrapTextLines(
-            subtitle || 'Thank you for reading this interactive 3D academic edition. Review key concepts and complete the module activities on the class wall.',
+            subtitle || 'Review key concepts and complete the module activities on the class wall.',
             44,
             5
         );
@@ -212,7 +212,7 @@ export const buildIllustratedBookPageSvg = ({
             ${summarySvg}
             <rect x="230" y="860" width="340" height="90" rx="14" fill="#ffffff" fill-opacity="0.08" stroke="#ffffff" stroke-opacity="0.15" />
             <text x="400" y="900" text-anchor="middle" font-family="monospace" font-size="16" fill="${theme.accentColor}">ISBN 978-958-8400-3D-${String(totalPages).padStart(2, '0')}</text>
-            <text x="400" y="928" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="13" fill="#cbd5e1">English Tech • Interactive 3D Library</text>
+            <text x="400" y="928" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="13" fill="#cbd5e1">English Tech</text>
         </svg>`;
 
         return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
@@ -331,7 +331,7 @@ export const buildIllustratedBookPageSvg = ({
         ${statsSvg}
         ${calloutSvg}
         <line x1="72" y1="1032" x2="728" y2="1032" stroke="#e2e8f0" stroke-width="1.5" />
-        <text x="72" y="1062" font-family="system-ui, -apple-system, sans-serif" font-size="13" fill="#94a3b8">English Tech • Interactive 3D Edition</text>
+        <text x="72" y="1062" font-family="system-ui, -apple-system, sans-serif" font-size="13" fill="#94a3b8">English Tech</text>
         <text x="728" y="1062" text-anchor="end" font-family="Georgia, serif" font-size="15" font-weight="bold" fill="#475569">Page ${pageNumber} of ${totalPages}</text>
     </svg>`;
 
@@ -344,7 +344,7 @@ export const buildIllustratedBookPageSvg = ({
 export const buildBookPagesFromOutline = (outline = [], { themeId = 'royal-indigo', author = 'English Tech Faculty' } = {}) => {
     const safeOutline = Array.isArray(outline) && outline.length > 0
         ? outline
-        : [{ variant: 'cover', title: 'Interactive 3D Book', subtitle: 'Academic Material' }];
+        : [{ variant: 'cover', title: 'Libro', subtitle: 'Material de lectura' }];
 
     const totalPages = safeOutline.length;
     return safeOutline.map((pageSpec, idx) =>
@@ -359,7 +359,7 @@ export const buildBookPagesFromOutline = (outline = [], { themeId = 'royal-indig
 };
 
 /**
- * Generates fallback 3D pages if a remote PDF is blocked by CORS and has no pre-rendered pages.
+ * Generates fallback pages if a remote PDF is blocked by CORS and has no pre-rendered pages.
  */
 export const buildFallbackBookPages = ({
     title = 'Documento PDF',
@@ -368,38 +368,33 @@ export const buildFallbackBookPages = ({
     author = 'Docente',
     themeId = 'royal-indigo'
 } = {}) => {
-    const cleanTitle = title || fileName || 'Libro 3D Interactivo';
+    const cleanTitle = title || fileName || 'Libro';
     const outline = [
         {
             variant: 'cover',
-            chapter: 'EDICIÓN DIGITAL 3D',
+            chapter: 'LIBRO',
             title: cleanTitle,
-            subtitle: description || 'Material de lectura interactivo con simulación física de hojas en 3D.',
+            subtitle: description || '',
             author
         },
         {
             variant: 'content',
-            chapter: 'GUÍA DE LECTURA',
+            chapter: 'CONTENIDO',
             title: cleanTitle,
-            subtitle: 'Resumen y acceso directo al documento original',
+            subtitle: fileName || 'Documento adjunto',
             body: [
-                description || 'Este documento ha sido publicado en la Biblioteca 3D del curso para su consulta interactiva.',
-                'Puedes pasar las páginas arrastrando las esquinas con el mouse o tu dedo en dispositivos móviles, o utilizando las flechas del teclado.'
+                description || 'Material de lectura del curso.'
             ],
-            bullets: [
-                'Usa los controles superiores para acercar o alejar el zoom de lectura.',
-                'Activa o silencia el sonido de hojas de papel en la barra superior.',
-                'Si deseas guardar el archivo original completo, usa el botón Descargar PDF.'
-            ],
-            calloutTitle: 'ARCHIVO ADJUNTO',
+            bullets: [],
+            calloutTitle: 'PDF',
             calloutText: fileName
-                ? `Archivo fuente: ${fileName}. Usa el botón superior "Descargar / Abrir PDF" para ver el archivo original.`
-                : 'Usa el botón superior "Descargar / Abrir PDF" para abrir el documento original en alta resolución.'
+                ? `Archivo: ${fileName}`
+                : 'Usa el botón PDF para abrir el archivo original.'
         },
         {
             variant: 'back-cover',
             title: cleanTitle,
-            subtitle: 'Fin de la vista previa interactiva. Descarga el PDF completo desde la barra de herramientas superior.'
+            subtitle: ''
         }
     ];
 
@@ -460,7 +455,7 @@ export const renderPdfToBookPages = async (
     } else if (source && source.url) {
         docParams = { url: source.url, withCredentials: false };
     } else {
-        throw new Error('Fuente PDF no válida para generar el Libro 3D.');
+        throw new Error('Fuente PDF no válida para generar el libro.');
     }
 
     const buildAttemptParams = (extra = {}) => {
@@ -601,7 +596,7 @@ export const compactBookPagesForFirestore = (
     pages = [],
     {
         maxTotalChars = MAX_TOTAL_FIRESTORE_BOOK_CHARS,
-        fallbackTitle = 'Interactive 3D Book',
+        fallbackTitle = 'Libro',
         themeId = 'royal-indigo'
     } = {}
 ) => {
@@ -628,12 +623,11 @@ export const compactBookPagesForFirestore = (
             // Replace overflow inline base64 page with a lightweight SVG page (~2KB)
             const compactSvg = buildIllustratedBookPageSvg({
                 variant: 'content',
-                chapter: 'CONTENIDO DEL DOCUMENTO',
+                chapter: 'CONTENIDO',
                 title: `${fallbackTitle} — Página ${i + 1}`,
-                subtitle: 'Vista optimizada para sincronización en la nube',
+                subtitle: '',
                 body: [
-                    'Esta página forma parte del documento PDF completo adjunto a este Libro 3D.',
-                    'Puedes abrir o descargar el archivo PDF original desde el botón superior para consultar todas las páginas adicionales en máxima resolución.'
+                    'Usa el botón PDF para abrir el documento completo.'
                 ],
                 pageNumber: i + 1,
                 totalPages: pages.length,
@@ -650,7 +644,7 @@ export const compactBookPagesForFirestore = (
 };
 
 /**
- * Normalizes and sanitizes a 3D Book record before saving to Firestore or rendering.
+ * Normalizes and sanitizes a Book record before saving to Firestore or rendering.
  */
 export const sanitizeBookForFirestore = (book = {}) => {
     const rawPages = Array.isArray(book.bookPages) && book.bookPages.length > 0
@@ -659,7 +653,7 @@ export const sanitizeBookForFirestore = (book = {}) => {
             ? book.pages
             : [];
 
-    const title = String(book.title || book.fileName || 'Libro 3D Interactivo').trim();
+    const title = String(book.title || book.fileName || 'Libro').trim();
     const rawTheme = book.theme || book.bookTheme;
     const theme = BOOK_THEMES[rawTheme] ? rawTheme : 'royal-indigo';
     const rawCat = book.category || book.bookCategory;
@@ -704,14 +698,14 @@ export const sanitizeBookForFirestore = (book = {}) => {
 };
 
 /**
- * Normalizes any book or task-like object into a consistent 3D Book structure for the viewer.
+ * Normalizes any book or task-like object into a consistent Book structure for the viewer.
  */
 export const normalizeBookRecord = (item = {}) => {
     if (!item || typeof item !== 'object') {
-        const fallback = buildFallbackBookPages({ title: 'Libro 3D' });
+        const fallback = buildFallbackBookPages({ title: 'Libro' });
         return {
             id: 'book_default',
-            title: 'Libro 3D',
+            title: 'Libro',
             description: '',
             category: 'textbook',
             theme: 'royal-indigo',
@@ -733,7 +727,7 @@ export const normalizeBookRecord = (item = {}) => {
             : [];
 
     const pdfUrl = item.pdfUrl || item.fileUrl || item.documentUrl || '';
-    const title = String(item.title || item.documentTitle || item.fileName || 'Libro 3D Interactivo').trim();
+    const title = String(item.title || item.documentTitle || item.fileName || 'Libro').trim();
     const rawTheme = item.theme || item.bookTheme;
     const theme = BOOK_THEMES[rawTheme] ? rawTheme : 'royal-indigo';
     const rawCat = item.category || item.bookCategory;

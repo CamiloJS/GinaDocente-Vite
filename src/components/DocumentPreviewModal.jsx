@@ -89,10 +89,10 @@ export const DocumentPreviewModal = ({
             type="button"
             onClick={() => setShow3DMode(true)}
             className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 active:scale-95 shadow-md transition-all cursor-pointer"
-            title="Ver este PDF como Libro 3D interactivo con movimiento de hojas"
+            title="Abrir como libro"
           >
             <BookOpen size={15} />
-            <span>Modo Libro 3D</span>
+            <span>Modo libro</span>
           </button>
 
           <a

@@ -201,7 +201,7 @@ const TaskCard = React.memo(({
         if (found) {
             return normalizeBookRecord({
                 ...found,
-                title: task?.title || found.title || 'Libro 3D Interactivo',
+                title: task?.title || found.title || 'Libro',
                 description: task?.description !== undefined && task?.description !== '' ? task.description : (found.description || '')
             });
         }
@@ -1510,7 +1510,7 @@ const TaskCard = React.memo(({
                             {isBook3D && (
                                 <span className="inline-flex items-center gap-1 text-[9.5px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 shrink-0 whitespace-nowrap">
                                     <BookOpen size={10} className="shrink-0" />
-                                    Libro 3D
+                                    Libro
                                 </span>
                             )}
 
@@ -2581,7 +2581,7 @@ const TaskCard = React.memo(({
                 );
             })()}
 
-            {/* Módulo Interactivo de Libro 3D (Publicación de Libro 3D en el Muro) */}
+            {/* Publicación de Libro en el Muro */}
             {isBook3D && linkedBook && (() => {
                 const bk = linkedBook;
                 const bkTheme = getBookTheme(bk.theme);
@@ -2593,36 +2593,31 @@ const TaskCard = React.memo(({
 
                 return (
                     <div className="my-3 rounded-2xl border border-indigo-200/80 dark:border-indigo-800/50 bg-gradient-to-br from-indigo-50/50 via-white to-violet-50/30 dark:from-gray-900 dark:via-gray-900/95 dark:to-indigo-950/25 shadow-sm overflow-hidden">
-                        {/* Cabecera del Libro 3D */}
-                        <div className="px-4 py-3 border-b border-indigo-100/80 dark:border-indigo-900/40 flex flex-wrap items-center justify-between gap-2 bg-gradient-to-r from-indigo-500/10 via-transparent to-violet-500/10">
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white flex items-center justify-center shadow-xs shrink-0">
-                                    <BookOpen size={16} />
+                        {/* Cabecera del Libro */}
+                        <div className="px-4 py-2.5 border-b border-indigo-100/80 dark:border-indigo-900/40 flex flex-wrap items-center justify-between gap-2 bg-gradient-to-r from-indigo-500/10 via-transparent to-violet-500/10">
+                            <div className="flex items-center gap-2">
+                                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                                    <BookOpen size={15} />
                                 </div>
-                                <span className="inline-flex items-center gap-1 text-[10.5px] font-extrabold px-2.5 py-0.5 rounded-full bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700 shadow-2xs">
-                                    <Layers size={11} className="text-indigo-600 dark:text-indigo-400" />
-                                    {totalPagesCount} {totalPagesCount === 1 ? 'página' : 'páginas'} en 3D
-                                </span>
-                                <span className="inline-flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/60">
-                                    <Sparkles size={11} />
-                                    Flipbook Interactivo
+                                <span className="text-[11px] font-bold text-gray-700 dark:text-gray-300">
+                                    {totalPagesCount} {totalPagesCount === 1 ? 'página' : 'páginas'}
                                 </span>
                             </div>
 
                             {pagesArr.length > 0 && (
                                 <span className="text-[10.5px] font-extrabold text-indigo-800 dark:text-indigo-300 bg-indigo-100/70 dark:bg-indigo-950/60 px-2.5 py-0.5 rounded-full border border-indigo-200/80 dark:border-indigo-800/60">
-                                    Hoja {safePageIdx + 1} de {pagesArr.length}
+                                    Pág. {safePageIdx + 1} / {pagesArr.length}
                                 </span>
                             )}
                         </div>
 
-                        {/* Escenario 3D de Vista Previa del Libro */}
+                        {/* Vista Previa del Libro */}
                         <div
                             onClick={() => setActiveFlipbookModal({ book: bk, initialPage: safePageIdx })}
                             className="relative group/bookcard cursor-pointer overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 p-5 sm:p-7 flex flex-col sm:flex-row items-center justify-center gap-6 border-b border-indigo-100/80 dark:border-gray-800"
-                            title="Haz clic para abrir el Libro 3D interactivo a pantalla completa"
+                            title="Abrir libro"
                         >
-                            {/* Cubierta Física 3D con Lomo y Grosor de Hojas */}
+                            {/* Cubierta Física con Lomo y Grosor de Hojas */}
                             <div
                                 className="relative w-44 sm:w-52 h-60 sm:h-72 shrink-0 select-none"
                                 style={{ perspective: '1200px' }}
@@ -2643,7 +2638,7 @@ const TaskCard = React.memo(({
                                     {currentPreviewPage ? (
                                         <img
                                             src={currentPreviewPage}
-                                            alt={`${bk.title} - Hoja ${safePageIdx + 1}`}
+                                            alt={`${bk.title} - Pág. ${safePageIdx + 1}`}
                                             className="w-full h-full object-contain bg-white"
                                         />
                                     ) : (
@@ -2673,7 +2668,7 @@ const TaskCard = React.memo(({
                                             setBookPreviewPageIdx(prev => (prev <= 0 ? pagesArr.length - 1 : prev - 1));
                                         }}
                                         className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 hover:bg-indigo-600 text-white border border-white/20 flex items-center justify-center shadow-lg transition-all hover:scale-110 z-20 cursor-pointer"
-                                        title="Hoja anterior"
+                                        title="Página anterior"
                                     >
                                         <ChevronLeft size={18} />
                                     </button>
@@ -2684,21 +2679,15 @@ const TaskCard = React.memo(({
                                             setBookPreviewPageIdx(prev => (prev >= pagesArr.length - 1 ? 0 : prev + 1));
                                         }}
                                         className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 hover:bg-indigo-600 text-white border border-white/20 flex items-center justify-center shadow-lg transition-all hover:scale-110 z-20 cursor-pointer"
-                                        title="Siguiente hoja"
+                                        title="Página siguiente"
                                     >
                                         <ChevronRight size={18} />
                                     </button>
                                 </>
                             )}
-
-                            {/* Etiqueta superior derecha */}
-                            <div className="absolute top-3 right-3 px-3 py-1 rounded-xl bg-indigo-600/90 backdrop-blur-md text-white text-[10.5px] font-extrabold border border-indigo-400/40 flex items-center gap-1.5 shadow-lg z-20">
-                                <Maximize2 size={11} />
-                                <span>Abrir lector 3D</span>
-                            </div>
                         </div>
 
-                        {/* Barra de acciones del Libro 3D */}
+                        {/* Barra de acciones del Libro */}
                         <div className="p-3.5 sm:p-4 flex flex-wrap items-center justify-between gap-2.5">
                             <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                                 <button
@@ -2707,17 +2696,17 @@ const TaskCard = React.memo(({
                                     className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white shadow-sm flex items-center justify-center gap-2 transition-all hover:scale-[1.01] cursor-pointer"
                                 >
                                     <BookOpen size={14} />
-                                    <span>Abrir Libro 3D</span>
+                                    <span>Abrir libro</span>
                                 </button>
 
                                 {pdfSourceUrl && (
                                     <a
                                         href={pdfSourceUrl}
-                                        download={bk.fileName || `${bk.title || 'libro_3d'}.pdf`}
+                                        download={bk.fileName || `${bk.title || 'libro'}.pdf`}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="px-3.5 py-2.5 rounded-xl text-xs font-extrabold bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
-                                        title="Descargar documento PDF original"
+                                        title="Descargar PDF"
                                     >
                                         <Download size={14} className="text-indigo-600 dark:text-indigo-400" />
                                         <span>Descargar PDF</span>
@@ -2730,8 +2719,8 @@ const TaskCard = React.memo(({
                                         onClick={() => onOpenBooksTab(role === 'teacher' ? bk : null)}
                                         className="px-3.5 py-2.5 rounded-xl text-xs font-bold bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-800 dark:text-indigo-300 border border-indigo-500/25 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                                     >
-                                        {role === 'teacher' ? <Edit3 size={13} /> : <Sparkles size={13} />}
-                                        <span>{role === 'teacher' ? 'Editar en Biblioteca 3D' : 'Biblioteca 3D'}</span>
+                                        {role === 'teacher' ? <Edit3 size={13} /> : <BookOpen size={13} />}
+                                        <span>{role === 'teacher' ? 'Editar' : 'Ver libros'}</span>
                                     </button>
                                 )}
                             </div>
@@ -2817,7 +2806,7 @@ const TaskCard = React.memo(({
                                     setActiveFlipbookModal({
                                         book: {
                                             id: `pdf_book_${task.id}`,
-                                            title: task.title || task.fileName || 'Libro 3D PDF',
+                                            title: task.title || task.fileName || 'Libro',
                                             description: task.description || '',
                                             pdfUrl: task.fileUrl,
                                             fileUrl: task.fileUrl,
@@ -2828,10 +2817,10 @@ const TaskCard = React.memo(({
                                     });
                                 }}
                                 className="px-2.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold flex items-center gap-1.5 shrink-0 shadow-xs transition-all cursor-pointer"
-                                title="Abrir este PDF como Libro 3D interactivo con animación de hojas"
+                                title="Abrir como libro"
                             >
                                 <BookOpen size={13} />
-                                <span>Libro 3D</span>
+                                <span>Abrir libro</span>
                             </button>
                         )}
                         <a 
