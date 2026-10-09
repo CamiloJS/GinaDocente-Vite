@@ -1586,19 +1586,382 @@ export const compressBookImageDataUrl = async (
 };
 
 /**
- * Dynamically loads pdfjs-dist and configures its worker.
+ * Installs essential runtime polyfills required by pdfjs-dist@6.x (such as
+ * Uint8Array.prototype.toHex used by font hashing, Map.prototype.getOrInsertComputed,
+ * and DOMMatrix) when running in browsers or runtimes that lack ES2025/2026 methods.
+ */
+const ensurePdfPolyfills = () => {
+    if (typeof Uint8Array !== 'undefined' && typeof Uint8Array.prototype.toHex !== 'function') {
+        Object.defineProperty(Uint8Array.prototype, 'toHex', {
+            configurable: true,
+            writable: true,
+            value: function toHex() {
+                let out = '';
+                for (let i = 0; i < this.length; i++) {
+                    out += this[i].toString(16).padStart(2, '0');
+                }
+                return out;
+            }
+        });
+    }
+    if (typeof Map !== 'undefined' && typeof Map.prototype.getOrInsertComputed !== 'function') {
+        Object.defineProperty(Map.prototype, 'getOrInsertComputed', {
+            configurable: true,
+            writable: true,
+            value: function getOrInsertComputed(key, callbackfn) {
+                if (this.has(key)) return this.get(key);
+                const val = callbackfn(key);
+                this.set(key, val);
+                return val;
+            }
+        });
+    }
+    if (typeof Map !== 'undefined' && typeof Map.prototype.getOrInsert !== 'function') {
+        Object.defineProperty(Map.prototype, 'getOrInsert', {
+            configurable: true,
+            writable: true,
+            value: function getOrInsert(key, defaultValue) {
+                if (this.has(key)) return this.get(key);
+                this.set(key, defaultValue);
+                return defaultValue;
+            }
+        });
+    }
+    if (typeof globalThis.DOMMatrix === 'undefined') {
+        globalThis.DOMMatrix = class DOMMatrixShim {
+            constructor(init) {
+                const v = Array.isArray(init) && init.length >= 6 ? init : [1, 0, 0, 1, 0, 0];
+                this.a = v[0];
+                this.b = v[1];
+                this.c = v[2];
+                this.d = v[3];
+                this.e = v[4];
+                this.f = v[5];
+            }
+            scaleSelf() { return this; }
+            translateSelf() { return this; }
+            multiplySelf() { return this; }
+            preMultiplySelf() { return this; }
+            invertSelf() { return this; }
+            scale() { return new DOMMatrixShim(); }
+            translate() { return new DOMMatrixShim(); }
+            multiply() { return new DOMMatrixShim(); }
+            inverse() { return new DOMMatrixShim(); }
+        };
+    }
+    if (typeof globalThis.Path2D === 'undefined') {
+        globalThis.Path2D = class Path2DShim {
+            constructor(path) {
+                this.ops = Array.isArray(path?.ops) ? [...path.ops] : [];
+            }
+            addPath(path) {
+                if (Array.isArray(path?.ops)) {
+                    this.ops.push(...path.ops);
+                }
+            }
+            moveTo(x, y) { this.ops.push(['moveTo', x, y]); }
+            lineTo(x, y) { this.ops.push(['lineTo', x, y]); }
+            bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x, y) {
+                this.ops.push(['bezierCurveTo', cp1x, cp1y, cp2x, cp2y, x, y]);
+            }
+            quadraticCurveTo(cpx, cpy, x, y) {
+                this.ops.push(['quadraticCurveTo', cpx, cpy, x, y]);
+            }
+            arc(x, y, r, s, e, ccw) {
+                this.ops.push(['arc', x, y, r, s, e, ccw]);
+            }
+            rect(x, y, w, h) { this.ops.push(['rect', x, y, w, h]); }
+            closePath() { this.ops.push(['closePath']); }
+        };
+    }
+};
+
+/**
+ * Configures pdfjs-dist GlobalWorkerOptions.workerSrc with a version-matched worker.
+ * Prefers a same-origin bundled legacy worker in HTTP(S) browser environments with CDN fallback.
+ */
+export const ensurePdfWorker = (pdfjsLib) => {
+    ensurePdfPolyfills();
+    if (!pdfjsLib || !pdfjsLib.GlobalWorkerOptions) return '';
+    const ver = pdfjsLib.version || '6.2.108';
+    const currentWorker = String(pdfjsLib.GlobalWorkerOptions.workerSrc || '').trim();
+    if (
+        !currentWorker ||
+        currentWorker.includes('cdnjs.cloudflare.com') ||
+        currentWorker.includes('4.10.38')
+    ) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${ver}/legacy/build/pdf.worker.min.mjs`;
+    }
+    return pdfjsLib.GlobalWorkerOptions.workerSrc;
+};
+
+/**
+ * Loads the bundled pdf.worker.min.mjs in-process on globalThis.pdfjsWorker and clears
+ * any cached rejected _setupFakeWorkerGlobal promise on PDFWorker so fallback rendering
+ * works 100% offline and on servers where .mjs static assets have wrong MIME types.
+ */
+export const ensurePdfInProcessWorkerFallback = async (pdfjsLib = null) => {
+    try {
+        if (pdfjsLib?.PDFWorker && '_setupFakeWorkerGlobal' in pdfjsLib.PDFWorker) {
+            delete pdfjsLib.PDFWorker._setupFakeWorkerGlobal;
+        }
+    } catch {
+        // Ignore non-configurable property errors
+    }
+    if (typeof globalThis !== 'undefined' && globalThis.pdfjsWorker?.WorkerMessageHandler) {
+        return globalThis.pdfjsWorker;
+    }
+    try {
+        const workerMod = await import('pdfjs-dist/legacy/build/pdf.worker.min.mjs');
+        const resolved = workerMod?.WorkerMessageHandler
+            ? workerMod
+            : workerMod?.default?.WorkerMessageHandler
+                ? workerMod.default
+                : workerMod;
+        if (typeof globalThis !== 'undefined' && resolved?.WorkerMessageHandler) {
+            globalThis.pdfjsWorker = resolved;
+        }
+        return resolved;
+    } catch {
+        return null;
+    }
+};
+
+/**
+ * Builds complete pdfjs-dist getDocument() initialization parameters including
+ * CMap, standard fonts, WASM (OpenJPEG/JBIG2/QCMS), and ICC color profile URLs
+ * so PDFs with CMYK/ICCBased colors, JPEG2000/JBIG2 images, or unembedded fonts never render blank.
+ */
+export const buildPdfDocumentInitParams = (baseParams = {}, pdfjsLib = null, extraOptions = {}) => {
+    ensurePdfPolyfills();
+    const ver = (pdfjsLib && pdfjsLib.version) || '6.2.108';
+    const cdnBase = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${ver}`;
+    const clonedBase = { ...(baseParams || {}) };
+    if (clonedBase.data instanceof Uint8Array) {
+        clonedBase.data = clonedBase.data.slice();
+    } else if (clonedBase.data instanceof ArrayBuffer) {
+        clonedBase.data = new Uint8Array(clonedBase.data.slice(0));
+    } else if (ArrayBuffer.isView(clonedBase.data)) {
+        clonedBase.data = new Uint8Array(
+            clonedBase.data.buffer.slice(
+                clonedBase.data.byteOffset,
+                clonedBase.data.byteOffset + clonedBase.data.byteLength
+            )
+        );
+    }
+
+    const mergedExtra = extraOptions || {};
+    const hasCustomDomWithoutFontApi =
+        typeof document !== 'undefined' &&
+        (!document.fonts || typeof FontFace === 'undefined');
+    const resolvedDisableFontFace =
+        mergedExtra.disableFontFace !== undefined
+            ? Boolean(mergedExtra.disableFontFace)
+            : clonedBase.disableFontFace !== undefined
+                ? Boolean(clonedBase.disableFontFace)
+                : hasCustomDomWithoutFontApi;
+    // CRITICAL: pdfjs-dist throws an assertion in FontLoader.loadSystemFont if disableFontFace is true
+    // while useSystemFonts is true, or when document.fonts (Font Loading API) is absent.
+    const resolvedUseSystemFonts = resolvedDisableFontFace
+        ? false
+        : mergedExtra.useSystemFonts !== undefined
+            ? Boolean(mergedExtra.useSystemFonts)
+            : clonedBase.useSystemFonts !== undefined
+                ? Boolean(clonedBase.useSystemFonts)
+                : true;
+
+    const nodeProc = globalThis.process;
+    const isNodeRuntime =
+        typeof nodeProc !== 'undefined' &&
+        Boolean(nodeProc?.versions?.node) &&
+        typeof nodeProc?.getBuiltinModule === 'function' &&
+        typeof window === 'undefined';
+
+    const domCanvasFactoryPatch =
+        typeof document !== 'undefined' && typeof HTMLCanvasElement === 'undefined'
+            ? {
+                  CanvasFactory: class CustomDomCanvasFactory {
+                      create(width, height) {
+                          const canvas = document.createElement('canvas');
+                          canvas.width = Math.max(1, Math.round(width || 1));
+                          canvas.height = Math.max(1, Math.round(height || 1));
+                          const context =
+                              canvas.getContext('2d', { alpha: false, willReadFrequently: true }) ||
+                              canvas.getContext('2d');
+                          return { canvas, context };
+                      }
+                      reset(canvasAndContext, width, height) {
+                          if (canvasAndContext && canvasAndContext.canvas) {
+                              canvasAndContext.canvas.width = Math.max(1, Math.round(width || 1));
+                              canvasAndContext.canvas.height = Math.max(1, Math.round(height || 1));
+                          }
+                      }
+                      destroy(canvasAndContext) {
+                          if (canvasAndContext && canvasAndContext.canvas) {
+                              canvasAndContext.canvas.width = 0;
+                              canvasAndContext.canvas.height = 0;
+                          }
+                      }
+                  }
+              }
+            : {};
+
+    const nodeBinaryDataFactoryPatch = isNodeRuntime
+        ? {
+              BinaryDataFactory: class HybridNodeBinaryDataFactory {
+                  constructor({ cMapUrl = null, standardFontDataUrl = null, wasmUrl = null } = {}) {
+                      this.cMapUrl = cMapUrl;
+                      this.standardFontDataUrl = standardFontDataUrl;
+                      this.wasmUrl = wasmUrl;
+                  }
+                  async fetch({ kind, filename } = {}) {
+                      const dirMap = {
+                          cMapUrl: 'cmaps',
+                          standardFontDataUrl: 'standard_fonts',
+                          wasmUrl: 'wasm'
+                      };
+                      const subDir = dirMap[kind];
+                      if (subDir && filename && nodeProc?.getBuiltinModule) {
+                          try {
+                              const fs = nodeProc.getBuiltinModule('fs/promises');
+                              const pathMod = nodeProc.getBuiltinModule('path');
+                              const localPath = pathMod.join(
+                                  nodeProc.cwd(),
+                                  'node_modules',
+                                  'pdfjs-dist',
+                                  subDir,
+                                  filename
+                              );
+                              const buf = await fs.readFile(localPath);
+                              return new Uint8Array(buf);
+                          } catch {
+                              // Fall through to HTTP fetch if local file is unavailable
+                          }
+                      }
+                      const baseUrl = this[kind] || '';
+                      const url = `${baseUrl}${filename || ''}`;
+                      if (typeof globalThis.fetch === 'function') {
+                          const res = await globalThis.fetch(url);
+                          if (!res.ok) {
+                              throw new Error(`Unable to load ${kind} data at: ${url}`);
+                          }
+                          return new Uint8Array(await res.arrayBuffer());
+                      }
+                      throw new Error(`Unable to load ${kind} data at: ${url}`);
+                  }
+              }
+          }
+        : {};
+
+    const result = {
+        cMapUrl: `${cdnBase}/cmaps/`,
+        cMapPacked: true,
+        standardFontDataUrl: `${cdnBase}/standardFontDataUrl/`.replace('standardFontDataUrl', 'standard_fonts'),
+        wasmUrl: `${cdnBase}/wasm/`,
+        iccUrl: `${cdnBase}/iccs/`,
+        isEvalSupported: false,
+        stopAtErrors: false,
+        isOffscreenCanvasSupported: false,
+        isImageDecoderSupported: false,
+        ...domCanvasFactoryPatch,
+        ...nodeBinaryDataFactoryPatch,
+        ...clonedBase,
+        ...mergedExtra,
+        useSystemFonts: resolvedUseSystemFonts
+    };
+
+    if (
+        resolvedDisableFontFace ||
+        mergedExtra.disableFontFace !== undefined ||
+        clonedBase.disableFontFace !== undefined
+    ) {
+        result.disableFontFace = resolvedDisableFontFace;
+    }
+
+    return result;
+};
+
+const computeCoprimeStride = (rawStride, width) => {
+    let stride = Math.max(1, Math.floor(rawStride) || 1);
+    const safeWidth = Math.max(1, Math.floor(width) || 1);
+    if (stride <= 1 || safeWidth <= 1) return 1;
+    const gcd = (a, b) => {
+        let x = Math.abs(a);
+        let y = Math.abs(b);
+        while (y !== 0) {
+            const t = y;
+            y = x % y;
+            x = t;
+        }
+        return x;
+    };
+    while (gcd(stride, safeWidth) !== 1) {
+        stride += 1;
+    }
+    return stride;
+};
+
+/**
+ * Detects whether a rendered 2D canvas page is completely blank (all white or transparent).
+ * Returns false if the canvas context does not implement getImageData (e.g. lightweight test mocks).
+ */
+export const isCanvasPageBlank = (canvas, ctx = null) => {
+    if (!canvas) return true;
+    const width = Number(canvas.width) || 0;
+    const height = Number(canvas.height) || 0;
+    if (width <= 0 || height <= 0) return true;
+
+    const context =
+        ctx || (typeof canvas.getContext === 'function' ? canvas.getContext('2d') : null);
+    if (!context || typeof context.getImageData !== 'function') {
+        return false;
+    }
+
+    try {
+        const imgData = context.getImageData(0, 0, width, height);
+        const data = imgData && imgData.data;
+        if (!data || typeof data.length !== 'number' || data.length < 4) {
+            return false;
+        }
+
+        const totalPixels = Math.floor(data.length / 4);
+        const rawStride = Math.max(1, Math.floor(totalPixels / 65000));
+        const pixelStride = computeCoprimeStride(rawStride, width);
+        const byteStep = pixelStride * 4;
+
+        for (let i = 0; i < data.length; i += byteStep) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+            const a = data[i + 3];
+            if (a > 12 && (r < 250 || g < 250 || b < 250)) {
+                return false;
+            }
+        }
+        return true;
+    } catch {
+        return false;
+    }
+};
+
+/**
+ * Dynamically loads pdfjs-dist (preferring the polyfilled legacy build) and configures its worker.
  */
 let cachedPdfJsPromise = null;
 const getPdfJs = async () => {
+    ensurePdfPolyfills();
     if (!cachedPdfJsPromise) {
-        cachedPdfJsPromise = import('pdfjs-dist').then((mod) => {
+        cachedPdfJsPromise = import('pdfjs-dist/legacy/build/pdf.mjs').then((mod) => {
             const pdfjsLib = mod.default || mod;
-            if (typeof window !== 'undefined' && 'Worker' in window && pdfjsLib.GlobalWorkerOptions) {
-                const currentWorker = String(pdfjsLib.GlobalWorkerOptions.workerSrc || '');
-                if (!currentWorker || currentWorker.includes('cdnjs.cloudflare.com')) {
-                    const ver = pdfjsLib.version || '6.2.108';
-                    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${ver}/build/pdf.worker.min.mjs`;
-                }
+            if (typeof window !== 'undefined' && 'Worker' in window) {
+                ensurePdfWorker(pdfjsLib);
+            }
+            return pdfjsLib;
+        });
+    } else {
+        cachedPdfJsPromise = cachedPdfJsPromise.then((pdfjsLib) => {
+            if (typeof window !== 'undefined' && 'Worker' in window) {
+                ensurePdfWorker(pdfjsLib);
             }
             return pdfjsLib;
         });
@@ -1606,8 +1969,84 @@ const getPdfJs = async () => {
     return cachedPdfJsPromise;
 };
 
+const splitExtractedTextIntoParagraphs = (rawText = '', maxParagraphs = 4) => {
+    const clean = String(rawText || '').replace(/\s+/g, ' ').trim();
+    if (!clean) return [];
+    const sentences = clean.split(/(?<=[.!?])\s+/);
+    const paragraphs = [];
+    let current = '';
+
+    for (const sentence of sentences) {
+        if (!sentence) continue;
+        if ((current + ' ' + sentence).trim().length <= 240) {
+            current = (current + ' ' + sentence).trim();
+        } else {
+            if (current) paragraphs.push(current);
+            current = sentence.slice(0, 240);
+            if (paragraphs.length >= maxParagraphs) break;
+        }
+    }
+    if (current && paragraphs.length < maxParagraphs) {
+        paragraphs.push(current);
+    }
+    return paragraphs.slice(0, maxParagraphs);
+};
+
+const decodeDataUrlToBytes = (dataUrl = '') => {
+    const raw = String(dataUrl || '').trim();
+    if (!raw.startsWith('data:')) return null;
+    const commaIdx = raw.indexOf(',');
+    if (commaIdx < 0) return null;
+    const header = raw.slice(0, commaIdx).toLowerCase();
+    const payload = raw.slice(commaIdx + 1);
+    try {
+        if (header.includes(';base64')) {
+            const cleanBase64 = payload.replace(/\s+/g, '');
+            if (typeof atob === 'function') {
+                const binary = atob(cleanBase64);
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) {
+                    bytes[i] = binary.charCodeAt(i) & 0xff;
+                }
+                return bytes;
+            }
+            if (typeof globalThis.Buffer !== 'undefined') {
+                return new Uint8Array(globalThis.Buffer.from(cleanBase64, 'base64'));
+            }
+        } else {
+            const decodedText = decodeURIComponent(payload);
+            return new TextEncoder().encode(decodedText);
+        }
+    } catch {
+        return null;
+    }
+    return null;
+};
+
+const buildAllVisibleOptionalContentPromise = (pdfDoc) => {
+    if (!pdfDoc || typeof pdfDoc.getOptionalContentConfig !== 'function') {
+        return undefined;
+    }
+    return pdfDoc
+        .getOptionalContentConfig({ intent: 'any' })
+        .then((ocConfig) => {
+            if (
+                ocConfig &&
+                typeof ocConfig.setVisibility === 'function' &&
+                typeof ocConfig[Symbol.iterator] === 'function'
+            ) {
+                for (const [id] of ocConfig) {
+                    ocConfig.setVisibility(id, true, false);
+                }
+            }
+            return ocConfig;
+        })
+        .catch(() => undefined);
+};
+
 /**
- * Renders a PDF (File, Blob, ArrayBuffer, or URL) into an array of lightly compressed JPEG page data URLs.
+ * Renders a PDF (File, Blob, ArrayBuffer, data: URL, blob: URL, or https: URL)
+ * into an array of lightly compressed JPEG page data URLs.
  */
 export const renderPdfToBookPages = async (
     source,
@@ -1618,6 +2057,9 @@ export const renderPdfToBookPages = async (
         quality = 0.80,
         compressionLevel = 'light',
         customCoverUrl = '',
+        fallbackTitle = 'Libro',
+        themeId = 'royal-indigo',
+        pdfjsLib: customPdfJsLib = null,
         onProgress
     } = {}
 ) => {
@@ -1625,13 +2067,49 @@ export const renderPdfToBookPages = async (
         throw new Error('renderPdfToBookPages requires a browser DOM environment.');
     }
 
-    const pdfjsLib = await getPdfJs();
+    const pdfjsLib = customPdfJsLib || (await getPdfJs());
     let docParams = null;
     let rawBytes = null;
     let sourceSizeBytes = Number(source?.size || source?.byteLength || 0);
+    const inferredTitle =
+        stripBookHtml(fallbackTitle || source?.name?.replace(/\.pdf$/i, '') || 'Libro') || 'Libro';
+
+    const resolveUrlOrDataString = async (urlStr) => {
+        const cleanUrl = String(urlStr || '').trim();
+        if (!cleanUrl) return;
+        if (cleanUrl.startsWith('data:')) {
+            const decoded = decodeDataUrlToBytes(cleanUrl);
+            if (decoded && decoded.byteLength > 0) {
+                rawBytes = decoded;
+                sourceSizeBytes = decoded.byteLength;
+                return;
+            }
+        }
+        if (typeof fetch === 'function' && /^(blob:|https?:)/i.test(cleanUrl)) {
+            try {
+                const res = await fetch(cleanUrl);
+                if (res && res.ok && typeof res.arrayBuffer === 'function') {
+                    const buf = await res.arrayBuffer();
+                    if (buf && buf.byteLength > 0) {
+                        rawBytes = new Uint8Array(buf);
+                        sourceSizeBytes = rawBytes.byteLength;
+                        return;
+                    }
+                }
+            } catch {
+                // Fall back to direct PDF.js URL streaming with Range disabled
+            }
+        }
+        docParams = {
+            url: cleanUrl,
+            withCredentials: false,
+            disableRange: true,
+            disableStream: true
+        };
+    };
 
     if (typeof source === 'string') {
-        docParams = { url: source, withCredentials: false };
+        await resolveUrlOrDataString(source);
     } else if (source instanceof ArrayBuffer) {
         rawBytes = new Uint8Array(source.slice(0));
         sourceSizeBytes = rawBytes.byteLength;
@@ -1643,121 +2121,287 @@ export const renderPdfToBookPages = async (
         rawBytes = new Uint8Array(buffer);
         sourceSizeBytes = rawBytes.byteLength;
     } else if (source && source.url) {
-        docParams = { url: source.url, withCredentials: false };
+        await resolveUrlOrDataString(source.url);
     } else {
         throw new Error('Fuente PDF no válida para generar el libro.');
     }
 
-    const buildAttemptParams = (extra = {}) => {
-        if (rawBytes) {
-            return { data: rawBytes.slice(), useSystemFonts: true, isEvalSupported: false, ...extra };
-        }
-        return { ...docParams, useSystemFonts: true, isEvalSupported: false, ...extra };
-    };
+    if (!rawBytes && !docParams) {
+        throw new Error('Fuente PDF vacía o no válida para generar el libro.');
+    }
 
+    const baseSourceParams = rawBytes ? { data: rawBytes } : docParams;
+    const buildAttemptParams = (extra = {}) =>
+        buildPdfDocumentInitParams(baseSourceParams, pdfjsLib, extra);
+
+    const ver = pdfjsLib.version || '6.2.108';
     let pdf = null;
+    let compatPdf = null;
+
     try {
         const loadingTask = pdfjsLib.getDocument(buildAttemptParams());
         pdf = await loadingTask.promise;
     } catch (firstErr) {
-        // Fallback CDN worker if initial worker URL failed
-        if (pdfjsLib.GlobalWorkerOptions) {
-            pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version || '6.2.108'}/build/pdf.worker.min.mjs`;
-        }
-        const retryTask = pdfjsLib.getDocument(buildAttemptParams({ disableAutoFetch: true }));
-        pdf = await retryTask.promise || (() => { throw firstErr; })();
-    }
-
-    const originalPageCount = pdf.numPages || 1;
-    const totalPages = Math.min(originalPageCount, Math.max(1, maxPages));
-    const compressionProfile = computeSmartPdfCompressionProfile({
-        fileSizeBytes: sourceSizeBytes,
-        pageCount: totalPages,
-        scale,
-        maxDimension,
-        quality,
-        compressionLevel
-    });
-
-    const pages = [];
-    const pageTexts = [];
-    let aspectRatio = DEFAULT_BOOK_ASPECT_RATIO;
-
-    for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-        const page = await pdf.getPage(pageNum);
-        const baseViewport = page.getViewport({ scale: 1 });
-        if (pageNum === 1 && baseViewport.width > 0 && baseViewport.height > 0) {
-            aspectRatio = Number((baseViewport.width / baseViewport.height).toFixed(3));
-        }
-
-        const targetScale = compressionProfile.scale;
-        const targetMaxDim = compressionProfile.maxDimension;
-        const longestSide = Math.max(baseViewport.width * targetScale, baseViewport.height * targetScale);
-        const effectiveScale = longestSide > targetMaxDim
-            ? (targetMaxDim / Math.max(baseViewport.width, baseViewport.height))
-            : targetScale;
-
-        const viewport = page.getViewport({ scale: effectiveScale });
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.max(1, Math.round(viewport.width));
-        canvas.height = Math.max(1, Math.round(viewport.height));
-
-        const ctx = canvas.getContext('2d', { alpha: false });
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-
-        await page.render({
-            canvasContext: ctx,
-            viewport
-        }).promise;
-
-        let dataUrl = canvas.toDataURL('image/jpeg', compressionProfile.quality);
-        // Gentle adaptive step-down if a single page has very heavy dense imagery
-        if (
-            dataUrl.length > compressionProfile.maxPageChars &&
-            compressionProfile.adaptiveStepDownQuality < compressionProfile.quality
-        ) {
-            dataUrl = canvas.toDataURL('image/jpeg', compressionProfile.adaptiveStepDownQuality);
-        }
-        pages.push(dataUrl);
-
+        await ensurePdfInProcessWorkerFallback(pdfjsLib);
         try {
-            const textContent = await page.getTextContent();
-            const snippet = (textContent?.items || [])
-                .map((it) => it.str || '')
-                .join(' ')
-                .replace(/\s+/g, ' ')
-                .trim()
-                .slice(0, 320);
-            pageTexts.push(snippet);
+            if (pdfjsLib.GlobalWorkerOptions) {
+                pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${ver}/legacy/build/pdf.worker.min.mjs`;
+            }
+            const jsDelivrTask = pdfjsLib.getDocument(buildAttemptParams({ disableAutoFetch: true }));
+            pdf = await jsDelivrTask.promise;
         } catch {
-            pageTexts.push('');
-        }
-
-        if (typeof onProgress === 'function') {
-            onProgress({
-                phase: 'render',
-                currentPage: pageNum,
-                totalPages,
-                percent: Math.round((pageNum / totalPages) * 100)
-            });
+            if (pdfjsLib.GlobalWorkerOptions) {
+                pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${ver}/legacy/build/pdf.worker.min.mjs`;
+            }
+            const unpkgTask = pdfjsLib.getDocument(
+                buildAttemptParams({
+                    disableAutoFetch: true,
+                    disableFontFace: true,
+                    useSystemFonts: false,
+                    isOffscreenCanvasSupported: false,
+                    isImageDecoderSupported: false
+                })
+            );
+            pdf = (await unpkgTask.promise) || (() => { throw firstErr; })();
         }
     }
 
-    const finalPages = customCoverUrl ? applyCustomCoverToPages(pages, customCoverUrl) : pages;
+    try {
+        const originalPageCount = pdf.numPages || 1;
+        const totalPages = Math.min(originalPageCount, Math.max(1, maxPages));
+        const compressionProfile = computeSmartPdfCompressionProfile({
+            fileSizeBytes: sourceSizeBytes,
+            pageCount: totalPages,
+            scale,
+            maxDimension,
+            quality,
+            compressionLevel
+        });
 
-    return {
-        pages: finalPages,
-        rawPdfPages: pages,
-        pageTexts,
-        pageCount: finalPages.length,
-        originalPageCount,
-        aspectRatio,
-        coverUrl: finalPages[0] || '',
-        compressionProfile
-    };
+        const pages = [];
+        const pageTexts = [];
+        let aspectRatio = DEFAULT_BOOK_ASPECT_RATIO;
+        let allLayersVisiblePromise = null;
+
+        for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+            const page = await pdf.getPage(pageNum);
+            const baseViewport = page.getViewport({ scale: 1 });
+            if (pageNum === 1 && baseViewport.width > 0 && baseViewport.height > 0) {
+                aspectRatio = Number((baseViewport.width / baseViewport.height).toFixed(3));
+            }
+
+            let fullPageText = '';
+            try {
+                const textContent = await page.getTextContent();
+                fullPageText = (textContent?.items || [])
+                    .map((it) => it.str || '')
+                    .join(' ')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+                pageTexts.push(fullPageText.slice(0, 320));
+            } catch {
+                pageTexts.push('');
+            }
+
+            const targetScale = compressionProfile.scale;
+            const targetMaxDim = compressionProfile.maxDimension;
+            const longestSide = Math.max(baseViewport.width * targetScale, baseViewport.height * targetScale);
+            const effectiveScale = longestSide > targetMaxDim
+                ? (targetMaxDim / Math.max(baseViewport.width, baseViewport.height))
+                : targetScale;
+
+            const viewport = page.getViewport({ scale: effectiveScale });
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(viewport.width));
+            canvas.height = Math.max(1, Math.round(viewport.height));
+
+            const ctx =
+                canvas.getContext('2d', { alpha: false, willReadFrequently: true }) ||
+                canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+
+            let renderSucceeded = false;
+            try {
+                await page.render({
+                    canvas: null,
+                    canvasContext: ctx,
+                    viewport,
+                    background: '#ffffff'
+                }).promise;
+                renderSucceeded = true;
+            } catch {
+                renderSucceeded = false;
+            }
+
+            let pageIsBlank = !renderSucceeded || isCanvasPageBlank(canvas, ctx);
+
+            // Stage 2: Retry with 'any' rendering intent + ENABLE_FORMS + all Optional Content Groups forced visible
+            if (pageIsBlank) {
+                try {
+                    if (!allLayersVisiblePromise) {
+                        allLayersVisiblePromise = buildAllVisibleOptionalContentPromise(pdf);
+                    }
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    await page.render({
+                        canvas: null,
+                        canvasContext: ctx,
+                        viewport,
+                        intent: 'any',
+                        annotationMode: 2,
+                        optionalContentConfigPromise: allLayersVisiblePromise,
+                        background: '#ffffff'
+                    }).promise;
+                    pageIsBlank = isCanvasPageBlank(canvas, ctx);
+                } catch {
+                    // Proceed to Stage 3 compatibility render
+                }
+            }
+
+            // Stage 3: Retry with FontFace/OffscreenCanvas/ImageDecoder disabled & useSystemFonts: false
+            // while keeping WASM enabled so JPEG2000/JBIG2 scanned images and vector glyph paths render directly
+            if (pageIsBlank) {
+                try {
+                    if (!compatPdf) {
+                        const compatTask = pdfjsLib.getDocument(
+                            buildAttemptParams({
+                                disableFontFace: true,
+                                useSystemFonts: false,
+                                isOffscreenCanvasSupported: false,
+                                isImageDecoderSupported: false,
+                                useWasm: true,
+                                useWorkerFetch: false
+                            })
+                        );
+                        compatPdf = await compatTask.promise;
+                    }
+                    if (compatPdf) {
+                        const compatPage = await compatPdf.getPage(pageNum);
+                        const compatViewport = compatPage.getViewport({ scale: effectiveScale });
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        await compatPage.render({
+                            canvas: null,
+                            canvasContext: ctx,
+                            viewport: compatViewport,
+                            intent: 'print',
+                            annotationMode: 2,
+                            background: '#ffffff'
+                        }).promise;
+                        pageIsBlank = isCanvasPageBlank(canvas, ctx);
+                        try {
+                            compatPage.cleanup?.();
+                        } catch {
+                            // Ignore cleanup errors
+                        }
+                    }
+                } catch {
+                    // Proceed to Stage 4 SVG synthesis
+                }
+            }
+
+            let dataUrl = '';
+            const extractedParagraphs = splitExtractedTextIntoParagraphs(fullPageText, 4);
+
+            // Stage 4: If canvas is still completely blank after all 3 canvas stages, ALWAYS synthesize a visible SVG page
+            if (pageIsBlank) {
+                const fallbackBody =
+                    extractedParagraphs.length > 0
+                        ? pageNum === 1 && extractedParagraphs.length > 1
+                            ? extractedParagraphs.slice(1)
+                            : extractedParagraphs
+                        : [
+                              `Vista interactiva de la página ${pageNum} de ${totalPages} (${inferredTitle}).`,
+                              'Usa el botón PDF en la barra superior para consultar el documento original de alta resolución.'
+                          ];
+                dataUrl = buildIllustratedBookPageSvg({
+                    variant: pageNum === 1 ? 'cover' : 'content',
+                    chapter: `PÁGINA ${pageNum}`,
+                    title: pageNum === 1 ? inferredTitle : `${inferredTitle} — Página ${pageNum}`,
+                    subtitle:
+                        pageNum === 1 && extractedParagraphs.length > 0
+                            ? (extractedParagraphs[0] || '').slice(0, 110)
+                            : '',
+                    body: fallbackBody,
+                    pageNumber: pageNum,
+                    totalPages,
+                    themeId
+                });
+            } else {
+                dataUrl = canvas.toDataURL('image/jpeg', compressionProfile.quality);
+                // Gentle adaptive step-down if a single page has very heavy dense imagery
+                if (
+                    dataUrl &&
+                    dataUrl.length > compressionProfile.maxPageChars &&
+                    compressionProfile.adaptiveStepDownQuality < compressionProfile.quality
+                ) {
+                    dataUrl = canvas.toDataURL('image/jpeg', compressionProfile.adaptiveStepDownQuality);
+                }
+                if (!dataUrl || dataUrl === 'data:,' || dataUrl.length < 32) {
+                    dataUrl = buildIllustratedBookPageSvg({
+                        variant: pageNum === 1 ? 'cover' : 'content',
+                        chapter: `PÁGINA ${pageNum}`,
+                        title: pageNum === 1 ? inferredTitle : `${inferredTitle} — Página ${pageNum}`,
+                        subtitle: '',
+                        body:
+                            extractedParagraphs.length > 0
+                                ? extractedParagraphs
+                                : [`Contenido de la página ${pageNum}.`],
+                        pageNumber: pageNum,
+                        totalPages,
+                        themeId
+                    });
+                }
+            }
+
+            pages.push(dataUrl);
+
+            // Release page operator lists and temporary canvas backing store to prevent GPU memory exhaustion
+            try {
+                page.cleanup?.();
+            } catch {
+                // Ignore cleanup errors
+            }
+            canvas.width = 0;
+            canvas.height = 0;
+
+            if (typeof onProgress === 'function') {
+                onProgress({
+                    phase: 'render',
+                    currentPage: pageNum,
+                    totalPages,
+                    percent: Math.round((pageNum / totalPages) * 100)
+                });
+            }
+        }
+
+        const finalPages = customCoverUrl ? applyCustomCoverToPages(pages, customCoverUrl) : pages;
+
+        return {
+            pages: finalPages,
+            rawPdfPages: pages,
+            pageTexts,
+            pageCount: finalPages.length,
+            originalPageCount,
+            aspectRatio,
+            coverUrl: finalPages[0] || '',
+            compressionProfile
+        };
+    } finally {
+        try {
+            await compatPdf?.destroy?.();
+        } catch {
+            // Ignore destroy errors
+        }
+        try {
+            await pdf?.destroy?.();
+        } catch {
+            // Ignore destroy errors
+        }
+    }
 };
 
 /**
@@ -1767,40 +2411,97 @@ export const renderPdfToBookPages = async (
 export const uploadBookPagesToStorage = async (
     pages = [],
     uploadImageFn,
-    { isDemoMode = false, folder = 'books', onProgress } = {}
+    { isDemoMode = false, folder = 'books', concurrency = 4, onProgress } = {}
 ) => {
     if (!Array.isArray(pages) || pages.length === 0) return [];
     if (isDemoMode || typeof uploadImageFn !== 'function') {
         return [...pages];
     }
 
-    const uploaded = [];
     const total = pages.length;
+    const uploaded = new Array(total);
+    const batchSize = Math.max(1, Math.min(8, Number(concurrency) || 4));
+    let completedCount = 0;
 
-    for (let i = 0; i < total; i++) {
-        const pageUrl = pages[i];
-        if (typeof pageUrl === 'string' && pageUrl.startsWith('data:image/') && !pageUrl.startsWith('data:image/svg+xml')) {
-            try {
-                const remoteUrl = await uploadImageFn(pageUrl, folder);
-                uploaded.push(remoteUrl || pageUrl);
-            } catch {
-                uploaded.push(pageUrl);
-            }
-        } else {
-            uploaded.push(pageUrl);
+    for (let start = 0; start < total; start += batchSize) {
+        const end = Math.min(total, start + batchSize);
+        const batchIndices = [];
+        for (let idx = start; idx < end; idx++) {
+            batchIndices.push(idx);
         }
 
-        if (typeof onProgress === 'function') {
-            onProgress({
-                phase: 'upload',
-                currentPage: i + 1,
-                totalPages: total,
-                percent: Math.round(((i + 1) / total) * 100)
-            });
-        }
+        await Promise.all(
+            batchIndices.map(async (i) => {
+                const pageUrl = pages[i];
+                if (
+                    typeof pageUrl === 'string' &&
+                    pageUrl.startsWith('data:image/') &&
+                    !pageUrl.startsWith('data:image/svg+xml')
+                ) {
+                    let remoteUrl = null;
+                    try {
+                        remoteUrl = await uploadImageFn(pageUrl, folder);
+                    } catch {
+                        try {
+                            remoteUrl = await uploadImageFn(pageUrl, folder);
+                        } catch {
+                            remoteUrl = null;
+                        }
+                    }
+                    uploaded[i] = remoteUrl || pageUrl;
+                } else {
+                    uploaded[i] = pageUrl;
+                }
+
+                completedCount += 1;
+                if (typeof onProgress === 'function') {
+                    onProgress({
+                        phase: 'upload',
+                        currentPage: completedCount,
+                        totalPages: total,
+                        percent: Math.round((completedCount / total) * 100)
+                    });
+                }
+            })
+        );
     }
 
     return uploaded;
+};
+
+/**
+ * Detects whether a book page URL is a compacted Firestore overflow placeholder or generic fallback SVG.
+ */
+export const isCompactedOrFallbackBookPage = (pageUrl = '') => {
+    if (typeof pageUrl !== 'string' || !pageUrl.trim()) return true;
+    if (!pageUrl.startsWith('data:image/svg+xml')) return false;
+    try {
+        const commaIdx = pageUrl.indexOf(',');
+        const payload = commaIdx >= 0 ? pageUrl.slice(commaIdx + 1) : pageUrl;
+        const decoded = decodeURIComponent(payload);
+        return (
+            decoded.includes('Usa el botón PDF para abrir el documento completo') ||
+            decoded.includes('VISTA PREVIA INTERACTIVA') ||
+            decoded.includes('ARCHIVO PDF VINCULADO')
+        );
+    } catch {
+        return false;
+    }
+};
+
+/**
+ * Determines whether a book record should render its pages live from pdfUrl
+ * (e.g. when bookPages is empty, truncated, or contains compacted placeholder SVGs).
+ */
+export const bookPagesNeedLivePdfRender = (
+    pages = [],
+    { pdfUrl = '', expectedPageCount = 0 } = {}
+) => {
+    if (!pdfUrl || typeof pdfUrl !== 'string' || !pdfUrl.trim()) return false;
+    if (!Array.isArray(pages) || pages.length === 0) return true;
+    const expected = Number(expectedPageCount) || 0;
+    if (expected > pages.length) return true;
+    return pages.some((p) => isCompactedOrFallbackBookPage(p));
 };
 
 /**
@@ -1813,6 +2514,7 @@ export const compactBookPagesForFirestore = (
         fallbackTitle = 'Libro',
         themeId = 'royal-indigo',
         bookOutline = [],
+        pageTexts = [],
         author = 'Docente'
     } = {}
 ) => {
@@ -1837,7 +2539,9 @@ export const compactBookPagesForFirestore = (
             result.push(raw);
         } else {
             const outlineSpec = Array.isArray(bookOutline) && bookOutline[i] ? bookOutline[i] : null;
-            // Replace overflow inline base64 page with a lightweight SVG page (~2KB) preserving outline text if available
+            const rawPageText = Array.isArray(pageTexts) && pageTexts[i] ? String(pageTexts[i]).trim() : '';
+            const extractedLines = splitExtractedTextIntoParagraphs(rawPageText, 3);
+            // Replace overflow inline base64 page with a lightweight SVG page (~2KB) preserving outline or extracted PDF text if available
             const compactSvg = outlineSpec
                 ? buildIllustratedBookPageSvg({
                       ...outlineSpec,
@@ -1853,7 +2557,10 @@ export const compactBookPagesForFirestore = (
                       chapter: 'CONTENIDO',
                       title: `${fallbackTitle} — Página ${i + 1}`,
                       subtitle: '',
-                      body: ['Usa el botón PDF para abrir el documento completo.'],
+                      body:
+                          extractedLines.length > 0
+                              ? [...extractedLines, 'Usa el botón PDF para abrir el documento completo.']
+                              : ['Usa el botón PDF para abrir el documento completo.'],
                       pageNumber: i + 1,
                       totalPages: pages.length,
                       themeId
@@ -1931,11 +2638,14 @@ export const sanitizeBookForFirestore = (book = {}) => {
         ? applyCustomCoverToPages(baseSourcePages, customCoverUrl)
         : baseSourcePages;
 
+    const rawPageTexts = Array.isArray(book.pageTexts) ? book.pageTexts : [];
+
     const finalPages = compactBookPagesForFirestore(pagesWithCover, {
         maxTotalChars: pagesBudget,
         fallbackTitle: title,
         themeId: theme,
         bookOutline: rawOutline,
+        pageTexts: rawPageTexts,
         author: authorName
     });
 
@@ -1962,8 +2672,8 @@ export const sanitizeBookForFirestore = (book = {}) => {
             ? finalPages[0]
             : resolvedCover;
 
-    const pageTexts = Array.isArray(book.pageTexts) && book.pageTexts.length > 0
-        ? book.pageTexts.slice(0, finalPages.length).map((t) => String(t || '').slice(0, 320))
+    const pageTexts = rawPageTexts.length > 0
+        ? rawPageTexts.slice(0, Math.max(finalPages.length, rawPageTexts.length)).map((t) => String(t || '').slice(0, 320))
         : bookOutline.length > 0
             ? extractBookOutlinePageTexts(bookOutline).slice(0, finalPages.length)
             : [];
@@ -1979,7 +2689,7 @@ export const sanitizeBookForFirestore = (book = {}) => {
         pageTexts,
         bookOutline,
         coverUrl,
-        pageCount: Number(book.pageCount) || finalPages.length,
+        pageCount: Math.max(finalPages.length, Number(book.pageCount) || 0),
         pdfUrl: book.pdfUrl || book.fileUrl || '',
         fileUrl: book.fileUrl || book.pdfUrl || '',
         fileName: book.fileName || '',
@@ -2041,7 +2751,7 @@ export const normalizeBookRecord = (item = {}) => {
         pageTexts: Array.isArray(item.pageTexts) ? item.pageTexts : [],
         bookOutline,
         coverUrl: customCoverUrl || pages[0] || item.coverUrl || '',
-        pageCount: pages.length || Number(item.pageCount) || 0,
+        pageCount: Math.max(pages.length, Number(item.pageCount) || 0),
         pdfUrl,
         fileUrl: item.fileUrl || pdfUrl,
         fileName: item.fileName || '',

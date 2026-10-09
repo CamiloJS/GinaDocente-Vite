@@ -31,6 +31,9 @@ import {
     playPageFlipSound,
     renderPdfToBookPages,
     buildFallbackBookPages,
+    buildIllustratedBookPageSvg,
+    isCompactedOrFallbackBookPage,
+    bookPagesNeedLivePdfRender,
     extractSvgExternalImageOverlay,
     resolveBookReaderUserKey,
     loadUserBookBookmarks,
@@ -106,27 +109,36 @@ export default function Flipbook3DModal({
             ? normalizedBook.bookPages
             : [];
 
+        const shouldRenderFromPdf = bookPagesNeedLivePdfRender(preRendered, {
+            pdfUrl: normalizedBook.pdfUrl,
+            expectedPageCount: normalizedBook.pageCount
+        });
+
         if (preRendered.length > 0) {
             setPages(preRendered);
-            setLoadingPdf(false);
             setCorsFallbackNotice(false);
-            return () => {
-                cancelled = true;
-            };
+            if (!shouldRenderFromPdf) {
+                setLoadingPdf(false);
+                return () => {
+                    cancelled = true;
+                };
+            }
         }
 
         if (normalizedBook.pdfUrl) {
-            setLoadingPdf(true);
+            setLoadingPdf(preRendered.length === 0);
             setCorsFallbackNotice(false);
             setRenderProgress({ currentPage: 0, totalPages: 0, percent: 8 });
 
             renderPdfToBookPages(normalizedBook.pdfUrl, {
-                maxPages: 50,
+                maxPages: 60,
                 scale: 1.55,
                 maxDimension: 1320,
                 quality: 0.80,
                 compressionLevel: 'light',
                 customCoverUrl: normalizedBook.customCoverUrl || '',
+                fallbackTitle: normalizedBook.title,
+                themeId: normalizedBook.theme,
                 onProgress: (prog) => {
                     if (!cancelled) setRenderProgress(prog);
                 }
@@ -134,8 +146,15 @@ export default function Flipbook3DModal({
                 .then((res) => {
                     if (cancelled) return;
                     if (Array.isArray(res?.pages) && res.pages.length > 0) {
-                        setPages(res.pages);
-                    } else {
+                        const mergedPages = res.pages.map((livePage, idx) => {
+                            const existingPage = preRendered[idx];
+                            if (existingPage && !isCompactedOrFallbackBookPage(existingPage)) {
+                                return existingPage;
+                            }
+                            return livePage;
+                        });
+                        setPages(mergedPages);
+                    } else if (preRendered.length === 0) {
                         setCorsFallbackNotice(true);
                         setPages(
                             buildFallbackBookPages({
@@ -152,17 +171,19 @@ export default function Flipbook3DModal({
                 })
                 .catch(() => {
                     if (cancelled) return;
-                    setCorsFallbackNotice(true);
-                    setPages(
-                        buildFallbackBookPages({
-                            title: normalizedBook.title,
-                            description: normalizedBook.description,
-                            fileName: normalizedBook.fileName,
-                            author: normalizedBook.authorName || 'Docente',
-                            themeId: normalizedBook.theme,
-                            customCoverUrl: normalizedBook.customCoverUrl || ''
-                        })
-                    );
+                    if (preRendered.length === 0) {
+                        setCorsFallbackNotice(true);
+                        setPages(
+                            buildFallbackBookPages({
+                                title: normalizedBook.title,
+                                description: normalizedBook.description,
+                                fileName: normalizedBook.fileName,
+                                author: normalizedBook.authorName || 'Docente',
+                                themeId: normalizedBook.theme,
+                                customCoverUrl: normalizedBook.customCoverUrl || ''
+                            })
+                        );
+                    }
                     setLoadingPdf(false);
                 });
         } else {
@@ -186,6 +207,7 @@ export default function Flipbook3DModal({
         normalizedBook.id,
         normalizedBook.pdfUrl,
         normalizedBook.bookPages,
+        normalizedBook.pageCount,
         normalizedBook.title,
         normalizedBook.description,
         normalizedBook.fileName,
@@ -691,6 +713,27 @@ export default function Flipbook3DModal({
                     src={pageSrc}
                     alt={`${normalizedBook.title} - Página ${pageIdx + 1}`}
                     draggable={false}
+                    onError={(e) => {
+                        const target = e.currentTarget;
+                        if (target.dataset.fallbackApplied === '1') return;
+                        target.dataset.fallbackApplied = '1';
+                        const rawSnippet = String(normalizedBook.pageTexts?.[pageIdx] || '').trim();
+                        target.src = buildIllustratedBookPageSvg({
+                            variant: pageIdx === 0 ? 'cover' : 'content',
+                            chapter: `PÁGINA ${pageIdx + 1}`,
+                            title:
+                                pageIdx === 0
+                                    ? normalizedBook.title
+                                    : `${normalizedBook.title} — Página ${pageIdx + 1}`,
+                            subtitle: '',
+                            body: rawSnippet
+                                ? [rawSnippet]
+                                : [`Vista de la página ${pageIdx + 1} de "${normalizedBook.title}".`],
+                            pageNumber: pageIdx + 1,
+                            totalPages: effectivePages.length,
+                            themeId: normalizedBook.theme
+                        });
+                    }}
                     className="w-full h-full object-contain pointer-events-none select-none"
                 />
                 {extImgOverlay && (

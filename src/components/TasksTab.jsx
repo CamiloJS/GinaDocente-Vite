@@ -260,6 +260,8 @@ const TasksTab = React.memo(({
                 scale: 1.6,
                 maxDimension: 1350,
                 quality: 0.82,
+                fallbackTitle: (taskTitle || '').trim() || file.name.replace(/\.pdf$/i, ''),
+                themeId: book3dTheme,
                 onProgress: (prog) => setBook3dProgress(prog)
             });
             if (Array.isArray(rendered?.pages) && rendered.pages.length > 0) {
@@ -1986,6 +1988,23 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                                     customCoverUrl: book3dCustomCover
                                                 });
                                                 pageTextsToPublish = extractBookOutlinePageTexts(outlineToPublish);
+                                            } else if (pagesToPublish.length === 0 && book3dPdfFile) {
+                                                try {
+                                                    const rendered = await renderPdfToBookPages(book3dPdfFile, {
+                                                        maxPages: 60,
+                                                        scale: 1.6,
+                                                        maxDimension: 1350,
+                                                        quality: 0.82,
+                                                        fallbackTitle: cleanTitle || book3dPdfFile.name.replace(/\.pdf$/i, ''),
+                                                        themeId: book3dTheme
+                                                    });
+                                                    if (Array.isArray(rendered?.pages) && rendered.pages.length > 0) {
+                                                        pagesToPublish = rendered.pages;
+                                                        pageTextsToPublish = rendered.pageTexts || [];
+                                                    }
+                                                } catch (renderErr) {
+                                                    console.warn('PDF render fallback during publish:', renderErr);
+                                                }
                                             }
 
                                             if (book3dCustomCover) {
@@ -2001,14 +2020,26 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                                 }
                                             );
                                             let uploadedPdfUrl = postFileUrl || '';
-                                            if (book3dPdfFile && !isDemoMode) {
-                                                try {
-                                                    const rawUrl = await uploadRawFileToStorage(book3dPdfFile, 'books');
-                                                    if (rawUrl) uploadedPdfUrl = rawUrl;
-                                                } catch (e) {
-                                                    console.warn("PDF raw upload fallback:", e);
+                                            let sessionBlobPdfUrl = '';
+                                            if (book3dPdfFile) {
+                                                if (!isDemoMode) {
+                                                    try {
+                                                        const rawUrl = await uploadRawFileToStorage(book3dPdfFile, 'books');
+                                                        if (rawUrl) uploadedPdfUrl = rawUrl;
+                                                    } catch (e) {
+                                                        console.warn("PDF raw upload fallback:", e);
+                                                    }
+                                                }
+                                                if (!uploadedPdfUrl && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+                                                    try {
+                                                        sessionBlobPdfUrl = URL.createObjectURL(book3dPdfFile);
+                                                    } catch {
+                                                        sessionBlobPdfUrl = '';
+                                                    }
                                                 }
                                             }
+                                            const persistedPdfUrl = uploadedPdfUrl || (isDemoMode ? sessionBlobPdfUrl : '');
+                                            const activeSessionPdfUrl = uploadedPdfUrl || sessionBlobPdfUrl || '';
                                             const finalBookTitle = cleanTitle || (book3dPdfFile?.name ? book3dPdfFile.name.replace(/\.pdf$/i, '') : 'Libro');
                                             const sanitizedBook = sanitizeBookForFirestore({
                                                 id: bookId,
@@ -2021,10 +2052,10 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                                 pageCount: uploadedPages.length,
                                                 customCoverUrl: book3dCustomCover ? uploadedPages[0] || book3dCustomCover : '',
                                                 coverUrl: uploadedPages[0] || '',
-                                                pdfUrl: uploadedPdfUrl,
-                                                fileUrl: uploadedPdfUrl,
-                                                fileName: book3dPdfFile?.name || (uploadedPdfUrl ? `${finalBookTitle}.pdf` : ''),
-                                                pdfFileName: book3dPdfFile?.name || (uploadedPdfUrl ? `${finalBookTitle}.pdf` : ''),
+                                                pdfUrl: persistedPdfUrl,
+                                                fileUrl: persistedPdfUrl,
+                                                fileName: book3dPdfFile?.name || ((persistedPdfUrl || activeSessionPdfUrl) ? `${finalBookTitle}.pdf` : ''),
+                                                pdfFileName: book3dPdfFile?.name || ((persistedPdfUrl || activeSessionPdfUrl) ? `${finalBookTitle}.pdf` : ''),
                                                 bookPages: uploadedPages,
                                                 pageTexts: pageTextsToPublish,
                                                 bookOutline: Array.isArray(outlineToPublish) && outlineToPublish.length > 0 ? outlineToPublish : [],
@@ -2039,6 +2070,15 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                                 updatedAt: Date.now(),
                                                 isDemoCreated: Boolean(isDemoMode)
                                             });
+
+                                            const inMemoryBook = {
+                                                ...sanitizedBook,
+                                                bookPages: uploadedPages.length > 0 ? uploadedPages : sanitizedBook.bookPages,
+                                                coverUrl: uploadedPages[0] || sanitizedBook.coverUrl,
+                                                pageCount: Math.max(uploadedPages.length, sanitizedBook.pageCount || 0),
+                                                pdfUrl: activeSessionPdfUrl || sanitizedBook.pdfUrl,
+                                                fileUrl: activeSessionPdfUrl || sanitizedBook.fileUrl
+                                            };
 
                                             const wallPostId = `book_wall_${bookId}`;
                                             const wallPostPayload = {
@@ -2076,23 +2116,32 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                                 isDemoCreated: Boolean(isDemoMode)
                                             };
 
+                                            const inMemoryWallPost = {
+                                                ...wallPostPayload,
+                                                bookPages: inMemoryBook.bookPages,
+                                                coverUrl: inMemoryBook.coverUrl,
+                                                pageCount: inMemoryBook.pageCount,
+                                                pdfUrl: inMemoryBook.pdfUrl,
+                                                fileUrl: inMemoryBook.fileUrl
+                                            };
+
                                             if (isDemoMode) {
                                                 const savedBook = saveDemoSandboxItem('books', sanitizedBook);
                                                 if (typeof setRawBooks === 'function') {
-                                                    setRawBooks(prev => [savedBook, ...(prev || []).filter(b => String(b.id) !== String(bookId))]);
+                                                    setRawBooks(prev => [{ ...savedBook, ...inMemoryBook }, ...(prev || []).filter(b => String(b.id) !== String(bookId))]);
                                                 }
                                                 const savedWall = saveDemoSandboxItem('tasks', wallPostPayload);
                                                 if (typeof setTasks === 'function') {
-                                                    setTasks(prev => [savedWall, ...(prev || []).filter(t => String(t.id) !== String(wallPostId))]);
+                                                    setTasks(prev => [{ ...savedWall, ...inMemoryWallPost }, ...(prev || []).filter(t => String(t.id) !== String(wallPostId))]);
                                                 }
                                             } else {
                                                 await withTimeout(setDoc(doc(effectiveDb, 'artifacts', effectiveAppId, 'public', 'data', 'books', bookId), sanitizedBook, { merge: true }));
                                                 await withTimeout(setDoc(doc(effectiveDb, 'artifacts', effectiveAppId, 'public', 'data', 'tasks', wallPostId), wallPostPayload, { merge: true }));
                                                 if (typeof setRawBooks === 'function') {
-                                                    setRawBooks(prev => [sanitizedBook, ...(prev || []).filter(b => String(b.id) !== String(bookId))]);
+                                                    setRawBooks(prev => [inMemoryBook, ...(prev || []).filter(b => String(b.id) !== String(bookId))]);
                                                 }
                                                 if (typeof setTasks === 'function') {
-                                                    setTasks(prev => [wallPostPayload, ...(prev || []).filter(t => String(t.id) !== String(wallPostId))]);
+                                                    setTasks(prev => [inMemoryWallPost, ...(prev || []).filter(t => String(t.id) !== String(wallPostId))]);
                                                 }
                                             }
 

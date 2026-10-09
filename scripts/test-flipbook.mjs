@@ -25,6 +25,13 @@ import {
   buildFallbackBookOutline,
   generateAiBookPages,
   computeSmartPdfCompressionProfile,
+  ensurePdfWorker,
+  ensurePdfInProcessWorkerFallback,
+  buildPdfDocumentInitParams,
+  isCanvasPageBlank,
+  renderPdfToBookPages,
+  isCompactedOrFallbackBookPage,
+  bookPagesNeedLivePdfRender,
   uploadBookPagesToStorage,
   compactBookPagesForFirestore,
   sanitizeBookForFirestore,
@@ -50,6 +57,7 @@ import {
   DEMO_TAB_INFO,
   DEMO_TEACHER_TAB_INFO
 } from '../src/utils/demoData.js';
+import { extractTextFromPDF } from '../src/utils/pdfExtractor.js';
 
 let okCount = 0;
 let failCount = 0;
@@ -1004,6 +1012,395 @@ check(
     serializedDupBook.length < 900000
 );
 
+console.log('\n== 14. Prevención de Páginas en Blanco al Subir Libros PDF (WASM/ICC/CMaps y Recuperación Multi-Etapa) ==');
+
+const mockPdfJsLegacyWorker = {
+  version: '6.2.108',
+  GlobalWorkerOptions: {
+    workerSrc: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs'
+  }
+};
+const resolvedWorkerUrl = ensurePdfWorker(mockPdfJsLegacyWorker);
+check(
+  'ensurePdfWorker corrige URLs obsoletas de cdnjs/4.10.38 hacia un worker compatible con pdfjs-dist@6.2.108',
+  typeof resolvedWorkerUrl === 'string' &&
+    resolvedWorkerUrl.includes('6.2.108') &&
+    !resolvedWorkerUrl.includes('cdnjs.cloudflare.com')
+);
+
+const sourceBytes = new Uint8Array([37, 80, 68, 70, 45, 49, 46, 55]);
+const docInitParams1 = buildPdfDocumentInitParams({ data: sourceBytes }, { version: '6.2.108' });
+const docInitParams2 = buildPdfDocumentInitParams(
+  { data: sourceBytes },
+  { version: '6.2.108' },
+  { disableFontFace: true, useSystemFonts: true, isOffscreenCanvasSupported: false }
+);
+check(
+  'buildPdfDocumentInitParams incluye cMapUrl, standardFontDataUrl, wasmUrl e iccUrl, clona data Uint8Array y fuerza useSystemFonts: false cuando disableFontFace: true (evitando crash en FontLoader.loadSystemFont)',
+  docInitParams1.cMapUrl.includes('6.2.108/cmaps/') &&
+    docInitParams1.cMapPacked === true &&
+    docInitParams1.standardFontDataUrl.includes('6.2.108/standard_fonts/') &&
+    docInitParams1.wasmUrl.includes('6.2.108/wasm/') &&
+    docInitParams1.iccUrl.includes('6.2.108/iccs/') &&
+    docInitParams1.useSystemFonts === true &&
+    docInitParams1.isEvalSupported === false &&
+    docInitParams1.stopAtErrors === false &&
+    docInitParams1.data instanceof Uint8Array &&
+    docInitParams1.data !== sourceBytes &&
+    docInitParams2.disableFontFace === true &&
+    docInitParams2.useSystemFonts === false &&
+    docInitParams2.isOffscreenCanvasSupported === false
+);
+
+// Blank canvas detector tests (including coprime stride anti-aliasing check on 1000x1300 canvas)
+const whitePixels = new Uint8ClampedArray(100 * 100 * 4);
+whitePixels.fill(255);
+const whiteCanvasMock = {
+  width: 100,
+  height: 100,
+  getContext: () => ({
+    getImageData: () => ({ data: whitePixels })
+  })
+};
+const drawnPixels = new Uint8ClampedArray(100 * 100 * 4);
+drawnPixels.fill(255);
+// Paint a single dark pixel in the middle of the page
+drawnPixels[2000] = 25;
+drawnPixels[2001] = 40;
+drawnPixels[2002] = 90;
+drawnPixels[2003] = 255;
+const drawnCanvasMock = {
+  width: 100,
+  height: 100,
+  getContext: () => ({
+    getImageData: () => ({ data: drawnPixels })
+  })
+};
+// 1000x1300 canvas where rawStride = floor(1300000 / 65000) = 20 divides width = 1000.
+// A vertical line at column x = 7 must still be detected thanks to coprime stride selection.
+const aliasedWidth = 1000;
+const aliasedHeight = 1300;
+const verticalLinePixels = new Uint8ClampedArray(aliasedWidth * aliasedHeight * 4);
+verticalLinePixels.fill(255);
+for (let y = 0; y < aliasedHeight; y++) {
+  const offset = (y * aliasedWidth + 7) * 4;
+  verticalLinePixels[offset] = 30;
+  verticalLinePixels[offset + 1] = 30;
+  verticalLinePixels[offset + 2] = 30;
+  verticalLinePixels[offset + 3] = 255;
+}
+const verticalLineCanvasMock = {
+  width: aliasedWidth,
+  height: aliasedHeight,
+  getContext: () => ({
+    getImageData: () => ({ data: verticalLinePixels })
+  })
+};
+check(
+  'isCanvasPageBlank detecta lienzos 100% blancos como en blanco (true), lienzos con trazos como válidos (false) y usa stride coprimo evitando aliasing vertical en anchos múltiplos de 20',
+  isCanvasPageBlank(whiteCanvasMock) === true &&
+    isCanvasPageBlank(drawnCanvasMock) === false &&
+    isCanvasPageBlank(verticalLineCanvasMock) === false &&
+    isCanvasPageBlank(null) === true &&
+    isCanvasPageBlank({ width: 0, height: 0 }) === true &&
+    isCanvasPageBlank({ width: 200, height: 200, getContext: () => ({}) }) === false
+);
+
+// Compacted / fallback page detection & live PDF render check (including normalizeBookRecord pageCount preservation)
+const compactedWithPageTexts = compactBookPagesForFirestore(
+  [
+    `data:image/jpeg;base64,${'A'.repeat(400000)}`,
+    `data:image/jpeg;base64,${'B'.repeat(400000)}`
+  ],
+  {
+    maxTotalChars: 450000,
+    fallbackTitle: 'International Finance',
+    pageTexts: [
+      'Cover text',
+      'Exchange rates and balance of payments determine currency stability in emerging markets.'
+    ]
+  }
+);
+check(
+  'compactBookPagesForFirestore preserva el texto extraído del PDF (pageTexts) dentro de las páginas SVG compactadas por límite de tamaño',
+  compactedWithPageTexts.length === 2 &&
+    compactedWithPageTexts[0].startsWith('data:image/jpeg') &&
+    compactedWithPageTexts[1].startsWith('data:image/svg+xml') &&
+    decodeURIComponent(compactedWithPageTexts[1]).includes('Exchange rates and balance of payments')
+);
+
+const normalizedTruncatedBook = normalizeBookRecord({
+  id: 'book_truncated',
+  title: 'Truncated Book',
+  bookPages: ['https://example.com/p1.jpg', 'https://example.com/p2.jpg'],
+  pageCount: 12,
+  pdfUrl: 'https://example.com/full.pdf'
+});
+check(
+  'bookPagesNeedLivePdfRender y normalizeBookRecord preservan pageCount real (> bookPages.length) y detectan cuándo renderizar páginas en vivo desde pdfUrl',
+  isCompactedOrFallbackBookPage(compactedWithPageTexts[1]) === true &&
+    isCompactedOrFallbackBookPage('https://storage.googleapis.com/books/page1.jpg') === false &&
+    isCompactedOrFallbackBookPage(DEMO_BOOKS[0].bookPages[1]) === false &&
+    normalizedTruncatedBook.pageCount === 12 &&
+    bookPagesNeedLivePdfRender(normalizedTruncatedBook.bookPages, {
+      pdfUrl: normalizedTruncatedBook.pdfUrl,
+      expectedPageCount: normalizedTruncatedBook.pageCount
+    }) === true &&
+    bookPagesNeedLivePdfRender([], { pdfUrl: 'https://example.com/book.pdf' }) === true &&
+    bookPagesNeedLivePdfRender(compactedWithPageTexts, { pdfUrl: 'https://example.com/book.pdf' }) === true &&
+    bookPagesNeedLivePdfRender(['https://example.com/p1.jpg'], {
+      pdfUrl: 'https://example.com/book.pdf',
+      expectedPageCount: 5
+    }) === true &&
+    bookPagesNeedLivePdfRender(
+      ['https://example.com/p1.jpg', 'https://example.com/p2.jpg'],
+      { pdfUrl: 'https://example.com/book.pdf', expectedPageCount: 2 }
+    ) === false &&
+    bookPagesNeedLivePdfRender([], { pdfUrl: '' }) === false
+);
+
+// Helper to construct a 100% valid PDF binary with exact xref byte offsets (0 PDF.js parser warnings)
+const buildValidPdfBytes = (pageStreams = []) => {
+  const objects = [];
+  const pageCount = pageStreams.length;
+  const firstPageObjId = 4;
+  const kidsRefs = Array.from({ length: pageCount }, (_, i) => `${firstPageObjId + i * 2} 0 R`).join(' ');
+  objects.push('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
+  objects.push(`2 0 obj\n<< /Type /Pages /Kids [${kidsRefs}] /Count ${pageCount} >>\nendobj\n`);
+  objects.push('3 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n');
+  pageStreams.forEach((streamText, idx) => {
+    const pageObjId = firstPageObjId + idx * 2;
+    const contentObjId = pageObjId + 1;
+    const resources = streamText ? ' /Resources << /Font << /F1 3 0 R >> >>' : '';
+    objects.push(
+      `${pageObjId} 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents ${contentObjId} 0 R${resources} >>\nendobj\n`
+    );
+    objects.push(
+      `${contentObjId} 0 obj\n<< /Length ${streamText.length} >>\nstream\n${streamText}\nendstream\nendobj\n`
+    );
+  });
+
+  let pdfStr = '%PDF-1.4\n';
+  const offsets = [0];
+  for (const objStr of objects) {
+    offsets.push(pdfStr.length);
+    pdfStr += objStr;
+  }
+  const xrefOffset = pdfStr.length;
+  pdfStr += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  for (let i = 1; i < offsets.length; i++) {
+    pdfStr += `${String(offsets[i]).padStart(10, '0')} 00000 n \n`;
+  }
+  pdfStr += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+  return new TextEncoder().encode(pdfStr);
+};
+
+// 3-page PDF:
+// - Page 1: Has text ("Macroeconomics Chapter One"). Stage 1 is simulated as blank, Stage 2 genuinely draws vector glyph paths via ctx.fill(path).
+// - Page 2: Has text ("Fiscal Policy and Interest Rates"). Canvas fails to paint across stages -> Stage 4 synthesizes readable SVG with the extracted text.
+// - Page 3: Scanned/empty-text page (""). Canvas stays blank across stages -> Stage 4 still synthesizes a visible SVG page instead of exporting a blank white JPEG.
+const minimalPdfBytes = buildValidPdfBytes([
+  'BT /F1 24 Tf 72 700 Td (Macroeconomics Chapter One) Tj ET',
+  'BT /F1 18 Tf 72 700 Td (Fiscal Policy and Interest Rates) Tj ET',
+  ''
+]);
+
+const fakeWorkerLoaded = await ensurePdfInProcessWorkerFallback({
+  PDFWorker: { _setupFakeWorkerGlobal: Promise.resolve(null) }
+});
+check(
+  'ensurePdfInProcessWorkerFallback carga pdf.worker.min.mjs en memoria (globalThis.pdfjsWorker.WorkerMessageHandler) para recuperación sin red ni errores MIME',
+  Boolean(fakeWorkerLoaded && globalThis.pdfjsWorker?.WorkerMessageHandler)
+);
+
+const prevDocument = globalThis.document;
+try {
+  let mainCanvasCount = 0;
+  let actualPage1GlyphFills = 0;
+  globalThis.document = {
+    baseURI: 'http://localhost:5173/',
+    createElement: (tag) => {
+      if (tag !== 'canvas') {
+        return {
+          style: {},
+          setAttribute: () => {},
+          getBoundingClientRect: () => ({ width: 10, height: 10 }),
+          remove: () => {}
+        };
+      }
+      let pageIndexForThisCanvas = 0;
+      let hasNonWhitePixels = false;
+      let fullClearCount = 0;
+      const canvasObj = {
+        width: 612,
+        height: 792,
+        toDataURL: () => `data:image/jpeg;base64,VALID_RENDERED_PAGE_${pageIndexForThisCanvas}`
+      };
+      const ctxObj = {
+        canvas: canvasObj,
+        fillStyle: '#ffffff',
+        strokeStyle: '#000000',
+        filter: 'none',
+        font: '12px sans-serif',
+        lineWidth: 1,
+        globalAlpha: 1,
+        globalCompositeOperation: 'source-over',
+        imageSmoothingEnabled: true,
+        imageSmoothingQuality: 'high',
+        save: () => {},
+        restore: () => {},
+        translate: () => {},
+        scale: () => {},
+        rotate: () => {},
+        transform: () => {},
+        setTransform: () => {},
+        resetTransform: () => {},
+        getTransform: () => ({
+          a: 1,
+          b: 0,
+          c: 0,
+          d: 1,
+          e: 0,
+          f: 0,
+          invertSelf() { return this; },
+          preMultiplySelf() { return this; },
+          multiplySelf() { return this; },
+          translate() { return this; },
+          scale() { return this; }
+        }),
+        beginPath: () => {},
+        closePath: () => {},
+        moveTo: () => {},
+        lineTo: () => {},
+        bezierCurveTo: () => {},
+        quadraticCurveTo: () => {},
+        arc: () => {},
+        rect: () => {},
+        clip: () => {},
+        setLineDash: () => {},
+        // ONLY real glyph/path drawing (fill / fillText) sets hasNonWhitePixels — NEVER background fillRect!
+        fill: (pathArg) => {
+          if (pageIndexForThisCanvas === 1 && Array.isArray(pathArg?.ops) && pathArg.ops.length > 0) {
+            actualPage1GlyphFills++;
+            // Simulate Stage 1 (fullClearCount === 2) dropping pixels, and Stage 2 (fullClearCount >= 3) retaining them
+            if (fullClearCount >= 3) {
+              hasNonWhitePixels = true;
+            }
+          }
+        },
+        stroke: () => {},
+        fillRect: (_x, _y, w, h) => {
+          if (w > 400 && h > 400) {
+            fullClearCount++;
+            if (fullClearCount === 1) {
+              mainCanvasCount++;
+              pageIndexForThisCanvas = mainCanvasCount;
+            }
+            if (String(ctxObj.fillStyle).toLowerCase() === '#ffffff' || String(ctxObj.fillStyle).toLowerCase() === 'rgb(255, 255, 255)') {
+              hasNonWhitePixels = false;
+            }
+          }
+        },
+        clearRect: () => {},
+        fillText: () => {
+          if (pageIndexForThisCanvas === 1 && fullClearCount >= 3) {
+            actualPage1GlyphFills++;
+            hasNonWhitePixels = true;
+          }
+        },
+        strokeText: () => {},
+        measureText: () => ({
+          width: 50,
+          actualBoundingBoxLeft: 0,
+          actualBoundingBoxRight: 50,
+          actualBoundingBoxAscent: 10,
+          actualBoundingBoxDescent: 2,
+          fontBoundingBoxAscent: 10,
+          fontBoundingBoxDescent: 2
+        }),
+        drawImage: () => {},
+        createImageData: (w, h) => ({ data: new Uint8ClampedArray(Math.max(4, w * h * 4)) }),
+        putImageData: () => {},
+        getImageData: () => {
+          const buf = new Uint8ClampedArray(64 * 4);
+          buf.fill(255);
+          if (hasNonWhitePixels) {
+            buf[0] = 20;
+            buf[1] = 30;
+            buf[2] = 40;
+            buf[3] = 255;
+          }
+          return { data: buf };
+        }
+      };
+      canvasObj.getContext = () => ctxObj;
+      return canvasObj;
+    },
+    body: {
+      append: () => {}
+    }
+  };
+
+  const renderedRecovery = await renderPdfToBookPages(minimalPdfBytes, {
+    maxPages: 10,
+    fallbackTitle: 'Macroeconomics Guide',
+    themeId: 'royal-indigo'
+  });
+
+  check(
+    'renderPdfToBookPages compila y dibuja glifos vectoriales reales (ctx.fill(Path2D) con FoxitSans.pfb) en Stage 2, sintetiza SVG con texto en Stage 4 (Página 2) y evita JPEG en blanco en páginas escaneadas sin texto (Página 3)',
+    actualPage1GlyphFills >= 20 &&
+      renderedRecovery.pageCount === 3 &&
+      renderedRecovery.pages.length === 3 &&
+      renderedRecovery.pageTexts.length === 3 &&
+      renderedRecovery.pageTexts[0].includes('Macroeconomics Chapter One') &&
+      renderedRecovery.pageTexts[1].includes('Fiscal Policy and Interest Rates') &&
+      renderedRecovery.pageTexts[2] === '' &&
+      renderedRecovery.pages[0].startsWith('data:image/jpeg;base64,VALID_RENDERED_PAGE_1') &&
+      renderedRecovery.pages[1].startsWith('data:image/svg+xml') &&
+      decodeURIComponent(renderedRecovery.pages[1]).includes('Fiscal Policy and Interest Rates') &&
+      renderedRecovery.pages[2].startsWith('data:image/svg+xml') &&
+      decodeURIComponent(renderedRecovery.pages[2]).includes('Macroeconomics Guide'),
+    JSON.stringify({
+      actualPage1GlyphFills,
+      pageCount: renderedRecovery.pageCount,
+      pageTexts: renderedRecovery.pageTexts,
+      p0: renderedRecovery.pages[0]?.slice(0, 60),
+      p1: renderedRecovery.pages[1]?.slice(0, 60),
+      p2: renderedRecovery.pages[2]?.slice(0, 60)
+    })
+  );
+
+  // Also verify data:application/pdf;base64,... URL source decoding in renderPdfToBookPages
+  const base64PdfUrl = `data:application/pdf;base64,${Buffer.from(minimalPdfBytes).toString('base64')}`;
+  const renderedFromDataUrl = await renderPdfToBookPages(base64PdfUrl, {
+    maxPages: 2,
+    fallbackTitle: 'Data URL PDF'
+  });
+  check(
+    'renderPdfToBookPages decodifica y renderiza directamente fuentes data:application/pdf;base64,... sin fallar en PDFFetchStream',
+    renderedFromDataUrl.pageCount === 2 &&
+      renderedFromDataUrl.originalPageCount === 3 &&
+      renderedFromDataUrl.pageTexts[0].includes('Macroeconomics Chapter One')
+  );
+} finally {
+  if (prevDocument === undefined) {
+    delete globalThis.document;
+  } else {
+    globalThis.document = prevDocument;
+  }
+}
+
+const extractedPdfText = await extractTextFromPDF(minimalPdfBytes.slice().buffer);
+check(
+  'extractTextFromPDF extrae texto de múltiples páginas PDF usando pdfjs-dist legacy y polyfills sin errores de toHex',
+  typeof extractedPdfText === 'string' &&
+    extractedPdfText.includes('[PAGINA 1]') &&
+    extractedPdfText.includes('Macroeconomics Chapter One') &&
+    extractedPdfText.includes('[PAGINA 2]') &&
+    extractedPdfText.includes('Fiscal Policy and Interest Rates')
+);
+
 console.log(`\n========================================`);
 console.log(`Total pruebas Flipbook 3D: ${okCount + failCount} | OK: ${okCount} | FAIL: ${failCount}`);
 console.log(`========================================\n`);
@@ -1011,4 +1408,5 @@ console.log(`========================================\n`);
 if (failCount > 0) {
   process.exit(1);
 }
+
 

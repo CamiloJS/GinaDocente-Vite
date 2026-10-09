@@ -604,6 +604,8 @@ export default function BooksLibraryModule({
                 scale: 1.6,
                 maxDimension: 1350,
                 quality: 0.82,
+                fallbackTitle: title || file.name.replace(/\.pdf$/i, ''),
+                themeId: theme,
                 onProgress: (prog) => setProgressInfo(prog)
             });
 
@@ -706,6 +708,26 @@ export default function BooksLibraryModule({
                 }
             }
 
+            if (pagesToSave.length === 0 && pdfFile) {
+                try {
+                    const rendered = await renderPdfToBookPages(pdfFile, {
+                        maxPages: 60,
+                        scale: 1.6,
+                        maxDimension: 1350,
+                        quality: 0.82,
+                        fallbackTitle: title.trim(),
+                        themeId: theme,
+                        onProgress: (prog) => setProgressInfo(prog)
+                    });
+                    if (Array.isArray(rendered?.pages) && rendered.pages.length > 0) {
+                        pagesToSave = rendered.pages;
+                        pageTextsToSave = rendered.pageTexts || [];
+                    }
+                } catch (renderErr) {
+                    console.warn('Error renderizando PDF al guardar:', renderErr);
+                }
+            }
+
             if (pagesToSave.length === 0) {
                 pagesToSave = buildFallbackBookPages({
                     title: title.trim(),
@@ -734,12 +756,11 @@ export default function BooksLibraryModule({
 
             // Upload raw PDF file if a new one was selected
             let finalPdfUrl = existingPdfUrl;
+            let sessionBlobPdfUrl = '';
             let finalFileName = existingFileName;
             if (pdfFile) {
                 finalFileName = pdfFile.name;
-                if (isDemoMode || typeof uploadRawFileFn !== 'function') {
-                    finalPdfUrl = existingPdfUrl || '';
-                } else {
+                if (!isDemoMode && typeof uploadRawFileFn === 'function') {
                     try {
                         setProgressInfo({ phase: 'pdf', currentPage: 1, totalPages: 1, percent: 95 });
                         const uploadedUrl = await uploadRawFileFn(pdfFile, 'books');
@@ -748,7 +769,17 @@ export default function BooksLibraryModule({
                         console.warn('No se pudo subir el PDF original, se usarán las hojas renderizadas:', uploadErr);
                     }
                 }
+                if (!finalPdfUrl && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+                    try {
+                        sessionBlobPdfUrl = URL.createObjectURL(pdfFile);
+                    } catch {
+                        sessionBlobPdfUrl = '';
+                    }
+                }
             }
+
+            const persistedPdfUrl = finalPdfUrl || (isDemoMode ? sessionBlobPdfUrl : '');
+            const activeSessionPdfUrl = finalPdfUrl || sessionBlobPdfUrl || '';
 
             const resolvedGroupId = targetGroupId || 'all';
             const matchedGroup = effectiveGroups.find((g) => String(g?.id) === String(resolvedGroupId));
@@ -769,10 +800,10 @@ export default function BooksLibraryModule({
                 customCoverUrl: customCoverUrl ? uploadedPages[0] || customCoverUrl : '',
                 coverUrl: uploadedPages[0] || '',
                 pageCount: uploadedPages.length,
-                pdfUrl: finalPdfUrl || '',
-                fileUrl: finalPdfUrl || '',
-                fileName: finalPdfUrl ? finalFileName || `${title.trim()}.pdf` : finalFileName || '',
-                pdfFileName: finalPdfUrl ? finalFileName || `${title.trim()}.pdf` : finalFileName || '',
+                pdfUrl: persistedPdfUrl || '',
+                fileUrl: persistedPdfUrl || '',
+                fileName: (persistedPdfUrl || activeSessionPdfUrl) ? finalFileName || `${title.trim()}.pdf` : finalFileName || '',
+                pdfFileName: (persistedPdfUrl || activeSessionPdfUrl) ? finalFileName || `${title.trim()}.pdf` : finalFileName || '',
                 aspectRatio,
                 targetGroupId: resolvedGroupId,
                 targetGroupName: resolvedGroupName,
@@ -796,13 +827,22 @@ export default function BooksLibraryModule({
                 isDemoCreated: Boolean(isDemoMode || existingRecord?.isDemoCreated)
             });
 
-            // Update local state immediately for snappy UX
+            const inMemoryBook = {
+                ...sanitizedBook,
+                bookPages: uploadedPages.length > 0 ? uploadedPages : sanitizedBook.bookPages,
+                coverUrl: uploadedPages[0] || sanitizedBook.coverUrl,
+                pageCount: Math.max(uploadedPages.length, sanitizedBook.pageCount || 0),
+                pdfUrl: activeSessionPdfUrl || sanitizedBook.pdfUrl,
+                fileUrl: activeSessionPdfUrl || sanitizedBook.fileUrl
+            };
+
+            // Update local state immediately with full rendered pages for snappy UX
             effectiveSetBooks?.((prev) => {
                 const list = Array.isArray(prev) ? prev : [];
                 const exists = list.some((b) => String(b?.id) === String(bookId));
                 return exists
-                    ? list.map((b) => (String(b?.id) === String(bookId) ? sanitizedBook : b))
-                    : [sanitizedBook, ...list];
+                    ? list.map((b) => (String(b?.id) === String(bookId) ? inMemoryBook : b))
+                    : [inMemoryBook, ...list];
             });
 
             const wallTaskId = `book_wall_${bookId}`;
@@ -844,11 +884,20 @@ export default function BooksLibraryModule({
                 isDemoCreated: Boolean(isDemoMode || existingRecord?.isDemoCreated)
             };
 
+            const inMemoryWallTask = {
+                ...wallTaskPayload,
+                bookPages: inMemoryBook.bookPages,
+                coverUrl: inMemoryBook.coverUrl,
+                pageCount: inMemoryBook.pageCount,
+                pdfUrl: inMemoryBook.pdfUrl,
+                fileUrl: inMemoryBook.fileUrl
+            };
+
             if (isDemoMode) {
                 saveDemoSandboxItem('books', sanitizedBook);
                 saveDemoSandboxItem('tasks', wallTaskPayload);
                 setTasks?.((prev) => [
-                    wallTaskPayload,
+                    inMemoryWallTask,
                     ...(Array.isArray(prev) ? prev.filter((t) => String(t?.id) !== wallTaskId) : [])
                 ]);
             } else {
@@ -867,7 +916,7 @@ export default function BooksLibraryModule({
                     )
                 );
                 setTasks?.((prev) => [
-                    wallTaskPayload,
+                    inMemoryWallTask,
                     ...(Array.isArray(prev) ? prev.filter((t) => String(t?.id) !== wallTaskId) : [])
                 ]);
             }
