@@ -653,6 +653,27 @@ check('ReviewsModule escala fuentes de elementos libres en miniaturas/tarjetas, 
   reviewsSrc.includes('hasDefaultShapeFill')
 );
 
+check('ReviewsModule abre directamente el Estudio de Diapositivas en Nueva presentación (handleOpenNewPresentationStudio) y persiste borradores nuevos al guardar',
+  reviewsSrc.includes('handleOpenNewPresentationStudio') &&
+  reviewsSrc.includes('isNewDraft: true') &&
+  reviewsSrc.includes('!updatedPres.id || updatedPres.isNewDraft') &&
+  reviewsSrc.includes('handleAutoAddContentBlock') &&
+  reviewsSrc.includes('handleApplyStarterTemplate') &&
+  reviewsSrc.includes("action === 'generate_full_deck'") &&
+  reviewsSrc.includes('showMoreFormatTools')
+);
+
+check('ReviewsModule sincroniza el título de portada con el tema, auto-enfoca bloques nuevos, protege contra duplicados en Ctrl+S y preserva estilos al borrar en el lienzo',
+  reviewsSrc.includes('onPatchSlide={handleSlidePatch}') &&
+  reviewsSrc.includes("shiftFieldTextStylesOnDelete(safeSlide.textStyles, 'cards', cIdx)") &&
+  reviewsSrc.includes("shiftFieldTextStylesOnDelete(safeSlide.textStyles, 'table.col', hIdx)") &&
+  reviewsSrc.includes("shiftFieldTextStylesOnDelete(safeSlide.textStyles, 'table.row', rIdx)") &&
+  reviewsSrc.includes('handleDeckTopicChange') &&
+  reviewsSrc.includes('focusCanvasField') &&
+  reviewsSrc.includes('persistedPresRef') &&
+  reviewsSrc.includes('handleQuickSaveInPlace')
+);
+
 console.log(`\nRESULTADO SLIDES STUDIO: ${okCount} OK, ${failCount} fallos\n`);
 if (failCount > 0) {
   process.exit(1);
