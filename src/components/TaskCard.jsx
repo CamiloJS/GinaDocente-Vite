@@ -22,7 +22,20 @@ import KahootBuilder from './KahootBuilder.jsx'
 import { validateKahootConfig, buildKahootLeaderboard, reconcileKahootParticipantsAfterEdit, canAccessKahootReview, buildPublicKahootUrl } from '../utils/kahootEngine.js'
 import { SlideCanvasSurface, SlidePresenterViewer, exportReviewToPresentation } from './ReviewsModule.jsx'
 import Flipbook3DModal from './Flipbook3DModal.jsx'
-import { getBookTheme, normalizeBookRecord } from '../utils/flipbookEngine.js'
+import {
+    getBookTheme,
+    normalizeBookRecord,
+    buildBookSpreads,
+    resolveSpreadDisplayState,
+    calculateDragCurlState,
+    playPageFlipSound,
+    renderPdfToBookPages,
+    buildFallbackBookPages,
+    buildIllustratedBookPageSvg,
+    isCompactedOrFallbackBookPage,
+    bookPagesNeedLivePdfRender,
+    extractSvgExternalImageOverlay
+} from '../utils/flipbookEngine.js'
 import { useVoiceRecorder } from '../utils/useVoiceRecorder.js'
 import { auth, signInAnonymously, doc, setDoc, updateDoc, deleteDoc } from '../firebase/config.js'
 import { runTransaction } from 'firebase/firestore'
@@ -65,7 +78,14 @@ const TaskCard = React.memo(({
     const [isEditingTask, setIsEditingTask] = useState(false);
     const [previewDoc, setPreviewDoc] = useState(null);
     const [activeFlipbookModal, setActiveFlipbookModal] = useState(null);
-    const [bookPreviewPageIdx, setBookPreviewPageIdx] = useState(0);
+    const [bookPreviewSpreadIdx, setBookPreviewSpreadIdx] = useState(0);
+    const [bookPreviewFlipAnim, setBookPreviewFlipAnim] = useState(null);
+    const [bookPreviewDragState, setBookPreviewDragState] = useState(null);
+    const [liveBookPages, setLiveBookPages] = useState(null);
+    const [loadingBookPdf, setLoadingBookPdf] = useState(false);
+    const [bookRenderProgress, setBookRenderProgress] = useState({ currentPage: 0, totalPages: 0, percent: 0 });
+    const bookPreviewStageRef = useRef(null);
+    const bookPreviewFlipTimerRef = useRef(null);
     const [editTaskData, setEditTaskData] = useState({ title: task?.title || '', description: task?.description || '', dueDate: task?.dueDate || '', dueTime: task?.dueTime || '', allowLate: task?.allowLate || false, geniallyUrl: task?.geniallyUrl || '', hideDate: !!task?.hideDate });
     const [showKahootLiveModal, setShowKahootLiveModal] = useState(false);
     const [kahootModalStartInReview, setKahootModalStartInReview] = useState(false);
@@ -107,6 +127,7 @@ const TaskCard = React.memo(({
     useEffect(() => () => {
         try { narracionRef.current?.detener?.(); } catch (e) { /* nada */ }
         try { pinAnimCleanupRef.current?.(); } catch (e) { /* nada */ }
+        if (bookPreviewFlipTimerRef.current) clearTimeout(bookPreviewFlipTimerRef.current);
     }, []);
 
 
@@ -199,14 +220,169 @@ const TaskCard = React.memo(({
         if (!isBook3D) return null;
         const found = (books || []).find(b => String(b?.id) === String(task?.bookId));
         if (found) {
+            const foundPages = Array.isArray(found.bookPages) && found.bookPages.length > 0 ? found.bookPages : [];
+            const taskPages = Array.isArray(task?.bookPages) && task.bookPages.length > 0 ? task.bookPages : [];
             return normalizeBookRecord({
                 ...found,
                 title: task?.title || found.title || 'Libro',
-                description: task?.description !== undefined && task?.description !== '' ? task.description : (found.description || '')
+                description: task?.description !== undefined && task?.description !== '' ? task.description : (found.description || ''),
+                pdfUrl: found.pdfUrl || found.fileUrl || task?.pdfUrl || task?.fileUrl || '',
+                fileUrl: found.fileUrl || found.pdfUrl || task?.fileUrl || task?.pdfUrl || '',
+                bookPages: foundPages.length >= taskPages.length ? foundPages : taskPages,
+                pageTexts: (Array.isArray(found.pageTexts) && found.pageTexts.length > 0)
+                    ? found.pageTexts
+                    : (Array.isArray(task?.pageTexts) ? task.pageTexts : []),
+                bookOutline: (Array.isArray(found.bookOutline) && found.bookOutline.length > 0)
+                    ? found.bookOutline
+                    : (Array.isArray(task?.bookOutline) ? task.bookOutline : []),
+                pageCount: Math.max(
+                    Number(found.pageCount) || 0,
+                    Number(task?.pageCount) || 0,
+                    foundPages.length,
+                    taskPages.length
+                )
             });
         }
         return normalizeBookRecord(task);
     }, [isBook3D, books, task]);
+
+    useEffect(() => {
+        setBookPreviewSpreadIdx(0);
+        setBookPreviewFlipAnim(null);
+        setBookPreviewDragState(null);
+        return () => {
+            if (bookPreviewFlipTimerRef.current) clearTimeout(bookPreviewFlipTimerRef.current);
+        };
+    }, [linkedBook?.id]);
+
+    // Cargar / renderizar páginas en vivo desde pdfUrl cuando las páginas en Firestore fueron compactadas o truncadas
+    useEffect(() => {
+        if (!isBook3D || !linkedBook) return;
+        let cancelled = false;
+        const preRendered = Array.isArray(linkedBook.bookPages) && linkedBook.bookPages.length > 0
+            ? linkedBook.bookPages
+            : [];
+        const pdfSourceUrl = linkedBook.pdfUrl || linkedBook.fileUrl || task?.pdfUrl || task?.fileUrl || '';
+        const expectedCount = Math.max(
+            preRendered.length,
+            Number(linkedBook.pageCount) || 0,
+            Number(task?.pageCount) || 0
+        );
+
+        const shouldRenderFromPdf = bookPagesNeedLivePdfRender(preRendered, {
+            pdfUrl: pdfSourceUrl,
+            expectedPageCount: expectedCount
+        });
+
+        if (!shouldRenderFromPdf || !pdfSourceUrl) {
+            setLiveBookPages(null);
+            setLoadingBookPdf(false);
+            return () => {
+                cancelled = true;
+            };
+        }
+
+        setLoadingBookPdf(true);
+        setBookRenderProgress({ currentPage: 0, totalPages: expectedCount, percent: 8 });
+
+        renderPdfToBookPages(pdfSourceUrl, {
+            maxPages: Math.max(60, expectedCount || 60),
+            scale: 1.5,
+            maxDimension: 1280,
+            quality: 0.80,
+            compressionLevel: 'light',
+            customCoverUrl: linkedBook.customCoverUrl || '',
+            fallbackTitle: linkedBook.title,
+            themeId: linkedBook.theme,
+            onProgress: (prog) => {
+                if (!cancelled) setBookRenderProgress(prog);
+            }
+        })
+            .then((res) => {
+                if (cancelled) return;
+                if (Array.isArray(res?.pages) && res.pages.length > 0) {
+                    const mergedPages = res.pages.map((livePage, idx) => {
+                        const existingPage = preRendered[idx];
+                        if (existingPage && !isCompactedOrFallbackBookPage(existingPage)) {
+                            return existingPage;
+                        }
+                        return livePage;
+                    });
+                    setLiveBookPages(mergedPages);
+                }
+                setLoadingBookPdf(false);
+            })
+            .catch(() => {
+                if (!cancelled) {
+                    setLoadingBookPdf(false);
+                }
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [
+        isBook3D,
+        linkedBook?.id,
+        linkedBook?.pdfUrl,
+        linkedBook?.fileUrl,
+        linkedBook?.bookPages,
+        linkedBook?.pageCount,
+        linkedBook?.title,
+        linkedBook?.theme,
+        linkedBook?.customCoverUrl,
+        task?.pdfUrl,
+        task?.fileUrl,
+        task?.pageCount
+    ]);
+
+    const effectiveBookPages = React.useMemo(() => {
+        if (!isBook3D || !linkedBook) return [];
+        if (Array.isArray(liveBookPages) && liveBookPages.length > 0) {
+            return liveBookPages;
+        }
+        const basePages = Array.isArray(linkedBook.bookPages) && linkedBook.bookPages.length > 0
+            ? linkedBook.bookPages
+            : buildFallbackBookPages({
+                title: linkedBook.title,
+                description: linkedBook.description,
+                fileName: linkedBook.fileName,
+                author: linkedBook.authorName || 'Docente',
+                themeId: linkedBook.theme,
+                customCoverUrl: linkedBook.customCoverUrl || ''
+            });
+
+        const expectedCount = Math.max(
+            basePages.length,
+            Number(linkedBook.pageCount) || 0,
+            Number(task?.pageCount) || 0
+        );
+
+        if (expectedCount > basePages.length) {
+            return Array.from({ length: expectedCount }, (_, idx) => {
+                if (basePages[idx]) return basePages[idx];
+                const rawSnippet = String(linkedBook.pageTexts?.[idx] || '').trim();
+                return buildIllustratedBookPageSvg({
+                    variant: idx === 0 ? 'cover' : idx === expectedCount - 1 && expectedCount >= 3 ? 'back-cover' : 'content',
+                    chapter: idx === 0 ? 'LIBRO' : `PÁGINA ${idx + 1}`,
+                    title: idx === 0 ? linkedBook.title : `${linkedBook.title} — Página ${idx + 1}`,
+                    subtitle: '',
+                    body: rawSnippet
+                        ? [rawSnippet, 'Usa el botón PDF para abrir el documento completo.']
+                        : [`Vista de la página ${idx + 1} de "${linkedBook.title}".`, 'Usa el botón PDF para abrir el documento completo.'],
+                    pageNumber: idx + 1,
+                    totalPages: expectedCount,
+                    themeId: linkedBook.theme
+                });
+            });
+        }
+        return basePages;
+    }, [isBook3D, linkedBook, liveBookPages, task?.pageCount]);
+
+    const bookSpreads = React.useMemo(
+        () => (effectiveBookPages.length > 0 ? buildBookSpreads(effectiveBookPages, true) : []),
+        [effectiveBookPages]
+    );
 
     const linkedEvaluation = React.useMemo(() => {
         if (!isEvaluation) return null;
@@ -2585,11 +2761,229 @@ const TaskCard = React.memo(({
             {isBook3D && linkedBook && (() => {
                 const bk = linkedBook;
                 const bkTheme = getBookTheme(bk.theme);
-                const pagesArr = Array.isArray(bk.bookPages) ? bk.bookPages : [];
+                const pagesArr = effectiveBookPages;
                 const totalPagesCount = pagesArr.length || Number(bk.pageCount) || 1;
-                const safePageIdx = pagesArr.length > 0 ? Math.min(bookPreviewPageIdx, pagesArr.length - 1) : 0;
-                const currentPreviewPage = pagesArr[safePageIdx] || bk.coverUrl || '';
+                const spreadState = resolveSpreadDisplayState(bookSpreads, bookPreviewSpreadIdx, totalPagesCount);
+                const safeSpreadIdx = spreadState.safeSpreadIdx;
+                const totalSpreads = spreadState.totalSpreads;
+                const currentSpread = spreadState.spread;
+                const leftPageIdx = spreadState.leftPageIdx;
+                const rightPageIdx = spreadState.rightPageIdx;
+                const closedPageIdx = spreadState.closedPageIdx;
+                const isCoverClosed = spreadState.isCoverClosed;
+                const isBackClosed = spreadState.isBackClosed;
+                const isOpenDoubleSpread = spreadState.isOpenDoubleSpread;
+                const primaryPreviewPageIdx = spreadState.primaryPageIndex;
+                const spreadBadgeLabel = spreadState.badgeLabel;
                 const pdfSourceUrl = bk.pdfUrl || bk.fileUrl || task.fileUrl || '';
+
+                const goToPreviewSpread = (targetIdx, direction = 'next') => {
+                    const bounded = Math.max(0, Math.min(totalSpreads - 1, targetIdx));
+                    if (bounded === safeSpreadIdx || bookPreviewFlipAnim) return;
+                    playPageFlipSound({ muted: false, direction });
+                    const targetSpread = bookSpreads[bounded] || currentSpread;
+                    if (bookPreviewFlipTimerRef.current) clearTimeout(bookPreviewFlipTimerRef.current);
+                    setBookPreviewFlipAnim({
+                        direction,
+                        fromSpread: currentSpread,
+                        toSpread: targetSpread,
+                        progress: 0
+                    });
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            setBookPreviewFlipAnim(prev => (prev ? { ...prev, progress: 1 } : null));
+                        });
+                    });
+                    bookPreviewFlipTimerRef.current = setTimeout(() => {
+                        setBookPreviewSpreadIdx(bounded);
+                        setBookPreviewFlipAnim(null);
+                    }, 360);
+                };
+
+                const handlePrevPreviewSpread = (e) => {
+                    if (e) e.stopPropagation();
+                    if (totalSpreads <= 1) return;
+                    const target = safeSpreadIdx <= 0 ? totalSpreads - 1 : safeSpreadIdx - 1;
+                    goToPreviewSpread(target, 'prev');
+                };
+
+                const handleNextPreviewSpread = (e) => {
+                    if (e) e.stopPropagation();
+                    if (totalSpreads <= 1) return;
+                    const target = safeSpreadIdx >= totalSpreads - 1 ? 0 : safeSpreadIdx + 1;
+                    goToPreviewSpread(target, 'next');
+                };
+
+                const handlePreviewPointerDown = (e) => {
+                    if (e.button !== undefined && e.button !== 0) return;
+                    if (e.target && typeof e.target.closest === 'function' && e.target.closest('button, a')) return;
+                    if (bookPreviewFlipAnim || totalSpreads <= 1 || !bookPreviewStageRef.current) return;
+                    const rect = bookPreviewStageRef.current.getBoundingClientRect();
+                    const relX = (e.clientX - rect.left) / Math.max(1, rect.width);
+                    let direction = null;
+                    if (isCoverClosed) {
+                        direction = safeSpreadIdx < totalSpreads - 1 ? 'next' : null;
+                    } else if (isBackClosed) {
+                        direction = safeSpreadIdx > 0 ? 'prev' : null;
+                    } else if (relX >= 0.5 && safeSpreadIdx < totalSpreads - 1) {
+                        direction = 'next';
+                    } else if (relX < 0.5 && safeSpreadIdx > 0) {
+                        direction = 'prev';
+                    }
+                    if (!direction) return;
+                    const targetIdx = direction === 'next' ? safeSpreadIdx + 1 : safeSpreadIdx - 1;
+                    setBookPreviewDragState({
+                        direction,
+                        startX: e.clientX,
+                        currentX: e.clientX,
+                        containerWidth: Math.max(220, rect.width),
+                        containerHeight: Math.max(180, rect.height),
+                        fromSpread: currentSpread,
+                        toSpread: bookSpreads[targetIdx] || currentSpread,
+                        targetIdx
+                    });
+                };
+
+                const handlePreviewPointerMove = (e) => {
+                    if (!bookPreviewDragState) return;
+                    setBookPreviewDragState(prev => (prev ? { ...prev, currentX: e.clientX } : null));
+                };
+
+                const handlePreviewPointerUp = (e) => {
+                    if (!bookPreviewDragState) return;
+                    const dx = (e?.clientX ?? bookPreviewDragState.currentX) - bookPreviewDragState.startX;
+                    const travel = Math.abs(dx);
+                    const { direction, targetIdx } = bookPreviewDragState;
+                    setBookPreviewDragState(null);
+                    if (travel < 8) {
+                        goToPreviewSpread(targetIdx, direction);
+                        return;
+                    }
+                    const curl = calculateDragCurlState({
+                        startX: bookPreviewDragState.startX,
+                        currentX: e?.clientX ?? bookPreviewDragState.currentX,
+                        containerWidth: bookPreviewDragState.containerWidth,
+                        containerHeight: bookPreviewDragState.containerHeight,
+                        direction
+                    });
+                    if (curl.shouldComplete) {
+                        playPageFlipSound({ muted: false, direction });
+                        setBookPreviewSpreadIdx(targetIdx);
+                    }
+                };
+
+                const activeDragCurl = bookPreviewDragState
+                    ? calculateDragCurlState({
+                        startX: bookPreviewDragState.startX,
+                        currentX: bookPreviewDragState.currentX,
+                        containerWidth: bookPreviewDragState.containerWidth,
+                        containerHeight: bookPreviewDragState.containerHeight,
+                        direction: bookPreviewDragState.direction
+                    })
+                    : null;
+
+                const renderPreviewPageSurface = (pageIdx, side = 'right') => {
+                    if (!Number.isInteger(pageIdx) || pageIdx < 0) return null;
+                    const pageNumber = pageIdx + 1;
+                    const rawEntry = pagesArr[pageIdx];
+                    const rawSrc = (typeof rawEntry === 'string'
+                        ? rawEntry
+                        : (rawEntry?.src || rawEntry?.imageUrl || ''))
+                        || (pageIdx === 0 ? (bk.customCoverUrl || bk.coverUrl || '') : '');
+                    const overlayInfo = extractSvgExternalImageOverlay(rawSrc);
+                    const displaySrc = overlayInfo?.cleanedSvgDataUrl || rawSrc;
+                    const isFallbackPlaceholder = !rawSrc || (loadingBookPdf && isCompactedOrFallbackBookPage(rawSrc) && pageIdx > 0);
+                    const rawSnippet = String(bk.pageTexts?.[pageIdx] || '').trim();
+
+                    const fallbackSvg = buildIllustratedBookPageSvg({
+                        variant: pageIdx === 0 ? 'cover' : pageIdx === totalPagesCount - 1 && totalPagesCount >= 3 ? 'back-cover' : 'content',
+                        chapter: pageIdx === 0 ? 'LIBRO' : `PÁGINA ${pageNumber}`,
+                        title: pageIdx === 0 ? bk.title : `${bk.title} — Página ${pageNumber}`,
+                        subtitle: pageIdx === 0 ? (bk.authorName || 'Docente') : '',
+                        body: rawSnippet ? [rawSnippet] : [`Vista de la página ${pageNumber} de "${bk.title}".`],
+                        pageNumber,
+                        totalPages: totalPagesCount,
+                        themeId: bk.theme
+                    });
+
+                    return (
+                        <div className="relative w-full h-full bg-[#fdfbf7] overflow-hidden select-none">
+                            <img
+                                src={displaySrc || fallbackSvg}
+                                alt={`${bk.title} - Pág. ${pageNumber}`}
+                                draggable={false}
+                                onError={(e) => {
+                                    if (e.currentTarget.src !== fallbackSvg) {
+                                        e.currentTarget.src = fallbackSvg;
+                                    }
+                                }}
+                                className="w-full h-full object-contain bg-[#fdfbf7] pointer-events-none"
+                            />
+                            {overlayInfo?.href && (
+                                <img
+                                    src={overlayInfo.href}
+                                    alt={bk.title}
+                                    draggable={false}
+                                    style={{
+                                        left: `${overlayInfo.leftPct}%`,
+                                        top: `${overlayInfo.topPct}%`,
+                                        width: `${overlayInfo.widthPct}%`,
+                                        height: `${overlayInfo.heightPct}%`,
+                                        objectFit: overlayInfo.objectFit || 'contain'
+                                    }}
+                                    className="absolute rounded-md shadow-sm pointer-events-none"
+                                />
+                            )}
+                            {isFallbackPlaceholder && (
+                                <div className="absolute inset-x-2 bottom-2 px-2 py-1 rounded-lg bg-slate-900/80 text-white text-[10px] font-bold flex items-center justify-center gap-1.5 backdrop-blur-xs">
+                                    <Loader2 size={11} className="animate-spin text-indigo-300" />
+                                    <span>Cargando pág. {pageNumber}...</span>
+                                </div>
+                            )}
+                            {/* Sombra realista de pliegue hacia el lomo central */}
+                            <div
+                                className="absolute inset-y-0 pointer-events-none"
+                                style={{
+                                    width: '26px',
+                                    ...(side === 'left'
+                                        ? {
+                                            right: 0,
+                                            background: 'linear-gradient(270deg, rgba(15,23,42,0.28) 0%, rgba(15,23,42,0.08) 52%, transparent 100%)'
+                                        }
+                                        : {
+                                            left: 0,
+                                            background: 'linear-gradient(90deg, rgba(15,23,42,0.30) 0%, rgba(15,23,42,0.08) 52%, transparent 100%)'
+                                        })
+                                }}
+                            />
+                        </div>
+                    );
+                };
+
+                const openModalAtCurrentSpread = (e) => {
+                    if (e) e.stopPropagation();
+                    const hasFullLivePages = Array.isArray(liveBookPages) && liveBookPages.length >= totalPagesCount;
+                    setActiveFlipbookModal({
+                        book: {
+                            ...bk,
+                            bookPages: hasFullLivePages
+                                ? liveBookPages
+                                : (Array.isArray(bk.bookPages) && bk.bookPages.length > 0 ? bk.bookPages : pagesArr),
+                            pageCount: totalPagesCount,
+                            initialPage: primaryPreviewPageIdx
+                        },
+                        initialPage: primaryPreviewPageIdx
+                    });
+                };
+
+                const activeTurnDirection = bookPreviewFlipAnim?.direction || bookPreviewDragState?.direction || null;
+                const activeTargetSpread = bookPreviewFlipAnim?.toSpread || bookPreviewDragState?.toSpread || null;
+                const stationaryLeftPageIdx = (activeTurnDirection === 'prev' && Number.isInteger(activeTargetSpread?.leftPage))
+                    ? activeTargetSpread.leftPage
+                    : leftPageIdx;
+                const stationaryRightPageIdx = (activeTurnDirection === 'next' && Number.isInteger(activeTargetSpread?.rightPage))
+                    ? activeTargetSpread.rightPage
+                    : rightPageIdx;
 
                 return (
                     <div className="my-3 rounded-2xl border border-indigo-200/80 dark:border-indigo-800/50 bg-gradient-to-br from-indigo-50/50 via-white to-violet-50/30 dark:from-gray-900 dark:via-gray-900/95 dark:to-indigo-950/25 shadow-sm overflow-hidden">
@@ -2602,89 +2996,267 @@ const TaskCard = React.memo(({
                                 <span className="text-[11px] font-bold text-gray-700 dark:text-gray-300">
                                     {totalPagesCount} {totalPagesCount === 1 ? 'página' : 'páginas'}
                                 </span>
+                                <span className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hidden sm:inline">
+                                    • {isCoverClosed ? 'Portada cerrada (clic para abrir)' : isBackClosed ? 'Contraportada' : 'Libro abierto a doble página'}
+                                </span>
                             </div>
 
-                            {pagesArr.length > 0 && (
-                                <span className="text-[10.5px] font-extrabold text-indigo-800 dark:text-indigo-300 bg-indigo-100/70 dark:bg-indigo-950/60 px-2.5 py-0.5 rounded-full border border-indigo-200/80 dark:border-indigo-800/60">
-                                    Pág. {safePageIdx + 1} / {pagesArr.length}
-                                </span>
-                            )}
+                            <div className="flex items-center gap-2">
+                                {loadingBookPdf && (
+                                    <span className="text-[10px] font-bold text-amber-300 bg-amber-950/70 px-2 py-0.5 rounded-full border border-amber-500/40 flex items-center gap-1">
+                                        <Loader2 size={10} className="animate-spin" />
+                                        <span>Renderizando PDF {bookRenderProgress.percent || 0}%</span>
+                                    </span>
+                                )}
+                                {pagesArr.length > 0 && (
+                                    <span className="text-[10.5px] font-extrabold text-indigo-800 dark:text-indigo-300 bg-indigo-100/70 dark:bg-indigo-950/60 px-2.5 py-0.5 rounded-full border border-indigo-200/80 dark:border-indigo-800/60">
+                                        {spreadBadgeLabel}
+                                    </span>
+                                )}
+                            </div>
                         </div>
 
-                        {/* Vista Previa del Libro */}
+                        {/* Escenario 3D Interactivo del Libro en el Muro (Portada cerrada -> Doble página abierta -> Contraportada) */}
                         <div
-                            onClick={() => setActiveFlipbookModal({ book: bk, initialPage: safePageIdx })}
-                            className="relative group/bookcard cursor-pointer overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 p-5 sm:p-7 flex flex-col sm:flex-row items-center justify-center gap-6 border-b border-indigo-100/80 dark:border-gray-800"
-                            title="Abrir libro"
+                            ref={bookPreviewStageRef}
+                            onPointerDown={handlePreviewPointerDown}
+                            onPointerMove={handlePreviewPointerMove}
+                            onPointerUp={handlePreviewPointerUp}
+                            onPointerCancel={() => setBookPreviewDragState(null)}
+                            className="relative group/bookcard select-none overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 px-4 py-6 sm:px-8 sm:py-8 flex flex-col items-center justify-center border-b border-indigo-100/80 dark:border-gray-800"
+                            style={{ perspective: '1600px' }}
                         >
-                            {/* Cubierta Física con Lomo y Grosor de Hojas */}
-                            <div
-                                className="relative w-44 sm:w-52 h-60 sm:h-72 shrink-0 select-none"
-                                style={{ perspective: '1200px' }}
+                            {/* Botón flotante para pantalla completa sincronizado */}
+                            <button
+                                type="button"
+                                onClick={openModalAtCurrentSpread}
+                                className="absolute top-3 right-3 z-20 px-2.5 py-1.5 rounded-lg bg-black/55 hover:bg-indigo-600 text-white/90 hover:text-white border border-white/15 text-[10px] font-bold flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
+                                title="Abrir en pantalla completa"
                             >
+                                <Maximize2 size={12} />
+                                <span className="hidden sm:inline">Pantalla completa</span>
+                            </button>
+
+                            {isOpenDoubleSpread ? (
+                                /* LIBRO ABIERTO A DOBLE PÁGINA CON LOMO CENTRAL Y HOJA GIRATORIA 3D */
                                 <div
-                                    className="relative w-full h-full rounded-r-2xl rounded-l-sm shadow-[18px_22px_38px_-8px_rgba(0,0,0,0.75)] transition-transform duration-500 group-hover/bookcard:[transform:rotateY(-18deg)_translateY(-4px)] overflow-hidden border border-white/20"
-                                    style={{
-                                        backgroundColor: bkTheme.coverBg,
-                                        transformStyle: 'preserve-3d'
-                                    }}
+                                    className="relative flex items-stretch justify-center w-full max-w-[460px] sm:max-w-[540px] h-56 sm:h-72 transition-all duration-500"
+                                    style={{ transformStyle: 'preserve-3d' }}
                                 >
+                                    {/* Tapa dura exterior bajo las hojas abiertas */}
                                     <div
-                                        className="absolute inset-y-0 left-0 w-4 z-10 pointer-events-none"
+                                        className="absolute -inset-x-2 -inset-y-1.5 rounded-xl pointer-events-none shadow-[0_24px_48px_-10px_rgba(0,0,0,0.85)] border border-white/15"
+                                        style={{ backgroundColor: bkTheme.coverBg }}
+                                    />
+
+                                    {/* Canto de hojas apiladas izquierda */}
+                                    <div
+                                        className="w-2 sm:w-2.5 my-1 rounded-l-sm shrink-0 z-10 pointer-events-none"
                                         style={{
-                                            background: 'linear-gradient(90deg, rgba(0,0,0,0.55) 0%, rgba(255,255,255,0.24) 45%, rgba(0,0,0,0.35) 100%)'
+                                            background: 'repeating-linear-gradient(90deg, #e2e8f0 0px, #f8fafc 1.2px, #cbd5e1 2.4px)',
+                                            boxShadow: '-3px 4px 10px rgba(0,0,0,0.45)'
                                         }}
                                     />
-                                    {currentPreviewPage ? (
-                                        <img
-                                            src={currentPreviewPage}
-                                            alt={`${bk.title} - Pág. ${safePageIdx + 1}`}
-                                            className="w-full h-full object-contain bg-white"
+
+                                    {/* Página Izquierda (Verso) */}
+                                    <div
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handlePrevPreviewSpread(e);
+                                        }}
+                                        className="relative flex-1 h-full rounded-l-md overflow-hidden border-y border-l border-stone-300/80 z-10 cursor-pointer group/leftpage"
+                                        title="Clic para volver a la página anterior"
+                                    >
+                                        {renderPreviewPageSurface(stationaryLeftPageIdx, 'left')}
+                                        <span className="absolute bottom-1.5 left-2 px-1.5 py-0.5 rounded bg-black/55 text-white text-[9px] font-bold pointer-events-none">
+                                            Pág. {(stationaryLeftPageIdx ?? 0) + 1}
+                                        </span>
+                                    </div>
+
+                                    {/* Lomo / Pliegue Central 3D */}
+                                    <div
+                                        className="w-2.5 sm:w-3 h-full z-20 shrink-0 pointer-events-none"
+                                        style={{
+                                            background: 'linear-gradient(90deg, rgba(15,23,42,0.55) 0%, rgba(255,255,255,0.22) 50%, rgba(15,23,42,0.55) 100%)',
+                                            boxShadow: 'inset 0 0 8px rgba(0,0,0,0.65)'
+                                        }}
+                                    />
+
+                                    {/* Página Derecha (Recto) */}
+                                    <div
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleNextPreviewSpread(e);
+                                        }}
+                                        className="relative flex-1 h-full rounded-r-md overflow-hidden border-y border-r border-stone-300/80 z-10 cursor-pointer group/rightpage"
+                                        title="Clic para pasar a la siguiente página"
+                                    >
+                                        {renderPreviewPageSurface(stationaryRightPageIdx, 'right')}
+                                        <span className="absolute bottom-1.5 right-2 px-1.5 py-0.5 rounded bg-black/55 text-white text-[9px] font-bold pointer-events-none">
+                                            Pág. {(stationaryRightPageIdx ?? 0) + 1}
+                                        </span>
+                                        {/* Esquina interactiva para pasar hoja */}
+                                        <div
+                                            className="absolute bottom-0 right-0 w-7 h-7 pointer-events-none transition-all duration-300 group-hover/rightpage:w-9 group-hover/rightpage:h-9"
+                                            style={{
+                                                background: 'linear-gradient(135deg, transparent 48%, rgba(148,163,184,0.45) 50%, rgba(255,255,255,0.92) 62%, rgba(203,213,225,0.85) 100%)',
+                                                boxShadow: '-2px -2px 6px rgba(0,0,0,0.18)'
+                                            }}
                                         />
-                                    ) : (
-                                        <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center text-white">
-                                            <BookOpen size={34} className="mb-2 opacity-80" />
-                                            <span className="text-xs font-bold line-clamp-3">{bk.title}</span>
-                                        </div>
+                                    </div>
+
+                                    {/* Canto de hojas apiladas derecha */}
+                                    <div
+                                        className="w-2 sm:w-2.5 my-1 rounded-r-sm shrink-0 z-10 pointer-events-none"
+                                        style={{
+                                            background: 'repeating-linear-gradient(90deg, #f8fafc 0px, #cbd5e1 1.2px, #f1f5f9 2.4px)',
+                                            boxShadow: '3px 4px 10px rgba(0,0,0,0.45)'
+                                        }}
+                                    />
+
+                                    {/* Hoja 3D de doble cara en movimiento durante animación o arrastre con el puntero */}
+                                    {(bookPreviewFlipAnim || activeDragCurl) && (() => {
+                                        const isNext = activeTurnDirection === 'next';
+                                        const angle = activeDragCurl
+                                            ? activeDragCurl.angleDeg
+                                            : (bookPreviewFlipAnim.progress === 1 ? (isNext ? -176 : 176) : (isNext ? -8 : 8));
+                                        const frontLeafPageIdx = isNext
+                                            ? (rightPageIdx ?? leftPageIdx)
+                                            : (leftPageIdx ?? rightPageIdx);
+                                        const backLeafPageIdx = isNext
+                                            ? (Number.isInteger(activeTargetSpread?.leftPage) ? activeTargetSpread.leftPage : frontLeafPageIdx)
+                                            : (Number.isInteger(activeTargetSpread?.rightPage) ? activeTargetSpread.rightPage : frontLeafPageIdx);
+
+                                        return (
+                                            <div
+                                                className="absolute top-0 bottom-0 w-1/2 z-30 pointer-events-none rounded-md shadow-2xl"
+                                                style={{
+                                                    left: isNext ? '50%' : '0%',
+                                                    transformOrigin: isNext ? 'left center' : 'right center',
+                                                    transformStyle: 'preserve-3d',
+                                                    transform: `rotateY(${angle}deg)`,
+                                                    transition: activeDragCurl ? 'none' : 'transform 340ms cubic-bezier(0.22, 1, 0.36, 1)'
+                                                }}
+                                            >
+                                                {/* Cara frontal de la hoja giratoria */}
+                                                <div
+                                                    className="absolute inset-0 overflow-hidden rounded-md"
+                                                    style={{ backfaceVisibility: 'hidden' }}
+                                                >
+                                                    {renderPreviewPageSurface(frontLeafPageIdx, isNext ? 'right' : 'left')}
+                                                </div>
+                                                {/* Cara posterior de la hoja giratoria (reverso al voltear más de 90°) */}
+                                                <div
+                                                    className="absolute inset-0 overflow-hidden rounded-md"
+                                                    style={{
+                                                        backfaceVisibility: 'hidden',
+                                                        transform: 'rotateY(180deg)'
+                                                    }}
+                                                >
+                                                    {renderPreviewPageSurface(backLeafPageIdx, isNext ? 'left' : 'right')}
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                            ) : (
+                                /* LIBRO CERRADO (Portada inicial en Spread 0 o Contraportada final) */
+                                <div
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (isCoverClosed && totalSpreads > 1) {
+                                            handleNextPreviewSpread(e);
+                                        } else if (isBackClosed && totalSpreads > 1) {
+                                            handlePrevPreviewSpread(e);
+                                        } else {
+                                            openModalAtCurrentSpread(e);
+                                        }
+                                    }}
+                                    className="relative w-44 sm:w-52 h-60 sm:h-72 shrink-0 select-none cursor-pointer"
+                                    style={{ perspective: '1200px' }}
+                                    title={isCoverClosed ? 'Clic para abrir el libro' : 'Clic para volver a abrir el libro'}
+                                >
+                                    {/* Canto de hojas izquierdas cuando está en la contraportada */}
+                                    {isBackClosed && (
+                                        <div
+                                            className="absolute top-2 bottom-2 -left-2.5 w-2.5 rounded-l-sm pointer-events-none z-10"
+                                            style={{
+                                                background: 'repeating-linear-gradient(90deg, #e2e8f0 0px, #f8fafc 1.5px, #cbd5e1 3px)',
+                                                boxShadow: '-4px 6px 14px rgba(0,0,0,0.45)'
+                                            }}
+                                        />
+                                    )}
+
+                                    <div
+                                        className={`relative w-full h-full ${isBackClosed ? 'rounded-l-2xl rounded-r-sm group-hover/bookcard:[transform:rotateY(16deg)_translateY(-4px)]' : 'rounded-r-2xl rounded-l-sm group-hover/bookcard:[transform:rotateY(-16deg)_translateY(-4px)]'} shadow-[18px_22px_38px_-8px_rgba(0,0,0,0.75)] transition-transform duration-500 overflow-hidden border border-white/20`}
+                                        style={{
+                                            backgroundColor: bkTheme.coverBg,
+                                            transformStyle: 'preserve-3d',
+                                            transformOrigin: isBackClosed ? 'right center' : 'left center',
+                                            ...((bookPreviewFlipAnim || activeDragCurl) ? {
+                                                transform: `rotateY(${activeDragCurl ? activeDragCurl.angleDeg : (bookPreviewFlipAnim.progress === 1 ? (isBackClosed ? 150 : -150) : (isBackClosed ? 12 : -12))}deg)`,
+                                                transition: activeDragCurl ? 'none' : 'transform 340ms cubic-bezier(0.22, 1, 0.36, 1)'
+                                            } : {})
+                                        }}
+                                    >
+                                        {/* Lomo físico de encuadernación */}
+                                        <div
+                                            className={`absolute inset-y-0 ${isBackClosed ? 'right-0' : 'left-0'} w-4 z-10 pointer-events-none`}
+                                            style={{
+                                                background: 'linear-gradient(90deg, rgba(0,0,0,0.55) 0%, rgba(255,255,255,0.24) 45%, rgba(0,0,0,0.35) 100%)'
+                                            }}
+                                        />
+                                        {renderPreviewPageSurface(
+                                            closedPageIdx,
+                                            isBackClosed ? 'left' : 'right'
+                                        )}
+                                    </div>
+
+                                    {/* Canto de hojas derechas cuando está en la portada cerrada */}
+                                    {!isBackClosed && (
+                                        <div
+                                            className="absolute top-2 bottom-2 -right-2.5 w-2.5 rounded-r-sm pointer-events-none"
+                                            style={{
+                                                background: 'repeating-linear-gradient(90deg, #f8fafc 0px, #cbd5e1 1.5px, #f1f5f9 3px)',
+                                                boxShadow: '4px 6px 14px rgba(0,0,0,0.45)'
+                                            }}
+                                        />
                                     )}
                                 </div>
-                                {/* Canto de hojas derechas */}
-                                <div
-                                    className="absolute top-2 bottom-2 -right-2.5 w-2.5 rounded-r-sm pointer-events-none"
-                                    style={{
-                                        background: 'repeating-linear-gradient(90deg, #f8fafc 0px, #cbd5e1 1.5px, #f1f5f9 3px)',
-                                        boxShadow: '4px 6px 14px rgba(0,0,0,0.45)'
-                                    }}
-                                />
-                            </div>
+                            )}
 
-                            {/* Controles de hojeo rápido en la tarjeta */}
-                            {pagesArr.length > 1 && (
+                            {/* Controles de hojeo rápido en la tarjeta (Abren y pasan pliegos de páginas en 3D) */}
+                            {totalSpreads > 1 && (
                                 <>
                                     <button
                                         type="button"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setBookPreviewPageIdx(prev => (prev <= 0 ? pagesArr.length - 1 : prev - 1));
-                                        }}
-                                        className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 hover:bg-indigo-600 text-white border border-white/20 flex items-center justify-center shadow-lg transition-all hover:scale-110 z-20 cursor-pointer"
-                                        title="Página anterior"
+                                        onClick={handlePrevPreviewSpread}
+                                        className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/65 hover:bg-indigo-600 text-white border border-white/20 flex items-center justify-center shadow-lg transition-all hover:scale-110 z-30 cursor-pointer"
+                                        title="Pliego anterior"
                                     >
                                         <ChevronLeft size={18} />
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setBookPreviewPageIdx(prev => (prev >= pagesArr.length - 1 ? 0 : prev + 1));
-                                        }}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 hover:bg-indigo-600 text-white border border-white/20 flex items-center justify-center shadow-lg transition-all hover:scale-110 z-20 cursor-pointer"
-                                        title="Página siguiente"
+                                        onClick={handleNextPreviewSpread}
+                                        className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/65 hover:bg-indigo-600 text-white border border-white/20 flex items-center justify-center shadow-lg transition-all hover:scale-110 z-30 cursor-pointer"
+                                        title="Siguiente pliego (abrir / pasar hoja)"
                                     >
                                         <ChevronRight size={18} />
                                     </button>
                                 </>
                             )}
+
+                            {/* Indicador inferior interactivo */}
+                            <div className="mt-3 flex items-center gap-2 text-[10.5px] font-bold text-indigo-200/90">
+                                <span>
+                                    {isCoverClosed
+                                        ? 'Haz clic en la portada o en la flecha derecha para abrir el libro'
+                                        : isBackClosed
+                                            ? 'Fin del libro • Haz clic para volver a hojear'
+                                            : 'Haz clic en las páginas o arrastra la esquina para pasar de hoja'}
+                                </span>
+                            </div>
                         </div>
 
                         {/* Barra de acciones del Libro */}
@@ -2692,7 +3264,7 @@ const TaskCard = React.memo(({
                             <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                                 <button
                                     type="button"
-                                    onClick={() => setActiveFlipbookModal({ book: bk, initialPage: safePageIdx })}
+                                    onClick={openModalAtCurrentSpread}
                                     className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white shadow-sm flex items-center justify-center gap-2 transition-all hover:scale-[1.01] cursor-pointer"
                                 >
                                     <BookOpen size={14} />

@@ -688,7 +688,7 @@ const TasksTab = React.memo(({
             const ownerTid = getItemTeacherId(bk);
             const teacherDisp = bk.authorName || bk.author || getTeacherDisplayName(ownerTid);
             const rawPages = Array.isArray(bk.bookPages) && bk.bookPages.length > 0 ? bk.bookPages : (Array.isArray(bk.pages) ? bk.pages : []);
-            const pageCountNum = rawPages.length > 0 ? rawPages.length : (Number(bk.pageCount) || 1);
+            const pageCountNum = Math.max(rawPages.length, Number(bk.pageCount) || 0, 1);
             const firstPageSrc = rawPages[0] ? (typeof rawPages[0] === 'string' ? rawPages[0] : rawPages[0]?.imageUrl) : '';
             synthesized.push({
                 id: `book_wall_${bk.id}`,

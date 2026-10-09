@@ -131,7 +131,7 @@ export default function Flipbook3DModal({
             setRenderProgress({ currentPage: 0, totalPages: 0, percent: 8 });
 
             renderPdfToBookPages(normalizedBook.pdfUrl, {
-                maxPages: 60,
+                maxPages: Math.max(60, Number(normalizedBook.pageCount) || 60),
                 scale: 1.55,
                 maxDimension: 1320,
                 quality: 0.80,

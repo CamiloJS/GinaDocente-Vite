@@ -39,6 +39,7 @@ import {
   buildBookSpreads,
   getSpreadIndexForPage,
   formatSpreadPageLabel,
+  resolveSpreadDisplayState,
   calculateDragCurlState,
   clampBookZoom,
   filterBooksCatalog,
@@ -1401,6 +1402,100 @@ check(
     extractedPdfText.includes('Fiscal Policy and Interest Rates')
 );
 
+console.log('\n== 16. Vista Previa Interactiva de Libros Abiertos a Doble Página en el Muro (TaskCard.jsx & resolveSpreadDisplayState) ==');
+const pages60 = Array.from({ length: 60 }, (_, idx) => `https://cdn.example.com/book/page_${idx + 1}.jpg`);
+const spreads60 = buildBookSpreads(pages60, true);
+
+const spread0State = resolveSpreadDisplayState(spreads60, 0, 60);
+check(
+  'resolveSpreadDisplayState en Spread 0 (Portada) resuelve índice numérico 0 sin caer en falsy 0 || null y etiqueta Pág. 1 / 60',
+  spread0State.isCoverClosed === true &&
+    spread0State.isOpenDoubleSpread === false &&
+    spread0State.isBackClosed === false &&
+    spread0State.leftPageIdx === null &&
+    spread0State.rightPageIdx === 0 &&
+    spread0State.closedPageIdx === 0 &&
+    spread0State.rightPageNumber === 1 &&
+    spread0State.primaryPageIndex === 0 &&
+    spread0State.badgeLabel === 'Pág. 1 / 60' &&
+    pages60[spread0State.closedPageIdx] === 'https://cdn.example.com/book/page_1.jpg'
+);
+
+const spread1State = resolveSpreadDisplayState(spreads60, 1, 60);
+check(
+  'resolveSpreadDisplayState en Spread 1 abre el libro a doble página (Pág. 2 izquierda y Pág. 3 derecha)',
+  spread1State.isCoverClosed === false &&
+    spread1State.isOpenDoubleSpread === true &&
+    spread1State.isBackClosed === false &&
+    spread1State.leftPageIdx === 1 &&
+    spread1State.rightPageIdx === 2 &&
+    spread1State.leftPageNumber === 2 &&
+    spread1State.rightPageNumber === 3 &&
+    spread1State.primaryPageIndex === 1 &&
+    spread1State.badgeLabel === 'Pág. 2–3 / 60' &&
+    pages60[spread1State.leftPageIdx] === 'https://cdn.example.com/book/page_2.jpg' &&
+    pages60[spread1State.rightPageIdx] === 'https://cdn.example.com/book/page_3.jpg'
+);
+
+const spread3State = resolveSpreadDisplayState(spreads60, 3, 60);
+check(
+  'resolveSpreadDisplayState en Spread 3 (Pág. 6–7 / 60) sincroniza primaryPageIndex=5 con getSpreadIndexForPage para abrir Flipbook3DModal en el mismo pliego',
+  spread3State.isOpenDoubleSpread === true &&
+    spread3State.leftPageIdx === 5 &&
+    spread3State.rightPageIdx === 6 &&
+    spread3State.leftPageNumber === 6 &&
+    spread3State.rightPageNumber === 7 &&
+    spread3State.primaryPageIndex === 5 &&
+    spread3State.badgeLabel === 'Pág. 6–7 / 60' &&
+    getSpreadIndexForPage(spread3State.primaryPageIndex, true, 60) === 3
+);
+
+const lastSpreadState = resolveSpreadDisplayState(spreads60, spreads60.length - 1, 60);
+check(
+  'resolveSpreadDisplayState en el último pliego (Contraportada cerrada) resuelve leftPageIdx=59, closedPageIdx=59 y etiqueta Pág. 60 / 60',
+  lastSpreadState.isCoverClosed === false &&
+    lastSpreadState.isOpenDoubleSpread === false &&
+    lastSpreadState.isBackClosed === true &&
+    lastSpreadState.leftPageIdx === 59 &&
+    lastSpreadState.rightPageIdx === null &&
+    lastSpreadState.closedPageIdx === 59 &&
+    lastSpreadState.leftPageNumber === 60 &&
+    lastSpreadState.primaryPageIndex === 59 &&
+    lastSpreadState.badgeLabel === 'Pág. 60 / 60'
+);
+
+const dragWithStageWidth = calculateDragCurlState({
+  startX: 400,
+  currentX: 220,
+  stageWidth: 500,
+  direction: 'next'
+});
+check(
+  'calculateDragCurlState acepta tanto containerWidth como stageWidth y calcula progreso y ángulo 3D de volteo',
+  dragWithStageWidth.progress > 0.5 &&
+    dragWithStageWidth.angleDeg < -90 &&
+    dragWithStageWidth.shouldComplete === true
+);
+
+const taskCardSrc = fs.readFileSync(new URL('../src/components/TaskCard.jsx', import.meta.url), 'utf8');
+check(
+  'TaskCard.jsx utiliza resolveSpreadDisplayState y consulta pagesArr[pageIdx] por índice numérico 0-based (no como objeto)',
+  taskCardSrc.includes('resolveSpreadDisplayState(bookSpreads, bookPreviewSpreadIdx, totalPagesCount)') &&
+    taskCardSrc.includes('const renderPreviewPageSurface = (pageIdx, side = \'right\') =>') &&
+    taskCardSrc.includes('const rawEntry = pagesArr[pageIdx];') &&
+    !taskCardSrc.includes('{spreadBadgeLabel} / {totalPagesCount}')
+);
+
+check(
+  'TaskCard.jsx protege botones superpuestos en pointerdown, renderiza hoja giratoria 3D de doble cara y sincroniza initialPage con Flipbook3DModal',
+  taskCardSrc.includes("e.target.closest('button, a')") &&
+    taskCardSrc.includes('frontLeafPageIdx') &&
+    taskCardSrc.includes('backLeafPageIdx') &&
+    taskCardSrc.includes("transform: 'rotateY(180deg)'") &&
+    taskCardSrc.includes('openModalAtCurrentSpread') &&
+    taskCardSrc.includes('initialPage: primaryPreviewPageIdx')
+);
+
 console.log(`\n========================================`);
 console.log(`Total pruebas Flipbook 3D: ${okCount + failCount} | OK: ${okCount} | FAIL: ${failCount}`);
 console.log(`========================================\n`);
@@ -1408,5 +1503,6 @@ console.log(`========================================\n`);
 if (failCount > 0) {
   process.exit(1);
 }
+
 
 

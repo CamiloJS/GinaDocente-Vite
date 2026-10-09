@@ -2481,6 +2481,7 @@ export const isCompactedOrFallbackBookPage = (pageUrl = '') => {
         const decoded = decodeURIComponent(payload);
         return (
             decoded.includes('Usa el botón PDF para abrir el documento completo') ||
+            decoded.includes('Usa el botón PDF para abrir el archivo original') ||
             decoded.includes('VISTA PREVIA INTERACTIVA') ||
             decoded.includes('ARCHIVO PDF VINCULADO')
         );
@@ -2828,11 +2829,80 @@ export const getSpreadIndexForPage = (pageIndex = 0, isDoublePage = true, totalP
  */
 export const formatSpreadPageLabel = (spread, totalPages = 1) => {
     if (!spread) return `1 / ${totalPages}`;
-    if (spread.leftPage !== null && spread.rightPage !== null) {
-        return `${spread.leftPage + 1}–${spread.rightPage + 1} / ${totalPages}`;
+    const resolveIdx = (val) =>
+        val !== null && val !== undefined
+            ? typeof val === 'object'
+                ? (Number.isFinite(val.pageIndex) ? val.pageIndex : null)
+                : (Number.isFinite(Number(val)) ? Number(val) : null)
+            : null;
+    const leftIdx = resolveIdx(spread.leftPage);
+    const rightIdx = resolveIdx(spread.rightPage);
+    if (leftIdx !== null && rightIdx !== null) {
+        return `${leftIdx + 1}–${rightIdx + 1} / ${totalPages}`;
     }
-    const single = spread.rightPage !== null ? spread.rightPage + 1 : (spread.leftPage ?? 0) + 1;
+    const single = rightIdx !== null ? rightIdx + 1 : (leftIdx ?? 0) + 1;
     return `${single} / ${totalPages}`;
+};
+
+/**
+ * Resolves the concrete 0-based page indices, 1-based page numbers, closed/open layout flags,
+ * and formatted badge label for a given spread index in a book preview or viewer.
+ */
+export const resolveSpreadDisplayState = (spreads = [], spreadIndex = 0, totalPages = 1) => {
+    const safeTotalPages = Math.max(1, Number(totalPages) || 1);
+    const totalSpreads = Math.max(1, Array.isArray(spreads) ? spreads.length : 1);
+    const safeSpreadIdx = Math.min(Math.max(0, Math.floor(Number(spreadIndex) || 0)), totalSpreads - 1);
+    const rawSpread = (Array.isArray(spreads) && spreads[safeSpreadIdx]) || {
+        index: 0,
+        leftPage: null,
+        rightPage: 0,
+        pages: [0],
+        isCover: true,
+        isBackCover: safeTotalPages === 1
+    };
+
+    const resolvePageIdx = (val) => {
+        if (val === null || val === undefined) return null;
+        if (typeof val === 'number' && Number.isFinite(val)) return val;
+        if (typeof val === 'object' && Number.isFinite(val.pageIndex)) return val.pageIndex;
+        return null;
+    };
+
+    const leftPageIdx = resolvePageIdx(rawSpread.leftPage);
+    const rightPageIdx = resolvePageIdx(rawSpread.rightPage);
+    const hasLeftPage = leftPageIdx !== null;
+    const hasRightPage = rightPageIdx !== null;
+
+    const isCoverClosed = !hasLeftPage && hasRightPage;
+    const isBackClosed = hasLeftPage && !hasRightPage;
+    const isOpenDoubleSpread = hasLeftPage && hasRightPage;
+    const primaryPageIndex = hasLeftPage ? leftPageIdx : (hasRightPage ? rightPageIdx : 0);
+
+    const normalizedSpread = {
+        ...rawSpread,
+        index: safeSpreadIdx,
+        leftPage: leftPageIdx,
+        rightPage: rightPageIdx,
+        pages: [leftPageIdx, rightPageIdx].filter((p) => p !== null)
+    };
+
+    return {
+        spreadIndex: safeSpreadIdx,
+        totalSpreads,
+        totalPages: safeTotalPages,
+        spread: normalizedSpread,
+        leftPageIdx,
+        rightPageIdx,
+        leftPageNumber: hasLeftPage ? leftPageIdx + 1 : null,
+        rightPageNumber: hasRightPage ? rightPageIdx + 1 : null,
+        closedPageIdx: hasRightPage ? rightPageIdx : leftPageIdx,
+        closedPageNumber: hasRightPage ? rightPageIdx + 1 : (hasLeftPage ? leftPageIdx + 1 : 1),
+        isCoverClosed,
+        isBackClosed,
+        isOpenDoubleSpread,
+        primaryPageIndex,
+        badgeLabel: `Pág. ${formatSpreadPageLabel(normalizedSpread, safeTotalPages)}`
+    };
 };
 
 /**
@@ -2843,11 +2913,12 @@ export const calculateDragCurlState = ({
     startY = 0,
     currentX = 0,
     currentY = 0,
-    containerWidth = 800,
+    containerWidth = 0,
     containerHeight = 600,
+    stageWidth = 0,
     direction = 'next'
 } = {}) => {
-    const safeWidth = Math.max(180, Number(containerWidth) || 800);
+    const safeWidth = Math.max(180, Number(containerWidth) || Number(stageWidth) || 800);
     const safeHeight = Math.max(180, Number(containerHeight) || 600);
     const deltaX = currentX - startX;
     const deltaY = currentY - startY;
