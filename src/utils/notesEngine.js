@@ -41,12 +41,12 @@ export const NOTE_HIGHLIGHT_COLORS = [
 ];
 
 export const NOTE_PAPER_THEMES = [
-  { id: 'default', label: 'Blanco limpio', lightBg: 'bg-white border-slate-200/80', darkBg: 'bg-slate-900 border-slate-800', dot: 'bg-white border-slate-300' },
-  { id: 'warm', label: 'Crema cálido', lightBg: 'bg-amber-50/40 border-amber-200/70', darkBg: 'bg-amber-950/20 border-amber-800/40', dot: 'bg-amber-100 border-amber-300' },
-  { id: 'sky', label: 'Azul hielo', lightBg: 'bg-sky-50/40 border-sky-200/70', darkBg: 'bg-sky-950/20 border-sky-800/40', dot: 'bg-sky-100 border-sky-300' },
-  { id: 'emerald', label: 'Verde salvia', lightBg: 'bg-emerald-50/40 border-emerald-200/70', darkBg: 'bg-emerald-950/20 border-emerald-800/40', dot: 'bg-emerald-100 border-emerald-300' },
-  { id: 'violet', label: 'Lavanda', lightBg: 'bg-violet-50/40 border-violet-200/70', darkBg: 'bg-violet-950/20 border-violet-800/40', dot: 'bg-violet-100 border-violet-300' },
-  { id: 'rose', label: 'Rosa pálido', lightBg: 'bg-rose-50/40 border-rose-200/70', darkBg: 'bg-rose-950/20 border-rose-800/40', dot: 'bg-rose-100 border-rose-300' }
+  { id: 'default', label: 'Blanco limpio', lightBg: 'bg-white border-slate-200', darkBg: 'bg-slate-900 border-slate-800', lightColor: '#ffffff', darkColor: '#0f172a', dot: 'bg-white border-slate-300' },
+  { id: 'warm', label: 'Crema cálido', lightBg: 'bg-amber-50 border-amber-200', darkBg: 'bg-slate-900 border-amber-800/70', lightColor: '#fffbeb', darkColor: '#1c1917', dot: 'bg-amber-100 border-amber-300' },
+  { id: 'sky', label: 'Azul hielo', lightBg: 'bg-sky-50 border-sky-200', darkBg: 'bg-slate-900 border-sky-800/70', lightColor: '#f0f9ff', darkColor: '#0c1929', dot: 'bg-sky-100 border-sky-300' },
+  { id: 'emerald', label: 'Verde salvia', lightBg: 'bg-emerald-50 border-emerald-200', darkBg: 'bg-slate-900 border-emerald-800/70', lightColor: '#ecfdf5', darkColor: '#091e1a', dot: 'bg-emerald-100 border-emerald-300' },
+  { id: 'violet', label: 'Lavanda', lightBg: 'bg-violet-50 border-violet-200', darkBg: 'bg-slate-900 border-violet-800/70', lightColor: '#f5f3ff', darkColor: '#171329', dot: 'bg-violet-100 border-violet-300' },
+  { id: 'rose', label: 'Rosa pálido', lightBg: 'bg-rose-50 border-rose-200', darkBg: 'bg-slate-900 border-rose-800/70', lightColor: '#fff1f2', darkColor: '#23121b', dot: 'bg-rose-100 border-rose-300' }
 ];
 
 export const NOTE_FORMATS = [

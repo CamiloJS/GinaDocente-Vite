@@ -1097,6 +1097,13 @@ export default function NotesModule({
     return isDarkMode ? found.darkBg : found.lightBg;
   };
 
+  const getPaperSurfaceStyle = (themeId) => {
+    const found = NOTE_PAPER_THEMES.find((t) => t.id === themeId) || NOTE_PAPER_THEMES[0];
+    return {
+      backgroundColor: isDarkMode ? (found.darkColor || '#0f172a') : (found.lightColor || '#ffffff')
+    };
+  };
+
   const getSheetRulingStyle = (styleId) => {
     const normalized = normalizeNoteSheetStyle(styleId);
     if (normalized === 'lined') {
@@ -1299,7 +1306,7 @@ export default function NotesModule({
       {/* Listado de notas */}
       {visibleNotes.length === 0 ? (
         <div className={`rounded-2xl border p-12 text-center space-y-2 ${
-          isDarkMode ? 'bg-slate-900/40 border-slate-800 text-slate-400' : 'bg-white border-slate-200/70 text-slate-500'
+          isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-white border-slate-200 text-slate-500'
         }`}>
           <div className="w-11 h-11 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center mx-auto">
             <NavNotebook size={22} />
@@ -1325,6 +1332,7 @@ export default function NotesModule({
             return (
               <article
                 key={note.id}
+                style={getPaperSurfaceStyle(note.paperTheme)}
                 className={`rounded-2xl border flex flex-col justify-between transition-all ${
                   isSheet
                     ? 'lg:col-span-2 overflow-hidden shadow-sm hover:shadow-md'
@@ -1335,7 +1343,7 @@ export default function NotesModule({
                   {/* Cabecera de la tarjeta / hoja */}
                   <div className={`flex items-start justify-between gap-2 ${
                     isSheet
-                      ? `px-6 sm:px-10 py-3.5 border-b ${isDarkMode ? 'border-slate-800/80 bg-slate-950/30' : 'border-slate-200/70 bg-white/50'}`
+                      ? `px-6 sm:px-10 py-3.5 border-b ${isDarkMode ? 'border-slate-800 bg-slate-950' : 'border-slate-200 bg-white'}`
                       : 'mb-2.5'
                   }`}>
                     <div className="flex flex-wrap items-center gap-1.5">
@@ -1770,7 +1778,7 @@ export default function NotesModule({
                 {/* Pie de la tarjeta / hoja */}
                 <div className={`flex items-center justify-between text-[11px] text-slate-400 ${
                   isSheet
-                    ? `px-6 sm:px-10 py-3 border-t ${isDarkMode ? 'border-slate-800/80 bg-slate-950/30' : 'border-slate-200/60 bg-white/50'}`
+                    ? `px-6 sm:px-10 py-3 border-t ${isDarkMode ? 'border-slate-800 bg-slate-950' : 'border-slate-200 bg-white'}`
                     : 'mt-4 pt-2.5 border-t border-slate-200/50 dark:border-slate-800/60'
                 }`}>
                   <div className="flex items-center gap-1.5 truncate">
@@ -2235,6 +2243,7 @@ export default function NotesModule({
                 onDrop={handleEditorDrop}
                 style={{
                   ...getFontFamilyStyle(fontFamily),
+                  ...getPaperSurfaceStyle(paperTheme),
                   ...(noteFormat === 'sheet' ? getSheetRulingStyle(sheetStyle) : {})
                 }}
                 data-placeholder="Escribe aquí..."
@@ -2568,16 +2577,19 @@ export default function NotesModule({
       ======================================================================== */}
       {activeSheetNote && typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-6 bg-slate-950/65 backdrop-blur-sm animate-fade-in"
+          className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-6 bg-slate-950/75 backdrop-blur-sm animate-fade-in"
           onClick={() => setActiveSheetNoteId(null)}
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className={`w-full max-w-4xl max-h-[92vh] flex flex-col rounded-2xl border shadow-2xl overflow-hidden ${getPaperThemeClasses(activeSheetNote.paperTheme)}`}
+            style={getPaperSurfaceStyle(activeSheetNote.paperTheme)}
+            className={`w-full max-w-4xl max-h-[92vh] flex flex-col rounded-2xl border shadow-2xl overflow-hidden ${
+              isDarkMode ? 'bg-slate-900 text-slate-100' : 'bg-white text-slate-900'
+            } ${getPaperThemeClasses(activeSheetNote.paperTheme)}`}
           >
             {/* Barra superior de la Hoja */}
             <div className={`flex flex-wrap items-center justify-between gap-2 px-6 py-3.5 border-b ${
-              isDarkMode ? 'border-slate-800 bg-slate-950/60 text-slate-100' : 'border-slate-200/80 bg-white/80 text-slate-900'
+              isDarkMode ? 'border-slate-800 bg-slate-950 text-slate-100' : 'border-slate-200 bg-white text-slate-900'
             }`}>
               <div className="flex flex-wrap items-center gap-2">
                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold ${
@@ -2632,7 +2644,10 @@ export default function NotesModule({
 
             {/* Cuerpo de página profesional */}
             <div
-              style={getSheetRulingStyle(activeSheetNote.sheetStyle)}
+              style={{
+                ...getPaperSurfaceStyle(activeSheetNote.paperTheme),
+                ...getSheetRulingStyle(activeSheetNote.sheetStyle)
+              }}
               className="flex-1 overflow-y-auto px-6 sm:px-14 py-8 sm:py-10 space-y-5"
             >
               <div className="border-b border-slate-200/80 dark:border-slate-800 pb-4 space-y-1.5">

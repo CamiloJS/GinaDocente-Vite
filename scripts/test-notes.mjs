@@ -397,6 +397,18 @@ check(
     DEMO_NOTES.some(n => n.noteFormat === 'sheet')
 );
 
+check(
+  'NOTE_PAPER_THEMES y el lector de hoja en pantalla completa usan fondos 100% sólidos y opacos (sin transparencias bg-*/40 ni bg-*/20)',
+  NOTE_PAPER_THEMES.every(
+    t =>
+      !/\bbg-[a-z0-9-]+\/\d+/.test(t.lightBg) &&
+      !/\bbg-[a-z0-9-]+\/\d+/.test(t.darkBg) &&
+      /^#[0-9a-fA-F]{6}$/.test(t.lightColor || '') &&
+      /^#[0-9a-fA-F]{6}$/.test(t.darkColor || '')
+  ) &&
+    notesModuleSrc.includes('getPaperSurfaceStyle(activeSheetNote.paperTheme)')
+);
+
 console.log('\n========================================');
 console.log(`Total pruebas Notas: ${okCount + failCount} | OK: ${okCount} | FAIL: ${failCount}`);
 console.log('========================================\n');
@@ -404,4 +416,5 @@ console.log('========================================\n');
 if (failCount > 0) {
   process.exit(1);
 }
+
 
