@@ -54,7 +54,7 @@ console.log('\n== 1. Constantes, PIN y Sanitizacion de Jugadores ==');
 check('4 colores Kahoot definidos', KAHOOT_COLORS.length === 4 && KAHOOT_COLORS[0].id === 'red');
 check('opciones de tiempo validas', KAHOOT_TIME_OPTIONS.includes(20) && KAHOOT_TIME_OPTIONS.includes(30));
 check('multiplicadores de puntos validos (1000 y 2000)', KAHOOT_POINTS_OPTIONS.some(p => p.maxPoints === 1000) && KAHOOT_POINTS_OPTIONS.some(p => p.maxPoints === 2000));
-check('4 tipos de preguntas soportados', Object.keys(KAHOOT_QUESTION_TYPES).length === 4);
+check('5 tipos de preguntas soportados (incluyendo acertijo/riddle)', Object.keys(KAHOOT_QUESTION_TYPES).length === 5 && Boolean(KAHOOT_QUESTION_TYPES.riddle));
 check('PIN generado tiene 6 digitos', /^\d{6}$/.test(generateKahootPin()));
 check('sanitizeKahootPlayerId limpia puntos, barras y espacios para Firestore', sanitizeKahootPlayerId('user.name/123@test') === 'user_name_123_test');
 check('sanitizeKahootPlayerId maneja vacio o nulo', sanitizeKahootPlayerId(null) === 'player_anon' && sanitizeKahootPlayerId('') === 'player_anon');
@@ -892,6 +892,241 @@ check(
   liveModalSrc.includes('prevReviewEnabled !== nextReviewEnabled') &&
     liveModalSrc.includes('partialKahootUpdates?.reviewEnabled !== undefined') &&
     taskCardSrc.includes("'kahoot.reviewEnabled': nextReview")
+);
+
+console.log('\n--- 18. Tipo de Pregunta Acertijo (Riddle) y Ventana de Gracia de 2 Segundos ---');
+
+// 18.1 Creación por defecto
+const qRiddleDef = createDefaultKahootQuestion('riddle', 4);
+check('createDefaultKahootQuestion crea pregunta tipo riddle con campos requeridos',
+  qRiddleDef.type === 'riddle' &&
+  qRiddleDef.correctAnswer === '' &&
+  Array.isArray(qRiddleDef.acceptedAnswers) &&
+  Array.isArray(qRiddleDef.options)
+);
+
+// 18.2 Normalización de respuesta escrita y sinónimos
+const normRiddleWritten = normalizeKahootQuestion({
+  type: 'riddle',
+  question: 'Tengo agujas pero no coso, tengo números pero no sé leer. ¿Qué soy?',
+  correctAnswer: 'un reloj',
+  acceptedAnswers: ['el reloj', 'reloj', 'a clock'],
+}, 0);
+check('normalizeKahootQuestion normaliza acertijo con respuesta escrita y sinónimos',
+  normRiddleWritten.type === 'riddle' &&
+  normRiddleWritten.correctAnswer === 'un reloj' &&
+  normRiddleWritten.acceptedAnswers.length === 3 &&
+  normRiddleWritten.acceptedAnswers.includes('reloj')
+);
+
+// 18.3 Normalización de acertijo con opciones y alias en español
+const normRiddleOptions = normalizeKahootQuestion({
+  tipo: 'acertijo',
+  enunciado: 'Oro parece, plata no es. ¿Qué es?',
+  opciones: [
+    { texto: 'El plátano', correcta: true },
+    { texto: 'La manzana', correcta: false },
+    { texto: 'El oro', correcta: false }
+  ]
+}, 1);
+check('normalizeKahootQuestion soporta alias en español (tipo: acertijo, opciones, correcta)',
+  normRiddleOptions.type === 'riddle' &&
+  normRiddleOptions.options.length === 3 &&
+  normRiddleOptions.options[0].isCorrect === true &&
+  normRiddleOptions.correctAnswer === 'El plátano'
+);
+
+// 18.4 Validación de configuración
+const configRiddleOk1 = validateKahootConfig({
+  title: 'Acertijos',
+  questions: [normRiddleWritten]
+});
+check('validateKahootConfig aprueba acertijo con respuesta escrita válida', configRiddleOk1.valid === true);
+
+const configRiddleOk2 = validateKahootConfig({
+  title: 'Acertijos con opciones',
+  questions: [normRiddleOptions]
+});
+check('validateKahootConfig aprueba acertijo con opciones válidas', configRiddleOk2.valid === true);
+
+const configRiddleInvalid = validateKahootConfig({
+  title: 'Acertijo inválido',
+  questions: [{
+    type: 'riddle',
+    text: '¿Quién soy?',
+    correctAnswer: '',
+    acceptedAnswers: [],
+    options: []
+  }]
+});
+check('validateKahootConfig rechaza acertijo sin solución escrita ni opciones válidas',
+  configRiddleInvalid.valid === false && configRiddleInvalid.error.includes('Acertijo')
+);
+
+const configRiddleNoCorrectOpt = validateKahootConfig({
+  title: 'Acertijo sin correcta',
+  questions: [{
+    type: 'riddle',
+    text: '¿Quién soy?',
+    options: [
+      { text: 'Opción 1', isCorrect: false },
+      { text: 'Opción 2', isCorrect: false }
+    ]
+  }]
+});
+check('validateKahootConfig rechaza acertijo con opciones si ninguna está marcada como correcta',
+  configRiddleNoCorrectOpt.valid === false
+);
+
+// 18.5 Evaluación de respuestas para Acertijo
+const riddleQuestion = {
+  type: 'riddle',
+  text: 'Blanco por dentro, verde por fuera. Si quieres que te lo diga, espera.',
+  correctAnswer: 'la pera',
+  acceptedAnswers: ['pera', 'una pera', 'a pear'],
+  options: [
+    { id: 'opt_pera', text: 'La pera', isCorrect: true },
+    { id: 'opt_manzana', text: 'La manzana', isCorrect: false }
+  ]
+};
+
+check('evaluateKahootAnswer para acertijo acepta solución escrita exacta',
+  evaluateKahootAnswer(riddleQuestion, { textAnswer: 'la pera' }) === true
+);
+check('evaluateKahootAnswer para acertijo acepta sinónimos en acceptedAnswers',
+  evaluateKahootAnswer(riddleQuestion, { textAnswer: 'pera' }) === true &&
+  evaluateKahootAnswer(riddleQuestion, { textAnswer: 'una pera' }) === true
+);
+check('evaluateKahootAnswer para acertijo es tolerante a tildes, mayúsculas y signos',
+  evaluateKahootAnswer(riddleQuestion, { textAnswer: '  ¡LA PÉRA!  ' }) === true
+);
+check('evaluateKahootAnswer para acertijo valida opción por optionIndex',
+  evaluateKahootAnswer(riddleQuestion, { optionIndex: 0 }) === true &&
+  evaluateKahootAnswer(riddleQuestion, { optionIndex: 1 }) === false
+);
+check('evaluateKahootAnswer para acertijo valida opción por optionId',
+  evaluateKahootAnswer(riddleQuestion, { optionId: 'opt_pera' }) === true &&
+  evaluateKahootAnswer(riddleQuestion, { optionId: 'opt_manzana' }) === false
+);
+check('evaluateKahootAnswer para acertijo rechaza respuesta incorrecta',
+  evaluateKahootAnswer(riddleQuestion, { textAnswer: 'un plátano' }) === false &&
+  evaluateKahootAnswer(riddleQuestion, { textAnswer: '' }) === false
+);
+
+// 18.6 Simulación de la regla de los 2 segundos (grace window)
+const simulateRiddleSubmission = ({ firstCorrectAt, nowTs, isAnswerCorrect }) => {
+  if (firstCorrectAt > 0) {
+    if (nowTs - firstCorrectAt > 2000) {
+      return { accepted: false, effectiveIsCorrect: false, reason: 'window_expired' };
+    }
+    return { accepted: true, effectiveIsCorrect: isAnswerCorrect, isFirst: false };
+  }
+  if (isAnswerCorrect) {
+    return { accepted: true, effectiveIsCorrect: true, isFirst: true, firstCorrectAt: nowTs };
+  }
+  return { accepted: true, effectiveIsCorrect: false, isFirst: false };
+};
+
+const sub1 = simulateRiddleSubmission({ firstCorrectAt: 0, nowTs: 10000, isAnswerCorrect: true });
+check('Regla 2s: El primer jugador que responde correctamente inicia firstCorrectAt',
+  sub1.accepted === true && sub1.effectiveIsCorrect === true && sub1.isFirst === true && sub1.firstCorrectAt === 10000
+);
+
+const sub2 = simulateRiddleSubmission({ firstCorrectAt: 10000, nowTs: 11500, isAnswerCorrect: true });
+check('Regla 2s: Otro jugador que responde correctamente dentro de 2s (1500ms) es validado como correcto',
+  sub2.accepted === true && sub2.effectiveIsCorrect === true && sub2.isFirst === false
+);
+
+const sub3 = simulateRiddleSubmission({ firstCorrectAt: 10000, nowTs: 12050, isAnswerCorrect: true });
+check('Regla 2s: Jugador que responde después de los 2 segundos (2050ms) queda bloqueado/expirado',
+  sub3.accepted === false && sub3.effectiveIsCorrect === false && sub3.reason === 'window_expired'
+);
+
+const subWrong = simulateRiddleSubmission({ firstCorrectAt: 0, nowTs: 9000, isAnswerCorrect: false });
+check('Regla 2s: Respuesta incorrecta no activa la ventana de firstCorrectAt',
+  subWrong.accepted === true && subWrong.effectiveIsCorrect === false && !subWrong.firstCorrectAt
+);
+
+// Simulación de 5 participantes respondiendo un acertijo
+const multiParticipantsAnswers = [
+  { id: 'p1', name: 'Ana', timeMs: 1200, isCorrect: true },
+  { id: 'p2', name: 'Luis', timeMs: 2500, isCorrect: true }, // +1300ms <= 2000ms -> OK
+  { id: 'p3', name: 'Carlos', timeMs: 3100, isCorrect: true }, // +1900ms <= 2000ms -> OK
+  { id: 'p4', name: 'Maria', timeMs: 3250, isCorrect: true }, // +2050ms > 2000ms -> FUERA
+  { id: 'p5', name: 'Pedro', timeMs: 1800, isCorrect: false }, // Incorrecto -> FUERA
+];
+
+const sortedSolvers = multiParticipantsAnswers
+  .filter((p) => p.isCorrect)
+  .sort((a, b) => a.timeMs - b.timeMs);
+const minSolverTime = sortedSolvers[0].timeMs;
+const validRiddleWinners = sortedSolvers
+  .filter((s, idx) => idx === 0 || s.timeMs - minSolverTime <= 2000)
+  .map((s, idx) => ({ ...s, isFirst: idx === 0 }));
+
+check('Regla 2s (5 jugadores): Valida a los 3 que respondieron dentro del rango de 2s del primero',
+  validRiddleWinners.length === 3 &&
+  validRiddleWinners[0].id === 'p1' && validRiddleWinners[0].isFirst === true &&
+  validRiddleWinners[1].id === 'p2' && validRiddleWinners[1].isFirst === false &&
+  validRiddleWinners[2].id === 'p3' && validRiddleWinners[2].isFirst === false
+);
+
+// 18.7 Bots simulados en Modo Demo con acertijo
+const botRiddleWritten = buildSimulatedBotAnswer(DEMO_KAHOOT_BOTS[0], normRiddleWritten, 0);
+check('buildSimulatedBotAnswer genera respuesta de texto para acertijo escrito',
+  botRiddleWritten.textAnswer !== undefined && typeof botRiddleWritten.isCorrect === 'boolean'
+);
+
+const botRiddleOptions = buildSimulatedBotAnswer(DEMO_KAHOOT_BOTS[0], normRiddleOptions, 1);
+check('buildSimulatedBotAnswer genera opción para acertijo de selección',
+  botRiddleOptions.optionIndex !== undefined && typeof botRiddleOptions.isCorrect === 'boolean'
+);
+
+// 18.8 Prompt y parseo de IA para acertijos
+const promptRiddle = construirPromptKahootIA({ tema: 'Misterios y lógica', total: 5, mezcla: 'solo_riddle' });
+check('construirPromptKahootIA incluye instrucciones para acertijos en solo_riddle',
+  promptRiddle.includes('riddle') && promptRiddle.includes('acertijo')
+);
+
+const rawAiRiddleJson = JSON.stringify([
+  {
+    tipo: 'acertijo',
+    enunciado: 'Vuelo sin alas, lloro sin ojos. ¿Qué soy?',
+    respuestaCorrecta: 'la nube',
+    sinonimos: ['una nube', 'nube', 'las nubes']
+  }
+]);
+const parsedAiRiddle = parsearKahootIA(rawAiRiddleJson);
+check('parsearKahootIA parsea correctamente preguntas de tipo riddle generadas por IA',
+  parsedAiRiddle.ok === true &&
+  parsedAiRiddle.questions.length === 1 &&
+  parsedAiRiddle.questions[0].type === 'riddle' &&
+  parsedAiRiddle.questions[0].correctAnswer === 'la nube' &&
+  parsedAiRiddle.questions[0].acceptedAnswers.includes('nube')
+);
+
+// 18.9 Integración en componentes UI (KahootBuilder, KahootLiveModal, TaskCard y PublicKahootViewer)
+check('KahootBuilder incluye botón de Acertijo y editor de respuestas escritas/opciones',
+  builderSrc.includes("handleAddQuestion('riddle')") &&
+  builderSrc.includes('Acertijo') &&
+  builderSrc.includes('Respuesta escrita') &&
+  builderSrc.includes('Opciones (selección)')
+);
+
+check('KahootLiveModal implementa ventana de 2 segundos, protección de sobreescritura, bloqueo y reinicio limpio',
+  liveModalSrc.includes('activeFirstCorrectAt') &&
+  liveModalSrc.includes("reason === 'riddle_solved'") &&
+  liveModalSrc.includes('isRiddleWindowActive') &&
+  liveModalSrc.includes('isRiddleLockedForMe') &&
+  liveModalSrc.includes('riddleWinners') &&
+  liveModalSrc.includes('Ganadores del Acertijo') &&
+  liveModalSrc.includes("'kahoot.firstCorrectAt': null") &&
+  liveModalSrc.includes('hasExistingFirstAt')
+);
+
+check('TaskCard y PublicKahootViewer muestran indicador distintivo de Acertijos en el muro y portal público',
+  taskCardSrc.includes('💡 Acertijos') &&
+  publicKahootSrc.includes('💡 Con acertijos')
 );
 
 console.log(`\nRESULTADO KAHOOT: ${okCount} OK, ${failCount} fallos\n`);

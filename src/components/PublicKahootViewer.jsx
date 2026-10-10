@@ -628,6 +628,11 @@ const PublicKahootViewer = ({
                       </p>
                       <p className="text-[11px] text-purple-200/80">
                         {qLen} {qLen === 1 ? 'pregunta' : 'preguntas'}
+                        {Array.isArray(k.questions) && k.questions.some((q) => q.type === 'riddle') && (
+                          <span className="ml-1.5 px-1.5 py-0.5 rounded bg-purple-500/30 text-purple-200 text-[10px] font-bold">
+                            💡 Con acertijos
+                          </span>
+                        )}
                         {roomTask.targetGroupName && roomTask.targetGroupName !== 'Global'
                           ? ` • ${roomTask.targetGroupName}`
                           : ''}

@@ -33,6 +33,7 @@ import {
   Lock,
   Unlock,
   Share2,
+  HelpCircle,
 } from './Icons.jsx';
 import {
   KAHOOT_COLORS,
@@ -174,6 +175,7 @@ const KahootLiveModal = ({
             prevKahoot.phase !== nextKahoot.phase ||
             prevKahoot.currentQuestionIndex !== nextKahoot.currentQuestionIndex ||
             prevKahoot.questionStartedAt !== nextKahoot.questionStartedAt ||
+            prevKahoot.firstCorrectAt !== nextKahoot.firstCorrectAt ||
             prevReviewEnabled !== nextReviewEnabled ||
             Boolean(prevMyEntry) !== Boolean(nextMyEntry) ||
             prevMyAns?.answeredAt !== nextMyAns?.answeredAt ||
@@ -230,7 +232,7 @@ const KahootLiveModal = ({
       return Array.isArray(parsed)
         ? parsed.map((q, i) => {
             const norm = normalizeKahootQuestion(q, i);
-            if (norm.type === 'quiz' || norm.type === 'truefalse') {
+            if (norm.type === 'quiz' || norm.type === 'truefalse' || norm.type === 'riddle') {
               const nonEmpty = (norm.options || []).filter(
                 (o) => String(o?.text || '').trim().length > 0
               );
@@ -306,6 +308,7 @@ const KahootLiveModal = ({
       qIndex: 0,
       phase: 'question', // 'question' | 'revealed' | 'podium'
       startedAt: startImmediateSolo ? Date.now() : 0,
+      firstCorrectAt: null,
       score: 0,
       streak: 0,
       correctCount: 0,
@@ -334,6 +337,27 @@ const KahootLiveModal = ({
   const activeStartedAt = viewMode === 'solo' ? soloState.startedAt : (Number(kahoot.questionStartedAt) || 0);
   const activeDuration = Number(currentQuestion?.timeLimit || kahoot.questionDuration || 20);
   const currentRoundKey = `${viewMode}_${activeQIndex}_${activeStartedAt}`;
+
+  // Marca de tiempo de la primera respuesta correcta en preguntas de tipo Acertijo (riddle)
+  const activeFirstCorrectAt = useMemo(() => {
+    if (viewMode === 'solo') {
+      return soloState.firstCorrectAt || null;
+    }
+    const kahootFirstAt = Number(kahoot.firstCorrectAt);
+    if (kahoot.firstCorrectRoundKey === currentRoundKey && kahootFirstAt > 0) {
+      return kahootFirstAt;
+    }
+    let earliest = null;
+    Object.values(kahoot.participants || {}).forEach((p) => {
+      const a = p?.answers?.[String(activeQIndex)];
+      if (a?.isCorrect && Number(a.answeredAt) > 0) {
+        if (!earliest || Number(a.answeredAt) < earliest) {
+          earliest = Number(a.answeredAt);
+        }
+      }
+    });
+    return earliest;
+  }, [viewMode, soloState.firstCorrectAt, kahoot.firstCorrectRoundKey, currentRoundKey, kahoot.firstCorrectAt, kahoot.participants, activeQIndex]);
 
   // Permite transición local instantánea a 'revealed' cuando todos responden o el reloj llega a 0
   const [localRevealedRoundKey, setLocalRevealedRoundKey] = useState('');
@@ -655,6 +679,69 @@ const KahootLiveModal = ({
           ? myParticipantData.lastAnswer
           : null);
 
+  const isRiddleQuestion = currentQuestion?.type === 'riddle';
+  const riddleGraceRemainingMs =
+    isRiddleQuestion && activeFirstCorrectAt
+      ? Math.max(0, activeFirstCorrectAt + 2000 - Date.now())
+      : null;
+  const isRiddleWindowActive =
+    isRiddleQuestion && activeFirstCorrectAt > 0 && riddleGraceRemainingMs > 0;
+  const isRiddleLockedForMe =
+    isRiddleQuestion && activeFirstCorrectAt > 0 && riddleGraceRemainingMs <= 0 && !myLiveAnswer;
+
+  const riddleWinners = useMemo(() => {
+    if (currentQuestion?.type !== 'riddle') return [];
+    if (viewMode === 'solo') {
+      const ans = soloState.answers[String(activeQIndex)];
+      if (ans?.isCorrect) {
+        return [
+          {
+            id: safePlayerId,
+            displayName: myNickname || loggedInName || 'Tú',
+            avatar: myAvatar,
+            timeSec: (Number(ans.timeMs || 0) / 1000).toFixed(1),
+            isFirst: true,
+          },
+        ];
+      }
+      return [];
+    }
+    const solvers = [];
+    Object.values(kahoot.participants || {}).forEach((p) => {
+      const ans = p?.answers?.[String(activeQIndex)];
+      if (ans?.isCorrect) {
+        solvers.push({
+          id: p.id,
+          displayName: p.displayName || p.nickname || p.realName || 'Jugador',
+          avatar: p.avatar || '🦊',
+          timeMs: Number(ans.timeMs) || 0,
+          timeSec: (Number(ans.timeMs || 0) / 1000).toFixed(1),
+          isFirst: Boolean(ans.isFirstCorrect),
+        });
+      }
+    });
+    solvers.sort((a, b) => a.timeMs - b.timeMs);
+    if (solvers.length === 0) return [];
+    const minTime = solvers[0].timeMs;
+    // Solo se valida a quienes respondieron dentro del rango de 2 segundos del primero
+    return solvers
+      .filter((s, idx) => idx === 0 || s.timeMs - minTime <= 2000)
+      .map((s, idx) => ({
+        ...s,
+        isFirst: idx === 0 || s.isFirst,
+      }));
+  }, [
+    currentQuestion?.type,
+    viewMode,
+    soloState.answers,
+    activeQIndex,
+    safePlayerId,
+    myNickname,
+    loggedInName,
+    myAvatar,
+    kahoot.participants,
+  ]);
+
   const gongBannerTimerRef = useRef(null);
   const soloSubmitTimerRef = useRef(null);
 
@@ -697,14 +784,28 @@ const KahootLiveModal = ({
         isLatestResponderOnAllAnswered = Boolean(latestId && latestId === safePlayerId);
       }
 
+      let isSolverOnRiddle = false;
+      if (reason === 'riddle_solved' && role !== 'teacher') {
+        const myAns = liveTaskRef.current?.kahoot?.participants?.[safePlayerId]?.answers?.[String(activeQIndex)];
+        isSolverOnRiddle = Boolean(myAns?.isCorrect);
+      }
+
+      // Respaldo de persistencia si el primer acertante cerró su navegador o el docente está en pestaña inactiva
+      const isLateRiddleFallbackPersist =
+        reason === 'riddle_solved' &&
+        activeFirstCorrectAt > 0 &&
+        Date.now() - activeFirstCorrectAt >= 2200;
+
       // Evitar tormenta de escrituras de 40+ clientes simultáneos al expirar el reloj:
-      // El docente/anfitrión (o el último estudiante en responder) persiste 'revealed' en Firestore.
+      // El docente/anfitrión (o el último estudiante en responder / acertante) persiste 'revealed' en Firestore.
       const shouldPersistPhase =
         role === 'teacher' ||
         isDemoTask ||
         reason === 'teacher_skip' ||
         reason === 'last_student_answered' ||
-        isLatestResponderOnAllAnswered;
+        isLatestResponderOnAllAnswered ||
+        isSolverOnRiddle ||
+        isLateRiddleFallbackPersist;
 
       if (shouldPersistPhase && liveTaskRef.current?.kahoot?.phase !== 'revealed') {
         updateKahootState(
@@ -784,6 +885,26 @@ const KahootLiveModal = ({
       triggerRoundEndWithGong('all_answered');
     }
   }, [isOpen, viewMode, activePhase, totalParticipants, answeredCount, triggerRoundEndWithGong]);
+
+  // Para preguntas tipo Acertijo (riddle):
+  // Si alguien ya respondió correctamente, cerrar la ronda exactamente a los 2 segundos de esa primera respuesta
+  useEffect(() => {
+    if (!isOpen || activePhase !== 'question' || currentQuestion?.type !== 'riddle') return undefined;
+    if (!activeFirstCorrectAt) return undefined;
+
+    const remainingWindowMs = Math.max(0, (activeFirstCorrectAt + 2000) - Date.now());
+
+    if (remainingWindowMs <= 0) {
+      triggerRoundEndWithGong('riddle_solved');
+      return undefined;
+    }
+
+    const timer = setTimeout(() => {
+      triggerRoundEndWithGong('riddle_solved');
+    }, remainingWindowMs);
+
+    return () => clearTimeout(timer);
+  }, [isOpen, activePhase, currentQuestion?.type, activeFirstCorrectAt, triggerRoundEndWithGong]);
 
   // Simulación automática de respuestas de compañeros de prueba (en Modo Demo o cuando el docente activó bots de prueba)
   const hasSimulatedBotsInRoom = useMemo(
@@ -871,8 +992,32 @@ const KahootLiveModal = ({
         // Si ya respondió esta pregunta, no repetir
         if (botData.answers && botData.answers[String(activeQIndex)]) return;
 
+        // Lógica de Acertijo (riddle) para bots: bloquear si ya pasaron >2s de la primera respuesta correcta
+        let currentFirstAt = Number(latestKahoot.firstCorrectAt) || 0;
+        if (!currentFirstAt) {
+          Object.values(currentParts).forEach((p) => {
+            const a = p?.answers?.[String(activeQIndex)];
+            if (a?.isCorrect && Number(a.answeredAt) > 0) {
+              if (!currentFirstAt || Number(a.answeredAt) < currentFirstAt) {
+                currentFirstAt = Number(a.answeredAt);
+              }
+            }
+          });
+        }
+        let isCorrectForBot = botAns.isCorrect;
+        let isFirstForBot = false;
+        if (currentQuestion.type === 'riddle') {
+          if (currentFirstAt > 0) {
+            if (Date.now() - currentFirstAt > 2000) {
+              return; // Ventana de 2 segundos cerrada para el acertijo
+            }
+          } else if (isCorrectForBot) {
+            isFirstForBot = true;
+          }
+        }
+
         const scoreCalc = calculateKahootPoints({
-          isCorrect: botAns.isCorrect,
+          isCorrect: isCorrectForBot,
           timeMs: botAns.timeMs,
           timeLimitSec: currentQuestion.timeLimit || 20,
           pointsMultiplier: currentQuestion.pointsMultiplier ?? 1,
@@ -881,6 +1026,8 @@ const KahootLiveModal = ({
 
         const answerRecord = {
           ...botAns,
+          isCorrect: isCorrectForBot,
+          isFirstCorrect: isFirstForBot,
           pointsEarned: scoreCalc.pointsEarned,
           streakBonus: scoreCalc.streakBonus,
           answeredAt: Date.now(),
@@ -890,7 +1037,7 @@ const KahootLiveModal = ({
           ...botData,
           score: (Number(botData.score) || 0) + scoreCalc.pointsEarned,
           streak: scoreCalc.newStreak,
-          correctCount: (Number(botData.correctCount) || 0) + (botAns.isCorrect ? 1 : 0),
+          correctCount: (Number(botData.correctCount) || 0) + (isCorrectForBot ? 1 : 0),
           totalTimeMs: (Number(botData.totalTimeMs) || 0) + (Number(botAns.timeMs) || 0),
           lastAnswer: answerRecord,
           answers: {
@@ -899,14 +1046,31 @@ const KahootLiveModal = ({
           },
         };
 
+        const existingFirstAt = Number(liveTaskRef.current?.kahoot?.firstCorrectAt) || 0;
+        const willSetBotFirst = isFirstForBot && existingFirstAt <= 0;
+        const botNowTs = Date.now();
+        const riddleDocUpdates = willSetBotFirst
+          ? { firstCorrectAt: botNowTs, firstCorrectRoundKey: currentRoundKey }
+          : {};
+        const riddleDotUpdates = willSetBotFirst
+          ? {
+              'kahoot.firstCorrectAt': botNowTs,
+              'kahoot.firstCorrectRoundKey': currentRoundKey,
+            }
+          : {};
+
         updateKahootState(
           {
+            ...riddleDocUpdates,
             participants: {
               ...currentParts,
               [bot.id]: updatedBot,
             },
           },
-          { [`kahoot.participants.${bot.id}`]: updatedBot }
+          {
+            ...riddleDotUpdates,
+            [`kahoot.participants.${bot.id}`]: updatedBot,
+          }
         );
       }, delayMs);
 
@@ -1007,9 +1171,41 @@ const KahootLiveModal = ({
     const elapsedMs = Math.max(200, Date.now() - startTs);
     const isCorrect = evaluateKahootAnswer(currentQuestion, submissionPayload);
 
+    let effectiveIsCorrect = isCorrect;
+    let isFirstForRiddle = false;
+    if (currentQuestion.type === 'riddle') {
+      let currentFirstAt = activeFirstCorrectAt;
+      const latestKahootData = liveTaskRef.current?.kahoot || kahoot;
+      if (
+        !currentFirstAt &&
+        latestKahootData?.firstCorrectRoundKey === currentRoundKey &&
+        Number(latestKahootData?.firstCorrectAt) > 0
+      ) {
+        currentFirstAt = Number(latestKahootData.firstCorrectAt);
+      }
+      if (!currentFirstAt) {
+        Object.values(latestKahootData?.participants || {}).forEach((p) => {
+          const a = p?.answers?.[String(activeQIndex)];
+          if (a?.isCorrect && Number(a.answeredAt) > 0) {
+            if (!currentFirstAt || Number(a.answeredAt) < currentFirstAt) {
+              currentFirstAt = Number(a.answeredAt);
+            }
+          }
+        });
+      }
+
+      if (currentFirstAt > 0 && Date.now() - currentFirstAt > 2000) {
+        showMessage?.('¡Acertijo resuelto! El tiempo para responder este acertijo ya terminó.');
+        return;
+      }
+      if (!currentFirstAt && isCorrect) {
+        isFirstForRiddle = true;
+      }
+    }
+
     if (viewMode === 'solo') {
       const scoreCalc = calculateKahootPoints({
-        isCorrect,
+        isCorrect: effectiveIsCorrect,
         timeMs: elapsedMs,
         timeLimitSec: currentQuestion.timeLimit || 20,
         pointsMultiplier: currentQuestion.pointsMultiplier ?? 1,
@@ -1020,7 +1216,8 @@ const KahootLiveModal = ({
         ...submissionPayload,
         ...(currentQuestion.id ? { questionId: currentQuestion.id } : {}),
         questionIndex: activeQIndex,
-        isCorrect,
+        isCorrect: effectiveIsCorrect,
+        isFirstCorrect: isFirstForRiddle,
         pointsEarned: scoreCalc.pointsEarned,
         streakBonus: scoreCalc.streakBonus,
         timeMs: elapsedMs,
@@ -1029,20 +1226,21 @@ const KahootLiveModal = ({
 
       setSoloState((prev) => ({
         ...prev,
+        firstCorrectAt: isFirstForRiddle ? Date.now() : prev.firstCorrectAt,
         score: prev.score + scoreCalc.pointsEarned,
         streak: scoreCalc.newStreak,
-        correctCount: prev.correctCount + (isCorrect ? 1 : 0),
+        correctCount: prev.correctCount + (effectiveIsCorrect ? 1 : 0),
         answers: {
           ...prev.answers,
           [String(activeQIndex)]: answerObj,
         },
       }));
 
-      // En modo práctica individual, tras responder uno mismo, suena la campana inmediatamente
+      // En modo práctica individual, tras responder uno mismo, suena la campana
       if (soloSubmitTimerRef.current) clearTimeout(soloSubmitTimerRef.current);
       soloSubmitTimerRef.current = setTimeout(() => {
-        triggerRoundEndWithGong('all_answered');
-      }, 200);
+        triggerRoundEndWithGong(currentQuestion.type === 'riddle' ? 'riddle_solved' : 'all_answered');
+      }, currentQuestion.type === 'riddle' ? 800 : 200);
       return;
     }
 
@@ -1060,8 +1258,15 @@ const KahootLiveModal = ({
       answers: {},
     };
 
+    const existingLiveFirstAt = Number(liveTaskRef.current?.kahoot?.firstCorrectAt) || 0;
+    const hasExistingFirstAt =
+      liveTaskRef.current?.kahoot?.firstCorrectRoundKey === currentRoundKey &&
+      existingLiveFirstAt > 0;
+    const willSetFirstAt = isFirstForRiddle && !hasExistingFirstAt;
+    const nowTs = Date.now();
+
     const scoreCalc = calculateKahootPoints({
-      isCorrect,
+      isCorrect: effectiveIsCorrect,
       timeMs: elapsedMs,
       timeLimitSec: currentQuestion.timeLimit || 20,
       pointsMultiplier: currentQuestion.pointsMultiplier ?? 1,
@@ -1072,11 +1277,12 @@ const KahootLiveModal = ({
       ...submissionPayload,
       ...(currentQuestion.id ? { questionId: currentQuestion.id } : {}),
       questionIndex: activeQIndex,
-      isCorrect,
+      isCorrect: effectiveIsCorrect,
+      isFirstCorrect: isFirstForRiddle && !hasExistingFirstAt,
       pointsEarned: scoreCalc.pointsEarned,
       streakBonus: scoreCalc.streakBonus,
       timeMs: elapsedMs,
-      answeredAt: Date.now(),
+      answeredAt: nowTs,
     };
 
     const updatedMe = {
@@ -1085,7 +1291,7 @@ const KahootLiveModal = ({
       avatar: myAvatar,
       score: (Number(me.score) || 0) + scoreCalc.pointsEarned,
       streak: scoreCalc.newStreak,
-      correctCount: (Number(me.correctCount) || 0) + (isCorrect ? 1 : 0),
+      correctCount: (Number(me.correctCount) || 0) + (effectiveIsCorrect ? 1 : 0),
       totalTimeMs: (Number(me.totalTimeMs) || 0) + elapsedMs,
       lastAnswer: answerObj,
       answers: {
@@ -1099,16 +1305,28 @@ const KahootLiveModal = ({
       [safePlayerId]: updatedMe,
     };
 
+    const riddleDocUpdates = willSetFirstAt
+      ? { firstCorrectAt: nowTs, firstCorrectRoundKey: currentRoundKey }
+      : {};
+    const riddleDotUpdates = willSetFirstAt
+      ? {
+          'kahoot.firstCorrectAt': nowTs,
+          'kahoot.firstCorrectRoundKey': currentRoundKey,
+        }
+      : {};
+
     // Si con esta respuesta ya respondieron todos los participantes, transicionar a 'revealed' en la misma escritura atómica
     const { totalParticipants: afterTotal, answeredCount: afterAnswered } =
       buildKahootLeaderboard(nextParts, activeQIndex);
     const allDoneNow = afterTotal > 0 && afterAnswered >= afterTotal;
 
     const partialPayload = {
+      ...riddleDocUpdates,
       participants: nextParts,
       ...(allDoneNow ? { phase: 'revealed', lastEndReason: 'all_answered' } : {}),
     };
     const dotPayload = {
+      ...riddleDotUpdates,
       [`kahoot.participants.${safePlayerId}`]: updatedMe,
       ...(allDoneNow
         ? {
@@ -1155,6 +1373,8 @@ const KahootLiveModal = ({
       currentQuestionIndex: indexToStart,
       questionStartedAt: now,
       questionDuration: dur,
+      firstCorrectAt: null,
+      firstCorrectRoundKey: nextRoundKey,
     };
     const dotUpdates = {
       'kahoot.status': 'live',
@@ -1162,6 +1382,8 @@ const KahootLiveModal = ({
       'kahoot.currentQuestionIndex': indexToStart,
       'kahoot.questionStartedAt': now,
       'kahoot.questionDuration': dur,
+      'kahoot.firstCorrectAt': null,
+      'kahoot.firstCorrectRoundKey': nextRoundKey,
     };
 
     // Al iniciar la Pregunta 1 (indexToStart === 0), reiniciar puntajes previos de la sala sin sobrescribir el mapa entero
@@ -1206,6 +1428,7 @@ const KahootLiveModal = ({
           qIndex: nextIdx,
           phase: 'question',
           startedAt: now,
+          firstCorrectAt: null,
         }));
       } else {
         setSoloState((prev) => ({ ...prev, phase: 'podium' }));
@@ -1243,6 +1466,8 @@ const KahootLiveModal = ({
       'kahoot.phase': 'lobby',
       'kahoot.currentQuestionIndex': 0,
       'kahoot.questionStartedAt': 0,
+      'kahoot.firstCorrectAt': null,
+      'kahoot.firstCorrectRoundKey': null,
     };
     Object.entries(kahoot.participants || {}).forEach(([k, p]) => {
       if (!p) return;
@@ -1266,6 +1491,8 @@ const KahootLiveModal = ({
         phase: 'lobby',
         currentQuestionIndex: 0,
         questionStartedAt: 0,
+        firstCorrectAt: null,
+        firstCorrectRoundKey: null,
         participants: resetParts,
       },
       dotUpdates
@@ -1802,6 +2029,66 @@ const KahootLiveModal = ({
                       </div>
                     )}
 
+                    {q.type === 'riddle' && (
+                      <div className="space-y-2">
+                        {q.options && q.options.length >= 2 ? (
+                          <div className="flex flex-col gap-2">
+                            {(q.options || []).map((opt, oIdx) => {
+                              const color = KAHOOT_COLORS[oIdx % KAHOOT_COLORS.length];
+                              const wasChosenByMe =
+                                mySavedAns &&
+                                (mySavedAns.optionIndex === oIdx ||
+                                  (Array.isArray(mySavedAns.optionIndices) &&
+                                    mySavedAns.optionIndices.includes(oIdx)));
+                              return (
+                                <div
+                                  key={opt.id || oIdx}
+                                  className={`flex items-center justify-between gap-3 p-3 rounded-2xl border-2 transition-all ${
+                                    opt.isCorrect
+                                      ? 'bg-emerald-500/25 border-emerald-400 text-white shadow-sm'
+                                      : 'bg-white/5 border-white/10 text-purple-100 opacity-80'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-3 min-w-0">
+                                    <span
+                                      className={`w-8 h-8 rounded-xl ${color.badgeClass} font-black text-sm flex items-center justify-center shrink-0`}
+                                    >
+                                      {color.symbol}
+                                    </span>
+                                    <span className="text-xs sm:text-sm font-bold break-words">
+                                      {opt.text}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    {wasChosenByMe && (
+                                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-white/20 text-white">
+                                        Tu elección
+                                      </span>
+                                    )}
+                                    {opt.isCorrect && (
+                                      <span className="text-xs font-black text-emerald-300 flex items-center gap-1">
+                                        <CheckCircle2 size={15} /> Correcta
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="p-3 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 text-xs sm:text-sm">
+                            <span className="font-black text-emerald-300">✔ Solución del acertijo: </span>
+                            <span className="font-bold text-white">{q.correctAnswer}</span>
+                            {q.acceptedAnswers?.length > 0 && (
+                              <span className="block text-[11px] text-purple-200 mt-1">
+                                También se acepta: {q.acceptedAnswers.join(', ')}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {q.explanation && (
                       <div className="p-3 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 text-xs text-indigo-100">
                         <strong className="text-indigo-300">Retroalimentación:</strong> {q.explanation}
@@ -2016,6 +2303,11 @@ const KahootLiveModal = ({
                   <span className="px-3 py-1 rounded-xl bg-white/15 border border-white/20">
                     Pregunta {activeQIndex + 1} de {questions.length}
                   </span>
+                  {currentQuestion.type === 'riddle' && (
+                    <span className="px-2.5 py-1 rounded-xl bg-purple-600 text-white flex items-center gap-1 shadow-sm">
+                      <HelpCircle size={13} /> Acertijo
+                    </span>
+                  )}
                   {currentQuestion.pointsMultiplier === 2 && (
                     <span className="px-2.5 py-1 rounded-xl bg-amber-400 text-gray-950 flex items-center gap-1 animate-bounce">
                       <Zap size={13} /> Puntos Dobles x2
@@ -2059,6 +2351,15 @@ const KahootLiveModal = ({
                   )}
                 </div>
               </div>
+
+              {isRiddleWindowActive && (
+                <div className="py-2 px-4 rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-gray-950 text-xs sm:text-sm font-black text-center flex items-center justify-center gap-2 shadow-lg animate-pulse">
+                  <Zap size={16} />
+                  <span>
+                    ⚡ ¡El acertijo fue respondido! Quedan {(riddleGraceRemainingMs / 1000).toFixed(1)}s para responder
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Tarjeta del Enunciado e Imagen de la Pregunta (blindada contra Modo Oscuro) */}
@@ -2120,6 +2421,29 @@ const KahootLiveModal = ({
                   </button>
                 </div>
 
+                {currentQuestion.type === 'riddle' && activeFirstCorrectAt && (
+                  <div className="p-3.5 rounded-2xl bg-amber-500/25 border border-amber-400/50 flex items-center justify-between gap-3 animate-pulse">
+                    <div className="flex items-center gap-2.5">
+                      <Zap size={20} className="text-amber-300 shrink-0" />
+                      <div>
+                        <h5 className="font-black text-xs sm:text-sm text-white">
+                          {isRiddleWindowActive
+                            ? `¡Acertijo respondido! Ventana de gracia: ${(riddleGraceRemainingMs / 1000).toFixed(1)}s`
+                            : '¡Tiempo del acertijo finalizado!'}
+                        </h5>
+                        <p className="text-[11px] text-purple-200">
+                          {isRiddleWindowActive
+                            ? 'Los demás estudiantes tienen 2 segundos para validar su respuesta.'
+                            : 'Cerrando pregunta y revelando los acertantes...'}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-xl bg-amber-400 text-gray-950 font-black text-xs shrink-0">
+                      {riddleWinners.length} {riddleWinners.length === 1 ? 'acierto' : 'aciertos'}
+                    </span>
+                  </div>
+                )}
+
                 {/* Barra de progreso de respuestas recibidas */}
                 <div className="w-full h-3 rounded-full bg-black/30 overflow-hidden p-0.5">
                   <div
@@ -2171,6 +2495,30 @@ const KahootLiveModal = ({
                         Respuesta enviada ({(myLiveAnswer.timeMs / 1000).toFixed(1)}s)
                       </span>
                     </div>
+                  </div>
+                )}
+
+                {/* Alerta de ventana de 2 segundos en acertijo o bloqueo */}
+                {isRiddleLockedForMe && (
+                  <div className="p-5 rounded-3xl bg-red-500/20 border-2 border-red-400 text-center space-y-2 animate-in zoom-in-95">
+                    <div className="w-12 h-12 rounded-2xl bg-red-500/40 text-red-200 flex items-center justify-center mx-auto">
+                      <Lock size={22} />
+                    </div>
+                    <h4 className="text-base sm:text-lg font-black text-white">
+                      ¡Acertijo resuelto!
+                    </h4>
+                    <p className="text-xs sm:text-sm text-purple-200">
+                      Otro participante resolvió el acertijo primero y la ventana de 2 segundos ha finalizado.
+                    </p>
+                  </div>
+                )}
+
+                {isRiddleWindowActive && !myLiveAnswer && (
+                  <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/30 via-yellow-400/25 to-amber-500/30 border-2 border-amber-400 text-white flex items-center justify-center gap-2 animate-bounce shadow-lg">
+                    <Zap size={18} className="text-amber-300" />
+                    <span className="font-black text-xs sm:text-sm">
+                      ⚡ ¡El acertijo fue respondido! Tienes {(riddleGraceRemainingMs / 1000).toFixed(1)}s para responder.
+                    </span>
                   </div>
                 )}
 
@@ -2359,6 +2707,97 @@ const KahootLiveModal = ({
                     )}
                   </div>
                 )}
+
+                {/* Entrada interactiva para Acertijo (Riddle) */}
+                {currentQuestion.type === 'riddle' && !isRiddleLockedForMe && (
+                  currentQuestion.options && currentQuestion.options.length >= 2 ? (
+                    <div className="flex flex-col gap-3 w-full">
+                      {(currentQuestion.options || []).map((opt, oIdx) => {
+                        const color = KAHOOT_COLORS[oIdx % KAHOOT_COLORS.length];
+                        const isLockedSelection =
+                          myLiveAnswer &&
+                          (myLiveAnswer.optionIndex === oIdx ||
+                            (Array.isArray(myLiveAnswer.optionIndices) &&
+                              myLiveAnswer.optionIndices.includes(oIdx)));
+
+                        return (
+                          <button
+                            key={opt.id || oIdx}
+                            type="button"
+                            disabled={Boolean(myLiveAnswer) || isRiddleLockedForMe}
+                            onClick={() => {
+                              handleSubmitAnswer({ optionIndex: oIdx, optionIndices: [oIdx] });
+                            }}
+                            className={`w-full p-4 sm:p-4.5 rounded-2xl border-b-4 text-left font-black transition-all flex items-center justify-between gap-3.5 shadow-lg ${
+                              color.bgClass
+                            } ${
+                              myLiveAnswer
+                                ? isLockedSelection
+                                  ? 'ring-4 ring-white scale-[1.01]'
+                                  : 'opacity-45 cursor-not-allowed'
+                                : isRiddleLockedForMe
+                                  ? 'opacity-40 cursor-not-allowed'
+                                  : 'hover:scale-[1.01] active:scale-[0.99] cursor-pointer'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                              <span className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-black/20 text-white font-black text-lg sm:text-xl flex items-center justify-center shrink-0 shadow-inner">
+                                {color.symbol}
+                              </span>
+                              <span className="text-sm sm:text-lg text-white leading-snug break-words">
+                                {opt.text}
+                              </span>
+                            </div>
+
+                            {isLockedSelection && (
+                              <span className="px-3 py-1 rounded-xl bg-white text-gray-950 text-xs font-black shrink-0 flex items-center gap-1">
+                                <CheckCircle2 size={14} /> Elegida
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    myLiveAnswer ? (
+                      <div className="p-4 rounded-2xl bg-white/10 border border-white/20 text-center">
+                        <span className="text-xs font-bold text-purple-200 block mb-1">
+                          Tu respuesta:
+                        </span>
+                        <span className="text-base sm:text-lg font-black text-white">
+                          “{myLiveAnswer.textAnswer || ''}”
+                        </span>
+                      </div>
+                    ) : (
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          if (!typedAnswerText.trim() || isRiddleLockedForMe) return;
+                          handleSubmitAnswer({ textAnswer: typedAnswerText.trim() });
+                        }}
+                        className="flex flex-col sm:flex-row gap-3 w-full"
+                      >
+                        <input
+                          type="text"
+                          disabled={isRiddleLockedForMe}
+                          value={typedAnswerText}
+                          onChange={(e) => setTypedAnswerText(e.target.value)}
+                          placeholder="Escribe la solución del acertijo..."
+                          style={{ backgroundColor: '#ffffff', color: '#0f172a' }}
+                          className="kahoot-light-input flex-1 py-4 px-5 rounded-2xl bg-white text-[#0f172a] font-black text-base outline-none ring-4 ring-purple-400/40 focus:ring-amber-400 disabled:opacity-50"
+                          autoFocus
+                        />
+                        <button
+                          type="submit"
+                          disabled={!typedAnswerText.trim() || isRiddleLockedForMe}
+                          className="px-8 py-4 rounded-2xl bg-emerald-400 hover:bg-emerald-300 disabled:opacity-40 text-gray-950 font-black text-base shadow-xl cursor-pointer"
+                        >
+                          Enviar
+                        </button>
+                      </form>
+                    )
+                  )
+                )}
               </>
             )}
           </div>
@@ -2441,6 +2880,50 @@ const KahootLiveModal = ({
             ) : (
               <div className="p-4 rounded-3xl bg-white/10 border border-white/20 text-center text-sm font-bold text-purple-200">
                 Tiempo finalizado.
+              </div>
+            )}
+
+            {/* Mención especial para ganadores del Acertijo en la ventana de 2 segundos */}
+            {currentQuestion.type === 'riddle' && (
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-purple-500/25 via-indigo-500/20 to-purple-500/25 border border-purple-400/50 flex flex-col gap-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center font-black text-lg shrink-0 shadow-md">
+                    <HelpCircle size={20} />
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-black uppercase tracking-wider text-purple-300 block">
+                      {riddleWinners.length > 0 ? `Ganadores del Acertijo (${riddleWinners.length})` : 'Acertijo no resuelto'}
+                    </span>
+                    <span className="text-xs text-purple-100">
+                      {riddleWinners.length > 0
+                        ? 'Participantes que descifraron la respuesta dentro de la ventana de gracia de 2 segundos:'
+                        : 'Nadie descifró el acertijo dentro del tiempo disponible.'}
+                    </span>
+                  </div>
+                </div>
+                {riddleWinners.length > 0 && (
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {riddleWinners.map((winner) => (
+                      <span
+                        key={winner.id}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm ${
+                          winner.isFirst
+                            ? 'bg-amber-400 text-gray-950 ring-2 ring-white'
+                            : 'bg-white/15 text-white border border-white/20'
+                        }`}
+                      >
+                        <span>{winner.avatar}</span>
+                        <span>{winner.displayName}</span>
+                        <span className="text-[10px] opacity-80">({winner.timeSec}s)</span>
+                        {winner.isFirst && (
+                          <span className="text-[9px] uppercase font-black px-1.5 py-0.5 rounded bg-black/20">
+                            1° Primero
+                          </span>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -2537,6 +3020,69 @@ const KahootLiveModal = ({
                         {idx + 1}°. {it}
                       </div>
                     ))}
+                  </div>
+                )}
+
+                {currentQuestion.type === 'riddle' && (
+                  <div className="space-y-2">
+                    {currentQuestion.options && currentQuestion.options.length >= 2 ? (
+                      <div className="flex flex-col gap-2">
+                        {currentQuestion.options.map((opt, oIdx) => {
+                          const color = KAHOOT_COLORS[oIdx % KAHOOT_COLORS.length];
+                          const votesForOpt = leaderboard.filter((p) => {
+                            const ans = p?.currentQuestionAnswer;
+                            if (!ans) return false;
+                            return (
+                              ans.optionIndex === oIdx ||
+                              (Array.isArray(ans.optionIndices) && ans.optionIndices.includes(oIdx))
+                            );
+                          }).length;
+
+                          return (
+                            <div
+                              key={opt.id || oIdx}
+                              className={`p-3 rounded-2xl border-2 flex items-center justify-between gap-3 ${
+                                opt.isCorrect
+                                  ? 'bg-emerald-500/30 border-emerald-400 text-white shadow-md'
+                                  : 'bg-white/5 border-white/10 text-purple-200 opacity-60'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <span
+                                  className={`w-7 h-7 rounded-lg ${color.badgeClass} font-black text-xs flex items-center justify-center shrink-0`}
+                                >
+                                  {color.symbol}
+                                </span>
+                                <span className="text-xs sm:text-sm font-bold break-words">
+                                  {opt.text}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                {viewMode === 'live' && (
+                                  <span className="text-xs font-extrabold px-2 py-0.5 rounded-lg bg-black/30">
+                                    {votesForOpt}
+                                  </span>
+                                )}
+                                {opt.isCorrect && (
+                                  <CheckCircle2 size={18} className="text-emerald-300 shrink-0" />
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="p-3.5 rounded-2xl bg-emerald-500/25 border border-emerald-400 text-sm font-bold">
+                        <div>
+                          ✔ Solución del acertijo: <span className="font-black">{currentQuestion.correctAnswer}</span>
+                        </div>
+                        {currentQuestion.acceptedAnswers && currentQuestion.acceptedAnswers.length > 0 && (
+                          <div className="text-xs text-purple-200 mt-1 font-normal">
+                            Respuestas aceptadas: <span className="font-semibold">{currentQuestion.acceptedAnswers.join(', ')}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 

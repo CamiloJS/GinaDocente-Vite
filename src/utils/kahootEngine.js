@@ -87,6 +87,12 @@ export const KAHOOT_QUESTION_TYPES = {
     shortLabel: 'Puzzle',
     description: 'Ordenar elementos',
   },
+  riddle: {
+    id: 'riddle',
+    label: 'Acertijo',
+    shortLabel: 'Acertijo',
+    description: 'Acertijo (gana el más rápido, ventana de 2s)',
+  },
 };
 
 export const KAHOOT_AVATARS = [
@@ -188,6 +194,24 @@ export function createDefaultKahootQuestion(type = 'quiz', index = 0) {
     };
   }
 
+  if (cleanType === 'riddle') {
+    return {
+      id: baseId,
+      type: 'riddle',
+      text: '',
+      imageUrl: '',
+      imageReveal: 'none',
+      timeLimit: 30,
+      pointsMultiplier: 2,
+      allowMultiple: false,
+      options: [],
+      correctAnswer: '',
+      acceptedAnswers: [],
+      puzzleItems: [],
+      explanation: '',
+    };
+  }
+
   return {
     id: baseId,
     type: 'quiz',
@@ -231,6 +255,8 @@ export function normalizeKahootQuestion(raw, index = 0, normOptions = {}) {
     type = 'type_answer';
   } else if (rawType === 'puzzle' || rawType === 'order' || rawType === 'ordenar') {
     type = 'puzzle';
+  } else if (rawType === 'riddle' || rawType === 'acertijo') {
+    type = 'riddle';
   }
 
   const rawTextSource = raw.text ?? raw.question ?? raw.pregunta ?? raw.enunciado ?? '';
@@ -375,6 +401,71 @@ export function normalizeKahootQuestion(raw, index = 0, normOptions = {}) {
     };
   }
 
+  if (type === 'riddle') {
+    const rawAccSource = raw.acceptedAnswers ?? raw.aceptadas ?? raw.sinonimos ?? raw.respuestasAceptadas;
+    const rawAcc = Array.isArray(rawAccSource)
+      ? rawAccSource
+      : typeof rawAccSource === 'string' && rawAccSource.trim()
+        ? rawAccSource.split(',').map((s) => s.trim())
+        : [];
+    const acceptedAnswers = rawAcc.map((s) => limpiarTextoPlano(s, 150)).filter(Boolean).slice(0, 10);
+
+    const rawOptions = Array.isArray(raw.options || raw.opciones) ? (raw.options || raw.opciones) : [];
+    let options = rawOptions.slice(0, 4).map((o, idx) => ({
+      id: String(o?.id || `${baseId}_${idx}`),
+      text: cleanFn(typeof o === 'string' ? o : (o?.text ?? o?.texto ?? ''), 220),
+      isCorrect: Boolean(typeof o === 'object' ? (o?.isCorrect ?? o?.correcta) : false),
+    }));
+
+    if (preserveDraft && rawOptions.length > 0) {
+      while (options.length < 4) {
+        const idx = options.length;
+        options.push({
+          id: `${baseId}_${idx}`,
+          text: '',
+          isCorrect: false,
+        });
+      }
+    }
+
+    const hasFilledOptions = options.some((o) => String(o.text || '').trim().length > 0);
+    const validOptions = hasFilledOptions
+      ? (preserveDraft ? options : options.filter((o) => String(o.text || '').trim().length > 0))
+      : [];
+
+    const correctAnswer = cleanFn(
+      raw.correctAnswer ??
+        raw.respuestaCorrecta ??
+        raw.respuesta ??
+        raw.answer ??
+        acceptedAnswers[0] ??
+        (options.find((o) => o?.isCorrect)?.text || '') ??
+        '',
+      200
+    );
+
+    const result = {
+      id: baseId,
+      type: 'riddle',
+      text,
+      question: text,
+      imageUrl,
+      imageReveal,
+      timeLimit,
+      pointsMultiplier: rawMult === 0 ? 0 : (rawMult === 1 || rawMult === 1000 ? 1 : 2),
+      allowMultiple: false,
+      options: validOptions,
+      correctAnswer,
+      acceptedAnswers,
+      puzzleItems: [],
+      explanation,
+    };
+    if (preserveDraft && typeof raw.acceptedAnswersInput === 'string') {
+      result.acceptedAnswersInput = raw.acceptedAnswersInput;
+    }
+    return result;
+  }
+
   // Quiz (Selección múltiple de 2 a 4 opciones)
   const rawOptions = Array.isArray(raw.options || raw.opciones) ? (raw.options || raw.opciones) : [];
   let options = rawOptions.slice(0, 4).map((o, idx) => ({
@@ -493,6 +584,26 @@ export function validateKahootConfig(kahootInput) {
       continue;
     }
 
+    if (q.type === 'riddle') {
+      const hasCorrectAnswer = Boolean(String(q.correctAnswer || '').trim());
+      const validOptions = (q.options || []).filter((o) => String(o.text || '').trim().length > 0);
+      const hasValidOptions = validOptions.length >= 2 && validOptions.some((o) => o.isCorrect);
+
+      if (!hasCorrectAnswer && !hasValidOptions) {
+        return {
+          valid: false,
+          error: `La pregunta #${num} (Acertijo) necesita la respuesta correcta escrita o al menos 2 opciones con una correcta.`,
+          normalizedQuestions: [],
+          questions: [],
+        };
+      }
+      normalizedQuestions.push({
+        ...q,
+        options: validOptions.length >= 2 ? validOptions : [],
+      });
+      continue;
+    }
+
     // Quiz o True/False
     const rawOptsList = Array.isArray(rawQ?.options || rawQ?.opciones) ? (rawQ.options || rawQ.opciones) : null;
     const rawHadExplicitValidCorrect = rawOptsList
@@ -573,6 +684,57 @@ export function evaluateKahootAnswer(question, submission) {
     const given = (submission.puzzleOrder || submission.orderedIds || []).map(normalizeCompareString).filter(Boolean);
     if (target.length === 0 || given.length !== target.length) return false;
     return target.every((item, idx) => item === given[idx]);
+  }
+
+  if (question.type === 'riddle') {
+    // Si la entrega es texto o un objeto con textAnswer/text
+    const rawText = typeof submission === 'string' ? submission : (submission.textAnswer ?? submission.text);
+    if (rawText !== undefined && rawText !== null && String(rawText).trim()) {
+      const given = normalizeCompareString(rawText);
+      if (!given) return false;
+      const validSet = new Set(
+        [question.correctAnswer, ...(question.acceptedAnswers || [])]
+          .map(normalizeCompareString)
+          .filter(Boolean)
+      );
+      if (validSet.has(given)) return true;
+
+      if (Array.isArray(question.options) && question.options.length > 0) {
+        const correctOptTexts = question.options
+          .filter((o) => o?.isCorrect)
+          .map((o) => normalizeCompareString(o?.text))
+          .filter(Boolean);
+        if (correctOptTexts.includes(given)) return true;
+      }
+      return false;
+    }
+
+    // Si la entrega es selección por opción (índice o ID)
+    const options = Array.isArray(question.options) ? question.options : [];
+    if (options.length > 0) {
+      if (submission.optionId !== undefined && submission.optionId !== null) {
+        const found = options.find((o) => String(o.id) === String(submission.optionId));
+        if (found) return Boolean(found.isCorrect);
+      }
+      if (submission.optionIndex !== undefined && submission.optionIndex !== null) {
+        const idx = Number(submission.optionIndex);
+        if (!Number.isNaN(idx) && idx >= 0 && idx < options.length) {
+          return Boolean(options[idx]?.isCorrect);
+        }
+      }
+      if (Array.isArray(submission.optionIndices) && submission.optionIndices.length > 0) {
+        const idx = Number(submission.optionIndices[0]);
+        if (!Number.isNaN(idx) && idx >= 0 && idx < options.length) {
+          return Boolean(options[idx]?.isCorrect);
+        }
+      }
+      if (Array.isArray(submission.optionIds) && submission.optionIds.length > 0) {
+        const found = options.find((o) => String(o.id) === String(submission.optionIds[0]));
+        if (found) return Boolean(found.isCorrect);
+      }
+    }
+
+    return false;
   }
 
   const options = Array.isArray(question.options) ? question.options : [];
@@ -781,6 +943,12 @@ export function reconcileKahootParticipantsAfterEdit(participantsMap = {}, norma
     if (q.type === 'type_answer') {
       return typeof ans.textAnswer === 'string' || typeof ans.text === 'string';
     }
+    if (q.type === 'riddle') {
+      if (typeof ans.textAnswer === 'string' || typeof ans.text === 'string') return true;
+      if (ans.optionIndex !== undefined || ans.optionId !== undefined) return true;
+      if (Array.isArray(ans.optionIndices) || Array.isArray(ans.optionIds)) return true;
+      return false;
+    }
     if (q.type === 'puzzle') {
       return Array.isArray(ans.puzzleOrder) || Array.isArray(ans.orderedIds);
     }
@@ -953,6 +1121,47 @@ export function buildSimulatedBotAnswer(bot, question, questionIndex) {
     };
   }
 
+  if (question.type === 'riddle') {
+    const hasOptions = Array.isArray(question.options) && question.options.length >= 2;
+    if (hasOptions) {
+      const correctIndices = question.options
+        .map((o, idx) => (o?.isCorrect ? idx : -1))
+        .filter((i) => i >= 0);
+      const wrongIndices = question.options
+        .map((o, idx) => (!o?.isCorrect ? idx : -1))
+        .filter((i) => i >= 0);
+      let chosenIdx = 0;
+      if (isCorrectRoll && correctIndices.length > 0) {
+        chosenIdx = correctIndices[Math.floor(Math.random() * correctIndices.length)];
+      } else if (!isCorrectRoll && wrongIndices.length > 0) {
+        chosenIdx = wrongIndices[Math.floor(Math.random() * wrongIndices.length)];
+      }
+      const sub = {
+        ...qIdField,
+        questionIndex,
+        optionIndex: chosenIdx,
+        optionIndices: [chosenIdx],
+        timeMs,
+      };
+      return {
+        ...sub,
+        isCorrect: evaluateKahootAnswer(question, sub),
+      };
+    } else {
+      const textAnswer = isCorrectRoll ? (question.correctAnswer || 'respuesta correcta') : 'no lo se';
+      const sub = {
+        ...qIdField,
+        questionIndex,
+        textAnswer,
+        timeMs,
+      };
+      return {
+        ...sub,
+        isCorrect: evaluateKahootAnswer(question, sub),
+      };
+    }
+  }
+
   const opts = Array.isArray(question.options) ? question.options : [];
   const hasAnyNonEmpty = opts.some((o) => String(o?.text || '').trim().length > 0);
   const correctIndices = opts
@@ -1015,7 +1224,7 @@ export function construirPromptKahootIA({
     'Combina preguntas de selección múltiple de 4 opciones (type "quiz") y preguntas de Verdadero o Falso (type "truefalse").';
   if (mezcla === 'completo') {
     instruccionTipos =
-      'Incluye una mezcla dinámica: mayoría de selección múltiple de 4 opciones (type "quiz"), algunas de Verdadero/Falso (type "truefalse"), al menos 1 de respuesta corta escrita (type "type_answer") y 1 de ordenar secuencia de 4 pasos/palabras (type "puzzle").';
+      'Incluye una mezcla dinámica: mayoría de selección múltiple de 4 opciones (type "quiz"), algunas de Verdadero/Falso (type "truefalse"), al menos 1 de respuesta corta escrita (type "type_answer"), 1 de ordenar secuencia de 4 pasos/palabras (type "puzzle") o 1 acertijo retador (type "riddle").';
   } else if (mezcla === 'solo_quiz') {
     instruccionTipos = 'Genera TODAS las preguntas de selección múltiple con exactamente 4 opciones (type "quiz").';
   } else if (mezcla === 'solo_vf') {
@@ -1026,6 +1235,9 @@ export function construirPromptKahootIA({
   } else if (mezcla === 'solo_puzzle') {
     instruccionTipos =
       'Genera TODAS las preguntas de ordenar secuencia de 4 pasos o palabras de arriba hacia abajo (type "puzzle") con puzzleItems.';
+  } else if (mezcla === 'solo_riddle') {
+    instruccionTipos =
+      'Genera TODAS las preguntas como acertijos retadores (type "riddle") con correctAnswer y acceptedAnswers.';
   }
 
   return [
@@ -1043,6 +1255,7 @@ export function construirPromptKahootIA({
     `  2) Verdadero/Falso: {"type":"truefalse","text":"Afirmación clara","timeLimit":15,"pointsMultiplier":1,"options":[{"text":"Verdadero","isCorrect":true},{"text":"Falso","isCorrect":false}],"explanation":"Breve explicación"}`,
     `  3) Respuesta corta: {"type":"type_answer","text":"Pregunta directa","timeLimit":30,"pointsMultiplier":2,"correctAnswer":"respuesta","acceptedAnswers":["sinonimo"],"explanation":"Breve explicación"}`,
     `  4) Puzzle (ordenar): {"type":"puzzle","text":"Ordena la secuencia o frase correctamente","timeLimit":30,"pointsMultiplier":2,"puzzleItems":["Paso 1","Paso 2","Paso 3","Paso 4"],"explanation":"Breve explicación"}`,
+    `  5) Acertijo: {"type":"riddle","text":"Acertijo breve e ingenioso","timeLimit":30,"pointsMultiplier":2,"correctAnswer":"solucion","acceptedAnswers":["sinonimo"],"explanation":"Breve explicación"}`,
     '- En las últimas 1 o 2 preguntas más retadoras usa "pointsMultiplier": 2 (Puntos Dobles).',
     '- No uses asteriscos (** o *) ni etiquetas HTML.',
     '- Varía la posición de la opción correcta en las preguntas tipo quiz para que no sea siempre la primera.',
@@ -1124,6 +1337,7 @@ export function parsearKahootIA(rawText, defaultTimeLimit = 20, startIndex = 0) 
     );
     if (!q.text) return;
     if (q.type === 'type_answer' && !String(q.correctAnswer || '').trim()) return;
+    if (q.type === 'riddle' && !String(q.correctAnswer || '').trim() && (q.options || []).filter((o) => String(o.text || '').trim()).length < 2) return;
     if (q.type === 'puzzle' && (q.puzzleItems || []).filter((x) => String(x || '').trim()).length < 3) return;
     const nonEmptyOpts = (q.options || []).filter((o) => String(o.text || '').trim().length > 0);
     if ((q.type === 'quiz' || q.type === 'truefalse') && nonEmptyOpts.length < 2) return;

@@ -2153,6 +2153,11 @@ const TaskCard = React.memo(({
                                     <span className="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-indigo-500/30 border border-indigo-400/30 text-indigo-200">
                                         {questions.length} {questions.length === 1 ? 'pregunta' : 'preguntas'}
                                     </span>
+                                    {questions.some((q) => q.type === 'riddle') && (
+                                        <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-purple-500/30 border border-purple-400/40 text-purple-200 flex items-center gap-1">
+                                            💡 Acertijos
+                                        </span>
+                                    )}
                                     {status === 'finished' ? (
                                         <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-500/25 border border-amber-400/40 text-amber-300 flex items-center gap-1">
                                             <Trophy size={11} /> Finalizado

@@ -16,6 +16,7 @@ import {
   Zap,
   X,
   Gamepad2,
+  HelpCircle,
 } from './Icons.jsx';
 import {
   KAHOOT_COLORS,
@@ -254,7 +255,9 @@ const KahootBuilder = ({
             ? 'solo_type_answer'
             : currentQ.type === 'puzzle'
               ? 'solo_puzzle'
-              : 'solo_quiz';
+              : currentQ.type === 'riddle'
+                ? 'solo_riddle'
+                : 'solo_quiz';
       const res = await generarKahootConIA(
         {
           tema: `Crea 1 excelente pregunta sobre: ${seedText}`,
@@ -290,6 +293,12 @@ const KahootBuilder = ({
   const isQuestionValid = (q) => {
     if (!q?.text?.trim()) return false;
     if (q.type === 'type_answer') return Boolean(q.correctAnswer?.trim());
+    if (q.type === 'riddle') {
+      const hasAns = Boolean(q.correctAnswer?.trim());
+      const validOpts = (q.options || []).filter((o) => String(o.text || '').trim());
+      const hasOpts = validOpts.length >= 2 && validOpts.some((o) => o.isCorrect);
+      return hasAns || hasOpts;
+    }
     if (q.type === 'puzzle') return (q.puzzleItems || []).filter((x) => String(x || '').trim()).length >= 3;
     const validOpts = (q.options || []).filter((o) => String(o.text || '').trim());
     return validOpts.length >= 2 && validOpts.some((o) => o.isCorrect);
@@ -402,6 +411,7 @@ const KahootBuilder = ({
                 <option value="solo_vf">Solo V/F</option>
                 <option value="solo_type_answer">Solo Respuesta corta</option>
                 <option value="solo_puzzle">Solo Puzzle</option>
+                <option value="solo_riddle">Solo Acertijos</option>
               </select>
             </div>
 
@@ -550,6 +560,14 @@ const KahootBuilder = ({
             title="Añadir pregunta de Verdadero o Falso"
           >
             <Plus size={14} /> V/F
+          </button>
+          <button
+            type="button"
+            onClick={() => handleAddQuestion('riddle')}
+            className="px-2.5 py-2 rounded-xl border-2 border-dashed border-amber-400 dark:border-amber-600 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40 text-xs font-extrabold flex items-center gap-1 transition-colors cursor-pointer"
+            title="Añadir pregunta de Acertijo (gana el más rápido, ventana de 2s)"
+          >
+            <Plus size={14} /> Acertijo
           </button>
         </div>
       </div>
@@ -994,6 +1012,176 @@ const KahootBuilder = ({
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Editor para Acertijo */}
+        {currentQ.type === 'riddle' && (
+          <div className="space-y-3.5 p-4 rounded-2xl bg-gradient-to-br from-amber-50/70 via-yellow-50/40 to-orange-50/30 dark:from-amber-950/30 dark:via-yellow-950/20 dark:to-orange-950/20 border-2 border-amber-300 dark:border-amber-700/80">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200/80 dark:border-amber-800/60 pb-2.5">
+              <div className="flex items-center gap-2">
+                <span className="w-7 h-7 rounded-lg bg-amber-400 text-gray-950 flex items-center justify-center font-black text-sm">
+                  💡
+                </span>
+                <div>
+                  <h5 className="text-xs font-black text-amber-950 dark:text-amber-200">
+                    Mecánica de Acertijo
+                  </h5>
+                  <p className="text-[10.5px] text-amber-900/80 dark:text-amber-300/80">
+                    El primer participante en acertar activa una ventana de 2s para los demás. Luego se bloquea.
+                  </p>
+                </div>
+              </div>
+
+              {/* Selector de modo: Respuesta escrita u Opciones */}
+              <div className="flex items-center gap-1 bg-white/80 dark:bg-gray-800 p-1 rounded-xl border border-amber-200 dark:border-amber-700">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const existingOptCorrect = currentQ.options?.find((o) => o.isCorrect)?.text || '';
+                    updateQuestionAt(safeIdx, {
+                      correctAnswer: currentQ.correctAnswer || existingOptCorrect,
+                      options: [],
+                    });
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                    !currentQ.options || currentQ.options.length < 2
+                      ? 'bg-amber-500 text-white shadow-xs'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                  }`}
+                >
+                  Respuesta escrita
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const currentOpts =
+                      currentQ.options && currentQ.options.length >= 2
+                        ? currentQ.options
+                        : [
+                            { id: `${currentQ.id}_0`, text: currentQ.correctAnswer || '', isCorrect: true },
+                            { id: `${currentQ.id}_1`, text: '', isCorrect: false },
+                            { id: `${currentQ.id}_2`, text: '', isCorrect: false },
+                            { id: `${currentQ.id}_3`, text: '', isCorrect: false },
+                          ];
+                    updateQuestionAt(safeIdx, { options: currentOpts });
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                    currentQ.options && currentQ.options.length >= 2
+                      ? 'bg-amber-500 text-white shadow-xs'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                  }`}
+                >
+                  Opciones (selección)
+                </button>
+              </div>
+            </div>
+
+            {/* Si es respuesta escrita */}
+            {(!currentQ.options || currentQ.options.length < 2) && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-200 mb-1">
+                    Respuesta correcta del acertijo <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={currentQ.correctAnswer || ''}
+                    onChange={(e) => updateQuestionAt(safeIdx, { correctAnswer: e.target.value })}
+                    placeholder="Escribe la solución del acertijo..."
+                    className="w-full py-2.5 px-3.5 text-xs sm:text-sm font-bold rounded-xl bg-white dark:bg-gray-900 border border-amber-300 dark:border-amber-700 text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-200 mb-1">
+                    Sinónimos o respuestas alternativas aceptadas (separadas por coma, opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={
+                      currentQ.acceptedAnswersInput !== undefined
+                        ? currentQ.acceptedAnswersInput
+                        : (currentQ.acceptedAnswers || []).join(', ')
+                    }
+                    onChange={(e) => {
+                      const rawVal = e.target.value;
+                      updateQuestionAt(safeIdx, {
+                        acceptedAnswersInput: rawVal,
+                        acceptedAnswers: rawVal.split(',').map((s) => s.trim()).filter(Boolean),
+                      });
+                    }}
+                    placeholder="ej. reloj, el reloj, a clock"
+                    className="w-full py-2 px-3 text-xs font-semibold rounded-xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Si son opciones de selección */}
+            {currentQ.options && currentQ.options.length >= 2 && (
+              <div className="space-y-2.5">
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-200 mb-1">
+                  Opciones del acertijo (marca la correcta):
+                </label>
+                <div className="flex flex-col gap-2.5">
+                  {currentQ.options.map((opt, oIdx) => {
+                    const colorInfo = KAHOOT_COLORS[oIdx % KAHOOT_COLORS.length];
+                    return (
+                      <div
+                        key={opt.id || oIdx}
+                        className={`flex items-center gap-2.5 p-2.5 rounded-2xl border-2 transition-all ${
+                          opt.isCorrect
+                            ? 'border-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/25 shadow-xs'
+                            : 'border-gray-200 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-800/60'
+                        }`}
+                      >
+                        <div
+                          className={`w-9 h-9 rounded-xl ${colorInfo.badgeClass} font-black text-base flex items-center justify-center shrink-0 shadow-xs select-none`}
+                        >
+                          {colorInfo.symbol}
+                        </div>
+                        <input
+                          type="text"
+                          value={opt.text}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            updateQuestionAt(safeIdx, (prev) => ({
+                              ...prev,
+                              options: prev.options.map((item, i) =>
+                                i === oIdx ? { ...item, text: val } : item
+                              ),
+                            }));
+                          }}
+                          placeholder={`Opción ${oIdx + 1}${oIdx >= 2 ? ' (opcional)' : ''}`}
+                          className="flex-1 py-2 px-3 text-xs sm:text-sm font-bold rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-amber-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            updateQuestionAt(safeIdx, (prev) => ({
+                              ...prev,
+                              options: prev.options.map((item, i) => ({
+                                ...item,
+                                isCorrect: i === oIdx,
+                              })),
+                            }));
+                          }}
+                          className={`px-3 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1.5 shrink-0 transition-all cursor-pointer ${
+                            opt.isCorrect
+                              ? 'bg-emerald-600 text-white shadow-sm scale-102'
+                              : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-emerald-500/20'
+                          }`}
+                          title="Marcar como respuesta correcta"
+                        >
+                          <CheckCircle2 size={14} />
+                          <span className="hidden sm:inline">{opt.isCorrect ? 'Correcta' : 'Marcar'}</span>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
