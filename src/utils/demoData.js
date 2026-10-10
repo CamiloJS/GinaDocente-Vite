@@ -1013,9 +1013,9 @@ export const DEMO_NOTES = [
   },
   {
     id: 'demo-note-shared-2',
-    title: 'Apuntes de Laura: Verbos de precisión para tendencias de mercado',
+    title: 'Verbos para tendencias de mercado',
     scope: 'shared',
-    content: '<p>Resumen de verbos técnicos vistos hoy en clase para describir gráficas financieras:</p><ul><li><span style="color: #059669;"><strong>To surge / To skyrocket:</strong></span> Subir drásticamente en un periodo corto.</li><li><span style="color: #e11d48;"><strong>To plummet / To plunge:</strong></span> Caer abruptamente (ej. caída del precio del petróleo).</li><li><span style="color: #4f46e5;"><strong>To plateau / To stabilize:</strong></span> Mantenerse estable tras una tendencia alcista.</li></ul><p><em>Nota asegurada con candado de sesión por Laura Restrepo.</em></p>',
+    content: '<p>Verbos técnicos vistos hoy en clase para describir gráficas financieras:</p><ul><li><span style="color: #059669;"><strong>To surge / To skyrocket:</strong></span> Subir drásticamente en un periodo corto.</li><li><span style="color: #e11d48;"><strong>To plummet / To plunge:</strong></span> Caer abruptamente (ej. caída del precio del petróleo).</li><li><span style="color: #4f46e5;"><strong>To plateau / To stabilize:</strong></span> Mantenerse estable tras una tendencia alcista.</li></ul>',
     fontFamily: 'serif',
     fontSize: 'base',
     paperTheme: 'emerald',
@@ -1040,11 +1040,11 @@ export const DEMO_NOTES = [
         actorName: 'Laura Restrepo',
         actorRole: 'student',
         timestamp: new Date(Date.now() - 1000 * 60 * 90).toISOString(),
-        summary: 'Aseguró sus apuntes de sesión con candado para evitar borrados accidentales',
-        previousTitle: 'Apuntes de Laura: Verbos de precisión para tendencias de mercado',
-        newTitle: 'Apuntes de Laura: Verbos de precisión para tendencias de mercado',
-        previousTextPreview: 'Resumen de verbos técnicos vistos hoy en clase para describir gráficas financieras...',
-        newTextPreview: 'Resumen de verbos técnicos vistos hoy en clase para describir gráficas financieras...'
+        summary: 'Activó el candado en la nota',
+        previousTitle: 'Verbos para tendencias de mercado',
+        newTitle: 'Verbos para tendencias de mercado',
+        previousTextPreview: 'Verbos técnicos vistos hoy en clase para describir gráficas financieras...',
+        newTextPreview: 'Verbos técnicos vistos hoy en clase para describir gráficas financieras...'
       }
     ],
     createdAt: Date.now() - 1000 * 60 * 110,
@@ -1052,9 +1052,9 @@ export const DEMO_NOTES = [
   },
   {
     id: 'demo-note-shared-3',
-    title: 'Pizarra Abierta: Lluvia de ideas — Debate sobre Aranceles y FOB vs. CIF',
+    title: 'Debate sobre aranceles y FOB vs. CIF',
     scope: 'shared',
-    content: '<p>Espacio colaborativo abierto para anotar argumentos del debate del viernes:</p><ul><li><strong>Grupo Exportadores:</strong> Analyzing how currency depreciation boosts competitiveness in agricultural exports.</li><li><strong>Grupo Importadores:</strong> Impact of higher tariffs on raw materials and industrial machinery.</li></ul><p>¡Pueden agregar sus ejemplos y enlaces de referencia aquí!</p>',
+    content: '<p>Argumentos para el debate del viernes:</p><ul><li><strong>Grupo Exportadores:</strong> Analyzing how currency depreciation boosts competitiveness in agricultural exports.</li><li><strong>Grupo Importadores:</strong> Impact of higher tariffs on raw materials and industrial machinery.</li></ul>',
     fontFamily: 'sans',
     fontSize: 'base',
     paperTheme: 'warm',
@@ -1088,13 +1088,13 @@ export const DEMO_NOTES = [
         actorName: 'Mateo Gómez',
         actorRole: 'student',
         timestamp: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
-        summary: 'Editó el contenido de la nota compartida (modificó el segundo punto)',
-        previousTitle: 'Pizarra Abierta: Lluvia de ideas — Debate sobre Aranceles y FOB vs. CIF',
-        newTitle: 'Pizarra Abierta: Lluvia de ideas — Debate sobre Aranceles y FOB vs. CIF',
-        previousContent: '<p>Espacio colaborativo abierto para anotar argumentos del debate del viernes:</p><ul><li><strong>Grupo Exportadores:</strong> Analyzing how currency depreciation boosts competitiveness in agricultural exports.</li><li><strong>Grupo Importadores:</strong> No sé qué poner todavía jajaja borrar luego.</li></ul>',
-        newContent: '<p>Espacio colaborativo abierto para anotar argumentos del debate del viernes:</p><ul><li><strong>Grupo Exportadores:</strong> Analyzing how currency depreciation boosts competitiveness in agricultural exports.</li><li><strong>Grupo Importadores:</strong> Impact of higher tariffs on raw materials and industrial machinery.</li></ul><p>¡Pueden agregar sus ejemplos y enlaces de referencia aquí!</p>',
-        previousTextPreview: 'Espacio colaborativo abierto... Grupo Importadores: No sé qué poner todavía jajaja borrar luego.',
-        newTextPreview: 'Espacio colaborativo abierto... Grupo Importadores: Impact of higher tariffs on raw materials and industrial machinery.'
+        summary: 'Editó el contenido de la nota compartida',
+        previousTitle: 'Debate sobre aranceles y FOB vs. CIF',
+        newTitle: 'Debate sobre aranceles y FOB vs. CIF',
+        previousContent: '<p>Argumentos para el debate del viernes:</p><ul><li><strong>Grupo Exportadores:</strong> Analyzing how currency depreciation boosts competitiveness in agricultural exports.</li><li><strong>Grupo Importadores:</strong> No sé qué poner todavía jajaja borrar luego.</li></ul>',
+        newContent: '<p>Argumentos para el debate del viernes:</p><ul><li><strong>Grupo Exportadores:</strong> Analyzing how currency depreciation boosts competitiveness in agricultural exports.</li><li><strong>Grupo Importadores:</strong> Impact of higher tariffs on raw materials and industrial machinery.</li></ul>',
+        previousTextPreview: 'Argumentos para el debate del viernes... Grupo Importadores: No sé qué poner todavía jajaja borrar luego.',
+        newTextPreview: 'Argumentos para el debate del viernes... Grupo Importadores: Impact of higher tariffs on raw materials and industrial machinery.'
       }
     ],
     createdAt: Date.now() - 1000 * 60 * 50,
@@ -1102,9 +1102,9 @@ export const DEMO_NOTES = [
   },
   {
     id: 'demo-note-private-guest',
-    title: 'Mis apuntes personales para el Quiz de pronunciación económica',
+    title: 'Pronunciación para el quiz',
     scope: 'private',
-    content: '<p>Recordar practicar la pronunciación antes de grabar el audio del Workshop 1:</p><ul><li><strong>Inflation:</strong> /ɪnˈfleɪ.ʃən/</li><li><strong>Equilibrium:</strong> /ˌiː.kwɪˈlɪb.ri.əm/</li><li><strong>Subsidiary:</strong> /səbˈsɪd.i.er.i/</li></ul>',
+    content: '<p>Practicar antes de grabar el audio del Workshop 1:</p><ul><li><strong>Inflation:</strong> /ɪnˈfleɪ.ʃən/</li><li><strong>Equilibrium:</strong> /ˌiː.kwɪˈlɪb.ri.əm/</li><li><strong>Subsidiary:</strong> /səbˈsɪd.i.er.i/</li></ul>',
     fontFamily: 'handwriting',
     fontSize: 'md',
     paperTheme: 'violet',
@@ -1124,9 +1124,9 @@ export const DEMO_NOTES = [
   },
   {
     id: 'demo-note-private-teacher',
-    title: 'Planeación privada docente: Retroalimentación del Workshop 1',
+    title: 'Retroalimentación del Workshop 1',
     scope: 'private',
-    content: '<p>Puntos a reforzar en la próxima sesión con el grupo de <strong>Inglés Técnico Económico</strong>:</p><ul><li>Revisar el uso de <em>unless</em> vs. <em>if not</em> en proyecciones de inflación.</li><li>Felicitar a Laura y Carlos por sus intervenciones en el foro.</li></ul>',
+    content: '<p>Puntos a reforzar en la próxima sesión:</p><ul><li>Revisar el uso de <em>unless</em> vs. <em>if not</em> en proyecciones de inflación.</li><li>Felicitar a Laura y Carlos por sus intervenciones en el foro.</li></ul>',
     fontFamily: 'sans',
     fontSize: 'base',
     paperTheme: 'default',
@@ -1226,8 +1226,8 @@ export const DEMO_TAB_INFO = {
     summary: 'OVA Studio y ruleta de participación.'
   },
   notes: {
-    title: 'Notas de Clase',
-    summary: 'Cuaderno compartido de la sesión y apuntes personales privados.'
+    title: 'Notas',
+    summary: 'Notas compartidas y privadas.'
   }
 };
 
@@ -1241,8 +1241,8 @@ export const DEMO_TEACHER_TAB_INFO = {
     summary: 'Sube y gestiona libros en PDF para tus estudiantes.'
   },
   notes: {
-    title: 'Notas y Apuntes',
-    summary: 'Cuaderno compartido de clase con seguro de sesión, apuntes privados y registro de últimos cambios.'
+    title: 'Notas',
+    summary: 'Notas compartidas y privadas.'
   },
   evaluaciones: {
     title: 'Evaluaciones',

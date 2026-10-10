@@ -1055,190 +1055,136 @@ export default function NotesModule({
   };
 
   return (
-    <div className="w-full space-y-6 pb-16">
-      {/* Encabezado minimalista de la sección Notas */}
-      <div className={`rounded-3xl border p-6 sm:p-8 transition-all ${
-        isDarkMode
-          ? 'bg-slate-900/90 border-slate-800 text-slate-100'
-          : 'bg-white border-slate-200/80 text-slate-900 shadow-sm'
-      }`}>
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
-          <div className="space-y-2 max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold tracking-wide uppercase bg-blue-500/10 text-blue-600 dark:text-blue-400">
-              <NavNotebook size={14} />
-              <span>Cuaderno Interactivo y Apuntes</span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-              Notas de Clase
-            </h1>
-            <p className={`text-sm leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-              Lleva el hilo de las sesiones en el cuaderno compartido con tu docente y compañeros, o guarda apuntes en tu espacio privado. Personaliza fuentes, colores y enlaces de YouTube o imágenes por URL, y asegura tus apuntes de sesión con candado.
-            </p>
-          </div>
+    <div className="w-full space-y-5 pb-16">
+      {/* Encabezado minimalista */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className={`text-2xl font-extrabold tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+          Notas
+        </h1>
 
-          <div className="flex flex-wrap items-center gap-2.5">
-            {/* Botón exclusivo y silencioso para el Docente: "Últimos cambios" */}
-            {isTeacher && (
-              <button
-                type="button"
-                onClick={() => setIsAuditModalOpen(true)}
-                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-semibold border transition-all ${
-                  isDarkMode
-                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20'
-                    : 'bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100'
-                }`}
-                title="Solo visible para el docente: los estudiantes no saben que este registro existe"
-              >
-                <Clock size={15} />
-                <span>Últimos cambios</span>
-                {teacherAuditFeed.length > 0 && (
-                  <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white">
-                    {teacherAuditFeed.length}
-                  </span>
-                )}
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={() => handleOpenNewNote(activeScope)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-sm transition-all cursor-pointer"
-            >
-              <Plus size={16} />
-              <span>{activeScope === 'shared' ? 'Nueva Nota Compartida' : 'Nueva Nota Privada'}</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Pestañas: Cuaderno Compartido vs Mis Notas Privadas + Buscador */}
-        <div className="mt-6 pt-5 border-t border-slate-200/70 dark:border-slate-800 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className={`inline-flex p-1 rounded-2xl border self-start ${
-            isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-100/80 border-slate-200/70'
-          }`}>
-            <button
-              type="button"
-              onClick={() => setActiveScope('shared')}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
-                activeScope === 'shared'
-                  ? (isDarkMode ? 'bg-slate-800 text-white shadow-sm' : 'bg-white text-slate-900 shadow-sm')
-                  : (isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900')
-              }`}
-            >
-              <UsersIcon size={16} />
-              <span>Notas Compartidas</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveScope('private')}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
-                activeScope === 'private'
-                  ? (isDarkMode ? 'bg-slate-800 text-white shadow-sm' : 'bg-white text-slate-900 shadow-sm')
-                  : (isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900')
-              }`}
-            >
-              <UserIcon size={16} />
-              <span>Mis Notas Privadas</span>
-            </button>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2.5 flex-1 md:justify-end">
-            {activeScope === 'shared' && academicGroups.length > 0 && (
-              <select
-                value={selectedGroupFilter}
-                onChange={(e) => setSelectedGroupFilter(e.target.value)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-medium border outline-none transition-all ${
-                  isDarkMode
-                    ? 'bg-slate-950 border-slate-800 text-slate-200'
-                    : 'bg-slate-50 border-slate-200 text-slate-700'
-                }`}
-              >
-                <option value="ALL">Todos los grupos</option>
-                {academicGroups.map((grp) => (
-                  <option key={grp.id} value={grp.id}>
-                    {grp.name}
-                  </option>
-                ))}
-              </select>
-            )}
-
-            <div className="relative flex-1 sm:flex-initial sm:w-64">
-              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Buscar en notas..."
-                className={`w-full pl-9 pr-8 py-2 rounded-xl text-xs sm:text-sm border outline-none transition-all ${
-                  isDarkMode
-                    ? 'bg-slate-950 border-slate-800 text-slate-100 placeholder-slate-500 focus:border-blue-500'
-                    : 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:bg-white'
-                }`}
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  <X size={13} />
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Cinta informativa minimalista sobre reglas de sesión y candado */}
-      <div className={`flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-2xl border text-xs ${
-        isDarkMode
-          ? 'bg-slate-900/60 border-slate-800/80 text-slate-400'
-          : 'bg-slate-50/90 border-slate-200/70 text-slate-600'
-      }`}>
         <div className="flex items-center gap-2">
-          <Lock size={14} className="text-blue-500 shrink-0" />
-          <span>
-            {activeScope === 'shared'
-              ? 'Puedes poner seguro (candado) a lo hecho en tu sesión para que ningún otro estudiante borre lo de otro. El docente tiene control total.'
-              : 'Tus notas privadas son estrictamente personales; nadie más puede verlas ni modificarlas.'}
-          </span>
-        </div>
-        <div className="flex items-center gap-2 text-[11px] font-medium text-slate-400">
-          <Globe size={13} />
-          <span>Enlaces inteligentes: YouTube, imágenes por URL y web (sin subida de archivos locales)</span>
-        </div>
-      </div>
+          {isTeacher && (
+            <button
+              type="button"
+              onClick={() => setIsAuditModalOpen(true)}
+              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                isDarkMode
+                  ? 'bg-slate-900 border-slate-800 text-slate-200 hover:bg-slate-800'
+                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <Clock size={14} />
+              <span>Últimos cambios</span>
+              {teacherAuditFeed.length > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white">
+                  {teacherAuditFeed.length}
+                </span>
+              )}
+            </button>
+          )}
 
-      {/* Listado de Notas */}
-      {visibleNotes.length === 0 ? (
-        <div className={`rounded-3xl border p-12 text-center space-y-4 ${
-          isDarkMode ? 'bg-slate-900/50 border-slate-800 text-slate-400' : 'bg-white border-slate-200/70 text-slate-500'
-        }`}>
-          <div className="w-14 h-14 rounded-2xl bg-blue-500/10 text-blue-500 flex items-center justify-center mx-auto">
-            <NavNotebook size={26} />
-          </div>
-          <div className="space-y-1 max-w-md mx-auto">
-            <h3 className={`text-base font-bold ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
-              {activeScope === 'shared'
-                ? 'Aún no hay notas compartidas en esta vista'
-                : 'No tienes notas privadas todavía'}
-            </h3>
-            <p className="text-xs leading-relaxed">
-              {activeScope === 'shared'
-                ? 'Crea la primera nota de la sesión para llevar el hilo de la clase, insertar videos de YouTube o imágenes por enlace y asegurar tus apuntes con candado.'
-                : 'Crea una nota privada para guardar tus resúmenes, vocabulario personal o recordatorios de estudio.'}
-            </p>
-          </div>
           <button
             type="button"
             onClick={() => handleOpenNewNote(activeScope)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition-all cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-sm transition-all active:scale-95 cursor-pointer"
           >
-            <Plus size={14} />
-            <span>Crear primera nota</span>
+            <Plus size={15} />
+            <span>Nueva nota</span>
           </button>
         </div>
+      </div>
+
+      {/* Pestañas: Notas compartidas / Notas privadas + Filtros */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className={`inline-flex p-1 rounded-xl border self-start ${
+          isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200/80'
+        }`}>
+          <button
+            type="button"
+            onClick={() => setActiveScope('shared')}
+            className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              activeScope === 'shared'
+                ? (isDarkMode ? 'bg-slate-800 text-white shadow-2xs' : 'bg-white text-slate-900 shadow-2xs')
+                : (isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900')
+            }`}
+          >
+            <UsersIcon size={14} />
+            <span>Notas compartidas</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveScope('private')}
+            className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              activeScope === 'private'
+                ? (isDarkMode ? 'bg-slate-800 text-white shadow-2xs' : 'bg-white text-slate-900 shadow-2xs')
+                : (isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900')
+            }`}
+          >
+            <UserIcon size={14} />
+            <span>Notas privadas</span>
+          </button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 flex-1 sm:justify-end">
+          {activeScope === 'shared' && academicGroups.length > 0 && (
+            <select
+              value={selectedGroupFilter}
+              onChange={(e) => setSelectedGroupFilter(e.target.value)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium border outline-none transition-all ${
+                isDarkMode
+                  ? 'bg-slate-900 border-slate-800 text-slate-200'
+                  : 'bg-white border-slate-200 text-slate-700'
+              }`}
+            >
+              <option value="ALL">Todos los grupos</option>
+              {academicGroups.map((grp) => (
+                <option key={grp.id} value={grp.id}>
+                  {grp.name}
+                </option>
+              ))}
+            </select>
+          )}
+
+          <div className="relative flex-1 sm:flex-initial sm:w-56">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Buscar..."
+              className={`w-full pl-8 pr-7 py-1.5 rounded-xl text-xs border outline-none transition-all ${
+                isDarkMode
+                  ? 'bg-slate-900 border-slate-800 text-slate-100 placeholder-slate-500 focus:border-blue-500'
+                  : 'bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-blue-500'
+              }`}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Listado de notas */}
+      {visibleNotes.length === 0 ? (
+        <div className={`rounded-2xl border p-12 text-center space-y-2 ${
+          isDarkMode ? 'bg-slate-900/40 border-slate-800 text-slate-400' : 'bg-white border-slate-200/70 text-slate-500'
+        }`}>
+          <div className="w-11 h-11 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center mx-auto">
+            <NavNotebook size={22} />
+          </div>
+          <p className={`text-sm font-semibold ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+            {activeScope === 'shared' ? 'No hay notas compartidas aún' : 'No hay notas privadas aún'}
+          </p>
+        </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {visibleNotes.map((note) => {
             const canEdit = canUserEditNote(note, currentUserObj);
             const canDelete = canUserDeleteNote(note, currentUserObj);
@@ -1250,11 +1196,11 @@ export default function NotesModule({
             return (
               <article
                 key={note.id}
-                className={`rounded-3xl border p-6 flex flex-col justify-between transition-all shadow-sm hover:shadow-md ${getPaperThemeClasses(note.paperTheme)}`}
+                className={`rounded-2xl border p-5 flex flex-col justify-between transition-all shadow-2xs hover:shadow-sm ${getPaperThemeClasses(note.paperTheme)}`}
               >
                 <div>
-                  {/* Cabecera de la tarjeta: Badges de estado, grupo y acciones */}
-                  <div className="flex items-start justify-between gap-3 mb-3">
+                  {/* Cabecera de la tarjeta */}
+                  <div className="flex items-start justify-between gap-2 mb-2.5">
                     <div className="flex flex-wrap items-center gap-1.5">
                       {note.isPinned && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-500/15 text-blue-600 dark:text-blue-400">
@@ -1263,28 +1209,15 @@ export default function NotesModule({
                         </span>
                       )}
 
-                      {note.scope === 'shared' ? (
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
-                          note.isLocked
-                            ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20'
-                            : 'bg-slate-500/10 text-slate-600 dark:text-slate-300'
-                        }`}>
-                          {note.isLocked ? <Lock size={11} /> : <Unlock size={11} />}
-                          <span>
-                            {note.isLocked
-                              ? `Seguro activo (${note.lockedByName || 'Sesión'})`
-                              : 'Sesión abierta'}
-                          </span>
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-violet-500/15 text-violet-700 dark:text-violet-300">
-                          <UserIcon size={11} />
-                          <span>Privada</span>
+                      {note.scope === 'shared' && note.isLocked && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+                          <Lock size={11} />
+                          <span>{note.lockedByName || 'Con candado'}</span>
                         </span>
                       )}
 
                       {note.scope === 'shared' && note.targetGroupName && (
-                        <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium ${
+                        <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${
                           isDarkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-200/70 text-slate-700'
                         }`}>
                           {note.targetGroupName}
@@ -1292,9 +1225,8 @@ export default function NotesModule({
                       )}
                     </div>
 
-                    {/* Botones de acción en la tarjeta */}
+                    {/* Acciones */}
                     <div className="flex items-center gap-1 shrink-0">
-                      {/* Botón de Seguro / Candado de sesión en notas compartidas */}
                       {note.scope === 'shared' && (
                         <button
                           type="button"
@@ -1302,16 +1234,16 @@ export default function NotesModule({
                           disabled={!canToggleLock}
                           title={
                             note.isLocked
-                              ? (canToggleLock ? 'Quitar seguro (candado) de esta sesión' : `Asegurada por ${note.lockedByName || 'otro usuario'}`)
-                              : 'Poner seguro (candado) a lo hecho en esta sesión'
+                              ? (canToggleLock ? 'Quitar candado' : `Bloqueada por ${note.lockedByName || 'otro usuario'}`)
+                              : 'Poner candado'
                           }
-                          className={`p-1.5 rounded-xl border text-xs transition-all ${
+                          className={`p-1.5 rounded-lg border text-xs transition-all ${
                             note.isLocked
                               ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
                               : (isDarkMode ? 'border-slate-700 text-slate-400 hover:text-slate-200' : 'border-slate-200 text-slate-500 hover:text-slate-800')
                           } ${!canToggleLock ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                         >
-                          {note.isLocked ? <Lock size={14} /> : <Unlock size={14} />}
+                          {note.isLocked ? <Lock size={13} /> : <Unlock size={13} />}
                         </button>
                       )}
 
@@ -1319,14 +1251,14 @@ export default function NotesModule({
                         <button
                           type="button"
                           onClick={() => handleTogglePin(note)}
-                          title={note.isPinned ? 'Desfijar nota' : 'Fijar nota arriba'}
-                          className={`p-1.5 rounded-xl transition-all cursor-pointer ${
+                          title={note.isPinned ? 'Desfijar' : 'Fijar'}
+                          className={`p-1.5 rounded-lg transition-all cursor-pointer ${
                             note.isPinned
                               ? 'text-blue-600 dark:text-blue-400 bg-blue-500/10'
                               : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
                           }`}
                         >
-                          <Pin size={14} />
+                          <Pin size={13} />
                         </button>
                       )}
 
@@ -1334,10 +1266,10 @@ export default function NotesModule({
                         <button
                           type="button"
                           onClick={() => handleOpenEditNote(note)}
-                          title="Editar nota"
-                          className="p-1.5 rounded-xl text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all cursor-pointer"
+                          title="Editar"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all cursor-pointer"
                         >
-                          <Edit3 size={14} />
+                          <Edit3 size={13} />
                         </button>
                       )}
 
@@ -1345,39 +1277,39 @@ export default function NotesModule({
                         <button
                           type="button"
                           onClick={() => setNotePendingDelete(note)}
-                          title={isTeacher ? 'Borrar nota (Permiso docente)' : 'Borrar mi nota'}
-                          className="p-1.5 rounded-xl text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-all cursor-pointer"
+                          title="Eliminar"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-all cursor-pointer"
                         >
-                          <Trash2 size={14} />
+                          <Trash2 size={13} />
                         </button>
                       )}
                     </div>
                   </div>
 
-                  {/* Título de la nota */}
+                  {/* Título */}
                   <h2
                     style={getFontFamilyStyle(note.fontFamily)}
-                    className={`text-lg font-bold tracking-tight mb-2.5 ${
+                    className={`text-base font-bold tracking-tight mb-2 ${
                       isDarkMode ? 'text-slate-100' : 'text-slate-900'
                     }`}
                   >
                     {note.title}
                   </h2>
 
-                  {/* Cuerpo enriquecido de la nota */}
+                  {/* Cuerpo */}
                   {note.content && (
                     <div
                       style={getFontFamilyStyle(note.fontFamily)}
-                      className={`prose prose-sm max-w-none break-words mb-4 ${getFontSizeClass(note.fontSize)} ${
+                      className={`prose prose-sm max-w-none break-words mb-3 ${getFontSizeClass(note.fontSize)} ${
                         isDarkMode ? 'text-slate-200 prose-invert' : 'text-slate-700'
                       } [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_blockquote]:border-l-4 [&_blockquote]:border-blue-500/50 [&_blockquote]:pl-3 [&_blockquote]:italic [&_a]:text-blue-600 [&_a]:underline`}
                       dangerouslySetInnerHTML={{ __html: sanitizeNoteHtml(note.content) }}
                     />
                   )}
 
-                  {/* Enlaces Inteligentes Adjuntos (Imágenes por URL, Videos de YouTube o Enlaces Web) */}
+                  {/* Enlaces adjuntos */}
                   {noteLinks.length > 0 && (
-                    <div className="space-y-3 mt-4 pt-3 border-t border-slate-200/60 dark:border-slate-800/80">
+                    <div className="space-y-2.5 mt-3 pt-2.5 border-t border-slate-200/60 dark:border-slate-800/80">
                       {noteLinks.map((item) => {
                         const canConvertImg = isLikelyImageLink(item);
                         const canConvertYt = Boolean(item.youtubeId);
@@ -1385,11 +1317,11 @@ export default function NotesModule({
                         return (
                           <div
                             key={item.id}
-                            className={`rounded-2xl border p-3 transition-all ${
+                            className={`rounded-xl border p-2.5 transition-all ${
                               isDarkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-white/80 border-slate-200/80'
                             }`}
                           >
-                            <div className="flex items-center justify-between gap-2 mb-2">
+                            <div className="flex items-center justify-between gap-2">
                               <a
                                 href={item.url}
                                 target="_blank"
@@ -1397,16 +1329,15 @@ export default function NotesModule({
                                 className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline truncate"
                               >
                                 {item.renderMode === 'youtube' ? (
-                                  <MonitorPlay size={14} className="text-rose-500 shrink-0" />
+                                  <MonitorPlay size={13} className="text-rose-500 shrink-0" />
                                 ) : item.renderMode === 'image' ? (
-                                  <ImageIcon size={14} className="text-emerald-500 shrink-0" />
+                                  <ImageIcon size={13} className="text-emerald-500 shrink-0" />
                                 ) : (
-                                  <Globe size={14} className="text-blue-500 shrink-0" />
+                                  <Globe size={13} className="text-blue-500 shrink-0" />
                                 )}
                                 <span className="truncate">{item.label || item.url}</span>
                               </a>
 
-                              {/* Botón para alternar entre Imagen/Video integrado y Enlace */}
                               {(canConvertImg || canConvertYt) && canEdit && (
                                 <button
                                   type="button"
@@ -1418,32 +1349,30 @@ export default function NotesModule({
                                   }`}
                                 >
                                   {item.renderMode === 'link'
-                                    ? (canConvertYt ? 'Convertir en Video YouTube' : 'Convertir en Imagen')
-                                    : 'Ver solo como enlace'}
+                                    ? (canConvertYt ? 'Ver video' : 'Ver imagen')
+                                    : 'Ver enlace'}
                                 </button>
                               )}
                             </div>
 
-                            {/* Renderizado como Video de YouTube integrado */}
                             {item.renderMode === 'youtube' && item.youtubeId && (
-                              <div className="rounded-xl overflow-hidden mt-1">
+                              <div className="rounded-lg overflow-hidden mt-2">
                                 <CustomVideoPlayer
                                   url={item.url}
                                   videoId={item.youtubeId}
-                                  title={item.label || 'Video de YouTube en nota'}
+                                  title={item.label || 'Video'}
                                   isDarkMode={isDarkMode}
                                 />
                               </div>
                             )}
 
-                            {/* Renderizado como Imagen por enlace URL */}
                             {item.renderMode === 'image' && (
-                              <div className="rounded-xl overflow-hidden mt-1 bg-slate-100 dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800">
+                              <div className="rounded-lg overflow-hidden mt-2 bg-slate-100 dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800">
                                 <img
                                   src={item.url}
-                                  alt={item.label || 'Imagen enlazada'}
+                                  alt={item.label || 'Imagen'}
                                   loading="lazy"
-                                  className="w-full max-h-72 object-contain mx-auto"
+                                  className="w-full max-h-64 object-contain mx-auto"
                                 />
                               </div>
                             )}
@@ -1453,9 +1382,9 @@ export default function NotesModule({
                     </div>
                   )}
 
-                  {/* Hilo de apuntes de la sesión (solo para notas compartidas) */}
+                  {/* Apuntes en notas compartidas */}
                   {note.scope === 'shared' && (
-                    <div className="mt-4 pt-3 border-t border-slate-200/60 dark:border-slate-800/80">
+                    <div className="mt-3 pt-2.5 border-t border-slate-200/60 dark:border-slate-800/80">
                       <div className="flex items-center justify-between">
                         <button
                           type="button"
@@ -1468,17 +1397,17 @@ export default function NotesModule({
                           }}
                           className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
                         >
-                          <MessageSquareText size={14} />
+                          <MessageSquareText size={13} />
                           <span>
                             {noteEntries.length > 0
-                              ? `Hilo de la sesión (${noteEntries.length} ${noteEntries.length === 1 ? 'apunte' : 'apuntes'})`
-                              : 'Agregar apunte al hilo de esta sesión'}
+                              ? `Apuntes (${noteEntries.length})`
+                              : 'Agregar apunte'}
                           </span>
                         </button>
                       </div>
 
                       {(isThreadOpen || noteEntries.length > 0) && (
-                        <div className="mt-3 space-y-2.5">
+                        <div className="mt-2.5 space-y-2">
                           {noteEntries.map((entry) => {
                             const canDeleteEntry = canUserDeleteNote(entry, currentUserObj);
                             const canToggleEntryLock = canUserToggleNoteLock(entry, currentUserObj);
@@ -1486,7 +1415,7 @@ export default function NotesModule({
                             return (
                               <div
                                 key={entry.id}
-                                className={`rounded-2xl p-3 border text-xs transition-all ${
+                                className={`rounded-xl p-2.5 border text-xs transition-all ${
                                   isDarkMode
                                     ? 'bg-slate-950/70 border-slate-800 text-slate-200'
                                     : 'bg-white/90 border-slate-200/80 text-slate-700'
@@ -1504,10 +1433,7 @@ export default function NotesModule({
                                       • {formatRelativeTime(entry.createdAt)}
                                     </span>
                                     {entry.isLocked && (
-                                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-                                        <Lock size={10} />
-                                        <span>Con seguro</span>
-                                      </span>
+                                      <Lock size={10} className="text-emerald-500" />
                                     )}
                                   </div>
 
@@ -1516,7 +1442,7 @@ export default function NotesModule({
                                       <button
                                         type="button"
                                         onClick={() => handleToggleThreadEntryLock(note, entry.id)}
-                                        title={entry.isLocked ? 'Quitar seguro del apunte' : 'Poner seguro a mi apunte'}
+                                        title={entry.isLocked ? 'Quitar candado' : 'Poner candado'}
                                         className="p-1 rounded-lg text-slate-400 hover:text-emerald-500 cursor-pointer"
                                       >
                                         {entry.isLocked ? <Lock size={12} /> : <Unlock size={12} />}
@@ -1526,7 +1452,7 @@ export default function NotesModule({
                                       <button
                                         type="button"
                                         onClick={() => handleDeleteThreadEntry(note, entry.id)}
-                                        title="Borrar apunte"
+                                        title="Eliminar"
                                         className="p-1 rounded-lg text-slate-400 hover:text-rose-500 cursor-pointer"
                                       >
                                         <Trash2 size={12} />
@@ -1551,17 +1477,17 @@ export default function NotesModule({
                                           }`}
                                         >
                                           {entry.link.renderMode === 'link'
-                                            ? (entry.link.youtubeId ? 'Convertir en Video YouTube' : 'Convertir en Imagen')
-                                            : 'Ver solo como enlace'}
+                                            ? (entry.link.youtubeId ? 'Ver video' : 'Ver imagen')
+                                            : 'Ver enlace'}
                                         </button>
                                       </div>
                                     )}
                                     {entry.link.renderMode === 'youtube' && entry.link.youtubeId ? (
-                                      <div className="rounded-xl overflow-hidden mt-1">
+                                      <div className="rounded-lg overflow-hidden mt-1">
                                         <CustomVideoPlayer
                                           url={entry.link.url}
                                           videoId={entry.link.youtubeId}
-                                          title={entry.link.label || 'Video en apunte'}
+                                          title={entry.link.label || 'Video'}
                                           isDarkMode={isDarkMode}
                                         />
                                       </div>
@@ -1569,7 +1495,7 @@ export default function NotesModule({
                                       <img
                                         src={entry.link.url}
                                         alt={entry.link.label || 'Imagen'}
-                                        className="mt-1 rounded-xl max-h-48 object-contain"
+                                        className="mt-1 rounded-lg max-h-48 object-contain"
                                       />
                                     ) : (
                                       <a
@@ -1589,15 +1515,15 @@ export default function NotesModule({
                           })}
 
                           {isThreadOpen && (
-                            <div className={`rounded-2xl p-3 border space-y-2 ${
+                            <div className={`rounded-xl p-2.5 border space-y-2 ${
                               isDarkMode ? 'bg-slate-950/90 border-slate-800' : 'bg-slate-50 border-slate-200'
                             }`}>
                               <textarea
                                 rows={2}
                                 value={threadEntryText}
                                 onChange={(e) => setThreadEntryText(e.target.value)}
-                                placeholder="Añadir un apunte al hilo de esta sesión..."
-                                className={`w-full text-xs p-2 rounded-xl border outline-none resize-none ${
+                                placeholder="Escribir apunte..."
+                                className={`w-full text-xs p-2 rounded-lg border outline-none resize-none ${
                                   isDarkMode
                                     ? 'bg-slate-900 border-slate-800 text-slate-100 placeholder-slate-500'
                                     : 'bg-white border-slate-200 text-slate-800 placeholder-slate-400'
@@ -1607,14 +1533,14 @@ export default function NotesModule({
                                 type="url"
                                 value={threadEntryLinkUrl}
                                 onChange={(e) => setThreadEntryLinkUrl(e.target.value)}
-                                placeholder="Opcional: pegar enlace de YouTube, imagen por URL o web (https://...)"
-                                className={`w-full text-[11px] px-2.5 py-1.5 rounded-xl border outline-none ${
+                                placeholder="Enlace https://... (opcional)"
+                                className={`w-full text-[11px] px-2.5 py-1.5 rounded-lg border outline-none ${
                                   isDarkMode
                                     ? 'bg-slate-900 border-slate-800 text-slate-200 placeholder-slate-500'
                                     : 'bg-white border-slate-200 text-slate-700 placeholder-slate-400'
                                 }`}
                               />
-                              <div className="flex items-center justify-between gap-2 pt-1">
+                              <div className="flex items-center justify-between gap-2 pt-0.5">
                                 <label className="inline-flex items-center gap-1.5 text-[11px] font-medium cursor-pointer select-none">
                                   <input
                                     type="checkbox"
@@ -1622,15 +1548,15 @@ export default function NotesModule({
                                     onChange={(e) => setThreadEntryLock(e.target.checked)}
                                     className="rounded text-blue-600"
                                   />
-                                  <Lock size={12} className="text-emerald-500" />
-                                  <span>Poner seguro (candado) a mi apunte</span>
+                                  <Lock size={11} className="text-emerald-500" />
+                                  <span>Poner candado</span>
                                 </label>
                                 <button
                                   type="button"
                                   onClick={() => handleAddThreadEntry(note)}
-                                  className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition-all cursor-pointer"
+                                  className="px-3 py-1 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition-all cursor-pointer"
                                 >
-                                  Publicar apunte
+                                  Guardar
                                 </button>
                               </div>
                             </div>
@@ -1643,10 +1569,10 @@ export default function NotesModule({
                                 setThreadEntryLinkUrl('');
                                 setExpandedThreadNoteId(note.id);
                               }}
-                              className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline pt-1 cursor-pointer"
+                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline pt-0.5 cursor-pointer"
                             >
                               <Plus size={12} />
-                              <span>Añadir apunte en esta sesión</span>
+                              <span>Agregar apunte</span>
                             </button>
                           )}
                         </div>
@@ -1655,8 +1581,8 @@ export default function NotesModule({
                   )}
                 </div>
 
-                {/* Pie de la tarjeta: Autor y fecha */}
-                <div className="mt-5 pt-3 border-t border-slate-200/50 dark:border-slate-800/60 flex items-center justify-between text-[11px] text-slate-400">
+                {/* Pie de la tarjeta */}
+                <div className="mt-4 pt-2.5 border-t border-slate-200/50 dark:border-slate-800/60 flex items-center justify-between text-[11px] text-slate-400">
                   <div className="flex items-center gap-1.5 truncate">
                     <span className="font-semibold text-slate-600 dark:text-slate-300">
                       {note.authorName || 'Usuario'}
@@ -1676,120 +1602,102 @@ export default function NotesModule({
       )}
 
       {/* ========================================================================
-          MODAL COMPOSITOR / EDITOR DE NOTA CON PERSONALIZACIÓN RICA DE TEXTO
+          MODAL COMPOSITOR / EDITOR DE NOTA
       ======================================================================== */}
       {isComposerOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
           <div
-            className={`w-full max-w-3xl max-h-[92vh] flex flex-col rounded-3xl border shadow-2xl overflow-hidden ${
+            className={`w-full max-w-2xl max-h-[92vh] flex flex-col rounded-2xl border shadow-2xl overflow-hidden ${
               isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900'
             }`}
           >
             {/* Cabecera del Editor */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200/80 dark:border-slate-800">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-                  <NavNotebook size={18} />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold">
-                    {editingNote ? 'Editar Nota' : 'Nueva Nota'}
-                  </h3>
-                  <p className="text-[11px] text-slate-400">
-                    Personaliza fuente, tamaño, colores, enlaces de imagen/YouTube y candado de sesión
-                  </p>
-                </div>
-              </div>
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200/80 dark:border-slate-800">
+              <h3 className="text-sm font-bold">
+                {editingNote ? 'Editar nota' : 'Nueva nota'}
+              </h3>
               <button
                 type="button"
                 onClick={() => setIsComposerOpen(false)}
-                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
-            {/* Cuerpo scrollable del Editor */}
-            <div className="p-6 overflow-y-auto space-y-4 flex-1">
-              {/* Selector de Tipo de Nota (Compartida vs Privada) y Grupo */}
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className={`inline-flex p-1 rounded-2xl border ${
+            {/* Cuerpo scrollable */}
+            <div className="p-5 overflow-y-auto space-y-3.5 flex-1">
+              {/* Selector: Notas compartidas vs Notas privadas + Grupo */}
+              <div className="flex flex-wrap items-center justify-between gap-2.5">
+                <div className={`inline-flex p-1 rounded-xl border ${
                   isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200'
                 }`}>
                   <button
                     type="button"
                     onClick={() => setScope('shared')}
-                    className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                       scope === 'shared'
-                        ? (isDarkMode ? 'bg-slate-800 text-white' : 'bg-white text-slate-900 shadow-sm')
+                        ? (isDarkMode ? 'bg-slate-800 text-white' : 'bg-white text-slate-900 shadow-2xs')
                         : 'text-slate-500'
                     }`}
                   >
-                    <UsersIcon size={14} />
-                    <span>Nota Compartida (Clase)</span>
+                    <UsersIcon size={13} />
+                    <span>Notas compartidas</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setScope('private')}
-                    className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                       scope === 'private'
-                        ? (isDarkMode ? 'bg-slate-800 text-white' : 'bg-white text-slate-900 shadow-sm')
+                        ? (isDarkMode ? 'bg-slate-800 text-white' : 'bg-white text-slate-900 shadow-2xs')
                         : 'text-slate-500'
                     }`}
                   >
-                    <UserIcon size={14} />
-                    <span>Nota Privada (Personal)</span>
+                    <UserIcon size={13} />
+                    <span>Notas privadas</span>
                   </button>
                 </div>
 
                 {scope === 'shared' && academicGroups.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-slate-400">Grupo:</span>
-                    <select
-                      value={targetGroupId}
-                      onChange={(e) => setTargetGroupId(e.target.value)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold border outline-none ${
-                        isDarkMode
-                          ? 'bg-slate-950 border-slate-800 text-slate-200'
-                          : 'bg-slate-50 border-slate-200 text-slate-700'
-                      }`}
-                    >
-                      {academicGroups.map((g) => (
-                        <option key={g.id} value={g.id}>
-                          {g.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <select
+                    value={targetGroupId}
+                    onChange={(e) => setTargetGroupId(e.target.value)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold border outline-none ${
+                      isDarkMode
+                        ? 'bg-slate-950 border-slate-800 text-slate-200'
+                        : 'bg-slate-50 border-slate-200 text-slate-700'
+                    }`}
+                  >
+                    {academicGroups.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name}
+                      </option>
+                    ))}
+                  </select>
                 )}
               </div>
 
-              {/* Input de Título */}
+              {/* Título */}
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder={
-                  scope === 'shared'
-                    ? 'Título de la sesión o apunte de clase (ej. Sesión 2: Phrasal Verbs & Market Trends)...'
-                    : 'Título de tu nota privada...'
-                }
+                placeholder="Título"
                 style={getFontFamilyStyle(fontFamily)}
-                className={`w-full px-4 py-3 rounded-2xl text-base sm:text-lg font-bold border outline-none transition-all ${
+                className={`w-full px-3.5 py-2.5 rounded-xl text-sm sm:text-base font-bold border outline-none transition-all ${
                   isDarkMode
                     ? 'bg-slate-950 border-slate-800 text-slate-100 placeholder-slate-500 focus:border-blue-500'
                     : 'bg-slate-50/70 border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:bg-white'
                 }`}
               />
 
-              {/* Barra de Herramientas de Personalización de Texto */}
-              <div className={`rounded-2xl border p-2.5 space-y-2.5 ${
+              {/* Barra de herramientas */}
+              <div className={`rounded-xl border p-2 space-y-2 ${
                 isDarkMode ? 'bg-slate-950/90 border-slate-800' : 'bg-slate-50 border-slate-200/80'
               }`}>
-                <div className="flex flex-wrap items-center gap-2">
-                  {/* Selector de Tipo de Fuente */}
+                <div className="flex flex-wrap items-center gap-1.5">
                   <div className="flex items-center gap-1">
-                    <Type size={14} className="text-slate-400 ml-1" />
+                    <Type size={13} className="text-slate-400 ml-1" />
                     <select
                       value={fontFamily}
                       onChange={(e) => {
@@ -1798,8 +1706,8 @@ export default function NotesModule({
                         const found = NOTE_FONT_FAMILIES.find((f) => f.id === nextFam);
                         if (found) execFormat('fontName', found.css);
                       }}
-                      title="Tipo de fuente"
-                      className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold border outline-none cursor-pointer ${
+                      title="Fuente"
+                      className={`px-2 py-1 rounded-lg text-xs font-semibold border outline-none cursor-pointer ${
                         isDarkMode
                           ? 'bg-slate-900 border-slate-800 text-slate-200'
                           : 'bg-white border-slate-200 text-slate-700'
@@ -1813,7 +1721,6 @@ export default function NotesModule({
                     </select>
                   </div>
 
-                  {/* Selector de Tamaño de Fuente */}
                   <select
                     value={fontSize}
                     onChange={(e) => {
@@ -1822,8 +1729,8 @@ export default function NotesModule({
                       const found = NOTE_FONT_SIZES.find((s) => s.id === nextSize);
                       if (found) execFormat('fontSize', found.execValue);
                     }}
-                    title="Tamaño del texto"
-                    className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold border outline-none cursor-pointer ${
+                    title="Tamaño"
+                    className={`px-2 py-1 rounded-lg text-xs font-semibold border outline-none cursor-pointer ${
                       isDarkMode
                         ? 'bg-slate-900 border-slate-800 text-slate-200'
                         : 'bg-white border-slate-200 text-slate-700'
@@ -1831,50 +1738,49 @@ export default function NotesModule({
                   >
                     {NOTE_FONT_SIZES.map((s) => (
                       <option key={s.id} value={s.id}>
-                        Tamaño: {s.label}
+                        {s.label}
                       </option>
                     ))}
                   </select>
 
-                  <div className="h-5 w-px bg-slate-300 dark:bg-slate-700 mx-0.5" />
+                  <div className="h-4 w-px bg-slate-300 dark:bg-slate-700 mx-0.5" />
 
-                  {/* Botones de estilo básico */}
                   <button
                     type="button"
                     onClick={() => execFormat('bold')}
                     title="Negrita"
-                    className="p-1.5 rounded-xl hover:bg-slate-200/70 dark:hover:bg-slate-800 cursor-pointer"
+                    className="p-1.5 rounded-lg hover:bg-slate-200/70 dark:hover:bg-slate-800 cursor-pointer"
                   >
-                    <Bold size={15} />
+                    <Bold size={14} />
                   </button>
                   <button
                     type="button"
                     onClick={() => execFormat('italic')}
                     title="Cursiva"
-                    className="p-1.5 rounded-xl hover:bg-slate-200/70 dark:hover:bg-slate-800 cursor-pointer"
+                    className="p-1.5 rounded-lg hover:bg-slate-200/70 dark:hover:bg-slate-800 cursor-pointer"
                   >
-                    <Italic size={15} />
+                    <Italic size={14} />
                   </button>
                   <button
                     type="button"
                     onClick={() => execFormat('underline')}
                     title="Subrayado"
-                    className="p-1.5 rounded-xl hover:bg-slate-200/70 dark:hover:bg-slate-800 cursor-pointer"
+                    className="p-1.5 rounded-lg hover:bg-slate-200/70 dark:hover:bg-slate-800 cursor-pointer"
                   >
-                    <Underline size={15} />
+                    <Underline size={14} />
                   </button>
                   <button
                     type="button"
                     onClick={() => execFormat('strikeThrough')}
                     title="Tachado"
-                    className="p-1.5 rounded-xl hover:bg-slate-200/70 dark:hover:bg-slate-800 cursor-pointer"
+                    className="p-1.5 rounded-lg hover:bg-slate-200/70 dark:hover:bg-slate-800 cursor-pointer"
                   >
-                    <Strikethrough size={15} />
+                    <Strikethrough size={14} />
                   </button>
 
-                  <div className="h-5 w-px bg-slate-300 dark:bg-slate-700 mx-0.5" />
+                  <div className="h-4 w-px bg-slate-300 dark:bg-slate-700 mx-0.5" />
 
-                  {/* Color de Texto */}
+                  {/* Color de texto */}
                   <div className="relative">
                     <button
                       type="button"
@@ -1882,18 +1788,17 @@ export default function NotesModule({
                         setShowColorMenu(!showColorMenu);
                         setShowHighlightMenu(false);
                       }}
-                      title="Color del texto"
-                      className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold border cursor-pointer ${
+                      title="Color de letra"
+                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold border cursor-pointer ${
                         isDarkMode
                           ? 'bg-slate-900 border-slate-800 text-slate-200'
                           : 'bg-white border-slate-200 text-slate-700'
                       }`}
                     >
-                      <Palette size={14} className="text-blue-500" />
-                      <span>Color</span>
+                      <Palette size={13} className="text-blue-500" />
                     </button>
                     {showColorMenu && (
-                      <div className={`absolute left-0 top-full mt-1.5 z-20 p-2 rounded-2xl border shadow-xl flex items-center gap-1.5 ${
+                      <div className={`absolute left-0 top-full mt-1.5 z-20 p-2 rounded-xl border shadow-xl flex items-center gap-1.5 ${
                         isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'
                       }`}>
                         {NOTE_TEXT_COLORS.map((c) => (
@@ -1906,7 +1811,7 @@ export default function NotesModule({
                             }}
                             title={c.label}
                             style={{ backgroundColor: c.color }}
-                            className="w-6 h-6 rounded-full border border-white/40 shadow-sm hover:scale-110 transition-transform cursor-pointer"
+                            className="w-5 h-5 rounded-full border border-white/40 shadow-2xs hover:scale-110 transition-transform cursor-pointer"
                           />
                         ))}
                       </div>
@@ -1921,18 +1826,17 @@ export default function NotesModule({
                         setShowHighlightMenu(!showHighlightMenu);
                         setShowColorMenu(false);
                       }}
-                      title="Resaltar texto"
-                      className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold border cursor-pointer ${
+                      title="Resaltar"
+                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold border cursor-pointer ${
                         isDarkMode
                           ? 'bg-slate-900 border-slate-800 text-slate-200'
                           : 'bg-white border-slate-200 text-slate-700'
                       }`}
                     >
-                      <Highlighter size={14} className="text-amber-500" />
-                      <span>Resaltar</span>
+                      <Highlighter size={13} className="text-amber-500" />
                     </button>
                     {showHighlightMenu && (
-                      <div className={`absolute left-0 top-full mt-1.5 z-20 p-2 rounded-2xl border shadow-xl flex items-center gap-1.5 ${
+                      <div className={`absolute left-0 top-full mt-1.5 z-20 p-2 rounded-xl border shadow-xl flex items-center gap-1.5 ${
                         isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'
                       }`}>
                         {NOTE_HIGHLIGHT_COLORS.map((h) => (
@@ -1945,83 +1849,75 @@ export default function NotesModule({
                             }}
                             title={h.label}
                             style={{ backgroundColor: h.color === 'transparent' ? '#ffffff' : h.color }}
-                            className="w-6 h-6 rounded-full border border-slate-300 shadow-sm hover:scale-110 transition-transform cursor-pointer"
+                            className="w-5 h-5 rounded-full border border-slate-300 shadow-2xs hover:scale-110 transition-transform cursor-pointer"
                           />
                         ))}
                       </div>
                     )}
                   </div>
 
-                  <div className="h-5 w-px bg-slate-300 dark:bg-slate-700 mx-0.5" />
+                  <div className="h-4 w-px bg-slate-300 dark:bg-slate-700 mx-0.5" />
 
-                  {/* Listas, Cita y Subtítulo */}
                   <button
                     type="button"
                     onClick={() => execFormat('insertUnorderedList')}
-                    title="Lista con viñetas"
-                    className="p-1.5 rounded-xl hover:bg-slate-200/70 dark:hover:bg-slate-800 cursor-pointer"
+                    title="Viñetas"
+                    className="p-1.5 rounded-lg hover:bg-slate-200/70 dark:hover:bg-slate-800 cursor-pointer"
                   >
-                    <List size={15} />
+                    <List size={14} />
                   </button>
                   <button
                     type="button"
                     onClick={() => execFormat('insertOrderedList')}
                     title="Lista numerada"
-                    className="p-1.5 rounded-xl hover:bg-slate-200/70 dark:hover:bg-slate-800 cursor-pointer"
+                    className="p-1.5 rounded-lg hover:bg-slate-200/70 dark:hover:bg-slate-800 cursor-pointer"
                   >
-                    <ListOrdered size={15} />
+                    <ListOrdered size={14} />
                   </button>
                   <button
                     type="button"
                     onClick={() => execFormat('formatBlock', 'blockquote')}
-                    title="Cita destacada"
-                    className="p-1.5 rounded-xl hover:bg-slate-200/70 dark:hover:bg-slate-800 cursor-pointer"
+                    title="Cita"
+                    className="p-1.5 rounded-lg hover:bg-slate-200/70 dark:hover:bg-slate-800 cursor-pointer"
                   >
-                    <Quote size={15} />
+                    <Quote size={14} />
                   </button>
                   <button
                     type="button"
                     onClick={() => execFormat('formatBlock', 'h3')}
-                    title="Subtítulo de sección"
-                    className="p-1.5 rounded-xl hover:bg-slate-200/70 dark:hover:bg-slate-800 cursor-pointer"
+                    title="Subtítulo"
+                    className="p-1.5 rounded-lg hover:bg-slate-200/70 dark:hover:bg-slate-800 cursor-pointer"
                   >
-                    <Heading size={15} />
+                    <Heading size={14} />
                   </button>
 
-                  {/* Botón para abrir la barra de Enlaces Inteligentes (Imagen por URL / YouTube / Web) */}
+                  {/* Botón Enlace */}
                   <button
                     type="button"
                     onClick={() => setShowLinkInput(!showLinkInput)}
-                    className={`ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                    className={`ml-auto inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
                       showLinkInput
                         ? 'bg-blue-600 text-white border-blue-600'
                         : (isDarkMode ? 'bg-slate-900 border-slate-700 text-blue-400' : 'bg-white border-blue-200 text-blue-600')
                     }`}
                   >
-                    <Globe size={14} />
-                    <span>+ Agregar Enlace (Imagen / YouTube / Web)</span>
+                    <Globe size={13} />
+                    <span>Enlace</span>
                   </button>
                 </div>
 
-                {/* Panel desplegable para insertar Enlace Inteligente (Sin subida de archivos locales) */}
+                {/* Panel desplegable de Enlace */}
                 {showLinkInput && (
-                  <div className={`p-3.5 rounded-2xl border space-y-3 ${
+                  <div className={`p-3 rounded-xl border space-y-2.5 ${
                     isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
                   }`}>
-                    <div className="flex items-center justify-between text-[11px] text-slate-400">
-                      <span>Pega un enlace de imagen, un enlace de YouTube o una página web:</span>
-                      <span className="font-semibold text-amber-600 dark:text-amber-400">
-                        Solo enlaces URL (sin subir archivos del dispositivo)
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <input
                         type="url"
                         value={linkUrlInput}
                         onChange={(e) => setLinkUrlInput(e.target.value)}
-                        placeholder="https://... (YouTube, imagen .png/.jpg o sitio web)"
-                        className={`px-3 py-2 rounded-xl text-xs border outline-none ${
+                        placeholder="https://... (imagen, YouTube o web)"
+                        className={`px-3 py-1.5 rounded-lg text-xs border outline-none ${
                           isDarkMode
                             ? 'bg-slate-950 border-slate-800 text-slate-100'
                             : 'bg-slate-50 border-slate-200 text-slate-800'
@@ -2031,8 +1927,8 @@ export default function NotesModule({
                         type="text"
                         value={linkLabelInput}
                         onChange={(e) => setLinkLabelInput(e.target.value)}
-                        placeholder="Título o descripción del enlace (opcional)"
-                        className={`px-3 py-2 rounded-xl text-xs border outline-none ${
+                        placeholder="Título (opcional)"
+                        className={`px-3 py-1.5 rounded-lg text-xs border outline-none ${
                           isDarkMode
                             ? 'bg-slate-950 border-slate-800 text-slate-100'
                             : 'bg-slate-50 border-slate-200 text-slate-800'
@@ -2040,74 +1936,72 @@ export default function NotesModule({
                       />
                     </div>
 
-                    {/* Opciones de conversión según el tipo de enlace detectado */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                        <span className="text-[11px] font-medium text-slate-400 mr-1">Convertir en:</span>
                         <button
                           type="button"
                           onClick={() => setLinkRenderPreference('auto')}
-                          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border cursor-pointer ${
+                          className={`px-2 py-1 rounded-lg text-[11px] font-semibold border cursor-pointer ${
                             linkRenderPreference === 'auto'
                               ? 'bg-blue-600 text-white border-blue-600'
                               : (isDarkMode ? 'border-slate-700 text-slate-300' : 'border-slate-200 text-slate-600')
                           }`}
                         >
-                          Automático {liveLinkPreview?.type === 'youtube' ? '(Video YouTube)' : liveLinkPreview?.type === 'image' ? '(Imagen)' : '(Enlace)'}
+                          Automático
                         </button>
                         <button
                           type="button"
                           onClick={() => setLinkRenderPreference('image')}
-                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold border cursor-pointer ${
+                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold border cursor-pointer ${
                             linkRenderPreference === 'image'
                               ? 'bg-emerald-600 text-white border-emerald-600'
                               : (isDarkMode ? 'border-slate-700 text-slate-300' : 'border-slate-200 text-slate-600')
                           }`}
                         >
-                          <ImageIcon size={12} />
-                          <span>Imagen integrada</span>
+                          <ImageIcon size={11} />
+                          <span>Imagen</span>
                         </button>
                         {liveLinkPreview?.youtubeId && (
                           <button
                             type="button"
                             onClick={() => setLinkRenderPreference('youtube')}
-                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold border cursor-pointer ${
+                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold border cursor-pointer ${
                               linkRenderPreference === 'youtube'
                                 ? 'bg-rose-600 text-white border-rose-600'
                                 : (isDarkMode ? 'border-slate-700 text-slate-300' : 'border-slate-200 text-slate-600')
                             }`}
                           >
-                            <MonitorPlay size={12} />
-                            <span>Video de YouTube</span>
+                            <MonitorPlay size={11} />
+                            <span>YouTube</span>
                           </button>
                         )}
                         <button
                           type="button"
                           onClick={() => setLinkRenderPreference('link')}
-                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold border cursor-pointer ${
+                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold border cursor-pointer ${
                             linkRenderPreference === 'link'
                               ? 'bg-indigo-600 text-white border-indigo-600'
                               : (isDarkMode ? 'border-slate-700 text-slate-300' : 'border-slate-200 text-slate-600')
                           }`}
                         >
-                          <Globe size={12} />
-                          <span>Solo enlace clicable</span>
+                          <Globe size={11} />
+                          <span>Enlace</span>
                         </button>
                       </div>
 
                       <button
                         type="button"
                         onClick={handleAddSmartLink}
-                        className="px-4 py-1.5 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition-all cursor-pointer"
+                        className="px-3 py-1 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition-all cursor-pointer"
                       >
-                        Insertar enlace
+                        Agregar
                       </button>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Área de Escritura Enriquecida (ContentEditable sin subida de archivos) */}
+              {/* Área de escritura */}
               <div
                 ref={editorRef}
                 contentEditable
@@ -2118,90 +2012,80 @@ export default function NotesModule({
                 onPaste={handleEditorPaste}
                 onDrop={handleEditorDrop}
                 style={getFontFamilyStyle(fontFamily)}
-                data-placeholder="Escribe aquí los apuntes de la sesión... Puedes aplicar colores, cambiar tipos de fuente y tamaños, o agregar enlaces de YouTube e imágenes por URL."
-                className={`min-h-[210px] p-4 rounded-2xl border outline-none transition-all prose prose-sm max-w-none ${getFontSizeClass(fontSize)} ${getPaperThemeClasses(paperTheme)} ${
+                data-placeholder="Escribe aquí..."
+                className={`min-h-[200px] p-3.5 rounded-xl border outline-none transition-all prose prose-sm max-w-none ${getFontSizeClass(fontSize)} ${getPaperThemeClasses(paperTheme)} ${
                   isDarkMode
                     ? 'text-slate-100 focus:border-blue-500'
                     : 'text-slate-800 focus:border-blue-500'
                 } empty:before:content-[attr(data-placeholder)] empty:before:text-slate-400 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_blockquote]:border-l-4 [&_blockquote]:border-blue-500/50 [&_blockquote]:pl-3 [&_blockquote]:italic`}
               />
 
-              {/* Lista de Enlaces Inteligentes añadidos a la nota en el editor */}
+              {/* Enlaces añadidos en el editor */}
               {links.length > 0 && (
-                <div className="space-y-2">
-                  <div className="text-xs font-semibold text-slate-400">
-                    Enlaces y recursos integrados en esta nota ({links.length}):
-                  </div>
-                  <div className="space-y-2">
-                    {links.map((item) => (
-                      <div
-                        key={item.id}
-                        className={`flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl border text-xs ${
-                          isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 truncate max-w-md">
-                          {item.renderMode === 'youtube' ? (
-                            <MonitorPlay size={14} className="text-rose-500 shrink-0" />
-                          ) : item.renderMode === 'image' ? (
-                            <ImageIcon size={14} className="text-emerald-500 shrink-0" />
-                          ) : (
-                            <Globe size={14} className="text-blue-500 shrink-0" />
-                          )}
-                          <span className="font-semibold truncate">{item.label}</span>
-                          <span className="text-[10px] text-slate-400 truncate">({item.url})</span>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleToggleLinkRenderMode(null, item.id, true)}
-                            className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border cursor-pointer ${
-                              isDarkMode
-                                ? 'border-slate-700 bg-slate-800 text-slate-200'
-                                : 'border-slate-200 bg-white text-slate-700'
-                            }`}
-                          >
-                            Modo actual: {item.renderMode === 'youtube' ? 'Video YouTube' : item.renderMode === 'image' ? 'Imagen' : 'Enlace'} (Cambiar)
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setLinks((prev) => prev.filter((l) => l.id !== item.id))}
-                            className="p-1 text-slate-400 hover:text-rose-500 cursor-pointer"
-                            title="Quitar enlace"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
+                <div className="space-y-1.5">
+                  {links.map((item) => (
+                    <div
+                      key={item.id}
+                      className={`flex flex-wrap items-center justify-between gap-2 p-2 rounded-xl border text-xs ${
+                        isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 truncate max-w-md">
+                        {item.renderMode === 'youtube' ? (
+                          <MonitorPlay size={13} className="text-rose-500 shrink-0" />
+                        ) : item.renderMode === 'image' ? (
+                          <ImageIcon size={13} className="text-emerald-500 shrink-0" />
+                        ) : (
+                          <Globe size={13} className="text-blue-500 shrink-0" />
+                        )}
+                        <span className="font-semibold truncate">{item.label}</span>
                       </div>
-                    ))}
-                  </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleLinkRenderMode(null, item.id, true)}
+                          className={`px-2 py-0.5 rounded-lg text-[11px] font-semibold border cursor-pointer ${
+                            isDarkMode
+                              ? 'border-slate-700 bg-slate-800 text-slate-200'
+                              : 'border-slate-200 bg-white text-slate-700'
+                          }`}
+                        >
+                          {item.renderMode === 'youtube' ? 'Video' : item.renderMode === 'image' ? 'Imagen' : 'Enlace'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setLinks((prev) => prev.filter((l) => l.id !== item.id))}
+                          className="p-1 text-slate-400 hover:text-rose-500 cursor-pointer"
+                          title="Quitar"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
 
-              {/* Selector de Color de Hoja (Paper Theme) y Seguro/Candado de Sesión */}
-              <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-slate-400">Fondo de hoja:</span>
-                  <div className="flex items-center gap-1.5">
-                    {NOTE_PAPER_THEMES.map((theme) => (
-                      <button
-                        key={theme.id}
-                        type="button"
-                        onClick={() => setPaperTheme(theme.id)}
-                        title={theme.label}
-                        className={`w-6 h-6 rounded-full border transition-transform cursor-pointer ${theme.dot} ${
-                          paperTheme === theme.id ? 'ring-2 ring-blue-500 scale-110' : ''
-                        }`}
-                      />
-                    ))}
-                  </div>
+              {/* Color de hoja y Candado */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                <div className="flex items-center gap-1.5">
+                  {NOTE_PAPER_THEMES.map((theme) => (
+                    <button
+                      key={theme.id}
+                      type="button"
+                      onClick={() => setPaperTheme(theme.id)}
+                      title={theme.label}
+                      className={`w-5 h-5 rounded-full border transition-transform cursor-pointer ${theme.dot} ${
+                        paperTheme === theme.id ? 'ring-2 ring-blue-500 scale-110' : ''
+                      }`}
+                    />
+                  ))}
                 </div>
 
-                {/* Candado / Seguro de sesión (en notas compartidas) */}
                 {scope === 'shared' && (
                   <label
-                    className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl border text-xs font-semibold cursor-pointer select-none transition-all ${
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold cursor-pointer select-none transition-all ${
                       isLockedOnSave
                         ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
                         : (isDarkMode ? 'bg-slate-950 border-slate-800 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-700')
@@ -2213,17 +2097,15 @@ export default function NotesModule({
                       onChange={(e) => setIsLockedOnSave(e.target.checked)}
                       className="rounded text-emerald-600"
                     />
-                    {isLockedOnSave ? <Lock size={14} /> : <Unlock size={14} />}
-                    <span>
-                      Poner seguro (candado) a lo hecho en esta sesión
-                    </span>
+                    {isLockedOnSave ? <Lock size={13} /> : <Unlock size={13} />}
+                    <span>Poner candado</span>
                   </label>
                 )}
               </div>
             </div>
 
             {/* Pie del Modal Editor */}
-            <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50">
+            <div className="flex items-center justify-end gap-2 px-5 py-3.5 border-t border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50">
               <button
                 type="button"
                 onClick={() => setIsComposerOpen(false)}
@@ -2238,10 +2120,10 @@ export default function NotesModule({
               <button
                 type="button"
                 onClick={handleSaveComposerNote}
-                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-sm transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-sm transition-all cursor-pointer"
               >
-                <CheckCircle2 size={16} />
-                <span>{editingNote ? 'Guardar cambios' : 'Publicar nota'}</span>
+                <CheckCircle2 size={14} />
+                <span>Guardar</span>
               </button>
             </div>
           </div>
@@ -2249,70 +2131,57 @@ export default function NotesModule({
       )}
 
       {/* ========================================================================
-          MODAL EXCLUSIVO DEL DOCENTE: "ÚLTIMOS CAMBIOS" (AUDITORÍA SILENCIOSA)
-          Estrictamente renderizado solo cuando isTeacher === true.
+          MODAL EXCLUSIVO DEL DOCENTE: "ÚLTIMOS CAMBIOS"
       ======================================================================== */}
       {isTeacher && isAuditModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/65 backdrop-blur-sm animate-fade-in">
           <div
-            className={`w-full max-w-3xl max-h-[90vh] flex flex-col rounded-3xl border shadow-2xl overflow-hidden ${
+            className={`w-full max-w-2xl max-h-[88vh] flex flex-col rounded-2xl border shadow-2xl overflow-hidden ${
               isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900'
             }`}
           >
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200/80 dark:border-slate-800">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-                  <Shield size={20} />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-base font-bold">Últimos Cambios en Notas Compartidas</h3>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-amber-500/15 text-amber-600 dark:text-amber-400">
-                      Vista privada del docente
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-400">
-                    Supervisa quién creó, editó, bloqueó o borró apuntes en la clase y restaura versiones anteriores si alguien escribió algo indebido.
-                  </p>
-                </div>
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200/80 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <Shield size={17} className="text-amber-500" />
+                <h3 className="text-sm font-bold">Últimos cambios</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setIsAuditModalOpen(false)}
-                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
-            <div className="px-6 py-3 border-b border-slate-200/60 dark:border-slate-800 flex items-center justify-between gap-3">
-              <span className="text-xs font-semibold text-slate-400">
-                Filtrar por nota:
+            <div className="px-5 py-2.5 border-b border-slate-200/60 dark:border-slate-800 flex items-center justify-between gap-3">
+              <span className="text-xs font-medium text-slate-400">
+                Nota:
               </span>
               <select
                 value={selectedAuditNoteFilter}
                 onChange={(e) => setSelectedAuditNoteFilter(e.target.value)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold border outline-none ${
+                className={`px-3 py-1 rounded-lg text-xs font-semibold border outline-none ${
                   isDarkMode ? 'bg-slate-950 border-slate-800 text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-700'
                 }`}
               >
-                <option value="ALL">Todas las notas compartidas</option>
+                <option value="ALL">Todas</option>
                 {(Array.isArray(notes) ? notes : [])
                   .filter((n) => n && n.scope !== 'private')
                   .map((n) => (
                     <option key={n.id} value={n.id}>
-                      {n.title} {n.isSoftDeleted ? '(Eliminada por estudiante)' : ''}
+                      {n.title} {n.isSoftDeleted ? '(Eliminada)' : ''}
                     </option>
                   ))}
               </select>
             </div>
 
-            <div className="p-6 overflow-y-auto space-y-3 flex-1">
+            <div className="p-5 overflow-y-auto space-y-2.5 flex-1">
               {teacherAuditFeed.filter(
                 (item) => selectedAuditNoteFilter === 'ALL' || String(item.noteId) === String(selectedAuditNoteFilter)
               ).length === 0 ? (
-                <div className="text-center py-12 text-xs text-slate-400">
-                  No hay cambios registrados para este filtro todavía.
+                <div className="text-center py-10 text-xs text-slate-400">
+                  Sin cambios registrados
                 </div>
               ) : (
                 teacherAuditFeed
@@ -2322,22 +2191,15 @@ export default function NotesModule({
                   .map((item) => (
                     <div
                       key={item.id}
-                      className={`rounded-2xl border p-4 space-y-2.5 ${
+                      className={`rounded-xl border p-3.5 space-y-2 ${
                         isDarkMode ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50/80 border-slate-200/80'
                       }`}
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-xs font-bold">{item.actorName}</span>
                           <span className="text-[11px] text-slate-400">@{item.actorId}</span>
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            item.actorRole === 'teacher'
-                              ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
-                              : 'bg-slate-500/15 text-slate-600 dark:text-slate-300'
-                          }`}>
-                            {item.actorRole === 'teacher' ? 'Docente' : 'Estudiante'}
-                          </span>
-                          <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+                          <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
                             • {item.summary}
                           </span>
                         </div>
@@ -2347,34 +2209,34 @@ export default function NotesModule({
                       </div>
 
                       <div className="text-xs font-semibold text-blue-600 dark:text-blue-400">
-                        Nota: {item.noteTitle}
+                        {item.noteTitle}
                         {item.isNoteSoftDeleted && (
-                          <span className="ml-2 px-2 py-0.5 rounded-full text-[10px] bg-rose-500/15 text-rose-500">
-                            Oculta / Borrada por estudiante
+                          <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] bg-rose-500/15 text-rose-500">
+                            Eliminada
                           </span>
                         )}
                       </div>
 
                       {(item.previousTextPreview || item.newTextPreview) && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 text-xs">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 text-xs">
                           {item.previousTextPreview && (
-                            <div className={`p-2.5 rounded-xl border ${
+                            <div className={`p-2 rounded-lg border ${
                               isDarkMode ? 'bg-rose-950/20 border-rose-900/40 text-rose-200' : 'bg-rose-50/70 border-rose-200 text-rose-900'
                             }`}>
-                              <div className="text-[10px] font-bold uppercase tracking-wider opacity-75 mb-1">
-                                Contenido anterior:
+                              <div className="text-[10px] font-bold opacity-75 mb-0.5">
+                                Antes:
                               </div>
-                              <p className="line-clamp-4 whitespace-pre-wrap">{item.previousTextPreview}</p>
+                              <p className="line-clamp-3 whitespace-pre-wrap">{item.previousTextPreview}</p>
                             </div>
                           )}
                           {item.newTextPreview && (
-                            <div className={`p-2.5 rounded-xl border ${
+                            <div className={`p-2 rounded-lg border ${
                               isDarkMode ? 'bg-emerald-950/20 border-emerald-900/40 text-emerald-200' : 'bg-emerald-50/70 border-emerald-200 text-emerald-900'
                             }`}>
-                              <div className="text-[10px] font-bold uppercase tracking-wider opacity-75 mb-1">
-                                Contenido después del cambio:
+                              <div className="text-[10px] font-bold opacity-75 mb-0.5">
+                                Después:
                               </div>
-                              <p className="line-clamp-4 whitespace-pre-wrap">{item.newTextPreview}</p>
+                              <p className="line-clamp-3 whitespace-pre-wrap">{item.newTextPreview}</p>
                             </div>
                           )}
                         </div>
@@ -2382,18 +2244,18 @@ export default function NotesModule({
 
                       {((Array.isArray(item.previousLinks) && item.previousLinks.length > 0) || (Array.isArray(item.newLinks) && item.newLinks.length > 0)) && (
                         <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                          Enlaces previos: {Array.isArray(item.previousLinks) ? item.previousLinks.length : 0} • Enlaces posteriores: {Array.isArray(item.newLinks) ? item.newLinks.length : 0}
+                          Enlaces: {Array.isArray(item.previousLinks) ? item.previousLinks.length : 0} → {Array.isArray(item.newLinks) ? item.newLinks.length : 0}
                         </div>
                       )}
                       {(item.action === 'edit' || item.action === 'soft_delete' || item.action === 'delete_block') && (typeof item.previousContent === 'string' || Array.isArray(item.previousLinks)) && (
-                        <div className="flex items-center justify-end gap-2 pt-1">
+                        <div className="flex items-center justify-end pt-1">
                           <button
                             type="button"
                             onClick={() => handleTeacherRestoreAuditVersion(item)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition-all cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition-all cursor-pointer"
                           >
-                            <RotateCcw size={13} />
-                            <span>Restaurar esta versión anterior</span>
+                            <RotateCcw size={12} />
+                            <span>Restaurar</span>
                           </button>
                         </div>
                       )}
@@ -2410,30 +2272,25 @@ export default function NotesModule({
       ======================================================================== */}
       {notePendingDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
-          <div className={`w-full max-w-md rounded-3xl border p-6 shadow-2xl space-y-4 ${
+          <div className={`w-full max-w-sm rounded-2xl border p-5 shadow-2xl space-y-4 ${
             isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900'
           }`}>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-rose-500/15 text-rose-500 flex items-center justify-center shrink-0">
-                <Trash2 size={20} />
+              <div className="w-9 h-9 rounded-xl bg-rose-500/15 text-rose-500 flex items-center justify-center shrink-0">
+                <Trash2 size={18} />
               </div>
-              <div>
-                <h3 className="text-base font-bold">¿Eliminar esta nota?</h3>
-                <p className="text-xs text-slate-400">
+              <div className="min-w-0">
+                <h3 className="text-sm font-bold">¿Eliminar nota?</h3>
+                <p className="text-xs text-slate-400 truncate">
                   {notePendingDelete.title}
                 </p>
               </div>
             </div>
-            <p className="text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-              {isTeacher
-                ? 'Como docente, tienes permiso total para eliminar definitivamente esta nota del cuaderno.'
-                : 'Se quitará esta nota de tu vista actual.'}
-            </p>
-            <div className="flex items-center justify-end gap-2.5 pt-2">
+            <div className="flex items-center justify-end gap-2 pt-1">
               <button
                 type="button"
                 onClick={() => setNotePendingDelete(null)}
-                className={`px-4 py-2 rounded-xl text-xs font-semibold border cursor-pointer ${
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold border cursor-pointer ${
                   isDarkMode ? 'border-slate-700 text-slate-300' : 'border-slate-200 text-slate-600'
                 }`}
               >
@@ -2442,9 +2299,9 @@ export default function NotesModule({
               <button
                 type="button"
                 onClick={handleConfirmDeleteNote}
-                className="px-4 py-2 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white cursor-pointer"
+                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white cursor-pointer"
               >
-                Sí, eliminar
+                Eliminar
               </button>
             </div>
           </div>

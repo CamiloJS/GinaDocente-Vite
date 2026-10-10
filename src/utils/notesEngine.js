@@ -4,11 +4,11 @@
 // registro silencioso de auditoría para el docente y filtrado multi-docente/grupo.
 
 export const NOTE_FONT_FAMILIES = [
-  { id: 'sans', label: 'Moderna (Sans)', css: 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
-  { id: 'serif', label: 'Editorial (Serif)', css: 'Georgia, Cambria, "Times New Roman", Times, serif' },
-  { id: 'mono', label: 'Código (Mono)', css: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace' },
-  { id: 'handwriting', label: 'Apunte (Manuscrita)', css: '"Segoe Print", "Bradley Hand", Chilanka, TSCu_Comic, casual, cursive' },
-  { id: 'classic', label: 'Académica (Clásica)', css: '"Palatino Linotype", "Book Antiqua", Palatino, serif' }
+  { id: 'sans', label: 'Sans', css: 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' },
+  { id: 'serif', label: 'Serif', css: 'Georgia, Cambria, "Times New Roman", Times, serif' },
+  { id: 'mono', label: 'Mono', css: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace' },
+  { id: 'handwriting', label: 'Manuscrita', css: '"Segoe Print", "Bradley Hand", Chilanka, TSCu_Comic, casual, cursive' },
+  { id: 'classic', label: 'Clásica', css: '"Palatino Linotype", "Book Antiqua", Palatino, serif' }
 ];
 
 export const NOTE_FONT_SIZES = [
@@ -20,14 +20,14 @@ export const NOTE_FONT_SIZES = [
 ];
 
 export const NOTE_TEXT_COLORS = [
-  { id: 'default', label: 'Por defecto', color: '#1e293b', darkColor: '#f1f5f9' },
-  { id: 'blue', label: 'Azul Cobalto', color: '#2563eb', darkColor: '#60a5fa' },
+  { id: 'default', label: 'Normal', color: '#1e293b', darkColor: '#f1f5f9' },
+  { id: 'blue', label: 'Azul', color: '#2563eb', darkColor: '#60a5fa' },
   { id: 'indigo', label: 'Índigo', color: '#4f46e5', darkColor: '#818cf8' },
-  { id: 'emerald', label: 'Esmeralda', color: '#059669', darkColor: '#34d399' },
+  { id: 'emerald', label: 'Verde', color: '#059669', darkColor: '#34d399' },
   { id: 'amber', label: 'Ámbar', color: '#d97706', darkColor: '#fbbf24' },
-  { id: 'rose', label: 'Carmesí', color: '#e11d48', darkColor: '#fb7185' },
+  { id: 'rose', label: 'Rojo', color: '#e11d48', darkColor: '#fb7185' },
   { id: 'purple', label: 'Violeta', color: '#7c3aed', darkColor: '#a78bfa' },
-  { id: 'slate', label: 'Gris Pizarra', color: '#64748b', darkColor: '#94a3b8' }
+  { id: 'slate', label: 'Gris', color: '#64748b', darkColor: '#94a3b8' }
 ];
 
 export const NOTE_HIGHLIGHT_COLORS = [

@@ -353,6 +353,16 @@ check(
     appSrc.includes("collection(db, 'artifacts', appId, 'public', 'data', 'notes')") &&
     appSrc.includes("changeTab('notes')")
 );
+check(
+  'NotesModule.jsx usa "Notas compartidas" y "Notas privadas" sin Mayúsculas En Cada Palabra y mantiene interfaz minimalista',
+  notesModuleSrc.includes('Notas compartidas') &&
+    notesModuleSrc.includes('Notas privadas') &&
+    !notesModuleSrc.includes('Notas Compartidas') &&
+    !notesModuleSrc.includes('Mis Notas Privadas') &&
+    !notesModuleSrc.includes('Cuaderno Interactivo y Apuntes') &&
+    notesModuleSrc.includes('No hay notas compartidas aún') &&
+    notesModuleSrc.includes('No hay notas privadas aún')
+);
 
 console.log('\n========================================');
 console.log(`Total pruebas Notas: ${okCount + failCount} | OK: ${okCount} | FAIL: ${failCount}`);
