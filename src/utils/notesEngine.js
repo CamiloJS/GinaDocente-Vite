@@ -49,6 +49,24 @@ export const NOTE_PAPER_THEMES = [
   { id: 'rose', label: 'Rosa pálido', lightBg: 'bg-rose-50/40 border-rose-200/70', darkBg: 'bg-rose-950/20 border-rose-800/40', dot: 'bg-rose-100 border-rose-300' }
 ];
 
+export const NOTE_FORMATS = [
+  { id: 'sticky', label: 'Nota rápida' },
+  { id: 'sheet', label: 'Hoja completa' }
+];
+
+export const NOTE_SHEET_STYLES = [
+  { id: 'blank', label: 'Lisa' },
+  { id: 'lined', label: 'Rayada' },
+  { id: 'grid', label: 'Cuadriculada' }
+];
+
+export const normalizeNoteFormat = (fmt) => (fmt === 'sheet' ? 'sheet' : 'sticky');
+
+export const normalizeNoteSheetStyle = (style) => {
+  if (style === 'lined' || style === 'grid') return style;
+  return 'blank';
+};
+
 /**
  * Extrae el ID de 11 caracteres de un enlace de YouTube.
  */

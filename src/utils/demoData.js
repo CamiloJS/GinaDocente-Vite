@@ -950,6 +950,8 @@ export const DEMO_NOTES = [
     fontFamily: 'sans',
     fontSize: 'base',
     paperTheme: 'sky',
+    noteFormat: 'sheet',
+    sheetStyle: 'lined',
     isPinned: true,
     isLocked: true,
     lockedBy: 'teacher',

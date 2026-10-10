@@ -11,6 +11,10 @@ import {
   NOTE_TEXT_COLORS,
   NOTE_HIGHLIGHT_COLORS,
   NOTE_PAPER_THEMES,
+  NOTE_FORMATS,
+  NOTE_SHEET_STYLES,
+  normalizeNoteFormat,
+  normalizeNoteSheetStyle,
   extractNoteYouTubeId,
   isNoteImageUrl,
   normalizeExternalNoteUrl,
@@ -369,8 +373,28 @@ check(
     notesModuleSrc.includes('isComposerOpen && typeof document !== \'undefined\' && createPortal(') &&
     notesModuleSrc.includes('isTeacher && isAuditModalOpen && typeof document !== \'undefined\' && createPortal(') &&
     notesModuleSrc.includes('notePendingDelete && typeof document !== \'undefined\' && createPortal(') &&
+    notesModuleSrc.includes('activeSheetNote && typeof document !== \'undefined\' && createPortal(') &&
     !appSrc.includes('pb-28 md:pb-8 relative z-10 shrink-0 mx-auto') &&
     appSrc.includes('pl-3 border-l z-0 shrink-0 py-3.5 overflow-hidden')
+);
+check(
+  'notesEngine.js y NotesModule.jsx soportan formato "Nota rápida" (sticky) y "Hoja completa" (sheet) con renglones (blank, lined, grid)',
+  Array.isArray(NOTE_FORMATS) &&
+    NOTE_FORMATS.length === 2 &&
+    NOTE_FORMATS.some(f => f.id === 'sticky' && f.label === 'Nota rápida') &&
+    NOTE_FORMATS.some(f => f.id === 'sheet' && f.label === 'Hoja completa') &&
+    Array.isArray(NOTE_SHEET_STYLES) &&
+    NOTE_SHEET_STYLES.length === 3 &&
+    normalizeNoteFormat('sheet') === 'sheet' &&
+    normalizeNoteFormat('sticky') === 'sticky' &&
+    normalizeNoteFormat('unknown') === 'sticky' &&
+    normalizeNoteSheetStyle('lined') === 'lined' &&
+    normalizeNoteSheetStyle('grid') === 'grid' &&
+    normalizeNoteSheetStyle('unknown') === 'blank' &&
+    notesModuleSrc.includes('Hoja completa') &&
+    notesModuleSrc.includes('getSheetRulingStyle') &&
+    notesModuleSrc.includes('handleToggleNoteFormat') &&
+    DEMO_NOTES.some(n => n.noteFormat === 'sheet')
 );
 
 console.log('\n========================================');
@@ -380,3 +404,4 @@ console.log('========================================\n');
 if (failCount > 0) {
   process.exit(1);
 }
+

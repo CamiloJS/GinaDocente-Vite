@@ -36,7 +36,10 @@ import {
   Type,
   CheckCircle2,
   Shield,
-  MessageSquareText
+  MessageSquareText,
+  FileText,
+  Grid,
+  Maximize2
 } from './Icons.jsx';
 import CustomVideoPlayer from './CustomVideoPlayer.jsx';
 import {
@@ -45,6 +48,10 @@ import {
   NOTE_TEXT_COLORS,
   NOTE_HIGHLIGHT_COLORS,
   NOTE_PAPER_THEMES,
+  NOTE_FORMATS,
+  NOTE_SHEET_STYLES,
+  normalizeNoteFormat,
+  normalizeNoteSheetStyle,
   classifyNoteUrl,
   sanitizeNoteHtml,
   stripNoteHtml,
@@ -88,6 +95,7 @@ export default function NotesModule({
   const [activeScope, setActiveScope] = useState('shared');
   const [selectedGroupFilter, setSelectedGroupFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState('all'); // 'all' | 'sticky' | 'sheet'
 
   // Modal de creación / edición de nota
   const [isComposerOpen, setIsComposerOpen] = useState(false);
@@ -98,9 +106,14 @@ export default function NotesModule({
   const [fontFamily, setFontFamily] = useState('sans');
   const [fontSize, setFontSize] = useState('base');
   const [paperTheme, setPaperTheme] = useState('default');
+  const [noteFormat, setNoteFormat] = useState('sticky'); // 'sticky' | 'sheet'
+  const [sheetStyle, setSheetStyle] = useState('blank'); // 'blank' | 'lined' | 'grid'
   const [isLockedOnSave, setIsLockedOnSave] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
   const [links, setLinks] = useState([]);
+
+  // Vista ampliada de Hoja Completa Profesional
+  const [activeSheetNoteId, setActiveSheetNoteId] = useState(null);
 
   // Barra para insertar enlace inteligente (imagen por URL, YouTube o enlace web)
   const [showLinkInput, setShowLinkInput] = useState(false);
@@ -210,7 +223,7 @@ export default function NotesModule({
   }, [isTeacher, notes]);
 
   // Abrir compositor para nueva nota
-  const handleOpenNewNote = (initialScope = activeScope) => {
+  const handleOpenNewNote = (initialScope = activeScope, initialFormat = null) => {
     setEditingNote(null);
     setTitle('');
     setScope(initialScope);
@@ -222,6 +235,8 @@ export default function NotesModule({
     setFontFamily('sans');
     setFontSize('base');
     setPaperTheme('default');
+    setNoteFormat(initialFormat ? normalizeNoteFormat(initialFormat) : (viewMode === 'sheet' ? 'sheet' : 'sticky'));
+    setSheetStyle('blank');
     setIsLockedOnSave(initialScope === 'shared');
     setIsPinned(false);
     setLinks([]);
@@ -253,6 +268,8 @@ export default function NotesModule({
     setFontFamily(note.fontFamily || 'sans');
     setFontSize(note.fontSize || 'base');
     setPaperTheme(note.paperTheme || 'default');
+    setNoteFormat(normalizeNoteFormat(note.noteFormat));
+    setSheetStyle(normalizeNoteSheetStyle(note.sheetStyle));
     setIsLockedOnSave(Boolean(note.isLocked));
     setIsPinned(Boolean(note.isPinned));
     setLinks(Array.isArray(note.links) ? [...note.links] : []);
@@ -529,6 +546,8 @@ export default function NotesModule({
         fontFamily,
         fontSize,
         paperTheme,
+        noteFormat: normalizeNoteFormat(noteFormat),
+        sheetStyle: normalizeNoteSheetStyle(sheetStyle),
         isPinned: Boolean(isPinned),
         isLocked: scope === 'shared' ? Boolean(isLockedOnSave) : false,
         lockedBy:
@@ -595,6 +614,8 @@ export default function NotesModule({
         fontFamily,
         fontSize,
         paperTheme,
+        noteFormat: normalizeNoteFormat(noteFormat),
+        sheetStyle: normalizeNoteSheetStyle(sheetStyle),
         isPinned: Boolean(isPinned),
         isLocked: scope === 'shared' ? Boolean(isLockedOnSave) : false,
         lockedBy: scope === 'shared' && isLockedOnSave ? normalizedUserId : null,
@@ -697,6 +718,27 @@ export default function NotesModule({
     const updated = {
       ...note,
       isPinned: !note.isPinned,
+      updatedAt: Date.now()
+    };
+    if (onSaveNote) {
+      await onSaveNote(updated);
+    }
+  };
+
+  // Alternar formato entre Nota rápida (sticky) y Hoja completa profesional (sheet)
+  const handleToggleNoteFormat = async (note) => {
+    if (!note) return;
+    if (!canUserEditNote(note, currentUserObj)) {
+      if (showNotify) {
+        showNotify('Esta nota tiene candado. Desbloquéala para cambiar su formato.', 'warning');
+      }
+      return;
+    }
+    const nextFmt = normalizeNoteFormat(note.noteFormat) === 'sheet' ? 'sticky' : 'sheet';
+    const updated = {
+      ...note,
+      noteFormat: nextFmt,
+      sheetStyle: normalizeNoteSheetStyle(note.sheetStyle),
       updatedAt: Date.now()
     };
     if (onSaveNote) {
@@ -1055,6 +1097,32 @@ export default function NotesModule({
     return isDarkMode ? found.darkBg : found.lightBg;
   };
 
+  const getSheetRulingStyle = (styleId) => {
+    const normalized = normalizeNoteSheetStyle(styleId);
+    if (normalized === 'lined') {
+      const lineColor = isDarkMode ? 'rgba(148, 163, 184, 0.14)' : 'rgba(100, 116, 139, 0.16)';
+      return {
+        backgroundImage: `repeating-linear-gradient(to bottom, transparent 0px, transparent 31px, ${lineColor} 31px, ${lineColor} 32px)`,
+        backgroundAttachment: 'local',
+        lineHeight: '32px'
+      };
+    }
+    if (normalized === 'grid') {
+      const gridColor = isDarkMode ? 'rgba(148, 163, 184, 0.11)' : 'rgba(100, 116, 139, 0.13)';
+      return {
+        backgroundImage: `linear-gradient(to right, ${gridColor} 1px, transparent 1px), linear-gradient(to bottom, ${gridColor} 1px, transparent 1px)`,
+        backgroundSize: '24px 24px',
+        backgroundAttachment: 'local'
+      };
+    }
+    return {};
+  };
+
+  const activeSheetNote = useMemo(() => {
+    if (!activeSheetNoteId) return null;
+    return visibleNotes.find((n) => String(n.id) === String(activeSheetNoteId)) || null;
+  }, [activeSheetNoteId, visibleNotes]);
+
   return (
     <div className="w-full space-y-5 pb-16">
       {/* Encabezado minimalista */}
@@ -1063,7 +1131,7 @@ export default function NotesModule({
           Notas
         </h1>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {isTeacher && (
             <button
               type="button"
@@ -1086,7 +1154,20 @@ export default function NotesModule({
 
           <button
             type="button"
-            onClick={() => handleOpenNewNote(activeScope)}
+            onClick={() => handleOpenNewNote(activeScope, 'sheet')}
+            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border transition-all active:scale-95 cursor-pointer ${
+              isDarkMode
+                ? 'bg-slate-900 border-slate-800 text-slate-100 hover:bg-slate-800'
+                : 'bg-white border-slate-200 text-slate-800 hover:bg-slate-50 shadow-2xs'
+            }`}
+          >
+            <FileText size={14} className="text-blue-500" />
+            <span>Hoja completa</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleOpenNewNote(activeScope, 'sticky')}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-sm transition-all active:scale-95 cursor-pointer"
           >
             <Plus size={15} />
@@ -1097,33 +1178,76 @@ export default function NotesModule({
 
       {/* Pestañas: Notas compartidas / Notas privadas + Filtros */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className={`inline-flex p-1 rounded-xl border self-start ${
-          isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200/80'
-        }`}>
-          <button
-            type="button"
-            onClick={() => setActiveScope('shared')}
-            className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              activeScope === 'shared'
-                ? (isDarkMode ? 'bg-slate-800 text-white shadow-2xs' : 'bg-white text-slate-900 shadow-2xs')
-                : (isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900')
-            }`}
-          >
-            <UsersIcon size={14} />
-            <span>Notas compartidas</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveScope('private')}
-            className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              activeScope === 'private'
-                ? (isDarkMode ? 'bg-slate-800 text-white shadow-2xs' : 'bg-white text-slate-900 shadow-2xs')
-                : (isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900')
-            }`}
-          >
-            <UserIcon size={14} />
-            <span>Notas privadas</span>
-          </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className={`inline-flex p-1 rounded-xl border ${
+            isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200/80'
+          }`}>
+            <button
+              type="button"
+              onClick={() => setActiveScope('shared')}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeScope === 'shared'
+                  ? (isDarkMode ? 'bg-slate-800 text-white shadow-2xs' : 'bg-white text-slate-900 shadow-2xs')
+                  : (isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900')
+              }`}
+            >
+              <UsersIcon size={14} />
+              <span>Notas compartidas</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveScope('private')}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeScope === 'private'
+                  ? (isDarkMode ? 'bg-slate-800 text-white shadow-2xs' : 'bg-white text-slate-900 shadow-2xs')
+                  : (isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900')
+              }`}
+            >
+              <UserIcon size={14} />
+              <span>Notas privadas</span>
+            </button>
+          </div>
+
+          {/* Selector de vista: Automático / Notas rápidas / Hojas completas */}
+          <div className={`inline-flex p-1 rounded-xl border ${
+            isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200/80'
+          }`}>
+            <button
+              type="button"
+              onClick={() => setViewMode('all')}
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                viewMode === 'all'
+                  ? (isDarkMode ? 'bg-slate-800 text-white shadow-2xs' : 'bg-white text-slate-900 shadow-2xs')
+                  : (isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900')
+              }`}
+            >
+              Todo
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('sticky')}
+              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                viewMode === 'sticky'
+                  ? (isDarkMode ? 'bg-slate-800 text-white shadow-2xs' : 'bg-white text-slate-900 shadow-2xs')
+                  : (isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900')
+              }`}
+            >
+              <Grid size={12} />
+              <span>Notas rápidas</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('sheet')}
+              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                viewMode === 'sheet'
+                  ? (isDarkMode ? 'bg-slate-800 text-white shadow-2xs' : 'bg-white text-slate-900 shadow-2xs')
+                  : (isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900')
+              }`}
+            >
+              <FileText size={12} />
+              <span>Hojas</span>
+            </button>
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 flex-1 sm:justify-end">
@@ -1193,16 +1317,37 @@ export default function NotesModule({
             const noteLinks = Array.isArray(note.links) ? note.links : [];
             const noteEntries = Array.isArray(note.entries) ? note.entries : [];
             const isThreadOpen = expandedThreadNoteId === note.id;
+            const savedFormat = normalizeNoteFormat(note.noteFormat);
+            const effectiveFormat = viewMode === 'all' ? savedFormat : viewMode;
+            const isSheet = effectiveFormat === 'sheet';
+            const noteSheetStyle = normalizeNoteSheetStyle(note.sheetStyle);
 
             return (
               <article
                 key={note.id}
-                className={`rounded-2xl border p-5 flex flex-col justify-between transition-all shadow-2xs hover:shadow-sm ${getPaperThemeClasses(note.paperTheme)}`}
+                className={`rounded-2xl border flex flex-col justify-between transition-all ${
+                  isSheet
+                    ? 'lg:col-span-2 overflow-hidden shadow-sm hover:shadow-md'
+                    : 'p-5 shadow-2xs hover:shadow-sm'
+                } ${getPaperThemeClasses(note.paperTheme)}`}
               >
                 <div>
-                  {/* Cabecera de la tarjeta */}
-                  <div className="flex items-start justify-between gap-2 mb-2.5">
+                  {/* Cabecera de la tarjeta / hoja */}
+                  <div className={`flex items-start justify-between gap-2 ${
+                    isSheet
+                      ? `px-6 sm:px-10 py-3.5 border-b ${isDarkMode ? 'border-slate-800/80 bg-slate-950/30' : 'border-slate-200/70 bg-white/50'}`
+                      : 'mb-2.5'
+                  }`}>
                     <div className="flex flex-wrap items-center gap-1.5">
+                      {isSheet && (
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                          isDarkMode ? 'bg-blue-500/15 text-blue-300' : 'bg-blue-500/10 text-blue-700'
+                        }`}>
+                          <FileText size={11} />
+                          <span>Hoja completa</span>
+                        </span>
+                      )}
+
                       {note.isPinned && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-500/15 text-blue-600 dark:text-blue-400">
                           <Pin size={11} />
@@ -1228,6 +1373,30 @@ export default function NotesModule({
 
                     {/* Acciones */}
                     <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setActiveSheetNoteId(note.id)}
+                        title="Abrir hoja en pantalla completa"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all cursor-pointer"
+                      >
+                        <Maximize2 size={13} />
+                      </button>
+
+                      {canEdit && (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleNoteFormat(note)}
+                          title={savedFormat === 'sheet' ? 'Cambiar a nota rápida' : 'Cambiar a hoja completa'}
+                          className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                            savedFormat === 'sheet'
+                              ? 'text-blue-600 dark:text-blue-400 bg-blue-500/10'
+                              : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
+                          }`}
+                        >
+                          <FileText size={13} />
+                        </button>
+                      )}
+
                       {note.scope === 'shared' && (
                         <button
                           type="button"
@@ -1287,303 +1456,323 @@ export default function NotesModule({
                     </div>
                   </div>
 
-                  {/* Título */}
-                  <h2
-                    style={getFontFamilyStyle(note.fontFamily)}
-                    className={`text-base font-bold tracking-tight mb-2 ${
-                      isDarkMode ? 'text-slate-100' : 'text-slate-900'
-                    }`}
+                  {/* Cuerpo de la nota / Hoja completa */}
+                  <div
+                    style={isSheet ? getSheetRulingStyle(noteSheetStyle) : undefined}
+                    className={
+                      isSheet
+                        ? `px-6 sm:px-10 py-6 sm:py-8 min-h-[220px] relative ${
+                            noteSheetStyle === 'lined'
+                              ? (isDarkMode ? 'border-l-2 border-rose-500/20 sm:ml-6' : 'border-l-2 border-rose-400/30 sm:ml-6')
+                              : ''
+                          }`
+                        : ''
+                    }
                   >
-                    {note.title}
-                  </h2>
-
-                  {/* Cuerpo */}
-                  {note.content && (
-                    <div
+                    {/* Título */}
+                    <h2
                       style={getFontFamilyStyle(note.fontFamily)}
-                      className={`prose prose-sm max-w-none break-words mb-3 ${getFontSizeClass(note.fontSize)} ${
-                        isDarkMode ? 'text-slate-200 prose-invert' : 'text-slate-700'
-                      } [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_blockquote]:border-l-4 [&_blockquote]:border-blue-500/50 [&_blockquote]:pl-3 [&_blockquote]:italic [&_a]:text-blue-600 [&_a]:underline`}
-                      dangerouslySetInnerHTML={{ __html: sanitizeNoteHtml(note.content) }}
-                    />
-                  )}
+                      className={`font-bold tracking-tight ${
+                        isSheet
+                          ? 'text-lg sm:text-xl pb-2.5 mb-3.5 border-b border-slate-200/70 dark:border-slate-800/80'
+                          : 'text-base mb-2'
+                      } ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}
+                    >
+                      {note.title}
+                    </h2>
 
-                  {/* Enlaces adjuntos */}
-                  {noteLinks.length > 0 && (
-                    <div className="space-y-2.5 mt-3 pt-2.5 border-t border-slate-200/60 dark:border-slate-800/80">
-                      {noteLinks.map((item) => {
-                        const canConvertImg = isLikelyImageLink(item);
-                        const canConvertYt = Boolean(item.youtubeId);
+                    {/* Cuerpo */}
+                    {note.content && (
+                      <div
+                        style={getFontFamilyStyle(note.fontFamily)}
+                        className={`prose prose-sm max-w-none break-words mb-3 ${getFontSizeClass(note.fontSize)} ${
+                          isDarkMode ? 'text-slate-200 prose-invert' : 'text-slate-700'
+                        } [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_blockquote]:border-l-4 [&_blockquote]:border-blue-500/50 [&_blockquote]:pl-3 [&_blockquote]:italic [&_a]:text-blue-600 [&_a]:underline`}
+                        dangerouslySetInnerHTML={{ __html: sanitizeNoteHtml(note.content) }}
+                      />
+                    )}
 
-                        return (
-                          <div
-                            key={item.id}
-                            className={`rounded-xl border p-2.5 transition-all ${
-                              isDarkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-white/80 border-slate-200/80'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <a
-                                href={item.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline truncate"
-                              >
-                                {item.renderMode === 'youtube' ? (
-                                  <MonitorPlay size={13} className="text-rose-500 shrink-0" />
-                                ) : item.renderMode === 'image' ? (
-                                  <ImageIcon size={13} className="text-emerald-500 shrink-0" />
-                                ) : (
-                                  <Globe size={13} className="text-blue-500 shrink-0" />
-                                )}
-                                <span className="truncate">{item.label || item.url}</span>
-                              </a>
+                    {/* Enlaces adjuntos */}
+                    {noteLinks.length > 0 && (
+                      <div className="space-y-2.5 mt-3 pt-2.5 border-t border-slate-200/60 dark:border-slate-800/80">
+                        {noteLinks.map((item) => {
+                          const canConvertImg = isLikelyImageLink(item);
+                          const canConvertYt = Boolean(item.youtubeId);
 
-                              {(canConvertImg || canConvertYt) && canEdit && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleLinkRenderMode(note, item.id, false)}
-                                  className={`px-2 py-0.5 rounded-lg text-[10px] font-semibold border transition-all shrink-0 cursor-pointer ${
-                                    isDarkMode
-                                      ? 'border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700'
-                                      : 'border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200'
-                                  }`}
+                          return (
+                            <div
+                              key={item.id}
+                              className={`rounded-xl border p-2.5 transition-all ${
+                                isDarkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-white/80 border-slate-200/80'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <a
+                                  href={item.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline truncate"
                                 >
-                                  {item.renderMode === 'link'
-                                    ? (canConvertYt ? 'Ver video' : 'Ver imagen')
-                                    : 'Ver enlace'}
-                                </button>
+                                  {item.renderMode === 'youtube' ? (
+                                    <MonitorPlay size={13} className="text-rose-500 shrink-0" />
+                                  ) : item.renderMode === 'image' ? (
+                                    <ImageIcon size={13} className="text-emerald-500 shrink-0" />
+                                  ) : (
+                                    <Globe size={13} className="text-blue-500 shrink-0" />
+                                  )}
+                                  <span className="truncate">{item.label || item.url}</span>
+                                </a>
+
+                                {(canConvertImg || canConvertYt) && canEdit && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleLinkRenderMode(note, item.id, false)}
+                                    className={`px-2 py-0.5 rounded-lg text-[10px] font-semibold border transition-all shrink-0 cursor-pointer ${
+                                      isDarkMode
+                                        ? 'border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700'
+                                        : 'border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                    }`}
+                                  >
+                                    {item.renderMode === 'link'
+                                      ? (canConvertYt ? 'Ver video' : 'Ver imagen')
+                                      : 'Ver enlace'}
+                                  </button>
+                                )}
+                              </div>
+
+                              {item.renderMode === 'youtube' && item.youtubeId && (
+                                <div className="rounded-lg overflow-hidden mt-2">
+                                  <CustomVideoPlayer
+                                    url={item.url}
+                                    videoId={item.youtubeId}
+                                    title={item.label || 'Video'}
+                                    isDarkMode={isDarkMode}
+                                  />
+                                </div>
+                              )}
+
+                              {item.renderMode === 'image' && (
+                                <div className="rounded-lg overflow-hidden mt-2 bg-slate-100 dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800">
+                                  <img
+                                    src={item.url}
+                                    alt={item.label || 'Imagen'}
+                                    loading="lazy"
+                                    className={`w-full ${isSheet ? 'max-h-96' : 'max-h-64'} object-contain mx-auto`}
+                                  />
+                                </div>
                               )}
                             </div>
-
-                            {item.renderMode === 'youtube' && item.youtubeId && (
-                              <div className="rounded-lg overflow-hidden mt-2">
-                                <CustomVideoPlayer
-                                  url={item.url}
-                                  videoId={item.youtubeId}
-                                  title={item.label || 'Video'}
-                                  isDarkMode={isDarkMode}
-                                />
-                              </div>
-                            )}
-
-                            {item.renderMode === 'image' && (
-                              <div className="rounded-lg overflow-hidden mt-2 bg-slate-100 dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800">
-                                <img
-                                  src={item.url}
-                                  alt={item.label || 'Imagen'}
-                                  loading="lazy"
-                                  className="w-full max-h-64 object-contain mx-auto"
-                                />
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Apuntes en notas compartidas */}
-                  {note.scope === 'shared' && (
-                    <div className="mt-3 pt-2.5 border-t border-slate-200/60 dark:border-slate-800/80">
-                      <div className="flex items-center justify-between">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (!isThreadOpen) {
-                              setThreadEntryText('');
-                              setThreadEntryLinkUrl('');
-                            }
-                            setExpandedThreadNoteId(isThreadOpen ? null : note.id);
-                          }}
-                          className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
-                        >
-                          <MessageSquareText size={13} />
-                          <span>
-                            {noteEntries.length > 0
-                              ? `Apuntes (${noteEntries.length})`
-                              : 'Agregar apunte'}
-                          </span>
-                        </button>
+                          );
+                        })}
                       </div>
+                    )}
 
-                      {(isThreadOpen || noteEntries.length > 0) && (
-                        <div className="mt-2.5 space-y-2">
-                          {noteEntries.map((entry) => {
-                            const canDeleteEntry = canUserDeleteNote(entry, currentUserObj);
-                            const canToggleEntryLock = canUserToggleNoteLock(entry, currentUserObj);
-
-                            return (
-                              <div
-                                key={entry.id}
-                                className={`rounded-xl p-2.5 border text-xs transition-all ${
-                                  isDarkMode
-                                    ? 'bg-slate-950/70 border-slate-800 text-slate-200'
-                                    : 'bg-white/90 border-slate-200/80 text-slate-700'
-                                }`}
-                              >
-                                <div className="flex items-center justify-between gap-2 mb-1">
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="font-bold">{entry.authorName}</span>
-                                    {entry.authorRole === 'teacher' && (
-                                      <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-500/15 text-blue-600 dark:text-blue-400">
-                                        Docente
-                                      </span>
-                                    )}
-                                    <span className="text-[10px] text-slate-400">
-                                      • {formatRelativeTime(entry.createdAt)}
-                                    </span>
-                                    {entry.isLocked && (
-                                      <Lock size={10} className="text-emerald-500" />
-                                    )}
-                                  </div>
-
-                                  <div className="flex items-center gap-1">
-                                    {canToggleEntryLock && (
-                                      <button
-                                        type="button"
-                                        onClick={() => handleToggleThreadEntryLock(note, entry.id)}
-                                        title={entry.isLocked ? 'Quitar candado' : 'Poner candado'}
-                                        className="p-1 rounded-lg text-slate-400 hover:text-emerald-500 cursor-pointer"
-                                      >
-                                        {entry.isLocked ? <Lock size={12} /> : <Unlock size={12} />}
-                                      </button>
-                                    )}
-                                    {canDeleteEntry && (
-                                      <button
-                                        type="button"
-                                        onClick={() => handleDeleteThreadEntry(note, entry.id)}
-                                        title="Eliminar"
-                                        className="p-1 rounded-lg text-slate-400 hover:text-rose-500 cursor-pointer"
-                                      >
-                                        <Trash2 size={12} />
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-
-                                <p className="whitespace-pre-wrap leading-relaxed">{entry.text}</p>
-
-                                {entry.link && (
-                                  <div className="mt-2 space-y-1">
-                                    {(isLikelyImageLink(entry.link) || Boolean(entry.link.youtubeId)) && canUserEditNote(entry, currentUserObj) && (
-                                      <div className="flex justify-end">
-                                        <button
-                                          type="button"
-                                          onClick={() => handleToggleThreadEntryLinkMode(note, entry.id)}
-                                          className={`px-2 py-0.5 rounded-lg text-[10px] font-semibold border cursor-pointer ${
-                                            isDarkMode
-                                              ? 'border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800'
-                                              : 'border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200'
-                                          }`}
-                                        >
-                                          {entry.link.renderMode === 'link'
-                                            ? (entry.link.youtubeId ? 'Ver video' : 'Ver imagen')
-                                            : 'Ver enlace'}
-                                        </button>
-                                      </div>
-                                    )}
-                                    {entry.link.renderMode === 'youtube' && entry.link.youtubeId ? (
-                                      <div className="rounded-lg overflow-hidden mt-1">
-                                        <CustomVideoPlayer
-                                          url={entry.link.url}
-                                          videoId={entry.link.youtubeId}
-                                          title={entry.link.label || 'Video'}
-                                          isDarkMode={isDarkMode}
-                                        />
-                                      </div>
-                                    ) : entry.link.renderMode === 'image' ? (
-                                      <img
-                                        src={entry.link.url}
-                                        alt={entry.link.label || 'Imagen'}
-                                        className="mt-1 rounded-lg max-h-48 object-contain"
-                                      />
-                                    ) : (
-                                      <a
-                                        href={entry.link.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 underline mt-1"
-                                      >
-                                        <Globe size={12} />
-                                        <span>{entry.link.url}</span>
-                                      </a>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-
-                          {isThreadOpen && (
-                            <div className={`rounded-xl p-2.5 border space-y-2 ${
-                              isDarkMode ? 'bg-slate-950/90 border-slate-800' : 'bg-slate-50 border-slate-200'
-                            }`}>
-                              <textarea
-                                rows={2}
-                                value={threadEntryText}
-                                onChange={(e) => setThreadEntryText(e.target.value)}
-                                placeholder="Escribir apunte..."
-                                className={`w-full text-xs p-2 rounded-lg border outline-none resize-none ${
-                                  isDarkMode
-                                    ? 'bg-slate-900 border-slate-800 text-slate-100 placeholder-slate-500'
-                                    : 'bg-white border-slate-200 text-slate-800 placeholder-slate-400'
-                                }`}
-                              />
-                              <input
-                                type="url"
-                                value={threadEntryLinkUrl}
-                                onChange={(e) => setThreadEntryLinkUrl(e.target.value)}
-                                placeholder="Enlace https://... (opcional)"
-                                className={`w-full text-[11px] px-2.5 py-1.5 rounded-lg border outline-none ${
-                                  isDarkMode
-                                    ? 'bg-slate-900 border-slate-800 text-slate-200 placeholder-slate-500'
-                                    : 'bg-white border-slate-200 text-slate-700 placeholder-slate-400'
-                                }`}
-                              />
-                              <div className="flex items-center justify-between gap-2 pt-0.5">
-                                <label className="inline-flex items-center gap-1.5 text-[11px] font-medium cursor-pointer select-none">
-                                  <input
-                                    type="checkbox"
-                                    checked={threadEntryLock}
-                                    onChange={(e) => setThreadEntryLock(e.target.checked)}
-                                    className="rounded text-blue-600"
-                                  />
-                                  <Lock size={11} className="text-emerald-500" />
-                                  <span>Poner candado</span>
-                                </label>
-                                <button
-                                  type="button"
-                                  onClick={() => handleAddThreadEntry(note)}
-                                  className="px-3 py-1 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition-all cursor-pointer"
-                                >
-                                  Guardar
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                          {!isThreadOpen && noteEntries.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => {
+                    {/* Apuntes en notas compartidas */}
+                    {note.scope === 'shared' && (
+                      <div className="mt-3 pt-2.5 border-t border-slate-200/60 dark:border-slate-800/80">
+                        <div className="flex items-center justify-between">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!isThreadOpen) {
                                 setThreadEntryText('');
                                 setThreadEntryLinkUrl('');
-                                setExpandedThreadNoteId(note.id);
-                              }}
-                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline pt-0.5 cursor-pointer"
-                            >
-                              <Plus size={12} />
-                              <span>Agregar apunte</span>
-                            </button>
-                          )}
+                              }
+                              setExpandedThreadNoteId(isThreadOpen ? null : note.id);
+                            }}
+                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                          >
+                            <MessageSquareText size={13} />
+                            <span>
+                              {noteEntries.length > 0
+                                ? `Apuntes (${noteEntries.length})`
+                                : 'Agregar apunte'}
+                            </span>
+                          </button>
                         </div>
-                      )}
-                    </div>
-                  )}
+
+                        {(isThreadOpen || noteEntries.length > 0) && (
+                          <div className="mt-2.5 space-y-2">
+                            {noteEntries.map((entry) => {
+                              const canDeleteEntry = canUserDeleteNote(entry, currentUserObj);
+                              const canToggleEntryLock = canUserToggleNoteLock(entry, currentUserObj);
+
+                              return (
+                                <div
+                                  key={entry.id}
+                                  className={`rounded-xl p-2.5 border text-xs transition-all ${
+                                    isDarkMode
+                                      ? 'bg-slate-950/70 border-slate-800 text-slate-200'
+                                      : 'bg-white/90 border-slate-200/80 text-slate-700'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between gap-2 mb-1">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="font-bold">{entry.authorName}</span>
+                                      {entry.authorRole === 'teacher' && (
+                                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-500/15 text-blue-600 dark:text-blue-400">
+                                          Docente
+                                        </span>
+                                      )}
+                                      <span className="text-[10px] text-slate-400">
+                                        • {formatRelativeTime(entry.createdAt)}
+                                      </span>
+                                      {entry.isLocked && (
+                                        <Lock size={10} className="text-emerald-500" />
+                                      )}
+                                    </div>
+
+                                    <div className="flex items-center gap-1">
+                                      {canToggleEntryLock && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleToggleThreadEntryLock(note, entry.id)}
+                                          title={entry.isLocked ? 'Quitar candado' : 'Poner candado'}
+                                          className="p-1 rounded-lg text-slate-400 hover:text-emerald-500 cursor-pointer"
+                                        >
+                                          {entry.isLocked ? <Lock size={12} /> : <Unlock size={12} />}
+                                        </button>
+                                      )}
+                                      {canDeleteEntry && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDeleteThreadEntry(note, entry.id)}
+                                          title="Eliminar"
+                                          className="p-1 rounded-lg text-slate-400 hover:text-rose-500 cursor-pointer"
+                                        >
+                                          <Trash2 size={12} />
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <p className="whitespace-pre-wrap leading-relaxed">{entry.text}</p>
+
+                                  {entry.link && (
+                                    <div className="mt-2 space-y-1">
+                                      {(isLikelyImageLink(entry.link) || Boolean(entry.link.youtubeId)) && canUserEditNote(entry, currentUserObj) && (
+                                        <div className="flex justify-end">
+                                          <button
+                                            type="button"
+                                            onClick={() => handleToggleThreadEntryLinkMode(note, entry.id)}
+                                            className={`px-2 py-0.5 rounded-lg text-[10px] font-semibold border cursor-pointer ${
+                                              isDarkMode
+                                                ? 'border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800'
+                                                : 'border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                            }`}
+                                          >
+                                            {entry.link.renderMode === 'link'
+                                              ? (entry.link.youtubeId ? 'Ver video' : 'Ver imagen')
+                                              : 'Ver enlace'}
+                                          </button>
+                                        </div>
+                                      )}
+                                      {entry.link.renderMode === 'youtube' && entry.link.youtubeId ? (
+                                        <div className="rounded-lg overflow-hidden mt-1">
+                                          <CustomVideoPlayer
+                                            url={entry.link.url}
+                                            videoId={entry.link.youtubeId}
+                                            title={entry.link.label || 'Video'}
+                                            isDarkMode={isDarkMode}
+                                          />
+                                        </div>
+                                      ) : entry.link.renderMode === 'image' ? (
+                                        <img
+                                          src={entry.link.url}
+                                          alt={entry.link.label || 'Imagen'}
+                                          className="mt-1 rounded-lg max-h-48 object-contain"
+                                        />
+                                      ) : (
+                                        <a
+                                          href={entry.link.url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 underline mt-1"
+                                        >
+                                          <Globe size={12} />
+                                          <span>{entry.link.url}</span>
+                                        </a>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+
+                            {isThreadOpen && (
+                              <div className={`rounded-xl p-2.5 border space-y-2 ${
+                                isDarkMode ? 'bg-slate-950/90 border-slate-800' : 'bg-slate-50 border-slate-200'
+                              }`}>
+                                <textarea
+                                  rows={2}
+                                  value={threadEntryText}
+                                  onChange={(e) => setThreadEntryText(e.target.value)}
+                                  placeholder="Escribir apunte..."
+                                  className={`w-full text-xs p-2 rounded-lg border outline-none resize-none ${
+                                    isDarkMode
+                                      ? 'bg-slate-900 border-slate-800 text-slate-100 placeholder-slate-500'
+                                      : 'bg-white border-slate-200 text-slate-800 placeholder-slate-400'
+                                  }`}
+                                />
+                                <input
+                                  type="url"
+                                  value={threadEntryLinkUrl}
+                                  onChange={(e) => setThreadEntryLinkUrl(e.target.value)}
+                                  placeholder="Enlace https://... (opcional)"
+                                  className={`w-full text-[11px] px-2.5 py-1.5 rounded-lg border outline-none ${
+                                    isDarkMode
+                                      ? 'bg-slate-900 border-slate-800 text-slate-200 placeholder-slate-500'
+                                      : 'bg-white border-slate-200 text-slate-700 placeholder-slate-400'
+                                  }`}
+                                />
+                                <div className="flex items-center justify-between gap-2 pt-0.5">
+                                  <label className="inline-flex items-center gap-1.5 text-[11px] font-medium cursor-pointer select-none">
+                                    <input
+                                      type="checkbox"
+                                      checked={threadEntryLock}
+                                      onChange={(e) => setThreadEntryLock(e.target.checked)}
+                                      className="rounded text-blue-600"
+                                    />
+                                    <Lock size={11} className="text-emerald-500" />
+                                    <span>Poner candado</span>
+                                  </label>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAddThreadEntry(note)}
+                                    className="px-3 py-1 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition-all cursor-pointer"
+                                  >
+                                    Guardar
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                            {!isThreadOpen && noteEntries.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setThreadEntryText('');
+                                  setThreadEntryLinkUrl('');
+                                  setExpandedThreadNoteId(note.id);
+                                }}
+                                className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline pt-0.5 cursor-pointer"
+                              >
+                                <Plus size={12} />
+                                <span>Agregar apunte</span>
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                {/* Pie de la tarjeta */}
-                <div className="mt-4 pt-2.5 border-t border-slate-200/50 dark:border-slate-800/60 flex items-center justify-between text-[11px] text-slate-400">
+                {/* Pie de la tarjeta / hoja */}
+                <div className={`flex items-center justify-between text-[11px] text-slate-400 ${
+                  isSheet
+                    ? `px-6 sm:px-10 py-3 border-t ${isDarkMode ? 'border-slate-800/80 bg-slate-950/30' : 'border-slate-200/60 bg-white/50'}`
+                    : 'mt-4 pt-2.5 border-t border-slate-200/50 dark:border-slate-800/60'
+                }`}>
                   <div className="flex items-center gap-1.5 truncate">
                     <span className="font-semibold text-slate-600 dark:text-slate-300">
                       {note.authorName || 'Usuario'}
@@ -1608,19 +1797,28 @@ export default function NotesModule({
       {isComposerOpen && typeof document !== 'undefined' && createPortal(
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-6 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
           <div
-            className={`w-full max-w-2xl max-h-[92vh] flex flex-col rounded-2xl border shadow-2xl overflow-hidden ${
+            className={`w-full ${noteFormat === 'sheet' ? 'max-w-4xl' : 'max-w-2xl'} max-h-[92vh] flex flex-col rounded-2xl border shadow-2xl overflow-hidden transition-all ${
               isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900'
             }`}
           >
             {/* Cabecera del Editor */}
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200/80 dark:border-slate-800">
-              <h3 className="text-sm font-bold">
-                {editingNote ? 'Editar nota' : 'Nueva nota'}
-              </h3>
+              <div className="flex items-center gap-2">
+                {noteFormat === 'sheet' ? (
+                  <FileText size={16} className="text-blue-500" />
+                ) : (
+                  <NavNotebook size={16} className="text-blue-500" />
+                )}
+                <h3 className="text-sm font-bold">
+                  {editingNote
+                    ? (noteFormat === 'sheet' ? 'Editar hoja completa' : 'Editar nota')
+                    : (noteFormat === 'sheet' ? 'Nueva hoja completa' : 'Nueva nota')}
+                </h3>
+              </div>
               <button
                 type="button"
                 onClick={() => setIsComposerOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
               >
                 <X size={16} />
               </button>
@@ -1628,35 +1826,58 @@ export default function NotesModule({
 
             {/* Cuerpo scrollable */}
             <div className="p-5 overflow-y-auto space-y-3.5 flex-1">
-              {/* Selector: Notas compartidas vs Notas privadas + Grupo */}
+              {/* Selector: Notas compartidas vs Notas privadas + Formato (Nota rápida / Hoja completa) + Grupo */}
               <div className="flex flex-wrap items-center justify-between gap-2.5">
-                <div className={`inline-flex p-1 rounded-xl border ${
-                  isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200'
-                }`}>
-                  <button
-                    type="button"
-                    onClick={() => setScope('shared')}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                      scope === 'shared'
-                        ? (isDarkMode ? 'bg-slate-800 text-white' : 'bg-white text-slate-900 shadow-2xs')
-                        : 'text-slate-500'
-                    }`}
-                  >
-                    <UsersIcon size={13} />
-                    <span>Notas compartidas</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setScope('private')}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                      scope === 'private'
-                        ? (isDarkMode ? 'bg-slate-800 text-white' : 'bg-white text-slate-900 shadow-2xs')
-                        : 'text-slate-500'
-                    }`}
-                  >
-                    <UserIcon size={13} />
-                    <span>Notas privadas</span>
-                  </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className={`inline-flex p-1 rounded-xl border ${
+                    isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200'
+                  }`}>
+                    <button
+                      type="button"
+                      onClick={() => setScope('shared')}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        scope === 'shared'
+                          ? (isDarkMode ? 'bg-slate-800 text-white' : 'bg-white text-slate-900 shadow-2xs')
+                          : 'text-slate-500'
+                      }`}
+                    >
+                      <UsersIcon size={13} />
+                      <span>Notas compartidas</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setScope('private')}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        scope === 'private'
+                          ? (isDarkMode ? 'bg-slate-800 text-white' : 'bg-white text-slate-900 shadow-2xs')
+                          : 'text-slate-500'
+                      }`}
+                    >
+                      <UserIcon size={13} />
+                      <span>Notas privadas</span>
+                    </button>
+                  </div>
+
+                  {/* Selector de Formato: Nota rápida vs Hoja completa */}
+                  <div className={`inline-flex p-1 rounded-xl border ${
+                    isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200'
+                  }`}>
+                    {NOTE_FORMATS.map((fmt) => (
+                      <button
+                        key={fmt.id}
+                        type="button"
+                        onClick={() => setNoteFormat(fmt.id)}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                          noteFormat === fmt.id
+                            ? (isDarkMode ? 'bg-slate-800 text-white' : 'bg-white text-slate-900 shadow-2xs')
+                            : 'text-slate-500'
+                        }`}
+                      >
+                        {fmt.id === 'sheet' ? <FileText size={13} /> : <Grid size={13} />}
+                        <span>{fmt.label}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {scope === 'shared' && academicGroups.length > 0 && (
@@ -2012,9 +2233,16 @@ export default function NotesModule({
                 onBlur={saveEditorSelection}
                 onPaste={handleEditorPaste}
                 onDrop={handleEditorDrop}
-                style={getFontFamilyStyle(fontFamily)}
+                style={{
+                  ...getFontFamilyStyle(fontFamily),
+                  ...(noteFormat === 'sheet' ? getSheetRulingStyle(sheetStyle) : {})
+                }}
                 data-placeholder="Escribe aquí..."
-                className={`min-h-[200px] p-3.5 rounded-xl border outline-none transition-all prose prose-sm max-w-none ${getFontSizeClass(fontSize)} ${getPaperThemeClasses(paperTheme)} ${
+                className={`${
+                  noteFormat === 'sheet'
+                    ? 'min-h-[320px] sm:min-h-[380px] px-6 sm:px-10 py-6 shadow-inner'
+                    : 'min-h-[200px] p-3.5'
+                } rounded-xl border outline-none transition-all prose prose-sm max-w-none ${getFontSizeClass(fontSize)} ${getPaperThemeClasses(paperTheme)} ${
                   isDarkMode
                     ? 'text-slate-100 focus:border-blue-500'
                     : 'text-slate-800 focus:border-blue-500'
@@ -2068,20 +2296,43 @@ export default function NotesModule({
                 </div>
               )}
 
-              {/* Color de hoja y Candado */}
+              {/* Color de hoja, Renglonado (para Hoja completa) y Candado */}
               <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-                <div className="flex items-center gap-1.5">
-                  {NOTE_PAPER_THEMES.map((theme) => (
-                    <button
-                      key={theme.id}
-                      type="button"
-                      onClick={() => setPaperTheme(theme.id)}
-                      title={theme.label}
-                      className={`w-5 h-5 rounded-full border transition-transform cursor-pointer ${theme.dot} ${
-                        paperTheme === theme.id ? 'ring-2 ring-blue-500 scale-110' : ''
-                      }`}
-                    />
-                  ))}
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    {NOTE_PAPER_THEMES.map((theme) => (
+                      <button
+                        key={theme.id}
+                        type="button"
+                        onClick={() => setPaperTheme(theme.id)}
+                        title={theme.label}
+                        className={`w-5 h-5 rounded-full border transition-transform cursor-pointer ${theme.dot} ${
+                          paperTheme === theme.id ? 'ring-2 ring-blue-500 scale-110' : ''
+                        }`}
+                      />
+                    ))}
+                  </div>
+
+                  {noteFormat === 'sheet' && (
+                    <div className={`inline-flex p-0.5 rounded-xl border ${
+                      isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200'
+                    }`}>
+                      {NOTE_SHEET_STYLES.map((st) => (
+                        <button
+                          key={st.id}
+                          type="button"
+                          onClick={() => setSheetStyle(st.id)}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
+                            sheetStyle === st.id
+                              ? (isDarkMode ? 'bg-slate-800 text-white' : 'bg-white text-slate-900 shadow-2xs')
+                              : 'text-slate-500'
+                          }`}
+                        >
+                          {st.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {scope === 'shared' && (
@@ -2306,6 +2557,158 @@ export default function NotesModule({
               >
                 Eliminar
               </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ========================================================================
+          MODAL LECTOR DE HOJA COMPLETA PROFESIONAL
+      ======================================================================== */}
+      {activeSheetNote && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-6 bg-slate-950/65 backdrop-blur-sm animate-fade-in"
+          onClick={() => setActiveSheetNoteId(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className={`w-full max-w-4xl max-h-[92vh] flex flex-col rounded-2xl border shadow-2xl overflow-hidden ${getPaperThemeClasses(activeSheetNote.paperTheme)}`}
+          >
+            {/* Barra superior de la Hoja */}
+            <div className={`flex flex-wrap items-center justify-between gap-2 px-6 py-3.5 border-b ${
+              isDarkMode ? 'border-slate-800 bg-slate-950/60 text-slate-100' : 'border-slate-200/80 bg-white/80 text-slate-900'
+            }`}>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold ${
+                  isDarkMode ? 'bg-blue-500/15 text-blue-300' : 'bg-blue-500/10 text-blue-700'
+                }`}>
+                  <FileText size={13} />
+                  <span>Hoja completa</span>
+                </span>
+                {activeSheetNote.scope === 'shared' && activeSheetNote.targetGroupName && (
+                  <span className={`px-2.5 py-1 rounded-lg text-xs font-medium ${
+                    isDarkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-200/70 text-slate-700'
+                  }`}>
+                    {activeSheetNote.targetGroupName}
+                  </span>
+                )}
+                {activeSheetNote.scope === 'shared' && activeSheetNote.isLocked && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+                    <Lock size={12} />
+                    <span>{activeSheetNote.lockedByName || 'Con candado'}</span>
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                {canUserEditNote(activeSheetNote, currentUserObj) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const target = activeSheetNote;
+                      setActiveSheetNoteId(null);
+                      handleOpenEditNote(target);
+                    }}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                      isDarkMode
+                        ? 'bg-slate-900 border-slate-700 text-slate-200 hover:bg-slate-800'
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Edit3 size={13} />
+                    <span>Editar</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setActiveSheetNoteId(null)}
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Cuerpo de página profesional */}
+            <div
+              style={getSheetRulingStyle(activeSheetNote.sheetStyle)}
+              className="flex-1 overflow-y-auto px-6 sm:px-14 py-8 sm:py-10 space-y-5"
+            >
+              <div className="border-b border-slate-200/80 dark:border-slate-800 pb-4 space-y-1.5">
+                <h1
+                  style={getFontFamilyStyle(activeSheetNote.fontFamily)}
+                  className={`text-xl sm:text-2xl font-extrabold tracking-tight ${
+                    isDarkMode ? 'text-white' : 'text-slate-900'
+                  }`}
+                >
+                  {activeSheetNote.title}
+                </h1>
+                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                  <span className="font-semibold text-slate-600 dark:text-slate-300">
+                    {activeSheetNote.authorName || 'Usuario'}
+                  </span>
+                  {activeSheetNote.authorRole === 'teacher' && (
+                    <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                      Docente
+                    </span>
+                  )}
+                  <span>•</span>
+                  <span>{formatRelativeTime(activeSheetNote.updatedAt || activeSheetNote.createdAt)}</span>
+                </div>
+              </div>
+
+              {activeSheetNote.content && (
+                <div
+                  style={getFontFamilyStyle(activeSheetNote.fontFamily)}
+                  className={`prose prose-sm sm:prose-base max-w-none break-words ${getFontSizeClass(activeSheetNote.fontSize)} ${
+                    isDarkMode ? 'text-slate-100 prose-invert' : 'text-slate-800'
+                  } [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_blockquote]:border-l-4 [&_blockquote]:border-blue-500/50 [&_blockquote]:pl-3 [&_blockquote]:italic [&_a]:text-blue-600 [&_a]:underline`}
+                  dangerouslySetInnerHTML={{ __html: sanitizeNoteHtml(activeSheetNote.content) }}
+                />
+              )}
+
+              {Array.isArray(activeSheetNote.links) && activeSheetNote.links.length > 0 && (
+                <div className="space-y-3 pt-4 border-t border-slate-200/70 dark:border-slate-800">
+                  {activeSheetNote.links.map((item) => (
+                    <div
+                      key={item.id}
+                      className={`rounded-xl border p-3 ${
+                        isDarkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-white/85 border-slate-200/80'
+                      }`}
+                    >
+                      <a
+                        href={item.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                      >
+                        <Globe size={13} />
+                        <span>{item.label || item.url}</span>
+                      </a>
+                      {item.renderMode === 'youtube' && item.youtubeId && (
+                        <div className="rounded-lg overflow-hidden mt-2">
+                          <CustomVideoPlayer
+                            url={item.url}
+                            videoId={item.youtubeId}
+                            title={item.label || 'Video'}
+                            isDarkMode={isDarkMode}
+                          />
+                        </div>
+                      )}
+                      {item.renderMode === 'image' && (
+                        <div className="rounded-lg overflow-hidden mt-2 bg-slate-100 dark:bg-slate-900">
+                          <img
+                            src={item.url}
+                            alt={item.label || 'Imagen'}
+                            className="w-full max-h-[420px] object-contain mx-auto"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>,
