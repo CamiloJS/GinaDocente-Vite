@@ -232,7 +232,7 @@ const KahootLiveModal = ({
       return Array.isArray(parsed)
         ? parsed.map((q, i) => {
             const norm = normalizeKahootQuestion(q, i);
-            if (norm.type === 'quiz' || norm.type === 'truefalse' || norm.type === 'riddle') {
+            if (norm.type === 'quiz' || norm.type === 'truefalse') {
               const nonEmpty = (norm.options || []).filter(
                 (o) => String(o?.text || '').trim().length > 0
               );
@@ -2030,61 +2030,13 @@ const KahootLiveModal = ({
                     )}
 
                     {q.type === 'riddle' && (
-                      <div className="space-y-2">
-                        {q.options && q.options.length >= 2 ? (
-                          <div className="flex flex-col gap-2">
-                            {(q.options || []).map((opt, oIdx) => {
-                              const color = KAHOOT_COLORS[oIdx % KAHOOT_COLORS.length];
-                              const wasChosenByMe =
-                                mySavedAns &&
-                                (mySavedAns.optionIndex === oIdx ||
-                                  (Array.isArray(mySavedAns.optionIndices) &&
-                                    mySavedAns.optionIndices.includes(oIdx)));
-                              return (
-                                <div
-                                  key={opt.id || oIdx}
-                                  className={`flex items-center justify-between gap-3 p-3 rounded-2xl border-2 transition-all ${
-                                    opt.isCorrect
-                                      ? 'bg-emerald-500/25 border-emerald-400 text-white shadow-sm'
-                                      : 'bg-white/5 border-white/10 text-purple-100 opacity-80'
-                                  }`}
-                                >
-                                  <div className="flex items-center gap-3 min-w-0">
-                                    <span
-                                      className={`w-8 h-8 rounded-xl ${color.badgeClass} font-black text-sm flex items-center justify-center shrink-0`}
-                                    >
-                                      {color.symbol}
-                                    </span>
-                                    <span className="text-xs sm:text-sm font-bold break-words">
-                                      {opt.text}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center gap-2 shrink-0">
-                                    {wasChosenByMe && (
-                                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-white/20 text-white">
-                                        Tu elección
-                                      </span>
-                                    )}
-                                    {opt.isCorrect && (
-                                      <span className="text-xs font-black text-emerald-300 flex items-center gap-1">
-                                        <CheckCircle2 size={15} /> Correcta
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <div className="p-3 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 text-xs sm:text-sm">
-                            <span className="font-black text-emerald-300">✔ Solución del acertijo: </span>
-                            <span className="font-bold text-white">{q.correctAnswer}</span>
-                            {q.acceptedAnswers?.length > 0 && (
-                              <span className="block text-[11px] text-purple-200 mt-1">
-                                También se acepta: {q.acceptedAnswers.join(', ')}
-                              </span>
-                            )}
-                          </div>
+                      <div className="p-3 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 text-xs sm:text-sm">
+                        <span className="font-black text-emerald-300">✔ Respuesta: </span>
+                        <span className="font-bold text-white">{q.correctAnswer}</span>
+                        {q.acceptedAnswers?.length > 0 && (
+                          <span className="block text-[11px] text-purple-200 mt-1">
+                            También se acepta: {q.acceptedAnswers.join(', ')}
+                          </span>
                         )}
                       </div>
                     )}
@@ -2407,7 +2359,9 @@ const KahootLiveModal = ({
                         Respuestas recibidas: {answeredCount} de {totalParticipants}
                       </h4>
                       <p className="text-xs text-purple-200/85">
-                        Los estudiantes están seleccionando su opción desde sus dispositivos. Las opciones se revelarán al finalizar la ronda.
+                        {currentQuestion.type === 'riddle' || currentQuestion.type === 'type_answer'
+                          ? 'Los estudiantes están escribiendo su respuesta desde sus dispositivos. La respuesta se revelará al finalizar la ronda.'
+                          : 'Los estudiantes están seleccionando su opción desde sus dispositivos. Las opciones se revelarán al finalizar la ronda.'}
                       </p>
                     </div>
                   </div>
@@ -2708,94 +2662,44 @@ const KahootLiveModal = ({
                   </div>
                 )}
 
-                {/* Entrada interactiva para Acertijo (Riddle) */}
+                {/* Entrada interactiva para Acertijo (Riddle - solo respuesta escrita) */}
                 {currentQuestion.type === 'riddle' && !isRiddleLockedForMe && (
-                  currentQuestion.options && currentQuestion.options.length >= 2 ? (
-                    <div className="flex flex-col gap-3 w-full">
-                      {(currentQuestion.options || []).map((opt, oIdx) => {
-                        const color = KAHOOT_COLORS[oIdx % KAHOOT_COLORS.length];
-                        const isLockedSelection =
-                          myLiveAnswer &&
-                          (myLiveAnswer.optionIndex === oIdx ||
-                            (Array.isArray(myLiveAnswer.optionIndices) &&
-                              myLiveAnswer.optionIndices.includes(oIdx)));
-
-                        return (
-                          <button
-                            key={opt.id || oIdx}
-                            type="button"
-                            disabled={Boolean(myLiveAnswer) || isRiddleLockedForMe}
-                            onClick={() => {
-                              handleSubmitAnswer({ optionIndex: oIdx, optionIndices: [oIdx] });
-                            }}
-                            className={`w-full p-4 sm:p-4.5 rounded-2xl border-b-4 text-left font-black transition-all flex items-center justify-between gap-3.5 shadow-lg ${
-                              color.bgClass
-                            } ${
-                              myLiveAnswer
-                                ? isLockedSelection
-                                  ? 'ring-4 ring-white scale-[1.01]'
-                                  : 'opacity-45 cursor-not-allowed'
-                                : isRiddleLockedForMe
-                                  ? 'opacity-40 cursor-not-allowed'
-                                  : 'hover:scale-[1.01] active:scale-[0.99] cursor-pointer'
-                            }`}
-                          >
-                            <div className="flex items-center gap-3.5 min-w-0 flex-1">
-                              <span className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-black/20 text-white font-black text-lg sm:text-xl flex items-center justify-center shrink-0 shadow-inner">
-                                {color.symbol}
-                              </span>
-                              <span className="text-sm sm:text-lg text-white leading-snug break-words">
-                                {opt.text}
-                              </span>
-                            </div>
-
-                            {isLockedSelection && (
-                              <span className="px-3 py-1 rounded-xl bg-white text-gray-950 text-xs font-black shrink-0 flex items-center gap-1">
-                                <CheckCircle2 size={14} /> Elegida
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
+                  myLiveAnswer ? (
+                    <div className="p-4 rounded-2xl bg-white/10 border border-white/20 text-center">
+                      <span className="text-xs font-bold text-purple-200 block mb-1">
+                        Tu respuesta:
+                      </span>
+                      <span className="text-base sm:text-lg font-black text-white">
+                        “{myLiveAnswer.textAnswer || ''}”
+                      </span>
                     </div>
                   ) : (
-                    myLiveAnswer ? (
-                      <div className="p-4 rounded-2xl bg-white/10 border border-white/20 text-center">
-                        <span className="text-xs font-bold text-purple-200 block mb-1">
-                          Tu respuesta:
-                        </span>
-                        <span className="text-base sm:text-lg font-black text-white">
-                          “{myLiveAnswer.textAnswer || ''}”
-                        </span>
-                      </div>
-                    ) : (
-                      <form
-                        onSubmit={(e) => {
-                          e.preventDefault();
-                          if (!typedAnswerText.trim() || isRiddleLockedForMe) return;
-                          handleSubmitAnswer({ textAnswer: typedAnswerText.trim() });
-                        }}
-                        className="flex flex-col sm:flex-row gap-3 w-full"
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (!typedAnswerText.trim() || isRiddleLockedForMe) return;
+                        handleSubmitAnswer({ textAnswer: typedAnswerText.trim() });
+                      }}
+                      className="flex flex-col sm:flex-row gap-3 w-full"
+                    >
+                      <input
+                        type="text"
+                        disabled={isRiddleLockedForMe}
+                        value={typedAnswerText}
+                        onChange={(e) => setTypedAnswerText(e.target.value)}
+                        placeholder="Escribe la respuesta del acertijo..."
+                        style={{ backgroundColor: '#ffffff', color: '#0f172a' }}
+                        className="kahoot-light-input flex-1 py-4 px-5 rounded-2xl bg-white text-[#0f172a] font-black text-base outline-none ring-4 ring-purple-400/40 focus:ring-amber-400 disabled:opacity-50"
+                        autoFocus
+                      />
+                      <button
+                        type="submit"
+                        disabled={!typedAnswerText.trim() || isRiddleLockedForMe}
+                        className="px-8 py-4 rounded-2xl bg-emerald-400 hover:bg-emerald-300 disabled:opacity-40 text-gray-950 font-black text-base shadow-xl cursor-pointer"
                       >
-                        <input
-                          type="text"
-                          disabled={isRiddleLockedForMe}
-                          value={typedAnswerText}
-                          onChange={(e) => setTypedAnswerText(e.target.value)}
-                          placeholder="Escribe la solución del acertijo..."
-                          style={{ backgroundColor: '#ffffff', color: '#0f172a' }}
-                          className="kahoot-light-input flex-1 py-4 px-5 rounded-2xl bg-white text-[#0f172a] font-black text-base outline-none ring-4 ring-purple-400/40 focus:ring-amber-400 disabled:opacity-50"
-                          autoFocus
-                        />
-                        <button
-                          type="submit"
-                          disabled={!typedAnswerText.trim() || isRiddleLockedForMe}
-                          className="px-8 py-4 rounded-2xl bg-emerald-400 hover:bg-emerald-300 disabled:opacity-40 text-gray-950 font-black text-base shadow-xl cursor-pointer"
-                        >
-                          Enviar
-                        </button>
-                      </form>
-                    )
+                        Enviar
+                      </button>
+                    </form>
                   )
                 )}
               </>
@@ -3024,63 +2928,13 @@ const KahootLiveModal = ({
                 )}
 
                 {currentQuestion.type === 'riddle' && (
-                  <div className="space-y-2">
-                    {currentQuestion.options && currentQuestion.options.length >= 2 ? (
-                      <div className="flex flex-col gap-2">
-                        {currentQuestion.options.map((opt, oIdx) => {
-                          const color = KAHOOT_COLORS[oIdx % KAHOOT_COLORS.length];
-                          const votesForOpt = leaderboard.filter((p) => {
-                            const ans = p?.currentQuestionAnswer;
-                            if (!ans) return false;
-                            return (
-                              ans.optionIndex === oIdx ||
-                              (Array.isArray(ans.optionIndices) && ans.optionIndices.includes(oIdx))
-                            );
-                          }).length;
-
-                          return (
-                            <div
-                              key={opt.id || oIdx}
-                              className={`p-3 rounded-2xl border-2 flex items-center justify-between gap-3 ${
-                                opt.isCorrect
-                                  ? 'bg-emerald-500/30 border-emerald-400 text-white shadow-md'
-                                  : 'bg-white/5 border-white/10 text-purple-200 opacity-60'
-                              }`}
-                            >
-                              <div className="flex items-center gap-2.5 min-w-0">
-                                <span
-                                  className={`w-7 h-7 rounded-lg ${color.badgeClass} font-black text-xs flex items-center justify-center shrink-0`}
-                                >
-                                  {color.symbol}
-                                </span>
-                                <span className="text-xs sm:text-sm font-bold break-words">
-                                  {opt.text}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2 shrink-0">
-                                {viewMode === 'live' && (
-                                  <span className="text-xs font-extrabold px-2 py-0.5 rounded-lg bg-black/30">
-                                    {votesForOpt}
-                                  </span>
-                                )}
-                                {opt.isCorrect && (
-                                  <CheckCircle2 size={18} className="text-emerald-300 shrink-0" />
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="p-3.5 rounded-2xl bg-emerald-500/25 border border-emerald-400 text-sm font-bold">
-                        <div>
-                          ✔ Solución del acertijo: <span className="font-black">{currentQuestion.correctAnswer}</span>
-                        </div>
-                        {currentQuestion.acceptedAnswers && currentQuestion.acceptedAnswers.length > 0 && (
-                          <div className="text-xs text-purple-200 mt-1 font-normal">
-                            Respuestas aceptadas: <span className="font-semibold">{currentQuestion.acceptedAnswers.join(', ')}</span>
-                          </div>
-                        )}
+                  <div className="p-3.5 rounded-2xl bg-emerald-500/25 border border-emerald-400 text-sm font-bold">
+                    <div>
+                      ✔ Respuesta: <span className="font-black">{currentQuestion.correctAnswer}</span>
+                    </div>
+                    {currentQuestion.acceptedAnswers && currentQuestion.acceptedAnswers.length > 0 && (
+                      <div className="text-xs text-purple-200 mt-1 font-normal">
+                        Respuestas aceptadas: <span className="font-semibold">{currentQuestion.acceptedAnswers.join(', ')}</span>
                       </div>
                     )}
                   </div>

@@ -23,6 +23,8 @@ import {
   canAccessKahootReview,
   parseKahootUrlInfo,
   buildPublicKahootUrl,
+  generarVariantesRespuestaAcertijo,
+  detectarIntencionAcertijoIA,
   KAHOOT_MAX_QUESTIONS,
   KAHOOT_AI_BATCH_SIZE
 } from '../src/utils/kahootEngine.js';
@@ -894,49 +896,66 @@ check(
     taskCardSrc.includes("'kahoot.reviewEnabled': nextReview")
 );
 
-console.log('\n--- 18. Tipo de Pregunta Acertijo (Riddle) y Ventana de Gracia de 2 Segundos ---');
+console.log('\n--- 18. Tipo de Pregunta Acertijo (Riddle) Exclusivamente Escrito, IA y Ventana de 2 Segundos ---');
 
 // 18.1 Creación por defecto
 const qRiddleDef = createDefaultKahootQuestion('riddle', 4);
-check('createDefaultKahootQuestion crea pregunta tipo riddle con campos requeridos',
+check('createDefaultKahootQuestion crea pregunta tipo riddle exclusivamente escrita (options: [])',
   qRiddleDef.type === 'riddle' &&
   qRiddleDef.correctAnswer === '' &&
   Array.isArray(qRiddleDef.acceptedAnswers) &&
-  Array.isArray(qRiddleDef.options)
+  Array.isArray(qRiddleDef.options) &&
+  qRiddleDef.options.length === 0
 );
 
-// 18.2 Normalización de respuesta escrita y sinónimos
+// 18.2 Normalización de respuesta escrita y sinónimos (siempre options: [])
 const normRiddleWritten = normalizeKahootQuestion({
   type: 'riddle',
   question: 'Tengo agujas pero no coso, tengo números pero no sé leer. ¿Qué soy?',
   correctAnswer: 'un reloj',
   acceptedAnswers: ['el reloj', 'reloj', 'a clock'],
 }, 0);
-check('normalizeKahootQuestion normaliza acertijo con respuesta escrita y sinónimos',
+check('normalizeKahootQuestion normaliza acertijo con respuesta escrita, sinónimos y options: []',
   normRiddleWritten.type === 'riddle' &&
   normRiddleWritten.correctAnswer === 'un reloj' &&
   normRiddleWritten.acceptedAnswers.length === 3 &&
-  normRiddleWritten.acceptedAnswers.includes('reloj')
+  normRiddleWritten.acceptedAnswers.includes('reloj') &&
+  normRiddleWritten.options.length === 0
 );
 
-// 18.3 Normalización de acertijo con opciones y alias en español
-const normRiddleOptions = normalizeKahootQuestion({
+// 18.3 Normalización de acertijo legado con opciones y alias en español (migra a respuesta escrita con options: [])
+const normRiddleLegacyOptions = normalizeKahootQuestion({
   tipo: 'acertijo',
   enunciado: 'Oro parece, plata no es. ¿Qué es?',
+  correctAnswer: '',
   opciones: [
     { texto: 'El plátano', correcta: true },
     { texto: 'La manzana', correcta: false },
     { texto: 'El oro', correcta: false }
   ]
 }, 1);
-check('normalizeKahootQuestion soporta alias en español (tipo: acertijo, opciones, correcta)',
-  normRiddleOptions.type === 'riddle' &&
-  normRiddleOptions.options.length === 3 &&
-  normRiddleOptions.options[0].isCorrect === true &&
-  normRiddleOptions.correctAnswer === 'El plátano'
+check('normalizeKahootQuestion convierte acertijo legado con opciones (incluso con correctAnswer: "") a respuesta escrita con options: []',
+  normRiddleLegacyOptions.type === 'riddle' &&
+  normRiddleLegacyOptions.options.length === 0 &&
+  normRiddleLegacyOptions.correctAnswer === 'El plátano'
 );
 
-// 18.4 Validación de configuración
+const normRiddleDraftCleared = normalizeKahootQuestion(
+  {
+    type: 'riddle',
+    text: 'Acertijo en edición',
+    correctAnswer: '',
+    acceptedAnswers: ['reloj'],
+    options: []
+  },
+  0,
+  { preserveDraft: true }
+);
+check('normalizeKahootQuestion con preserveDraft permite vaciar correctAnswer en el editor sin sobreescribir con acceptedAnswers[0]',
+  normRiddleDraftCleared.correctAnswer === '' && normRiddleDraftCleared.acceptedAnswers[0] === 'reloj'
+);
+
+// 18.4 Validación de configuración (exclusivamente escrita)
 const configRiddleOk1 = validateKahootConfig({
   title: 'Acertijos',
   questions: [normRiddleWritten]
@@ -944,10 +963,10 @@ const configRiddleOk1 = validateKahootConfig({
 check('validateKahootConfig aprueba acertijo con respuesta escrita válida', configRiddleOk1.valid === true);
 
 const configRiddleOk2 = validateKahootConfig({
-  title: 'Acertijos con opciones',
-  questions: [normRiddleOptions]
+  title: 'Acertijos migrados',
+  questions: [normRiddleLegacyOptions]
 });
-check('validateKahootConfig aprueba acertijo con opciones válidas', configRiddleOk2.valid === true);
+check('validateKahootConfig aprueba acertijo migrado con respuesta escrita válida', configRiddleOk2.valid === true);
 
 const configRiddleInvalid = validateKahootConfig({
   title: 'Acertijo inválido',
@@ -959,58 +978,84 @@ const configRiddleInvalid = validateKahootConfig({
     options: []
   }]
 });
-check('validateKahootConfig rechaza acertijo sin solución escrita ni opciones válidas',
+check('validateKahootConfig rechaza acertijo sin respuesta escrita',
   configRiddleInvalid.valid === false && configRiddleInvalid.error.includes('Acertijo')
 );
 
-const configRiddleNoCorrectOpt = validateKahootConfig({
-  title: 'Acertijo sin correcta',
+const configRiddleOnlyUncorrectOpts = validateKahootConfig({
+  title: 'Acertijo sin respuesta escrita',
   questions: [{
     type: 'riddle',
     text: '¿Quién soy?',
+    correctAnswer: '   ',
     options: [
       { text: 'Opción 1', isCorrect: false },
       { text: 'Opción 2', isCorrect: false }
     ]
   }]
 });
-check('validateKahootConfig rechaza acertijo con opciones si ninguna está marcada como correcta',
-  configRiddleNoCorrectOpt.valid === false
+check('validateKahootConfig exige correctAnswer en acertijo cuando no hay respuesta escrita ni opción correcta',
+  configRiddleOnlyUncorrectOpts.valid === false
 );
 
-// 18.5 Evaluación de respuestas para Acertijo
+// 18.5 Evaluación de respuestas para Acertijo (exclusivamente escrita y tolerante a artículos/variantes)
 const riddleQuestion = {
   type: 'riddle',
   text: 'Blanco por dentro, verde por fuera. Si quieres que te lo diga, espera.',
   correctAnswer: 'la pera',
-  acceptedAnswers: ['pera', 'una pera', 'a pear'],
-  options: [
-    { id: 'opt_pera', text: 'La pera', isCorrect: true },
-    { id: 'opt_manzana', text: 'La manzana', isCorrect: false }
-  ]
+  acceptedAnswers: ['una pera', 'a pear'],
+  options: []
 };
 
 check('evaluateKahootAnswer para acertijo acepta solución escrita exacta',
   evaluateKahootAnswer(riddleQuestion, { textAnswer: 'la pera' }) === true
 );
-check('evaluateKahootAnswer para acertijo acepta sinónimos en acceptedAnswers',
+check('evaluateKahootAnswer para acertijo acepta variantes sin artículo y con artículo automáticamente',
   evaluateKahootAnswer(riddleQuestion, { textAnswer: 'pera' }) === true &&
-  evaluateKahootAnswer(riddleQuestion, { textAnswer: 'una pera' }) === true
+  evaluateKahootAnswer(riddleQuestion, { textAnswer: 'una pera' }) === true &&
+  evaluateKahootAnswer(riddleQuestion, { textAnswer: 'pear' }) === true &&
+  evaluateKahootAnswer(riddleQuestion, { textAnswer: 'the pear' }) === true
 );
 check('evaluateKahootAnswer para acertijo es tolerante a tildes, mayúsculas y signos',
   evaluateKahootAnswer(riddleQuestion, { textAnswer: '  ¡LA PÉRA!  ' }) === true
 );
-check('evaluateKahootAnswer para acertijo valida opción por optionIndex',
-  evaluateKahootAnswer(riddleQuestion, { optionIndex: 0 }) === true &&
-  evaluateKahootAnswer(riddleQuestion, { optionIndex: 1 }) === false
+check('evaluateKahootAnswer para acertijo ignora optionIndex/optionId y exige respuesta escrita',
+  evaluateKahootAnswer(riddleQuestion, { optionIndex: 0 }) === false &&
+  evaluateKahootAnswer(riddleQuestion, { optionId: 'opt_pera' }) === false
 );
-check('evaluateKahootAnswer para acertijo valida opción por optionId',
-  evaluateKahootAnswer(riddleQuestion, { optionId: 'opt_pera' }) === true &&
-  evaluateKahootAnswer(riddleQuestion, { optionId: 'opt_manzana' }) === false
-);
-check('evaluateKahootAnswer para acertijo rechaza respuesta incorrecta',
+check('evaluateKahootAnswer para acertijo rechaza respuesta incorrecta o vacía',
   evaluateKahootAnswer(riddleQuestion, { textAnswer: 'un plátano' }) === false &&
   evaluateKahootAnswer(riddleQuestion, { textAnswer: '' }) === false
+);
+
+// Evaluación con artículos elididos en francés (l'horloge / l’horloge) y posesivos (tu sombra / your shadow)
+const frenchRiddleQ = {
+  type: 'riddle',
+  text: "J'ai des aiguilles mais je ne couds pas. Qui suis-je ?",
+  correctAnswer: "l'horloge",
+  acceptedAnswers: [],
+  options: []
+};
+check('evaluateKahootAnswer para acertijo en francés acepta l\'horloge, l’horloge, horloge y une horloge',
+  evaluateKahootAnswer(frenchRiddleQ, { textAnswer: "l'horloge" }) === true &&
+  evaluateKahootAnswer(frenchRiddleQ, { textAnswer: 'l’horloge' }) === true &&
+  evaluateKahootAnswer(frenchRiddleQ, { textAnswer: 'horloge' }) === true &&
+  evaluateKahootAnswer(frenchRiddleQ, { textAnswer: 'une horloge' }) === true
+);
+
+const possessiveRiddleQ = {
+  type: 'riddle',
+  text: 'Te sigo todo el día pero desaparezco en la oscuridad. ¿Qué soy?',
+  correctAnswer: 'tu sombra',
+  acceptedAnswers: ['your shadow'],
+  options: []
+};
+check('evaluateKahootAnswer para acertijo acepta variantes con o sin posesivos y artículos (sombra, la sombra, shadow, the shadow)',
+  evaluateKahootAnswer(possessiveRiddleQ, { textAnswer: 'sombra' }) === true &&
+  evaluateKahootAnswer(possessiveRiddleQ, { textAnswer: 'la sombra' }) === true &&
+  evaluateKahootAnswer(possessiveRiddleQ, { textAnswer: 'mi sombra' }) === true &&
+  evaluateKahootAnswer(possessiveRiddleQ, { textAnswer: 'shadow' }) === true &&
+  evaluateKahootAnswer(possessiveRiddleQ, { textAnswer: 'the shadow' }) === true
 );
 
 // 18.6 Simulación de la regla de los 2 segundos (grace window)
@@ -1071,46 +1116,107 @@ check('Regla 2s (5 jugadores): Valida a los 3 que respondieron dentro del rango 
   validRiddleWinners[2].id === 'p3' && validRiddleWinners[2].isFirst === false
 );
 
-// 18.7 Bots simulados en Modo Demo con acertijo
+// 18.7 Bots simulados en Modo Demo con acertijo (exclusivamente texto)
 const botRiddleWritten = buildSimulatedBotAnswer(DEMO_KAHOOT_BOTS[0], normRiddleWritten, 0);
-check('buildSimulatedBotAnswer genera respuesta de texto para acertijo escrito',
+check('buildSimulatedBotAnswer genera respuesta de texto para acertijo',
   botRiddleWritten.textAnswer !== undefined && typeof botRiddleWritten.isCorrect === 'boolean'
 );
 
-const botRiddleOptions = buildSimulatedBotAnswer(DEMO_KAHOOT_BOTS[0], normRiddleOptions, 1);
-check('buildSimulatedBotAnswer genera opción para acertijo de selección',
-  botRiddleOptions.optionIndex !== undefined && typeof botRiddleOptions.isCorrect === 'boolean'
+const botRiddleLegacy = buildSimulatedBotAnswer(DEMO_KAHOOT_BOTS[0], normRiddleLegacyOptions, 1);
+check('buildSimulatedBotAnswer genera siempre textAnswer para acertijo migrado',
+  botRiddleLegacy.textAnswer !== undefined && typeof botRiddleLegacy.isCorrect === 'boolean'
 );
 
-// 18.8 Prompt y parseo de IA para acertijos
+// 18.8 Detección automática de intención de acertijos y generación de variantes IA
+check('detectarIntencionAcertijoIA detecta palabras clave (acertijo, acertijos, adivinanza, riddle, riddles, devinettes)',
+  detectarIntencionAcertijoIA('Quiero 5 acertijos de lógica') === true &&
+  detectarIntencionAcertijoIA('Adivinanzas para niños de primaria') === true &&
+  detectarIntencionAcertijoIA('Fun riddles about animals') === true &&
+  detectarIntencionAcertijoIA('Un acertijo difícil') === true &&
+  detectarIntencionAcertijoIA('Devinettes en français') === true &&
+  detectarIntencionAcertijoIA('Verb to be and daily routines') === false
+);
+
+const variantesReloj = generarVariantesRespuestaAcertijo('el reloj', ['un reloj'], 'Español');
+check('generarVariantesRespuestaAcertijo genera variantes con y sin artículo y plural',
+  variantesReloj.includes('reloj') &&
+  variantesReloj.includes('un reloj') &&
+  variantesReloj.includes('relojes')
+);
+
+const variantesSinArticulo = generarVariantesRespuestaAcertijo('reloj', [], 'es');
+const variantesLuz = generarVariantesRespuestaAcertijo('luz', [], 'es');
+const variantesClockBare = generarVariantesRespuestaAcertijo('clock', [], 'en');
+check('generarVariantesRespuestaAcertijo genera artículos y plurales incluso cuando correctAnswer viene sin artículo (reloj -> el reloj, relojes; luz -> la luz, luces; clock -> the clock, a clock, clocks)',
+  variantesSinArticulo.includes('el reloj') &&
+  variantesSinArticulo.includes('un reloj') &&
+  variantesSinArticulo.includes('relojes') &&
+  variantesLuz.includes('la luz') &&
+  variantesLuz.includes('luces') &&
+  variantesClockBare.includes('the clock') &&
+  variantesClockBare.includes('a clock') &&
+  variantesClockBare.includes('clocks')
+);
+
+const variantesClock = generarVariantesRespuestaAcertijo('the clock', [], 'Inglés');
+check('generarVariantesRespuestaAcertijo genera variantes en inglés (clock, a clock, clocks)',
+  variantesClock.includes('clock') &&
+  variantesClock.includes('a clock') &&
+  variantesClock.includes('clocks')
+);
+
 const promptRiddle = construirPromptKahootIA({ tema: 'Misterios y lógica', total: 5, mezcla: 'solo_riddle' });
-check('construirPromptKahootIA incluye instrucciones para acertijos en solo_riddle',
-  promptRiddle.includes('riddle') && promptRiddle.includes('acertijo')
+check('construirPromptKahootIA incluye instrucciones optimizadas para acertijos en solo_riddle',
+  promptRiddle.includes('riddle') &&
+  promptRiddle.includes('1 a 3 palabras') &&
+  promptRiddle.includes('"options": []') &&
+  promptRiddle.includes('ventana de gracia de 2 segundos')
+);
+
+const promptAutoDetect = construirPromptKahootIA({ tema: 'Adivinanzas de animales y naturaleza', total: 4, mezcla: 'mixto' });
+check('construirPromptKahootIA auto-detecta intención de acertijos desde el tema aunque mezcla sea mixto',
+  promptAutoDetect.includes('Genera ÚNICAMENTE preguntas de tipo "riddle"') &&
+  promptAutoDetect.includes('"options": []')
 );
 
 const rawAiRiddleJson = JSON.stringify([
   {
     tipo: 'acertijo',
-    enunciado: 'Vuelo sin alas, lloro sin ojos. ¿Qué soy?',
-    respuestaCorrecta: 'la nube',
-    sinonimos: ['una nube', 'nube', 'las nubes']
+    enunciado: 'Tengo agujas pero no sé coser, tengo números pero no sé leer. ¿Qué soy?',
+    respuestaCorrecta: 'Es el reloj.',
+    sinonimos: ['cronómetro']
+  },
+  {
+    type: 'riddle',
+    text: 'I have hands but cannot clap (Tengo agujas pero no aplaudo). What am I?',
+    correctAnswer: 'a clock (un reloj)',
+    acceptedAnswers: []
   }
 ]);
-const parsedAiRiddle = parsearKahootIA(rawAiRiddleJson);
-check('parsearKahootIA parsea correctamente preguntas de tipo riddle generadas por IA',
+const parsedAiRiddle = parsearKahootIA(rawAiRiddleJson, 30, 0, { idioma: 'bilingue' });
+check('parsearKahootIA limpia prefijos verbosos, separa traducciones entre paréntesis, fuerza options: [] y auto-enriquece acceptedAnswers con variantes con/sin artículo',
   parsedAiRiddle.ok === true &&
-  parsedAiRiddle.questions.length === 1 &&
+  parsedAiRiddle.questions.length === 2 &&
   parsedAiRiddle.questions[0].type === 'riddle' &&
-  parsedAiRiddle.questions[0].correctAnswer === 'la nube' &&
-  parsedAiRiddle.questions[0].acceptedAnswers.includes('nube')
+  parsedAiRiddle.questions[0].options.length === 0 &&
+  parsedAiRiddle.questions[0].correctAnswer === 'el reloj' &&
+  parsedAiRiddle.questions[0].acceptedAnswers.includes('reloj') &&
+  parsedAiRiddle.questions[0].acceptedAnswers.includes('un reloj') &&
+  parsedAiRiddle.questions[0].acceptedAnswers.includes('cronómetro') &&
+  parsedAiRiddle.questions[1].correctAnswer === 'a clock' &&
+  parsedAiRiddle.questions[1].acceptedAnswers.includes('un reloj') &&
+  parsedAiRiddle.questions[1].acceptedAnswers.includes('clock') &&
+  parsedAiRiddle.questions[1].acceptedAnswers.includes('reloj') &&
+  evaluateKahootAnswer(parsedAiRiddle.questions[1], { textAnswer: 'clock' }) === true &&
+  evaluateKahootAnswer(parsedAiRiddle.questions[1], { textAnswer: 'reloj' }) === true
 );
 
 // 18.9 Integración en componentes UI (KahootBuilder, KahootLiveModal, TaskCard y PublicKahootViewer)
-check('KahootBuilder incluye botón de Acertijo y editor de respuestas escritas/opciones',
+check('KahootBuilder incluye editor simplificado de Acertijo con etiqueta "Respuesta", sin selector de opciones y con detección IA',
   builderSrc.includes("handleAddQuestion('riddle')") &&
-  builderSrc.includes('Acertijo') &&
-  builderSrc.includes('Respuesta escrita') &&
-  builderSrc.includes('Opciones (selección)')
+  builderSrc.includes('detectarIntencionAcertijoIA') &&
+  builderSrc.includes('Respuesta <span className="text-red-500">*</span>') &&
+  !builderSrc.includes('Opciones (selección)')
 );
 
 check('KahootLiveModal implementa ventana de 2 segundos, protección de sobreescritura, bloqueo y reinicio limpio',
@@ -1133,4 +1239,5 @@ console.log(`\nRESULTADO KAHOOT: ${okCount} OK, ${failCount} fallos\n`);
 if (failCount > 0) {
   process.exit(1);
 }
+
 

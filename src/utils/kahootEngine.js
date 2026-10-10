@@ -255,7 +255,7 @@ export function normalizeKahootQuestion(raw, index = 0, normOptions = {}) {
     type = 'type_answer';
   } else if (rawType === 'puzzle' || rawType === 'order' || rawType === 'ordenar') {
     type = 'puzzle';
-  } else if (rawType === 'riddle' || rawType === 'acertijo') {
+  } else if (rawType === 'riddle' || rawType === 'acertijo' || rawType === 'adivinanza') {
     type = 'riddle';
   }
 
@@ -320,16 +320,26 @@ export function normalizeKahootQuestion(raw, index = 0, normOptions = {}) {
         ? rawAccSource.split(',').map((s) => s.trim())
         : [];
     const acceptedAnswers = rawAcc.map((s) => limpiarTextoPlano(s, 150)).filter(Boolean).slice(0, 6);
-    const correctAnswer = cleanFn(
-      raw.correctAnswer ??
-        raw.respuestaCorrecta ??
-        raw.respuesta ??
-        raw.answer ??
-        acceptedAnswers[0] ??
-        (Array.isArray(raw.options) ? raw.options.find((o) => o?.isCorrect)?.text : '') ??
-        '',
-      200
+    const fallbackOptText = Array.isArray(raw.options)
+      ? (raw.options.find((o) => o?.isCorrect)?.text ?? '')
+      : '';
+    const explicitCandidates = [
+      raw.correctAnswer,
+      raw.respuestaCorrecta,
+      raw.respuesta,
+      raw.answer,
+      fallbackOptText,
+    ];
+    const firstExplicit = explicitCandidates.find(
+      (c) => c !== undefined && c !== null && String(c).trim().length > 0
     );
+    const rawCorrectChosen =
+      firstExplicit !== undefined
+        ? firstExplicit
+        : !preserveDraft && acceptedAnswers[0]
+          ? acceptedAnswers[0]
+          : (raw.correctAnswer ?? '');
+    const correctAnswer = cleanFn(rawCorrectChosen, 200);
 
     const result = {
       id: baseId,
@@ -408,41 +418,30 @@ export function normalizeKahootQuestion(raw, index = 0, normOptions = {}) {
       : typeof rawAccSource === 'string' && rawAccSource.trim()
         ? rawAccSource.split(',').map((s) => s.trim())
         : [];
-    const acceptedAnswers = rawAcc.map((s) => limpiarTextoPlano(s, 150)).filter(Boolean).slice(0, 10);
+    const acceptedAnswers = rawAcc.map((s) => limpiarTextoPlano(s, 150)).filter(Boolean).slice(0, 12);
 
     const rawOptions = Array.isArray(raw.options || raw.opciones) ? (raw.options || raw.opciones) : [];
-    let options = rawOptions.slice(0, 4).map((o, idx) => ({
-      id: String(o?.id || `${baseId}_${idx}`),
-      text: cleanFn(typeof o === 'string' ? o : (o?.text ?? o?.texto ?? ''), 220),
-      isCorrect: Boolean(typeof o === 'object' ? (o?.isCorrect ?? o?.correcta) : false),
-    }));
+    const fallbackCorrectOpt = rawOptions.find((o) => typeof o === 'object' && (o?.isCorrect || o?.correcta));
+    const fallbackOptText = fallbackCorrectOpt ? (fallbackCorrectOpt.text ?? fallbackCorrectOpt.texto ?? '') : '';
 
-    if (preserveDraft && rawOptions.length > 0) {
-      while (options.length < 4) {
-        const idx = options.length;
-        options.push({
-          id: `${baseId}_${idx}`,
-          text: '',
-          isCorrect: false,
-        });
-      }
-    }
-
-    const hasFilledOptions = options.some((o) => String(o.text || '').trim().length > 0);
-    const validOptions = hasFilledOptions
-      ? (preserveDraft ? options : options.filter((o) => String(o.text || '').trim().length > 0))
-      : [];
-
-    const correctAnswer = cleanFn(
-      raw.correctAnswer ??
-        raw.respuestaCorrecta ??
-        raw.respuesta ??
-        raw.answer ??
-        acceptedAnswers[0] ??
-        (options.find((o) => o?.isCorrect)?.text || '') ??
-        '',
-      200
+    const explicitCandidates = [
+      raw.correctAnswer,
+      raw.respuestaCorrecta,
+      raw.respuesta,
+      raw.answer,
+      raw.solucion,
+      fallbackOptText,
+    ];
+    const firstExplicit = explicitCandidates.find(
+      (c) => c !== undefined && c !== null && String(c).trim().length > 0
     );
+    const rawCorrectChosen =
+      firstExplicit !== undefined
+        ? firstExplicit
+        : !preserveDraft && acceptedAnswers[0]
+          ? acceptedAnswers[0]
+          : (raw.correctAnswer ?? '');
+    const correctAnswer = cleanFn(rawCorrectChosen, 200);
 
     const result = {
       id: baseId,
@@ -454,7 +453,7 @@ export function normalizeKahootQuestion(raw, index = 0, normOptions = {}) {
       timeLimit,
       pointsMultiplier: rawMult === 0 ? 0 : (rawMult === 1 || rawMult === 1000 ? 1 : 2),
       allowMultiple: false,
-      options: validOptions,
+      options: [],
       correctAnswer,
       acceptedAnswers,
       puzzleItems: [],
@@ -586,20 +585,17 @@ export function validateKahootConfig(kahootInput) {
 
     if (q.type === 'riddle') {
       const hasCorrectAnswer = Boolean(String(q.correctAnswer || '').trim());
-      const validOptions = (q.options || []).filter((o) => String(o.text || '').trim().length > 0);
-      const hasValidOptions = validOptions.length >= 2 && validOptions.some((o) => o.isCorrect);
-
-      if (!hasCorrectAnswer && !hasValidOptions) {
+      if (!hasCorrectAnswer) {
         return {
           valid: false,
-          error: `La pregunta #${num} (Acertijo) necesita la respuesta correcta escrita o al menos 2 opciones con una correcta.`,
+          error: `La pregunta #${num} (Acertijo) necesita la respuesta correcta.`,
           normalizedQuestions: [],
           questions: [],
         };
       }
       normalizedQuestions.push({
         ...q,
-        options: validOptions.length >= 2 ? validOptions : [],
+        options: [],
       });
       continue;
     }
@@ -658,8 +654,346 @@ const normalizeCompareString = (str) =>
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\u2018\u2019\u02BC`]/g, "'")
+    .replace(/\b(l|d)'\s*/gi, '$1 ')
     .replace(/[.,!?;:¡¿"']/g, '')
-    .replace(/\s+/g, ' ');
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const stripLeadingArticle = (str) =>
+  String(str || '')
+    .replace(
+      /^(?:l['’]|d['’]|(?:l|d|el|la|los|las|un|una|unos|unas|tu|tus|mi|mis|su|sus|the|a|an|your|my|his|her|our|their|le|les|une|des|du|ton|ta|tes|mon|ma|mes|son|sa|ses)\s+)/i,
+      ''
+    )
+    .trim();
+
+const EN_IRREGULAR_PLURALS = {
+  tooth: 'teeth',
+  foot: 'feet',
+  mouse: 'mice',
+  child: 'children',
+  man: 'men',
+  woman: 'women',
+  person: 'people',
+  leaf: 'leaves',
+  knife: 'knives',
+  life: 'lives',
+  wolf: 'wolves',
+  half: 'halves',
+  echo: 'echoes',
+  hero: 'heroes',
+  potato: 'potatoes',
+  tomato: 'tomatoes',
+};
+
+const EN_IRREGULAR_SINGULARS = Object.fromEntries(
+  Object.entries(EN_IRREGULAR_PLURALS).map(([s, p]) => [p, s])
+);
+
+const pluralizeSpanishWord = (word) => {
+  const w = String(word || '').trim();
+  if (!w || /\s/.test(w) || w.endsWith('s')) return '';
+  if (/z$/i.test(w)) return `${w.slice(0, -1)}ces`;
+  if (/[aeiouáéíóú]$/i.test(w)) return `${w}s`;
+  return `${w}es`;
+};
+
+const singularizeSpanishWord = (word) => {
+  const w = String(word || '').trim();
+  if (!w || /\s/.test(w) || !w.endsWith('s') || w.length <= 3) return '';
+  if (/ces$/i.test(w)) return `${w.slice(0, -3)}z`;
+  if (/[bcdfghjklmnñpqrstvwxyz]es$/i.test(w)) return w.slice(0, -2);
+  return w.slice(0, -1);
+};
+
+const pluralizeEnglishWord = (word) => {
+  const w = String(word || '').trim().toLowerCase();
+  if (!w || /\s/.test(w)) return '';
+  if (EN_IRREGULAR_PLURALS[w]) return EN_IRREGULAR_PLURALS[w];
+  if (w.endsWith('s')) return '';
+  if (/[^aeiou]y$/i.test(w)) return `${w.slice(0, -1)}ies`;
+  if (/(?:s|sh|ch|x|z)$/i.test(w)) return `${w}es`;
+  return `${w}s`;
+};
+
+const singularizeEnglishWord = (word) => {
+  const w = String(word || '').trim().toLowerCase();
+  if (!w || /\s/.test(w)) return '';
+  if (EN_IRREGULAR_SINGULARS[w]) return EN_IRREGULAR_SINGULARS[w];
+  if (!w.endsWith('s') || w.endsWith('ss') || w.length <= 3) return '';
+  if (/ies$/i.test(w) && w.length > 4) return `${w.slice(0, -3)}y`;
+  if (/(?:ses|shes|ches|xes|zes)$/i.test(w) && w.length > 4) return w.slice(0, -2);
+  return w.slice(0, -1);
+};
+
+const splitRiddleAnswerParts = (rawStr) => {
+  const s = String(rawStr || '').trim();
+  if (!s) return [];
+  const parts = [];
+  const parenMatch = s.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
+  if (parenMatch) {
+    parts.push(parenMatch[1].trim(), parenMatch[2].trim());
+  } else {
+    parts.push(s);
+  }
+  const expanded = [];
+  parts.forEach((p) => {
+    if (p.includes('/')) {
+      p.split('/')
+        .map((x) => x.trim())
+        .filter(Boolean)
+        .forEach((x) => expanded.push(x));
+    } else {
+      expanded.push(p);
+    }
+  });
+  return expanded.filter(Boolean);
+};
+
+/**
+ * Genera variantes válidas para respuestas de acertijos (con/sin artículo, singular/plural básico)
+ * para que las entregas rápidas dentro de los 2 segundos no fallen por artículos o variantes mínimas.
+ */
+export function generarVariantesRespuestaAcertijo(correctAnswer = '', existingAccepted = [], idioma = '') {
+  const cleanItem = (val) =>
+    limpiarTextoPlano(val, 150)
+      .replace(/[\u2018\u2019\u02BC`]/g, "'")
+      .replace(/^[¡¿"'\s]+|[.!?"'\s]+$/g, '')
+      .trim();
+
+  const rawMainParts = splitRiddleAnswerParts(correctAnswer).map(cleanItem).filter(Boolean);
+  const mainClean = rawMainParts[0] || cleanItem(correctAnswer);
+  const extraFromMain = rawMainParts.slice(1);
+
+  const rawAcceptedParts = [];
+  if (Array.isArray(existingAccepted)) {
+    existingAccepted.forEach((item) => {
+      splitRiddleAnswerParts(item)
+        .map(cleanItem)
+        .filter(Boolean)
+        .forEach((p) => rawAcceptedParts.push(p));
+    });
+  }
+
+  const seeds = [mainClean, ...extraFromMain, ...rawAcceptedParts].filter(Boolean);
+
+  const seenNorm = new Set();
+  const mainNorm = normalizeCompareString(mainClean);
+  const result = [];
+
+  const addCandidate = (cand) => {
+    const c = cleanItem(cand);
+    if (!c) return;
+    const n = normalizeCompareString(c);
+    if (!n || n === mainNorm || seenNorm.has(n)) return;
+    seenNorm.add(n);
+    result.push(c);
+  };
+
+  // Preservar primero las respuestas secundarias extraídas y las aceptadas explícitas del docente o de la IA
+  extraFromMain.forEach(addCandidate);
+  rawAcceptedParts.forEach(addCandidate);
+
+  const isFrenchHint =
+    String(idioma || '').toLowerCase().includes('fr') ||
+    seeds.some((s) => /^(?:l'|le\s+|une\s+|les\s+|des\s+)/i.test(s));
+
+  seeds.forEach((seed) => {
+    const lower = seed.toLowerCase();
+    const mFrElided = lower.match(/^l'\s*(.+)$/i);
+    const mFr = lower.match(/^(le|la|les|un|une|des|ton|ta|mon|ma)\s+(.+)$/i);
+    const mEsMasc = lower.match(/^(el|un|tu|mi|su)\s+(.+)$/i);
+    const mEsFem = lower.match(/^(la|una)\s+(.+)$/i);
+    const mEsPlMasc = lower.match(/^(los|unos|tus|mis|sus)\s+(.+)$/i);
+    const mEsPlFem = lower.match(/^(las|unas)\s+(.+)$/i);
+    const mEn = lower.match(/^(the|a|an|your|my)\s+(.+)$/i);
+
+    if (mFrElided) {
+      const core = mFrElided[1].trim();
+      addCandidate(core);
+      addCandidate(`l'${core}`);
+      addCandidate(`un ${core}`);
+      addCandidate(`une ${core}`);
+      if (!/\s/.test(core) && !core.endsWith('s')) {
+        addCandidate(`${core}s`);
+        addCandidate(`les ${core}s`);
+      }
+      return;
+    }
+
+    if (isFrenchHint && mFr) {
+      const det = mFr[1].toLowerCase();
+      const core = mFr[2].trim();
+      const isVowel = /^[aeiouéèêàùîôûh]/i.test(core);
+      addCandidate(core);
+      if (isVowel) addCandidate(`l'${core}`);
+      if (det === 'la' || det === 'une' || det === 'ta' || det === 'ma') {
+        addCandidate(`la ${core}`);
+        addCandidate(`une ${core}`);
+      } else if (det === 'les' || det === 'des') {
+        addCandidate(`les ${core}`);
+        addCandidate(`des ${core}`);
+        if (!/\s/.test(core) && core.endsWith('s') && core.length > 3) {
+          const sing = core.slice(0, -1);
+          addCandidate(sing);
+          addCandidate(isVowel ? `l'${sing}` : `le ${sing}`);
+          addCandidate(`un ${sing}`);
+          addCandidate(`une ${sing}`);
+        }
+      } else {
+        addCandidate(`le ${core}`);
+        addCandidate(`un ${core}`);
+      }
+      if (!/\s/.test(core) && !core.endsWith('s')) {
+        addCandidate(`${core}s`);
+        addCandidate(`les ${core}s`);
+      }
+      return;
+    }
+
+    if (mEsMasc) {
+      const det = mEsMasc[1].toLowerCase();
+      const core = mEsMasc[2].trim();
+      const looksFemCore =
+        /(?:a|cion|sion|dad|tad|tud|nube|flor|luz|llave|noche|voz|sal|piel|red|sombra|edad)$/i.test(core) &&
+        !/^(?:dia|mapa|planeta|problema|idioma|tema|sistema|clima|poema|agua|aguila|hacha|alma)$/i.test(core);
+      addCandidate(core);
+      if ((det === 'tu' || det === 'mi' || det === 'su') && looksFemCore) {
+        addCandidate(`la ${core}`);
+        addCandidate(`una ${core}`);
+        addCandidate(`tu ${core}`);
+      } else {
+        addCandidate(`el ${core}`);
+        addCandidate(`un ${core}`);
+        if (det === 'tu' || det === 'mi' || det === 'su') addCandidate(`tu ${core}`);
+      }
+      const plural = pluralizeSpanishWord(core);
+      if (plural) {
+        addCandidate(plural);
+        addCandidate(`${looksFemCore ? 'las' : 'los'} ${plural}`);
+      }
+      return;
+    }
+
+    if (mEsFem) {
+      const core = mEsFem[2].trim();
+      addCandidate(core);
+      addCandidate(`la ${core}`);
+      addCandidate(`una ${core}`);
+      const plural = pluralizeSpanishWord(core);
+      if (plural) {
+        addCandidate(plural);
+        addCandidate(`las ${plural}`);
+      }
+      return;
+    }
+
+    if (mEsPlMasc || mEsPlFem) {
+      const isFem = Boolean(mEsPlFem);
+      const core = (mEsPlMasc ? mEsPlMasc[2] : mEsPlFem[2]).trim();
+      addCandidate(core);
+      addCandidate(`${isFem ? 'las' : 'los'} ${core}`);
+      addCandidate(`${isFem ? 'unas' : 'unos'} ${core}`);
+      const sing = singularizeSpanishWord(core);
+      if (sing && sing.length >= 2) {
+        addCandidate(sing);
+        addCandidate(`${isFem ? 'la' : 'el'} ${sing}`);
+        addCandidate(`${isFem ? 'una' : 'un'} ${sing}`);
+      }
+      return;
+    }
+
+    if (mEn) {
+      const det = mEn[1].toLowerCase();
+      const core = mEn[2].trim();
+      const indef = /^[aeiou]/i.test(core) ? 'an' : 'a';
+      addCandidate(core);
+      addCandidate(`the ${core}`);
+      const singFromPl = singularizeEnglishWord(core);
+      if (singFromPl) {
+        const singIndef = /^[aeiou]/i.test(singFromPl) ? 'an' : 'a';
+        addCandidate(singFromPl);
+        addCandidate(`the ${singFromPl}`);
+        addCandidate(`${singIndef} ${singFromPl}`);
+      } else {
+        addCandidate(`${indef} ${core}`);
+        if (det === 'your' || det === 'my') addCandidate(`your ${core}`);
+        const plural = pluralizeEnglishWord(core);
+        if (plural) addCandidate(plural);
+      }
+      return;
+    }
+
+    // Si la semilla no tiene artículo inicial y es corta (1 a 2 palabras)
+    const words = lower.split(/\s+/).filter(Boolean);
+    if (words.length >= 1 && words.length <= 2) {
+      const core = lower;
+      const isEnglishMode =
+        String(idioma || '').toLowerCase().startsWith('en') ||
+        String(idioma || '').toLowerCase() === 'bilingue' ||
+        seeds.some((s) => /^(the|a|an|your|my)\s+/i.test(s));
+      const isSpanishMode =
+        String(idioma || '').toLowerCase().startsWith('es') ||
+        String(idioma || '').toLowerCase().startsWith('bilingue') ||
+        seeds.some((s) => /^(el|la|los|las|un|una|tu|mi)\s+/i.test(s)) ||
+        /[áéíóúñ]/i.test(core);
+
+      if (isFrenchHint) {
+        const isVowel = /^[aeiouéèêàùîôûh]/i.test(core);
+        if (isVowel) addCandidate(`l'${core}`);
+        addCandidate(`le ${core}`);
+        addCandidate(`la ${core}`);
+        addCandidate(`un ${core}`);
+        addCandidate(`une ${core}`);
+      }
+      if (isEnglishMode || (!isSpanishMode && !isFrenchHint)) {
+        const singEn = singularizeEnglishWord(core);
+        if (singEn) {
+          const singIndef = /^[aeiou]/i.test(singEn) ? 'an' : 'a';
+          addCandidate(singEn);
+          addCandidate(`the ${singEn}`);
+          addCandidate(`${singIndef} ${singEn}`);
+          addCandidate(`the ${core}`);
+        } else {
+          const indef = /^[aeiou]/i.test(core) ? 'an' : 'a';
+          addCandidate(`the ${core}`);
+          addCandidate(`${indef} ${core}`);
+          const plEn = pluralizeEnglishWord(core);
+          if (plEn) addCandidate(plEn);
+        }
+      }
+      if (isSpanishMode || (!isEnglishMode && !isFrenchHint)) {
+        const looksFem =
+          /(?:a|cion|sion|dad|tad|tud|nube|flor|luz|llave|noche|voz|sal|piel|red|sombra|edad)$/i.test(core) &&
+          !/^(?:dia|mapa|planeta|problema|idioma|tema|sistema|clima|poema|agua|aguila|hacha|alma)$/i.test(core);
+        if (looksFem) {
+          addCandidate(`la ${core}`);
+          addCandidate(`una ${core}`);
+        } else {
+          addCandidate(`el ${core}`);
+          addCandidate(`un ${core}`);
+        }
+        const plEs = pluralizeSpanishWord(core);
+        if (plEs) {
+          addCandidate(plEs);
+          addCandidate(`${looksFem ? 'las' : 'los'} ${plEs}`);
+        } else {
+          const singEs = singularizeSpanishWord(core);
+          if (singEs && singEs.length >= 2) {
+            const singFem =
+              /(?:a|cion|sion|dad|tad|tud|nube|flor|luz|llave|noche|voz|sal|piel|red|sombra|edad)$/i.test(singEs);
+            addCandidate(singEs);
+            addCandidate(`${singFem ? 'la' : 'el'} ${singEs}`);
+            addCandidate(`${singFem ? 'una' : 'un'} ${singEs}`);
+          }
+        }
+      }
+    }
+  });
+
+  return result.slice(0, 16);
+}
 
 /**
  * Evalúa si la respuesta de un estudiante a una pregunta de Kahoot es correcta.
@@ -687,53 +1021,31 @@ export function evaluateKahootAnswer(question, submission) {
   }
 
   if (question.type === 'riddle') {
-    // Si la entrega es texto o un objeto con textAnswer/text
-    const rawText = typeof submission === 'string' ? submission : (submission.textAnswer ?? submission.text);
-    if (rawText !== undefined && rawText !== null && String(rawText).trim()) {
-      const given = normalizeCompareString(rawText);
-      if (!given) return false;
-      const validSet = new Set(
-        [question.correctAnswer, ...(question.acceptedAnswers || [])]
-          .map(normalizeCompareString)
-          .filter(Boolean)
-      );
-      if (validSet.has(given)) return true;
+    // Los acertijos funcionan exclusivamente con respuesta escrita (options: [])
+    const rawText = typeof submission === 'string' ? submission : (submission.textAnswer ?? submission.text ?? '');
+    if (rawText === undefined || rawText === null || !String(rawText).trim()) return false;
 
-      if (Array.isArray(question.options) && question.options.length > 0) {
-        const correctOptTexts = question.options
-          .filter((o) => o?.isCorrect)
-          .map((o) => normalizeCompareString(o?.text))
-          .filter(Boolean);
-        if (correctOptTexts.includes(given)) return true;
-      }
-      return false;
-    }
+    const given = normalizeCompareString(rawText);
+    if (!given) return false;
 
-    // Si la entrega es selección por opción (índice o ID)
-    const options = Array.isArray(question.options) ? question.options : [];
-    if (options.length > 0) {
-      if (submission.optionId !== undefined && submission.optionId !== null) {
-        const found = options.find((o) => String(o.id) === String(submission.optionId));
-        if (found) return Boolean(found.isCorrect);
-      }
-      if (submission.optionIndex !== undefined && submission.optionIndex !== null) {
-        const idx = Number(submission.optionIndex);
-        if (!Number.isNaN(idx) && idx >= 0 && idx < options.length) {
-          return Boolean(options[idx]?.isCorrect);
-        }
-      }
-      if (Array.isArray(submission.optionIndices) && submission.optionIndices.length > 0) {
-        const idx = Number(submission.optionIndices[0]);
-        if (!Number.isNaN(idx) && idx >= 0 && idx < options.length) {
-          return Boolean(options[idx]?.isCorrect);
-        }
-      }
-      if (Array.isArray(submission.optionIds) && submission.optionIds.length > 0) {
-        const found = options.find((o) => String(o.id) === String(submission.optionIds[0]));
-        if (found) return Boolean(found.isCorrect);
+    const splitMain = splitRiddleAnswerParts(question.correctAnswer);
+    const splitAccepted = (question.acceptedAnswers || []).flatMap(splitRiddleAnswerParts);
+    const candidates = [
+      question.correctAnswer,
+      ...splitMain,
+      ...(question.acceptedAnswers || []),
+      ...splitAccepted,
+      ...generarVariantesRespuestaAcertijo(question.correctAnswer, question.acceptedAnswers),
+    ];
+    const validSet = new Set(candidates.map(normalizeCompareString).filter(Boolean));
+    if (validSet.has(given)) return true;
+
+    const givenCore = stripLeadingArticle(given);
+    if (givenCore) {
+      for (const cand of validSet) {
+        if (stripLeadingArticle(cand) === givenCore) return true;
       }
     }
-
     return false;
   }
 
@@ -940,14 +1252,8 @@ export function reconcileKahootParticipantsAfterEdit(participantsMap = {}, norma
 
   const isAnswerCompatibleWithType = (q, ans) => {
     if (!q || !ans || typeof ans !== 'object') return false;
-    if (q.type === 'type_answer') {
+    if (q.type === 'type_answer' || q.type === 'riddle') {
       return typeof ans.textAnswer === 'string' || typeof ans.text === 'string';
-    }
-    if (q.type === 'riddle') {
-      if (typeof ans.textAnswer === 'string' || typeof ans.text === 'string') return true;
-      if (ans.optionIndex !== undefined || ans.optionId !== undefined) return true;
-      if (Array.isArray(ans.optionIndices) || Array.isArray(ans.optionIds)) return true;
-      return false;
     }
     if (q.type === 'puzzle') {
       return Array.isArray(ans.puzzleOrder) || Array.isArray(ans.orderedIds);
@@ -1122,44 +1428,22 @@ export function buildSimulatedBotAnswer(bot, question, questionIndex) {
   }
 
   if (question.type === 'riddle') {
-    const hasOptions = Array.isArray(question.options) && question.options.length >= 2;
-    if (hasOptions) {
-      const correctIndices = question.options
-        .map((o, idx) => (o?.isCorrect ? idx : -1))
-        .filter((i) => i >= 0);
-      const wrongIndices = question.options
-        .map((o, idx) => (!o?.isCorrect ? idx : -1))
-        .filter((i) => i >= 0);
-      let chosenIdx = 0;
-      if (isCorrectRoll && correctIndices.length > 0) {
-        chosenIdx = correctIndices[Math.floor(Math.random() * correctIndices.length)];
-      } else if (!isCorrectRoll && wrongIndices.length > 0) {
-        chosenIdx = wrongIndices[Math.floor(Math.random() * wrongIndices.length)];
-      }
-      const sub = {
-        ...qIdField,
-        questionIndex,
-        optionIndex: chosenIdx,
-        optionIndices: [chosenIdx],
-        timeMs,
-      };
-      return {
-        ...sub,
-        isCorrect: evaluateKahootAnswer(question, sub),
-      };
-    } else {
-      const textAnswer = isCorrectRoll ? (question.correctAnswer || 'respuesta correcta') : 'no lo se';
-      const sub = {
-        ...qIdField,
-        questionIndex,
-        textAnswer,
-        timeMs,
-      };
-      return {
-        ...sub,
-        isCorrect: evaluateKahootAnswer(question, sub),
-      };
-    }
+    const validPool = [question.correctAnswer, ...(question.acceptedAnswers || [])].filter(Boolean);
+    const chosenCorrect =
+      validPool.length > 0
+        ? validPool[Math.floor(Math.random() * validPool.length)]
+        : 'respuesta correcta';
+    const textAnswer = isCorrectRoll ? chosenCorrect : 'no lo se';
+    const sub = {
+      ...qIdField,
+      questionIndex,
+      textAnswer,
+      timeMs,
+    };
+    return {
+      ...sub,
+      isCorrect: evaluateKahootAnswer(question, sub),
+    };
   }
 
   const opts = Array.isArray(question.options) ? question.options : [];
@@ -1197,6 +1481,13 @@ export function buildSimulatedBotAnswer(bot, question, questionIndex) {
 }
 
 /**
+ * Detecta si el tema o instrucción escrito por el docente solicita explícitamente acertijos/adivinanzas.
+ */
+export function detectarIntencionAcertijoIA(texto = '') {
+  return /\b(acertijos?|adivinanzas?|riddles?|devinettes?)\b/i.test(String(texto || ''));
+}
+
+/**
  * Construye el prompt para generar un Kahoot completo con IA
  */
 export function construirPromptKahootIA({
@@ -1210,6 +1501,12 @@ export function construirPromptKahootIA({
 }) {
   const num = Math.max(1, Math.min(KAHOOT_MAX_QUESTIONS, Number(total) || 6));
   const listaEvitar = Array.isArray(evitar) ? evitar.filter(Boolean) : [];
+  const intencionRiddle = detectarIntencionAcertijoIA(tema);
+  const mezclaEfectiva =
+    mezcla === 'solo_riddle' ||
+    ((!mezcla || mezcla === 'variado' || mezcla === 'completo' || mezcla === 'mixto') && intencionRiddle)
+      ? 'solo_riddle'
+      : mezcla;
 
   const mapaIdiomas = {
     es: 'Todo en español',
@@ -1222,22 +1519,22 @@ export function construirPromptKahootIA({
 
   let instruccionTipos =
     'Combina preguntas de selección múltiple de 4 opciones (type "quiz") y preguntas de Verdadero o Falso (type "truefalse").';
-  if (mezcla === 'completo') {
+  if (mezclaEfectiva === 'completo') {
     instruccionTipos =
-      'Incluye una mezcla dinámica: mayoría de selección múltiple de 4 opciones (type "quiz"), algunas de Verdadero/Falso (type "truefalse"), al menos 1 de respuesta corta escrita (type "type_answer"), 1 de ordenar secuencia de 4 pasos/palabras (type "puzzle") o 1 acertijo retador (type "riddle").';
-  } else if (mezcla === 'solo_quiz') {
+      'Incluye una mezcla dinámica: mayoría de selección múltiple de 4 opciones (type "quiz"), algunas de Verdadero/Falso (type "truefalse"), al menos 1 de respuesta corta escrita (type "type_answer"), 1 de ordenar secuencia de 4 pasos/palabras (type "puzzle") o 1 acertijo retador de respuesta escrita (type "riddle").';
+  } else if (mezclaEfectiva === 'solo_quiz') {
     instruccionTipos = 'Genera TODAS las preguntas de selección múltiple con exactamente 4 opciones (type "quiz").';
-  } else if (mezcla === 'solo_vf') {
+  } else if (mezclaEfectiva === 'solo_vf') {
     instruccionTipos = 'Genera TODAS las preguntas de Verdadero o Falso (type "truefalse").';
-  } else if (mezcla === 'solo_type_answer') {
+  } else if (mezclaEfectiva === 'solo_type_answer') {
     instruccionTipos =
       'Genera TODAS las preguntas de respuesta corta escrita (type "type_answer") con correctAnswer y acceptedAnswers.';
-  } else if (mezcla === 'solo_puzzle') {
+  } else if (mezclaEfectiva === 'solo_puzzle') {
     instruccionTipos =
       'Genera TODAS las preguntas de ordenar secuencia de 4 pasos o palabras de arriba hacia abajo (type "puzzle") con puzzleItems.';
-  } else if (mezcla === 'solo_riddle') {
+  } else if (mezclaEfectiva === 'solo_riddle') {
     instruccionTipos =
-      'Genera TODAS las preguntas como acertijos retadores (type "riddle") con correctAnswer y acceptedAnswers.';
+      'Genera ÚNICAMENTE preguntas de tipo "riddle" (acertijos dinámicos e ingeniosos) exclusivamente de respuesta escrita ("options": []), pensados para resolverse en pocos segundos, con una respuesta corta y concreta en correctAnswer (de 1 a 3 palabras, nunca oraciones largas) y múltiples variantes válidas en acceptedAnswers (con y sin artículo como "reloj", "el reloj", "un reloj", "clock", "a clock", "the clock", singular/plural y sinónimos equivalentes).';
   }
 
   return [
@@ -1255,7 +1552,8 @@ export function construirPromptKahootIA({
     `  2) Verdadero/Falso: {"type":"truefalse","text":"Afirmación clara","timeLimit":15,"pointsMultiplier":1,"options":[{"text":"Verdadero","isCorrect":true},{"text":"Falso","isCorrect":false}],"explanation":"Breve explicación"}`,
     `  3) Respuesta corta: {"type":"type_answer","text":"Pregunta directa","timeLimit":30,"pointsMultiplier":2,"correctAnswer":"respuesta","acceptedAnswers":["sinonimo"],"explanation":"Breve explicación"}`,
     `  4) Puzzle (ordenar): {"type":"puzzle","text":"Ordena la secuencia o frase correctamente","timeLimit":30,"pointsMultiplier":2,"puzzleItems":["Paso 1","Paso 2","Paso 3","Paso 4"],"explanation":"Breve explicación"}`,
-    `  5) Acertijo: {"type":"riddle","text":"Acertijo breve e ingenioso","timeLimit":30,"pointsMultiplier":2,"correctAnswer":"solucion","acceptedAnswers":["sinonimo"],"explanation":"Breve explicación"}`,
+    `  5) Acertijo (solo respuesta escrita): {"type":"riddle","text":"Acertijo ingenioso, retador pero resoluble en pocos segundos","timeLimit":30,"pointsMultiplier":2,"options":[],"correctAnswer":"reloj","acceptedAnswers":["el reloj","un reloj","clock","a clock","the clock","relojes"],"explanation":"Breve explicación"}`,
+    '- Regla crítica para Acertijos (type "riddle"): NUNCA incluyas opciones de selección ("options": []); "correctAnswer" DEBE ser una respuesta corta, limpia y concreta de 1 a 3 palabras sin traducciones entre paréntesis (nunca una oración larga); y "acceptedAnswers" DEBE incluir múltiples variantes válidas con y sin artículo ("reloj", "el reloj", "un reloj", "a clock", "the clock", "clock"), singular/plural, traducciones al otro idioma si el modo es bilingüe y sinónimos equivalentes para que los estudiantes que escriban rápido dentro de la ventana de gracia de 2 segundos sean validados sin fallar por artículos.',
     '- En las últimas 1 o 2 preguntas más retadoras usa "pointsMultiplier": 2 (Puntos Dobles).',
     '- No uses asteriscos (** o *) ni etiquetas HTML.',
     '- Varía la posición de la opción correcta en las preguntas tipo quiz para que no sea siempre la primera.',
@@ -1299,10 +1597,21 @@ function limpiarBloqueJSON(texto) {
   return t;
 }
 
+const limpiarSolucionAcertijoIA = (str) =>
+  String(str || '')
+    .trim()
+    .replace(/[\u2018\u2019\u02BC`]/g, "'")
+    .replace(
+      /^(?:la\s+respuesta\s+correcta\s+es|la\s+respuesta\s+es|respuesta\s*:|soluci[oó]n\s*:|la\s+r[eé]ponse\s+est|r[eé]ponse\s*:|the\s+answer\s+is|answer\s*:|c'est|ce\s+sont|they\s+are|it\s+is|it's|son|es)\s+/i,
+      ''
+    )
+    .replace(/^[¡¿"'\s]+|[.!?"'\s]+$/g, '')
+    .trim();
+
 /**
  * Parsea la salida de la IA en preguntas de Kahoot normalizadas y baraja la posición de las opciones si todas las correctas quedaron en el índice 0.
  */
-export function parsearKahootIA(rawText, defaultTimeLimit = 20, startIndex = 0) {
+export function parsearKahootIA(rawText, defaultTimeLimit = 20, startIndex = 0, parseOptions = {}) {
   const cleaned = limpiarBloqueJSON(rawText);
   let parsed = null;
   try {
@@ -1327,17 +1636,39 @@ export function parsearKahootIA(rawText, defaultTimeLimit = 20, startIndex = 0) 
     return { ok: false, questions: [], error: 'No se encontraron preguntas en la respuesta de la IA.' };
   }
 
+  const forceRiddle = parseOptions?.forceType === 'riddle';
+  const idiomaHint = parseOptions?.idioma || '';
+
   const questions = [];
   const vistos = new Set();
   list.slice(0, KAHOOT_MAX_QUESTIONS).forEach((item) => {
     const globalIdx = startIndex + questions.length;
+    const rawItem = forceRiddle && item && typeof item === 'object' ? { ...item, type: 'riddle' } : item;
     const q = normalizeKahootQuestion(
-      { ...item, id: undefined, timeLimit: item?.timeLimit || defaultTimeLimit },
+      { ...rawItem, id: undefined, timeLimit: rawItem?.timeLimit || defaultTimeLimit },
       globalIdx
     );
     if (!q.text) return;
+
+    if (q.type === 'riddle') {
+      q.options = [];
+      const mainParts = splitRiddleAnswerParts(q.correctAnswer)
+        .map(limpiarSolucionAcertijoIA)
+        .filter(Boolean);
+      q.correctAnswer = mainParts[0] || limpiarSolucionAcertijoIA(q.correctAnswer);
+      if (!q.correctAnswer) return;
+      const cleanedAccepted = [
+        ...mainParts.slice(1),
+        ...(q.acceptedAnswers || []).flatMap(splitRiddleAnswerParts).map(limpiarSolucionAcertijoIA),
+      ].filter(Boolean);
+      q.acceptedAnswers = generarVariantesRespuestaAcertijo(
+        q.correctAnswer,
+        cleanedAccepted,
+        idiomaHint
+      );
+    }
+
     if (q.type === 'type_answer' && !String(q.correctAnswer || '').trim()) return;
-    if (q.type === 'riddle' && !String(q.correctAnswer || '').trim() && (q.options || []).filter((o) => String(o.text || '').trim()).length < 2) return;
     if (q.type === 'puzzle' && (q.puzzleItems || []).filter((x) => String(x || '').trim()).length < 3) return;
     const nonEmptyOpts = (q.options || []).filter((o) => String(o.text || '').trim().length > 0);
     if ((q.type === 'quiz' || q.type === 'truefalse') && nonEmptyOpts.length < 2) return;
@@ -1387,14 +1718,23 @@ export async function generarKahootConIA(config, callGemini) {
     KAHOOT_MIN_QUESTIONS,
     Math.min(KAHOOT_MAX_QUESTIONS, Number(config?.total) || 6)
   );
-  const defaultTimeLimit = config?.timeLimit || 20;
+  const esModoAcertijo =
+    config?.mezcla === 'solo_riddle' ||
+    ((!config?.mezcla || config?.mezcla === 'variado' || config?.mezcla === 'completo' || config?.mezcla === 'mixto') &&
+      detectarIntencionAcertijoIA(config?.tema));
+  const effectiveConfig = esModoAcertijo ? { ...config, mezcla: 'solo_riddle' } : config;
+  const defaultTimeLimit = effectiveConfig?.timeLimit || (esModoAcertijo ? 30 : 20);
+  const parseOpts = {
+    forceType: esModoAcertijo ? 'riddle' : undefined,
+    idioma: effectiveConfig?.idioma || '',
+  };
 
   if (totalDeseado <= KAHOOT_AI_BATCH_SIZE) {
-    const prompt = construirPromptKahootIA({ ...config, total: totalDeseado });
+    const prompt = construirPromptKahootIA({ ...effectiveConfig, total: totalDeseado });
     for (let intento = 0; intento < 2; intento++) {
       const rawResponse = await callGemini(prompt, 120000);
       if (rawResponse) {
-        const res = parsearKahootIA(rawResponse, defaultTimeLimit, 0);
+        const res = parsearKahootIA(rawResponse, defaultTimeLimit, 0, parseOpts);
         if (res.ok && res.questions.length > 0) {
           return { ok: true, questions: res.questions.slice(0, totalDeseado), error: '' };
         }
@@ -1417,7 +1757,7 @@ export async function generarKahootConIA(config, callGemini) {
     const faltan = totalDeseado - acumuladas.length;
     const cantidadLote = Math.min(KAHOOT_AI_BATCH_SIZE, faltan);
     const prompt = construirPromptKahootIA({
-      ...config,
+      ...effectiveConfig,
       total: cantidadLote,
       evitar: acumuladas.map((q) => q.text.slice(0, 80)),
     });
@@ -1429,7 +1769,7 @@ export async function generarKahootConIA(config, callGemini) {
       continue;
     }
 
-    const parsed = parsearKahootIA(rawResponse, defaultTimeLimit, acumuladas.length);
+    const parsed = parsearKahootIA(rawResponse, defaultTimeLimit, acumuladas.length, parseOpts);
     if (!parsed.ok || parsed.questions.length === 0) {
       intentosFallidos++;
       if (intentosFallidos >= 2) break;
