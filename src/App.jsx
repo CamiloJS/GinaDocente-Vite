@@ -2747,7 +2747,7 @@ function App() {
               return;
             }
             try {
-              const compressed = await compressImage(file, 400, 400, 0.7);
+              const compressed = await compressImage(file, 256, 256, 0.72);
               setGoogleOnboarding(p => ({
                 ...p,
                 photoChoice: 'custom',
@@ -2796,6 +2796,14 @@ function App() {
                 finalPhoto = googleOnboarding.photoURL || '';
               } else if (googleOnboarding.photoChoice === 'custom') {
                 finalPhoto = googleOnboarding.customPhotoUrl || '';
+                if (finalPhoto && finalPhoto.startsWith('data:image/') && !isDemoMode) {
+                  try {
+                    const uploadedAvatarUrl = await uploadImageToStorage(finalPhoto, 'avatars');
+                    if (uploadedAvatarUrl) finalPhoto = uploadedAvatarUrl;
+                  } catch (uploadErr) {
+                    console.warn('No se pudo subir avatar de onboarding a Storage:', uploadErr);
+                  }
+                }
               } else {
                 finalPhoto = ''; // initials
               }
@@ -5704,27 +5712,29 @@ useEffect(() => {
             if (avatarPreviewUrl.startsWith('data:image/gif')) {
                 finalImagePayload = avatarPreviewUrl;
             } else {
+                const avatarSize = 256;
                 const canvas = document.createElement('canvas');
-                canvas.width = 400; canvas.height = 400;
+                canvas.width = avatarSize; canvas.height = avatarSize;
                 const ctx = canvas.getContext('2d');
                 ctx.fillStyle = "#ffffff"; 
-                ctx.fillRect(0, 0, 400, 400);
+                ctx.fillRect(0, 0, avatarSize, avatarSize);
 
                 const img = cropImageRef.current;
                 
-                // Matemática exacta del recorte interactivo
+                // Matemática exacta del recorte interactivo (proporcional al lienzo de 192px)
                 if (img && img.naturalWidth > 0 && img.naturalHeight > 0) {
-                    const scale = Math.max(400 / img.naturalWidth, 400 / img.naturalHeight);
+                    const scale = Math.max(avatarSize / img.naturalWidth, avatarSize / img.naturalHeight);
                     const w = img.naturalWidth * scale * cropZoom;
                     const h = img.naturalHeight * scale * cropZoom;
+                    const offsetRatio = avatarSize / 192;
                     
-                    const dx = (400 - w) / 2 + (cropOffset.x * 2.08); 
-                    const dy = (400 - h) / 2 + (cropOffset.y * 2.08);
+                    const dx = (avatarSize - w) / 2 + (cropOffset.x * offsetRatio); 
+                    const dy = (avatarSize - h) / 2 + (cropOffset.y * offsetRatio);
 
                     ctx.drawImage(img, dx, dy, w, h);
                 }
 
-                finalImagePayload = (img && img.naturalWidth > 0) ? canvas.toDataURL('image/jpeg', 0.8) : avatarPreviewUrl;
+                finalImagePayload = (img && img.naturalWidth > 0) ? canvas.toDataURL('image/jpeg', 0.72) : avatarPreviewUrl;
             }
             
             // 🛑 CERRAR EL MODAL INMEDIATAMENTE para evitar congelamientos

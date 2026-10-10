@@ -92,10 +92,28 @@ export default function NotesModule({
   const isTeacher = role === 'teacher';
 
   // Pestaña activa: 'shared' (Cuaderno compartido de clase) | 'private' (Mis notas privadas)
-  const [activeScope, setActiveScope] = useState('shared');
+  const [activeScope, setActiveScope] = useState(() => {
+    try {
+      const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('englishTech_notesActiveScope') : null;
+      if (saved === 'private' || saved === 'shared') return saved;
+    } catch {}
+    return 'shared';
+  });
+  const hasAutoSelectedScopeRef = useRef(false);
   const [selectedGroupFilter, setSelectedGroupFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState('all'); // 'all' | 'sticky' | 'sheet'
+
+  const changeActiveScope = (nextScope) => {
+    const resolved = nextScope === 'private' ? 'private' : 'shared';
+    hasAutoSelectedScopeRef.current = true;
+    setActiveScope(resolved);
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('englishTech_notesActiveScope', resolved);
+      }
+    } catch {}
+  };
 
   // Modal de creación / edición de nota
   const [isComposerOpen, setIsComposerOpen] = useState(false);
@@ -154,6 +172,31 @@ export default function NotesModule({
     myChatId: normalizedUserId,
     name: currentUserName
   }), [role, normalizedUserId, currentUserName]);
+
+  const scopeCounts = useMemo(() => {
+    let shared = 0;
+    let priv = 0;
+    (Array.isArray(notes) ? notes : []).forEach((note) => {
+      if (!note || note.isSoftDeleted) return;
+      if (note.scope === 'private') {
+        const owner = String(note.ownerId || note.authorId || '').trim().toLowerCase();
+        if (owner === normalizedUserId) priv += 1;
+      } else {
+        shared += 1;
+      }
+    });
+    return { shared, private: priv };
+  }, [notes, normalizedUserId]);
+
+  useEffect(() => {
+    if (hasAutoSelectedScopeRef.current) return;
+    if (scopeCounts.shared === 0 && scopeCounts.private > 0 && activeScope === 'shared') {
+      hasAutoSelectedScopeRef.current = true;
+      setActiveScope('private');
+    } else if (scopeCounts.shared > 0 || scopeCounts.private > 0) {
+      hasAutoSelectedScopeRef.current = true;
+    }
+  }, [scopeCounts.shared, scopeCounts.private, activeScope]);
 
   // Filtrar notas visibles según pestaña (compartidas vs privadas), búsqueda y borrado suave de estudiantes
   const visibleNotes = useMemo(() => {
@@ -639,7 +682,7 @@ export default function NotesModule({
       if (onSaveNote) {
         await onSaveNote(newNote);
       }
-      setActiveScope(scope);
+      changeActiveScope(scope);
       if (showNotify) {
         showNotify(
           scope === 'private'
@@ -1191,7 +1234,7 @@ export default function NotesModule({
           }`}>
             <button
               type="button"
-              onClick={() => setActiveScope('shared')}
+              onClick={() => changeActiveScope('shared')}
               className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 activeScope === 'shared'
                   ? (isDarkMode ? 'bg-slate-800 text-white shadow-2xs' : 'bg-white text-slate-900 shadow-2xs')
@@ -1200,10 +1243,19 @@ export default function NotesModule({
             >
               <UsersIcon size={14} />
               <span>Notas compartidas</span>
+              {scopeCounts.shared > 0 && (
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                  activeScope === 'shared'
+                    ? (isDarkMode ? 'bg-slate-700 text-slate-200' : 'bg-slate-100 text-slate-700')
+                    : (isDarkMode ? 'bg-slate-800/80 text-slate-400' : 'bg-slate-200/70 text-slate-600')
+                }`}>
+                  {scopeCounts.shared}
+                </span>
+              )}
             </button>
             <button
               type="button"
-              onClick={() => setActiveScope('private')}
+              onClick={() => changeActiveScope('private')}
               className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 activeScope === 'private'
                   ? (isDarkMode ? 'bg-slate-800 text-white shadow-2xs' : 'bg-white text-slate-900 shadow-2xs')
@@ -1212,6 +1264,15 @@ export default function NotesModule({
             >
               <UserIcon size={14} />
               <span>Notas privadas</span>
+              {scopeCounts.private > 0 && (
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                  activeScope === 'private'
+                    ? (isDarkMode ? 'bg-slate-700 text-slate-200' : 'bg-slate-100 text-slate-700')
+                    : (isDarkMode ? 'bg-slate-800/80 text-slate-400' : 'bg-slate-200/70 text-slate-600')
+                }`}>
+                  {scopeCounts.private}
+                </span>
+              )}
             </button>
           </div>
 

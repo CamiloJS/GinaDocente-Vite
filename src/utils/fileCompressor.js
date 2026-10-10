@@ -8,7 +8,7 @@ const MAX_DOC_SIZE_BYTES = 30 * 1024 * 1024;   // 30 MB
  * Comprime una imagen silenciosamente usando HTML5 Canvas
  * Mantiene alta fidelidad visual y dimensiones nítidas (hasta 2560px)
  */
-export async function compressImageSilently(file, maxDimension = 2560, initialQuality = 0.85) {
+export async function compressImageSilently(file, maxDimension = 2560, initialQuality = 0.85, forceJpeg = false) {
   // Preservar GIFs animados intactos
   if (file.type === 'image/gif' || file.name?.toLowerCase().endsWith('.gif')) {
     return file;
@@ -24,7 +24,7 @@ export async function compressImageSilently(file, maxDimension = 2560, initialQu
         let width = img.width;
         let height = img.height;
 
-        // Escalar proporcionalmente solo si supera la dimensión máxima de alta resolución
+        // Escalar proporcionalmente si supera la dimensión máxima solicitada
         if (width > maxDimension || height > maxDimension) {
           if (width > height) {
             height = Math.round((height * maxDimension) / width);
@@ -41,9 +41,11 @@ export async function compressImageSilently(file, maxDimension = 2560, initialQu
         const ctx = canvas.getContext('2d');
 
         const isPng = file.type === 'image/png' || file.name?.toLowerCase().endsWith('.png');
-        
-        // Si no es PNG con transparencia, dibujar fondo blanco de seguridad
-        if (!isPng) {
+        const shouldConvertToJpeg = forceJpeg || maxDimension <= 1600 || initialQuality < 0.85 || file.size > MAX_IMAGE_SIZE_BYTES;
+        const outputMime = (isPng && !shouldConvertToJpeg) ? 'image/png' : 'image/jpeg';
+
+        // Si se exporta como JPEG, dibujar fondo blanco de seguridad
+        if (outputMime === 'image/jpeg') {
           ctx.fillStyle = '#FFFFFF';
           ctx.fillRect(0, 0, width, height);
         } else {
@@ -52,9 +54,7 @@ export async function compressImageSilently(file, maxDimension = 2560, initialQu
 
         ctx.drawImage(img, 0, 0, width, height);
 
-        // Si es mayor a 10MB o PNG grande, convertir a JPEG/WebP de alta calidad para máxima ligereza
-        const outputMime = (isPng && file.size <= MAX_IMAGE_SIZE_BYTES) ? 'image/png' : 'image/jpeg';
-        const quality = isPng && outputMime === 'image/png' ? undefined : initialQuality;
+        const quality = outputMime === 'image/png' ? undefined : initialQuality;
 
         canvas.toBlob(
           (blob) => {

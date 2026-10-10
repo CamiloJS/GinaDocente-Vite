@@ -131,8 +131,9 @@ export const compressImage = async (file, maxWidth = 2048, maxHeight = 2048, qua
     });
   }
 
-  // Compresión sutil de alta resolución (máx 10 MB, resolución nítida)
-  const optimizedFile = await compressImageSilently(file, Math.max(maxWidth, 2048), quality);
+  // Respetar el límite de dimensión solicitado (ej. 256px para avatares, 800px para posts, 2048px por defecto)
+  const targetMaxDim = Math.max(64, Math.min(Number(maxWidth) || 2048, Number(maxHeight) || 2048));
+  const optimizedFile = await compressImageSilently(file, targetMaxDim, quality, targetMaxDim <= 512);
 
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
