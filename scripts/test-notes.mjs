@@ -363,6 +363,15 @@ check(
     notesModuleSrc.includes('No hay notas compartidas aún') &&
     notesModuleSrc.includes('No hay notas privadas aún')
 );
+check(
+  'NotesModule.jsx renderiza sus modales con createPortal en document.body (z-[200]) y App.jsx mantiene la barra derecha de chats en el fondo (z-0) sin sobreponerse',
+  notesModuleSrc.includes("import { createPortal } from 'react-dom'") &&
+    notesModuleSrc.includes('isComposerOpen && typeof document !== \'undefined\' && createPortal(') &&
+    notesModuleSrc.includes('isTeacher && isAuditModalOpen && typeof document !== \'undefined\' && createPortal(') &&
+    notesModuleSrc.includes('notePendingDelete && typeof document !== \'undefined\' && createPortal(') &&
+    !appSrc.includes('pb-28 md:pb-8 relative z-10 shrink-0 mx-auto') &&
+    appSrc.includes('pl-3 border-l z-0 shrink-0 py-3.5 overflow-hidden')
+);
 
 console.log('\n========================================');
 console.log(`Total pruebas Notas: ${okCount + failCount} | OK: ${okCount} | FAIL: ${failCount}`);

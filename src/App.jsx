@@ -13108,7 +13108,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
               )}
 
               {/* Navbar Principal Estilo Moderno */}
-              <nav className={`sticky top-0 z-50 backdrop-blur-md border-b transition-colors duration-300 ${isDarkMode ? 'bg-gray-900/80 border-gray-800' : 'bg-white/80 border-gray-200'}`}>
+              <nav className={`sticky top-0 z-30 backdrop-blur-md border-b transition-colors duration-300 ${isDarkMode ? 'bg-gray-900/80 border-gray-800' : 'bg-white/80 border-gray-200'}`}>
                 <div className="max-w-[1600px] mx-auto px-4 h-16 flex items-center justify-between gap-4">
                   {/* Left: Brand */}
                   <div className="flex items-center gap-3 cursor-pointer select-none" onClick={() => changeTab('tasks')}>
@@ -13242,9 +13242,9 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                 </div>
               </nav>
 
-              <div className="max-w-[1600px] mx-auto w-full flex justify-center items-start px-2 md:px-4 gap-4 xl:gap-6 relative z-10 h-[calc(100vh-64px)] overflow-y-auto">
+              <div className="max-w-[1600px] mx-auto w-full flex justify-center items-start px-2 md:px-4 gap-4 xl:gap-6 relative h-[calc(100vh-64px)] overflow-y-auto">
                   {/* LEFT SIDEBAR (Panel de Navegación Fijo / Sticky Optimizado) */}
-                  <aside className={`w-[245px] xl:w-[265px] hidden lg:flex flex-col justify-between sticky top-0 h-[calc(100vh-64px)] pr-2 py-3.5 z-10 shrink-0 overflow-y-auto overflow-x-hidden select-none ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  <aside className={`w-[245px] xl:w-[265px] hidden lg:flex flex-col justify-between sticky top-0 h-[calc(100vh-64px)] pr-2 py-3.5 z-0 shrink-0 overflow-y-auto overflow-x-hidden select-none ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                       <div className="space-y-3">
                           {/* Profile Card Compacto */}
                           <div className={`p-3 rounded-2xl border shadow-xs flex items-center gap-3 transition-colors ${isDarkMode ? 'bg-gray-800/90 border-gray-700/80' : 'bg-white border-gray-200'}`}>
@@ -13365,7 +13365,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                   </aside>
 
                   {/* CENTER CONTENT */}
-                  <main className={`flex-1 ${activeTab === 'tools' || activeTab === 'books' || activeTab === 'notes' ? 'max-w-5xl xl:max-w-6xl' : 'max-w-[680px]'} min-w-0 w-full p-2 md:p-6 pb-28 md:pb-8 relative z-10 shrink-0 mx-auto`}>
+                  <main className={`flex-1 ${activeTab === 'tools' || activeTab === 'books' || activeTab === 'notes' ? 'max-w-5xl xl:max-w-6xl' : 'max-w-[680px]'} min-w-0 w-full p-2 md:p-6 pb-28 md:pb-8 relative shrink-0 mx-auto`}>
                       {activeTab === 'tasks' && (
                           <React.Suspense fallback={<div className="space-y-4 p-4">{[1,2,3].map(i => <div key={i} className="p-4 rounded-2xl border animate-pulse bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800"><div className="flex items-center gap-3 mb-4"><div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700" /><div className="flex-1 space-y-2"><div className="h-3 w-1/3 rounded bg-gray-200 dark:bg-gray-700" /></div></div><div className="h-4 w-full rounded mb-2 bg-gray-200 dark:bg-gray-700" /><div className="h-4 w-5/6 rounded bg-gray-200 dark:bg-gray-700" /></div>)}</div>}>
                           <TasksTab 
@@ -13487,7 +13487,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                   </main>
 
                   {/* RIGHT SIDEBAR (Barra lateral de Chats fija estilo Facebook con Scroll Independiente) */}
-                  <aside className={`w-[275px] xl:w-[310px] hidden lg:flex flex-col sticky top-0 h-[calc(100vh-64px)] pl-3 border-l z-10 shrink-0 py-3.5 overflow-hidden ${isDarkMode ? 'border-gray-800 text-gray-300' : 'border-gray-200 text-gray-700'}`}>
+                  <aside className={`w-[275px] xl:w-[310px] hidden lg:flex flex-col sticky top-0 h-[calc(100vh-64px)] pl-3 border-l z-0 shrink-0 py-3.5 overflow-hidden ${isDarkMode ? 'border-gray-800 text-gray-300' : 'border-gray-200 text-gray-700'}`}>
                       {/* Encabezado de Chats (Fijo arriba) */}
                        <div className="flex items-center justify-between px-1 pb-2">
                            <h3 className={`text-xs font-bold uppercase tracking-wider ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Mensajes</h3>
@@ -14348,7 +14348,7 @@ Bot:`;
                       /* PESTAÑA MINIMIZADA ANCLADA ABAJO A LA DERECHA (SOBRE LA NAV EN MÓVIL) */
                       <div 
                           onClick={() => setIsChatMinimized(false)}
-                          className={`fixed bottom-20 sm:bottom-0 right-3 sm:right-6 md:right-8 z-[120] w-auto sm:w-80 max-w-[calc(100vw-24px)] rounded-2xl sm:rounded-t-2xl sm:rounded-b-none shadow-2xl border transition-all duration-300 flex items-center justify-between p-2.5 px-3.5 cursor-pointer select-none ${
+                          className={`fixed bottom-20 sm:bottom-0 right-3 sm:right-6 md:right-8 z-[120] sm:z-40 w-auto sm:w-80 max-w-[calc(100vw-24px)] rounded-2xl sm:rounded-t-2xl sm:rounded-b-none shadow-2xl border transition-all duration-300 flex items-center justify-between p-2.5 px-3.5 cursor-pointer select-none ${
                               isDarkMode ? 'bg-gray-800 border-gray-700 text-white shadow-black/60 hover:bg-gray-750' : 'bg-white border-gray-200 text-gray-800 shadow-xl hover:bg-gray-50'
                           }`}
                       >
@@ -14419,7 +14419,7 @@ Bot:`;
                           const activePattern = CHAT_PATTERNS.find(p => p.id === currentPrefs.pattern)?.style || {};
 
                           return (
-                              <div className={`fixed inset-x-0 bottom-0 top-0 sm:top-auto sm:bottom-0 sm:right-6 md:right-8 sm:left-auto z-[120] w-full sm:w-[380px] sm:max-w-[calc(100vw-24px)] h-full sm:h-[520px] sm:max-h-[calc(100vh-80px)] rounded-none sm:rounded-t-2xl shadow-2xl border-t sm:border flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 duration-200 ${
+                              <div className={`fixed inset-x-0 bottom-0 top-0 sm:top-auto sm:bottom-0 sm:right-6 md:right-8 sm:left-auto z-[120] sm:z-40 w-full sm:w-[380px] sm:max-w-[calc(100vw-24px)] h-full sm:h-[520px] sm:max-h-[calc(100vh-80px)] rounded-none sm:rounded-t-2xl shadow-2xl border-t sm:border flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 duration-200 ${
                                   isDarkMode ? 'bg-gray-900 border-gray-700 shadow-black/70' : 'bg-white border-gray-200 shadow-2xl'
                               }`}>
                                   {/* Encabezado del Chat */}
