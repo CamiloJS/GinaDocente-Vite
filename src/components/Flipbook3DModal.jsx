@@ -18,7 +18,8 @@ import {
     Loader2,
     Edit3,
     FileText,
-    Bookmark
+    Bookmark,
+    Music
 } from './Icons';
 import {
     normalizeBookRecord,
@@ -29,6 +30,9 @@ import {
     calculateDragCurlState,
     clampBookZoom,
     playPageFlipSound,
+    readingAmbientPlayer,
+    READING_AUDIO_PRESETS,
+    getReadingAudioPreset,
     renderPdfToBookPages,
     buildFallbackBookPages,
     buildBookPagesFromOutline,
@@ -77,7 +81,11 @@ export default function Flipbook3DModal({
     const [soundMuted, setSoundMuted] = useState(false);
     const [showThumbnails, setShowThumbnails] = useState(false);
     const [showBookmarksPanel, setShowBookmarksPanel] = useState(false);
+    const [showAmbientMenu, setShowAmbientMenu] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [ambientState, setAmbientState] = useState(() => readingAmbientPlayer.getState());
+
+    const ambientMenuRef = useRef(null);
 
     // Per-user Bookmarks & Last Read Page
     const [bookmarks, setBookmarks] = useState(() => {
@@ -102,6 +110,72 @@ export default function Flipbook3DModal({
         const arr = Array.isArray(normalizedBook.bookPages) ? normalizedBook.bookPages : [];
         return `${arr.length}:${String(arr[0] || '').slice(0, 64)}:${String(arr[arr.length - 1] || '').slice(0, 64)}`;
     }, [normalizedBook.bookPages]);
+
+    // Subscribe to ambient audio state changes
+    useEffect(() => {
+        return readingAmbientPlayer.subscribe(setAmbientState);
+    }, []);
+
+    // Ambient Reading Audio Lifecycle: Progressive Fade-in on mount and Fade-out on close
+    useEffect(() => {
+        const ambient = normalizedBook.ambientAudio || {};
+        const trackId = ambient.trackId || normalizedBook.ambientAudioTrack || 'piano-calm';
+        const isAudioEnabled = ambient.enabled !== false && normalizedBook.ambientAudioEnabled !== false && trackId !== 'none';
+        const customUrl = ambient.customUrl || normalizedBook.ambientAudioUrl || '';
+        const volume = ambient.volume ?? normalizedBook.ambientAudioVolume ?? 0.22;
+        const title = ambient.title || normalizedBook.ambientAudioTitle || '';
+
+        if (isAudioEnabled) {
+            readingAmbientPlayer.start({
+                trackId,
+                customUrl,
+                volume,
+                fadeInDuration: 2.2,
+                title
+            });
+        } else {
+            readingAmbientPlayer.stop({ fadeOutDuration: 0.5 });
+        }
+
+        const unlockAmbientAudio = () => {
+            if (isAudioEnabled && !readingAmbientPlayer.isPlaying && !readingAmbientPlayer.isMuted) {
+                readingAmbientPlayer.start({
+                    trackId,
+                    customUrl,
+                    volume,
+                    fadeInDuration: 1.6,
+                    title
+                });
+            }
+        };
+
+        window.addEventListener('pointerdown', unlockAmbientAudio, { once: true });
+        window.addEventListener('keydown', unlockAmbientAudio, { once: true });
+
+        return () => {
+            window.removeEventListener('pointerdown', unlockAmbientAudio);
+            window.removeEventListener('keydown', unlockAmbientAudio);
+            readingAmbientPlayer.stop({ fadeOutDuration: 1.2 });
+        };
+    }, [
+        normalizedBook.id,
+        normalizedBook.ambientAudioTrack,
+        normalizedBook.ambientAudioEnabled,
+        normalizedBook.ambientAudioUrl,
+        normalizedBook.ambientAudioVolume
+    ]);
+
+    // Close ambient audio menu when clicking outside
+    useEffect(() => {
+        if (!showAmbientMenu) return;
+        const handleClickOutside = (e) => {
+            if (ambientMenuRef.current && !ambientMenuRef.current.contains(e.target)) {
+                setShowAmbientMenu(false);
+            }
+        };
+        document.addEventListener('pointerdown', handleClickOutside);
+        return () => document.removeEventListener('pointerdown', handleClickOutside);
+    }, [showAmbientMenu]);
 
     // Reload bookmarks when book or user changes
     useEffect(() => {
@@ -490,6 +564,9 @@ export default function Flipbook3DModal({
             } else if (e.key === 'm' || e.key === 'M') {
                 e.preventDefault();
                 setSoundMuted((m) => !m);
+            } else if (e.key === 'a' || e.key === 'A') {
+                e.preventDefault();
+                readingAmbientPlayer.toggleMute();
             } else if (e.key === 'b' || e.key === 'B') {
                 e.preventDefault();
                 handleToggleBookmark(activeBookmarkTargetPageIndex);
@@ -1034,7 +1111,7 @@ export default function Flipbook3DModal({
                         </button>
                     </div>
 
-                    {/* Sound Toggle */}
+                    {/* Sound Toggle (Hojas) */}
                     <button
                         type="button"
                         onClick={() => setSoundMuted((m) => !m)}
@@ -1043,10 +1120,116 @@ export default function Flipbook3DModal({
                                 ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
                                 : 'bg-white/10 hover:bg-white/20 text-emerald-300'
                         }`}
-                        title={soundMuted ? 'Activar sonido de hojas' : 'Silenciar sonido de hojas'}
+                        title={soundMuted ? 'Activar sonido de hojas (M)' : 'Silenciar sonido de hojas (M)'}
                     >
                         {soundMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
                     </button>
+
+                    {/* Ambient Reading Audio Controller & Popover */}
+                    <div className="relative" ref={ambientMenuRef}>
+                        <button
+                            type="button"
+                            onClick={() => setShowAmbientMenu((v) => !v)}
+                            className={`p-1.5 sm:px-2.5 sm:py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 ${
+                                ambientState.isPlaying && !ambientState.isMuted && ambientState.trackId !== 'none'
+                                    ? 'bg-emerald-600/90 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/25 border border-emerald-400/40'
+                                    : 'bg-white/10 hover:bg-white/20 text-slate-300 border border-white/10'
+                            }`}
+                            title={`Música de lectura: ${ambientState.title} (A)`}
+                        >
+                            {ambientState.isPlaying && !ambientState.isMuted && ambientState.trackId !== 'none' ? (
+                                <span className="flex items-end gap-0.5 h-3.5 w-3.5 shrink-0 justify-center">
+                                    <span className="w-0.5 bg-white rounded-full animate-bounce" style={{ height: '70%', animationDuration: '0.8s' }} />
+                                    <span className="w-0.5 bg-white rounded-full animate-bounce" style={{ height: '100%', animationDuration: '0.6s' }} />
+                                    <span className="w-0.5 bg-white rounded-full animate-bounce" style={{ height: '45%', animationDuration: '0.9s' }} />
+                                </span>
+                            ) : (
+                                <Music size={15} className="shrink-0 text-slate-400" />
+                            )}
+                            <span className="hidden md:inline max-w-[100px] truncate text-[11px] font-bold">
+                                {ambientState.isMuted || ambientState.trackId === 'none' ? 'Música' : ambientState.title}
+                            </span>
+                        </button>
+
+                        {/* Ambient Audio Popover */}
+                        {showAmbientMenu && (
+                            <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 rounded-2xl bg-slate-900/95 border border-white/15 p-4 shadow-2xl backdrop-blur-xl z-50 animate-in fade-in zoom-in-95 text-white">
+                                <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-3">
+                                    <div className="flex items-center gap-2">
+                                        <Music size={16} className="text-emerald-400" />
+                                        <span className="text-xs font-bold tracking-wide">Música de lectura</span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => readingAmbientPlayer.toggleMute()}
+                                        className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-all cursor-pointer ${
+                                            ambientState.isMuted || ambientState.trackId === 'none'
+                                                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                                                : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                        }`}
+                                    >
+                                        {ambientState.isMuted || ambientState.trackId === 'none' ? 'Silenciado' : 'Sonando'}
+                                    </button>
+                                </div>
+
+                                {/* Presets List */}
+                                <div className="space-y-1.5 max-h-56 overflow-y-auto no-scrollbar mb-3">
+                                    {READING_AUDIO_PRESETS.map((preset) => {
+                                        const isSelected = ambientState.trackId === preset.id;
+                                        if (preset.id === 'custom' && !normalizedBook.ambientAudioUrl && !normalizedBook.ambientAudio?.customUrl) {
+                                            return null;
+                                        }
+                                        return (
+                                            <button
+                                                key={preset.id}
+                                                type="button"
+                                                onClick={() => {
+                                                    readingAmbientPlayer.changeTrack(
+                                                        preset.id,
+                                                        preset.id === 'custom' ? (normalizedBook.ambientAudioUrl || normalizedBook.ambientAudio?.customUrl || '') : '',
+                                                        preset.name
+                                                    );
+                                                }}
+                                                className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between transition-all cursor-pointer ${
+                                                    isSelected
+                                                        ? 'bg-emerald-600/30 border border-emerald-400/50 text-white font-bold'
+                                                        : 'hover:bg-white/5 text-slate-300 border border-transparent'
+                                                }`}
+                                            >
+                                                <div>
+                                                    <div className="text-xs font-semibold">{preset.name}</div>
+                                                    <div className="text-[10px] text-slate-400 truncate max-w-[210px]">{preset.description}</div>
+                                                </div>
+                                                {isSelected && (
+                                                    <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Volume Slider */}
+                                <div className="pt-2 border-t border-white/10">
+                                    <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1.5 font-medium">
+                                        <span>Volumen ({Math.round((ambientState.volume / 0.65) * 100)}%)</span>
+                                        <span className="text-[10px] text-slate-500">Suave</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Volume2 size={14} className="text-slate-400 shrink-0" />
+                                        <input
+                                            type="range"
+                                            min="0.04"
+                                            max="0.65"
+                                            step="0.02"
+                                            value={ambientState.volume}
+                                            onChange={(e) => readingAmbientPlayer.setVolume(parseFloat(e.target.value))}
+                                            className="w-full accent-emerald-500 h-1.5 bg-white/20 rounded-lg cursor-pointer"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
 
                     {/* Thumbnails Drawer Button */}
                     <button

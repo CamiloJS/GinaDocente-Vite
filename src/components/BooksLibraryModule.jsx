@@ -13,7 +13,12 @@ import {
     X,
     CheckCircle2,
     RotateCcw,
-    ImageIcon
+    ImageIcon,
+    Music,
+    Volume2,
+    VolumeX,
+    Play,
+    Square
 } from './Icons';
 import {
     BOOK_THEMES,
@@ -29,7 +34,11 @@ import {
     syncBookOutlineMetadata,
     generateAiBookPages,
     applyCustomCoverToPages,
-    compressBookImageDataUrl
+    compressBookImageDataUrl,
+    READING_AUDIO_PRESETS,
+    getReadingAudioPreset,
+    clampReadingVolume,
+    readingAmbientPlayer
 } from '../utils/flipbookEngine';
 import {
     db,
@@ -156,8 +165,16 @@ export default function BooksLibraryModule({
     const [isSaving, setIsSaving] = useState(false);
     const [progressInfo, setProgressInfo] = useState({ phase: '', currentPage: 0, totalPages: 0, percent: 0 });
 
+    // Ambient Reading Audio Configuration (Música de fondo)
+    const [ambientAudioEnabled, setAmbientAudioEnabled] = useState(true);
+    const [ambientAudioTrack, setAmbientAudioTrack] = useState('piano-calm');
+    const [ambientAudioUrl, setAmbientAudioUrl] = useState('');
+    const [ambientAudioVolume, setAmbientAudioVolume] = useState(0.22);
+    const [previewingAmbient, setPreviewingAmbient] = useState(false);
+
     const fileInputRef = useRef(null);
     const coverInputRef = useRef(null);
+    const ambientAudioFileInputRef = useRef(null);
 
     const canonicalTeacherId = useMemo(
         () => getCanonicalTeacherId(myChatId || loggedInName || user?.displayName || user?.email),
@@ -302,6 +319,11 @@ export default function BooksLibraryModule({
         setIsProcessingPdf(false);
         setIsSaving(false);
         setProgressInfo({ phase: '', currentPage: 0, totalPages: 0, percent: 0 });
+        setAmbientAudioEnabled(true);
+        setAmbientAudioTrack('piano-calm');
+        setAmbientAudioUrl('');
+        setAmbientAudioVolume(0.22);
+        setPreviewingAmbient(false);
     }, []);
 
     const handleOpenCreate = useCallback(
@@ -395,8 +417,67 @@ export default function BooksLibraryModule({
         setPreviewPages(Array.isArray(bookItem.bookPages) ? bookItem.bookPages : []);
         setPreviewPageTexts(Array.isArray(bookItem.pageTexts) ? bookItem.pageTexts : []);
         setAspectRatio(bookItem.aspectRatio || 0.707);
+
+        const amb = bookItem.ambientAudio || {};
+        setAmbientAudioEnabled(amb.enabled !== false && bookItem.ambientAudioEnabled !== false);
+        setAmbientAudioTrack(amb.trackId || bookItem.ambientAudioTrack || 'piano-calm');
+        setAmbientAudioUrl(amb.customUrl || bookItem.ambientAudioUrl || '');
+        setAmbientAudioVolume(clampReadingVolume(amb.volume ?? bookItem.ambientAudioVolume ?? 0.22));
+        setPreviewingAmbient(false);
+
         setIsCreating(true);
     }, []);
+
+    const handleTogglePreviewAmbient = () => {
+        if (previewingAmbient) {
+            readingAmbientPlayer.stop({ fadeOutDuration: 0.5 });
+            setPreviewingAmbient(false);
+        } else {
+            readingAmbientPlayer.start({
+                trackId: ambientAudioTrack,
+                customUrl: ambientAudioUrl,
+                volume: ambientAudioVolume,
+                fadeInDuration: 0.8,
+                title: getReadingAudioPreset(ambientAudioTrack)?.name
+            });
+            setPreviewingAmbient(true);
+        }
+    };
+
+    useEffect(() => {
+        if (!isCreating && previewingAmbient) {
+            readingAmbientPlayer.stop({ fadeOutDuration: 0.5 });
+            setPreviewingAmbient(false);
+        }
+    }, [isCreating, previewingAmbient]);
+
+    const handleSelectCustomAudioFile = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!file.type.startsWith('audio/') && !/\.(mp3|wav|ogg|m4a|aac)$/i.test(file.name)) {
+            notify('Archivo no compatible', 'Selecciona un archivo de audio (MP3, WAV, OGG, M4A).', 'warning');
+            return;
+        }
+        try {
+            if (!isDemoMode && typeof uploadRawFileFn === 'function') {
+                const uploadedUrl = await uploadRawFileFn(file, 'books_audio');
+                if (uploadedUrl) {
+                    setAmbientAudioUrl(uploadedUrl);
+                    setAmbientAudioTrack('custom');
+                    notify('Audio listo', 'Se cargó el audio de lectura.');
+                    return;
+                }
+            }
+            if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+                const localUrl = URL.createObjectURL(file);
+                setAmbientAudioUrl(localUrl);
+                setAmbientAudioTrack('custom');
+                notify('Audio listo', 'Audio cargado en la sesión local.');
+            }
+        } catch (err) {
+            console.warn('Error cargando audio personalizado:', err);
+        }
+    };
 
     // Support opening a specific book in edit mode when navigated from the Wall
     useEffect(() => {
@@ -786,6 +867,14 @@ export default function BooksLibraryModule({
             const resolvedGroupName =
                 resolvedGroupId === 'all' ? 'Global' : matchedGroup?.name || existingRecord?.targetGroupName || 'Grupo';
 
+            const ambientAudioPayload = {
+                enabled: Boolean(ambientAudioEnabled),
+                trackId: ambientAudioTrack || 'piano-calm',
+                customUrl: (ambientAudioUrl || '').trim(),
+                volume: clampReadingVolume(ambientAudioVolume),
+                title: getReadingAudioPreset(ambientAudioTrack)?.name || 'Música de lectura'
+            };
+
             const rawBookPayload = {
                 id: bookId,
                 title: title.trim(),
@@ -815,7 +904,12 @@ export default function BooksLibraryModule({
                 ownerTeacherId: ownerTid,
                 createdAt: existingRecord?.createdAt || now,
                 updatedAt: now,
-                isDemoCreated: Boolean(isDemoMode || existingRecord?.isDemoCreated)
+                isDemoCreated: Boolean(isDemoMode || existingRecord?.isDemoCreated),
+                ambientAudio: ambientAudioPayload,
+                ambientAudioTrack: ambientAudioPayload.trackId,
+                ambientAudioUrl: ambientAudioPayload.customUrl,
+                ambientAudioEnabled: ambientAudioPayload.enabled,
+                ambientAudioVolume: ambientAudioPayload.volume
             };
 
             const sanitizedBook = sanitizeBookForFirestore({
@@ -1447,6 +1541,112 @@ export default function BooksLibraryModule({
                                         </select>
                                     </div>
                                 )}
+
+                                {/* Configuración de Música de fondo / Audio de lectura */}
+                                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 space-y-2.5">
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                                            <Music size={13} className="text-emerald-500" />
+                                            <span>Música de fondo</span>
+                                        </label>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={handleTogglePreviewAmbient}
+                                                className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold flex items-center gap-1 transition-all cursor-pointer ${
+                                                    previewingAmbient
+                                                        ? 'bg-emerald-600 text-white shadow-xs'
+                                                        : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300'
+                                                }`}
+                                                title={previewingAmbient ? 'Detener prueba' : 'Escuchar muestra'}
+                                            >
+                                                {previewingAmbient ? <Square size={10} className="fill-white" /> : <Play size={10} />}
+                                                <span>{previewingAmbient ? 'Detener' : 'Probar'}</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setAmbientAudioEnabled((v) => !v)}
+                                                className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer ${
+                                                    ambientAudioEnabled
+                                                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                                        : 'bg-slate-200 dark:bg-slate-700 text-slate-500'
+                                                }`}
+                                            >
+                                                {ambientAudioEnabled ? 'Activado' : 'Desactivado'}
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {ambientAudioEnabled && (
+                                        <div className="space-y-2 pt-1 animate-in fade-in duration-150">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                <div>
+                                                    <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">
+                                                        Pista ambiental
+                                                    </label>
+                                                    <select
+                                                        value={ambientAudioTrack}
+                                                        onChange={(e) => setAmbientAudioTrack(e.target.value)}
+                                                        className="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-medium focus:outline-none"
+                                                    >
+                                                        {READING_AUDIO_PRESETS.map((p) => (
+                                                            <option key={p.id} value={p.id}>
+                                                                {p.name} {p.recommended ? '(Recomendado)' : ''}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+
+                                                <div>
+                                                    <div className="flex items-center justify-between text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">
+                                                        <span>Volumen</span>
+                                                        <span>{Math.round((ambientAudioVolume / 0.65) * 100)}%</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 pt-1">
+                                                        <Volume2 size={13} className="text-slate-400 shrink-0" />
+                                                        <input
+                                                            type="range"
+                                                            min="0.04"
+                                                            max="0.65"
+                                                            step="0.02"
+                                                            value={ambientAudioVolume}
+                                                            onChange={(e) => setAmbientAudioVolume(parseFloat(e.target.value))}
+                                                            className="w-full accent-emerald-500 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg cursor-pointer"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {ambientAudioTrack === 'custom' && (
+                                                <div className="pt-1.5 space-y-1.5 border-t border-slate-200 dark:border-slate-700/60">
+                                                    <input
+                                                        ref={ambientAudioFileInputRef}
+                                                        type="file"
+                                                        accept="audio/*,.mp3,.wav,.ogg,.m4a"
+                                                        onChange={handleSelectCustomAudioFile}
+                                                        className="hidden"
+                                                    />
+                                                    <div className="flex items-center gap-2">
+                                                        <input
+                                                            type="url"
+                                                            value={ambientAudioUrl}
+                                                            onChange={(e) => setAmbientAudioUrl(e.target.value)}
+                                                            placeholder="Enlace de audio MP3 o sube un archivo..."
+                                                            className="flex-1 px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs focus:outline-none"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => ambientAudioFileInputRef.current?.click()}
+                                                            className="px-2.5 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-xs font-bold shrink-0 cursor-pointer"
+                                                        >
+                                                            Subir audio
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             {creationMode === 'create' && previewOutline.length === 0 && (
@@ -1478,7 +1678,14 @@ export default function BooksLibraryModule({
                                                     category,
                                                     bookPages: previewPages,
                                                     pageCount: previewPages.length,
-                                                    pdfUrl: existingPdfUrl
+                                                    pdfUrl: existingPdfUrl,
+                                                    ambientAudio: {
+                                                        enabled: ambientAudioEnabled,
+                                                        trackId: ambientAudioTrack,
+                                                        customUrl: ambientAudioUrl,
+                                                        volume: ambientAudioVolume,
+                                                        title: getReadingAudioPreset(ambientAudioTrack)?.name
+                                                    }
                                                 })
                                             }
                                             className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 transition-all"
@@ -1547,7 +1754,14 @@ export default function BooksLibraryModule({
                                             category,
                                             bookPages: previewPages,
                                             pageCount: previewPages.length,
-                                            pdfUrl: existingPdfUrl
+                                            pdfUrl: existingPdfUrl,
+                                            ambientAudio: {
+                                                enabled: ambientAudioEnabled,
+                                                trackId: ambientAudioTrack,
+                                                customUrl: ambientAudioUrl,
+                                                volume: ambientAudioVolume,
+                                                title: getReadingAudioPreset(ambientAudioTrack)?.name
+                                            }
                                         })
                                     }
                                 />
@@ -1566,7 +1780,14 @@ export default function BooksLibraryModule({
                                                     category,
                                                     bookPages: previewPages,
                                                     pageCount: previewPages.length,
-                                                    pdfUrl: existingPdfUrl
+                                                    pdfUrl: existingPdfUrl,
+                                                    ambientAudio: {
+                                                        enabled: ambientAudioEnabled,
+                                                        trackId: ambientAudioTrack,
+                                                        customUrl: ambientAudioUrl,
+                                                        volume: ambientAudioVolume,
+                                                        title: getReadingAudioPreset(ambientAudioTrack)?.name
+                                                    }
                                                 })
                                             }
                                             className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"

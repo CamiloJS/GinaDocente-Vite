@@ -1,7 +1,7 @@
 // src/components/TasksTab.jsx
 import React, { useState, useRef } from 'react'
 import {
-  Book, BookOpen, CheckCheck, CheckCircle2, ChevronRight, Globe, ImageIcon, Mic, NavNotebook, PaperclipIcon, Plus, SearchIcon, Sparkles, Square, Target, Loader2, Undo2, UploadCloud, X, Play, Pause, MessageCircle, BarChart2, Vote, Gamepad2, ClipboardList, NavSlides
+  Book, BookOpen, CheckCheck, CheckCircle2, ChevronRight, Globe, ImageIcon, Mic, NavNotebook, PaperclipIcon, Plus, SearchIcon, Sparkles, Square, Target, Loader2, Undo2, UploadCloud, X, Play, Pause, MessageCircle, BarChart2, Vote, Gamepad2, ClipboardList, NavSlides, Music, Volume2, VolumeX
 } from './Icons.jsx'
 import TaskCard from './TaskCard.jsx'
 import KahootBuilder from './KahootBuilder.jsx'
@@ -17,7 +17,7 @@ import GeniallyEmbedPlayer, { extractGeniallyUrl } from './GeniallyEmbedPlayer.j
 import { DEMO_TTL_MS, saveDemoSandboxItem } from '../utils/demoData.js'
 import { getCanonicalTeacherId, getItemTeacherId, getTeacherDisplayName, uploadImageToStorage, uploadRawFileToStorage, generateId } from '../utils/helpers.js'
 import { createDefaultKahootQuestion, validateKahootConfig, generateKahootPin } from '../utils/kahootEngine.js'
-import { BOOK_THEMES, renderPdfToBookPages, uploadBookPagesToStorage, sanitizeBookForFirestore, buildFallbackBookPages, buildBookPagesFromOutline, extractBookOutlinePageTexts, syncBookOutlineMetadata, stripBookHtml, generateAiBookPages, applyCustomCoverToPages, compressBookImageDataUrl } from '../utils/flipbookEngine.js'
+import { BOOK_THEMES, renderPdfToBookPages, uploadBookPagesToStorage, sanitizeBookForFirestore, buildFallbackBookPages, buildBookPagesFromOutline, extractBookOutlinePageTexts, syncBookOutlineMetadata, stripBookHtml, generateAiBookPages, applyCustomCoverToPages, compressBookImageDataUrl, READING_AUDIO_PRESETS, getReadingAudioPreset, clampReadingVolume, readingAmbientPlayer } from '../utils/flipbookEngine.js'
 import Flipbook3DModal from './Flipbook3DModal.jsx'
 import BookWordEditor from './BookWordEditor.jsx'
 
@@ -80,6 +80,65 @@ const TasksTab = React.memo(({
     const [book3dPreviewModal, setBook3dPreviewModal] = useState(null);
     const book3dFileInputRef = useRef(null);
     const book3dCoverInputRef = useRef(null);
+    const book3dAmbientFileInputRef = useRef(null);
+
+    // Configuración de música de fondo / audio de lectura para libros
+    const [book3dAmbientEnabled, setBook3dAmbientEnabled] = useState(true);
+    const [book3dAmbientTrack, setBook3dAmbientTrack] = useState('piano-calm');
+    const [book3dAmbientUrl, setBook3dAmbientUrl] = useState('');
+    const [book3dAmbientVolume, setBook3dAmbientVolume] = useState(0.22);
+    const [book3dPreviewingAmbient, setBook3dPreviewingAmbient] = useState(false);
+
+    const handleToggleBook3dPreviewAmbient = () => {
+        if (book3dPreviewingAmbient) {
+            readingAmbientPlayer.stop({ fadeOutDuration: 0.5 });
+            setBook3dPreviewingAmbient(false);
+        } else {
+            readingAmbientPlayer.start({
+                trackId: book3dAmbientTrack,
+                customUrl: book3dAmbientUrl,
+                volume: book3dAmbientVolume,
+                fadeInDuration: 0.8,
+                title: getReadingAudioPreset(book3dAmbientTrack)?.name
+            });
+            setBook3dPreviewingAmbient(true);
+        }
+    };
+
+    const handleSelectBook3dCustomAudioFile = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!file.type.startsWith('audio/') && !/\.(mp3|wav|ogg|m4a|aac)$/i.test(file.name)) {
+            showMessage('⚠️ Selecciona un archivo de audio (MP3, WAV, OGG, M4A).');
+            return;
+        }
+        try {
+            if (!isDemoMode) {
+                const uploaded = await uploadRawFileToStorage(file, 'books_audio');
+                if (uploaded) {
+                    setBook3dAmbientUrl(uploaded);
+                    setBook3dAmbientTrack('custom');
+                    showMessage('🎵 Audio de lectura listo.');
+                    return;
+                }
+            }
+            if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+                const localUrl = URL.createObjectURL(file);
+                setBook3dAmbientUrl(localUrl);
+                setBook3dAmbientTrack('custom');
+                showMessage('🎵 Audio cargado en la sesión.');
+            }
+        } catch (err) {
+            console.warn('Error subiendo audio de libro:', err);
+        }
+    };
+
+    React.useEffect(() => {
+        if ((!isFormExpanded || postType !== 'book3d') && book3dPreviewingAmbient) {
+            readingAmbientPlayer.stop({ fadeOutDuration: 0.5 });
+            setBook3dPreviewingAmbient(false);
+        }
+    }, [isFormExpanded, postType, book3dPreviewingAmbient]);
 
     const handleSwitchBook3dMode = (nextMode) => {
         if (nextMode === book3dMode) return;
@@ -712,6 +771,11 @@ const TasksTab = React.memo(({
                 fileName: bk.pdfFileName || bk.fileName || `${bk.title || 'Libro'}.pdf`,
                 targetGroupId: bk.targetGroupId || 'all',
                 targetGroupName: bk.targetGroupName || 'General',
+                ambientAudio: bk.ambientAudio,
+                ambientAudioTrack: bk.ambientAudioTrack || bk.ambientAudio?.trackId || 'piano-calm',
+                ambientAudioUrl: bk.ambientAudioUrl || bk.ambientAudio?.customUrl || '',
+                ambientAudioEnabled: bk.ambientAudioEnabled ?? bk.ambientAudio?.enabled ?? true,
+                ambientAudioVolume: bk.ambientAudioVolume ?? bk.ambientAudio?.volume ?? 0.22,
                 author: teacherDisp,
                 authorName: teacherDisp,
                 authorId: ownerTid,
@@ -1696,7 +1760,14 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                                                     aspectRatio: book3dAspectRatio || 0.707,
                                                                     bookPages: book3dPages,
                                                                     pageTexts: book3dPageTexts,
-                                                                    pageCount: book3dPages.length
+                                                                    pageCount: book3dPages.length,
+                                                                    ambientAudio: {
+                                                                        enabled: Boolean(book3dAmbientEnabled),
+                                                                        trackId: book3dAmbientTrack || 'piano-calm',
+                                                                        customUrl: (book3dAmbientUrl || '').trim(),
+                                                                        volume: clampReadingVolume(book3dAmbientVolume),
+                                                                        title: getReadingAudioPreset(book3dAmbientTrack)?.name
+                                                                    }
                                                                 },
                                                                 initialPage: idx
                                                             })
@@ -1711,6 +1782,112 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                                 )}
                                             </div>
                                         )}
+
+                                        {/* Música de fondo */}
+                                        <div className="p-3 rounded-xl bg-white dark:bg-gray-900 border border-orange-200/80 dark:border-orange-800/60 space-y-2.5">
+                                            <div className="flex items-center justify-between">
+                                                <label className="text-[11px] font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                                                    <Music size={13} className="text-emerald-500" />
+                                                    <span>Música de fondo</span>
+                                                </label>
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleToggleBook3dPreviewAmbient}
+                                                        className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold flex items-center gap-1 transition-all cursor-pointer ${
+                                                            book3dPreviewingAmbient
+                                                                ? 'bg-emerald-600 text-white shadow-xs'
+                                                                : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
+                                                        }`}
+                                                        title={book3dPreviewingAmbient ? 'Detener prueba' : 'Escuchar muestra'}
+                                                    >
+                                                        {book3dPreviewingAmbient ? <Square size={10} className="fill-white" /> : <Play size={10} />}
+                                                        <span>{book3dPreviewingAmbient ? 'Detener' : 'Probar'}</span>
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setBook3dAmbientEnabled((v) => !v)}
+                                                        className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer ${
+                                                            book3dAmbientEnabled
+                                                                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                                                : 'bg-gray-200 dark:bg-gray-700 text-gray-500'
+                                                        }`}
+                                                    >
+                                                        {book3dAmbientEnabled ? 'Activado' : 'Desactivado'}
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {book3dAmbientEnabled && (
+                                                <div className="space-y-2 pt-1 animate-in fade-in duration-150">
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                        <div>
+                                                            <label className="block text-[10px] font-semibold text-gray-500 dark:text-gray-400 mb-1">
+                                                                Pista ambiental
+                                                            </label>
+                                                            <select
+                                                                value={book3dAmbientTrack}
+                                                                onChange={(e) => setBook3dAmbientTrack(e.target.value)}
+                                                                className="w-full px-2.5 py-1.5 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white text-xs font-medium focus:outline-none"
+                                                            >
+                                                                {READING_AUDIO_PRESETS.map((p) => (
+                                                                    <option key={p.id} value={p.id}>
+                                                                        {p.name} {p.recommended ? '(Recomendado)' : ''}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+
+                                                        <div>
+                                                            <div className="flex items-center justify-between text-[10px] font-semibold text-gray-500 dark:text-gray-400 mb-1">
+                                                                <span>Volumen</span>
+                                                                <span>{Math.round((book3dAmbientVolume / 0.65) * 100)}%</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2 pt-1">
+                                                                <Volume2 size={13} className="text-gray-400 shrink-0" />
+                                                                <input
+                                                                    type="range"
+                                                                    min="0.04"
+                                                                    max="0.65"
+                                                                    step="0.02"
+                                                                    value={book3dAmbientVolume}
+                                                                    onChange={(e) => setBook3dAmbientVolume(parseFloat(e.target.value))}
+                                                                    className="w-full accent-emerald-500 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-lg cursor-pointer"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {book3dAmbientTrack === 'custom' && (
+                                                        <div className="pt-1.5 space-y-1.5 border-t border-gray-200 dark:border-gray-700/60">
+                                                            <input
+                                                                ref={book3dAmbientFileInputRef}
+                                                                type="file"
+                                                                accept="audio/*,.mp3,.wav,.ogg,.m4a"
+                                                                onChange={handleSelectBook3dCustomAudioFile}
+                                                                className="hidden"
+                                                            />
+                                                            <div className="flex items-center gap-2">
+                                                                <input
+                                                                    type="url"
+                                                                    value={book3dAmbientUrl}
+                                                                    onChange={(e) => setBook3dAmbientUrl(e.target.value)}
+                                                                    placeholder="Enlace de audio MP3 o sube un archivo..."
+                                                                    className="flex-1 px-2.5 py-1.5 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white text-xs focus:outline-none"
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => book3dAmbientFileInputRef.current?.click()}
+                                                                    className="px-2.5 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-xs font-bold shrink-0 cursor-pointer"
+                                                                >
+                                                                    Subir audio
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
 
@@ -1734,7 +1911,14 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                                         aspectRatio: book3dAspectRatio || 0.707,
                                                         bookPages: book3dPages,
                                                         pageTexts: book3dPageTexts,
-                                                        pageCount: book3dPages.length
+                                                        pageCount: book3dPages.length,
+                                                        ambientAudio: {
+                                                            enabled: Boolean(book3dAmbientEnabled),
+                                                            trackId: book3dAmbientTrack || 'piano-calm',
+                                                            customUrl: (book3dAmbientUrl || '').trim(),
+                                                            volume: clampReadingVolume(book3dAmbientVolume),
+                                                            title: getReadingAudioPreset(book3dAmbientTrack)?.name
+                                                        }
                                                     },
                                                     initialPage: pageIdx
                                                 })
@@ -2041,6 +2225,13 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                             const persistedPdfUrl = uploadedPdfUrl || (isDemoMode ? sessionBlobPdfUrl : '');
                                             const activeSessionPdfUrl = uploadedPdfUrl || sessionBlobPdfUrl || '';
                                             const finalBookTitle = cleanTitle || (book3dPdfFile?.name ? book3dPdfFile.name.replace(/\.pdf$/i, '') : 'Libro');
+                                            const ambientAudioPayload = {
+                                                enabled: Boolean(book3dAmbientEnabled),
+                                                trackId: book3dAmbientTrack || 'piano-calm',
+                                                customUrl: (book3dAmbientUrl || '').trim(),
+                                                volume: clampReadingVolume(book3dAmbientVolume),
+                                                title: getReadingAudioPreset(book3dAmbientTrack)?.name || 'Música de lectura'
+                                            };
                                             const sanitizedBook = sanitizeBookForFirestore({
                                                 id: bookId,
                                                 title: finalBookTitle,
@@ -2068,7 +2259,12 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                                 ownerTeacherId: canonicalOwnerId,
                                                 createdAt: Date.now(),
                                                 updatedAt: Date.now(),
-                                                isDemoCreated: Boolean(isDemoMode)
+                                                isDemoCreated: Boolean(isDemoMode),
+                                                ambientAudio: ambientAudioPayload,
+                                                ambientAudioTrack: ambientAudioPayload.trackId,
+                                                ambientAudioUrl: ambientAudioPayload.customUrl,
+                                                ambientAudioEnabled: ambientAudioPayload.enabled,
+                                                ambientAudioVolume: ambientAudioPayload.volume
                                             });
 
                                             const inMemoryBook = {
@@ -2077,7 +2273,12 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                                 coverUrl: uploadedPages[0] || sanitizedBook.coverUrl,
                                                 pageCount: Math.max(uploadedPages.length, sanitizedBook.pageCount || 0),
                                                 pdfUrl: activeSessionPdfUrl || sanitizedBook.pdfUrl,
-                                                fileUrl: activeSessionPdfUrl || sanitizedBook.fileUrl
+                                                fileUrl: activeSessionPdfUrl || sanitizedBook.fileUrl,
+                                                ambientAudio: ambientAudioPayload,
+                                                ambientAudioTrack: ambientAudioPayload.trackId,
+                                                ambientAudioUrl: ambientAudioPayload.customUrl,
+                                                ambientAudioEnabled: ambientAudioPayload.enabled,
+                                                ambientAudioVolume: ambientAudioPayload.volume
                                             };
 
                                             const wallPostId = `book_wall_${bookId}`;
@@ -2113,7 +2314,12 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                                 createdAt: Date.now(),
                                                 reactions: {},
                                                 comments: [],
-                                                isDemoCreated: Boolean(isDemoMode)
+                                                isDemoCreated: Boolean(isDemoMode),
+                                                ambientAudio: ambientAudioPayload,
+                                                ambientAudioTrack: ambientAudioPayload.trackId,
+                                                ambientAudioUrl: ambientAudioPayload.customUrl,
+                                                ambientAudioEnabled: ambientAudioPayload.enabled,
+                                                ambientAudioVolume: ambientAudioPayload.volume
                                             };
 
                                             const inMemoryWallPost = {
@@ -2122,7 +2328,12 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                                 coverUrl: inMemoryBook.coverUrl,
                                                 pageCount: inMemoryBook.pageCount,
                                                 pdfUrl: inMemoryBook.pdfUrl,
-                                                fileUrl: inMemoryBook.fileUrl
+                                                fileUrl: inMemoryBook.fileUrl,
+                                                ambientAudio: ambientAudioPayload,
+                                                ambientAudioTrack: ambientAudioPayload.trackId,
+                                                ambientAudioUrl: ambientAudioPayload.customUrl,
+                                                ambientAudioEnabled: ambientAudioPayload.enabled,
+                                                ambientAudioVolume: ambientAudioPayload.volume
                                             };
 
                                             if (isDemoMode) {
@@ -2152,6 +2363,14 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                             setBook3dRawPdfFirstPage('');
                                             setBook3dPdfFile(null);
                                             setBook3dPreviewModal(null);
+                                            setBook3dAmbientEnabled(true);
+                                            setBook3dAmbientTrack('piano-calm');
+                                            setBook3dAmbientUrl('');
+                                            setBook3dAmbientVolume(0.22);
+                                            if (book3dPreviewingAmbient) {
+                                                readingAmbientPlayer.stop({ fadeOutDuration: 0.5 });
+                                                setBook3dPreviewingAmbient(false);
+                                            }
                                             if (typeof setTaskTitle === 'function') setTaskTitle("");
                                             if (typeof setTaskDesc === 'function') setTaskDesc("");
                                             setIsFormExpanded(false);

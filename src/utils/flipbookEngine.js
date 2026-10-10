@@ -5,6 +5,49 @@
  * and Firestore 1MB payload protection.
  */
 
+import {
+    DEFAULT_FADE_IN_SECONDS,
+    DEFAULT_FADE_OUT_SECONDS,
+    DEFAULT_READING_VOLUME,
+    READING_AUDIO_PRESETS,
+    getReadingAudioPreset,
+    clampReadingVolume,
+    readingAmbientPlayer
+} from './readingAudioEngine.js';
+
+export {
+    DEFAULT_FADE_IN_SECONDS,
+    DEFAULT_FADE_OUT_SECONDS,
+    DEFAULT_READING_VOLUME,
+    READING_AUDIO_PRESETS,
+    getReadingAudioPreset,
+    clampReadingVolume,
+    readingAmbientPlayer
+};
+
+/**
+ * Normalizes ambient audio configuration for reading flipbooks.
+ */
+export const normalizeBookAmbientAudio = (raw = {}) => {
+    const obj = raw && typeof raw === 'object' ? raw : {};
+    const rawTrack = String(obj.trackId || obj.track || 'piano-calm').trim().toLowerCase();
+    const preset = getReadingAudioPreset(rawTrack);
+    const enabled = obj.enabled !== undefined ? Boolean(obj.enabled) : (preset.id !== 'none');
+    const customUrl = typeof obj.customUrl === 'string'
+        ? obj.customUrl.trim()
+        : (typeof obj.url === 'string' ? obj.url.trim() : '');
+    const volume = clampReadingVolume(obj.volume !== undefined ? obj.volume : preset.defaultVolume);
+    const title = String(obj.title || (preset.id === 'custom' ? 'Audio personalizado' : preset.name)).trim();
+
+    return {
+        enabled,
+        trackId: preset.id,
+        customUrl,
+        volume,
+        title
+    };
+};
+
 export const MAX_TOTAL_FIRESTORE_BOOK_CHARS = 650000;
 export const DEFAULT_BOOK_ASPECT_RATIO = 0.707; // Standard A4 / Academic textbook portrait ratio (width / height)
 
@@ -2679,6 +2722,18 @@ export const sanitizeBookForFirestore = (book = {}) => {
             ? extractBookOutlinePageTexts(bookOutline).slice(0, finalPages.length)
             : [];
 
+    const ambientAudio = normalizeBookAmbientAudio(book.ambientAudio || {
+        enabled: book.ambientAudioEnabled,
+        trackId: book.ambientAudioTrack,
+        customUrl: book.ambientAudioUrl,
+        volume: book.ambientAudioVolume,
+        title: book.ambientAudioTitle
+    });
+
+    if (ambientAudio.customUrl && ambientAudio.customUrl.startsWith('data:') && ambientAudio.customUrl.length > 50000) {
+        ambientAudio.customUrl = '';
+    }
+
     return {
         ...restBook,
         title,
@@ -2695,7 +2750,12 @@ export const sanitizeBookForFirestore = (book = {}) => {
         fileUrl: book.fileUrl || book.pdfUrl || '',
         fileName: book.fileName || '',
         aspectRatio: Number(book.aspectRatio) > 0 ? Number(book.aspectRatio) : DEFAULT_BOOK_ASPECT_RATIO,
-        targetGroupId: book.targetGroupId || 'all'
+        targetGroupId: book.targetGroupId || 'all',
+        ambientAudio,
+        ambientAudioTrack: ambientAudio.trackId,
+        ambientAudioUrl: ambientAudio.customUrl,
+        ambientAudioEnabled: ambientAudio.enabled,
+        ambientAudioVolume: ambientAudio.volume
     };
 };
 
@@ -2705,6 +2765,7 @@ export const sanitizeBookForFirestore = (book = {}) => {
 export const normalizeBookRecord = (item = {}) => {
     if (!item || typeof item !== 'object') {
         const fallback = buildFallbackBookPages({ title: 'Libro' });
+        const defaultAmbient = normalizeBookAmbientAudio({ enabled: true, trackId: 'piano-calm', volume: 0.22 });
         return {
             id: 'book_default',
             title: 'Libro',
@@ -2720,7 +2781,12 @@ export const normalizeBookRecord = (item = {}) => {
             pdfUrl: '',
             fileUrl: '',
             fileName: '',
-            aspectRatio: DEFAULT_BOOK_ASPECT_RATIO
+            aspectRatio: DEFAULT_BOOK_ASPECT_RATIO,
+            ambientAudio: defaultAmbient,
+            ambientAudioTrack: defaultAmbient.trackId,
+            ambientAudioUrl: defaultAmbient.customUrl,
+            ambientAudioEnabled: defaultAmbient.enabled,
+            ambientAudioVolume: defaultAmbient.volume
         };
     }
 
@@ -2741,6 +2807,14 @@ export const normalizeBookRecord = (item = {}) => {
     const bookOutline = Array.isArray(item.bookOutline) ? item.bookOutline : [];
     const rawPageTexts = Array.isArray(item.pageTexts) ? item.pageTexts : [];
 
+    const ambientAudio = normalizeBookAmbientAudio(item.ambientAudio || {
+        enabled: item.ambientAudioEnabled,
+        trackId: item.ambientAudioTrack,
+        customUrl: item.ambientAudioUrl,
+        volume: item.ambientAudioVolume,
+        title: item.ambientAudioTitle
+    });
+
     return {
         ...item,
         id: item.id || item.bookId || 'book_preview',
@@ -2757,7 +2831,12 @@ export const normalizeBookRecord = (item = {}) => {
         pdfUrl,
         fileUrl: item.fileUrl || pdfUrl,
         fileName: item.fileName || '',
-        aspectRatio: Number(item.aspectRatio) > 0 ? Number(item.aspectRatio) : DEFAULT_BOOK_ASPECT_RATIO
+        aspectRatio: Number(item.aspectRatio) > 0 ? Number(item.aspectRatio) : DEFAULT_BOOK_ASPECT_RATIO,
+        ambientAudio,
+        ambientAudioTrack: ambientAudio.trackId,
+        ambientAudioUrl: ambientAudio.customUrl,
+        ambientAudioEnabled: ambientAudio.enabled,
+        ambientAudioVolume: ambientAudio.volume
     };
 };
 

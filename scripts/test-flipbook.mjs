@@ -49,7 +49,12 @@ import {
   saveUserBookBookmarks,
   toggleUserBookBookmark,
   saveUserBookLastPage,
-  playPageFlipSound
+  playPageFlipSound,
+  READING_AUDIO_PRESETS,
+  getReadingAudioPreset,
+  clampReadingVolume,
+  normalizeBookAmbientAudio,
+  readingAmbientPlayer
 } from '../src/utils/flipbookEngine.js';
 
 import {
@@ -1545,6 +1550,138 @@ check(
     flipbookModalSrc.includes("if (e?.type === 'pointercancel')") &&
     flipbookModalSrc.includes('const isTap = totalMove < 14 && rawDistance >= -6;') &&
     flipbookModalSrc.includes('const isIntentionalDrag = dragState.shouldComplete || rawDistance >= 14 || isCoverSwipe;')
+);
+
+console.log('\n== 23. Audio Ambiental Progresivo (Fade In / Fade Out) y Presets de Lectura ==');
+check(
+  'READING_AUDIO_PRESETS define al menos 6 presets ambientales de lectura y opción personalizada (custom)',
+  Array.isArray(READING_AUDIO_PRESETS) &&
+    READING_AUDIO_PRESETS.length >= 7 &&
+    READING_AUDIO_PRESETS.some((p) => p.id === 'piano-calm') &&
+    READING_AUDIO_PRESETS.some((p) => p.id === 'rain-reading') &&
+    READING_AUDIO_PRESETS.some((p) => p.id === 'lofi-study') &&
+    READING_AUDIO_PRESETS.some((p) => p.id === 'library-peace') &&
+    READING_AUDIO_PRESETS.some((p) => p.id === 'serene-forest') &&
+    READING_AUDIO_PRESETS.some((p) => p.id === 'deep-focus') &&
+    READING_AUDIO_PRESETS.some((p) => p.id === 'custom')
+);
+
+check(
+  'getReadingAudioPreset resuelve el preset pedido o fallback a piano-calm',
+  getReadingAudioPreset('rain-reading').name.includes('Lluvia') &&
+    getReadingAudioPreset('lofi-study').name.includes('Lofi') &&
+    getReadingAudioPreset('desconocido').id === 'piano-calm' &&
+    getReadingAudioPreset(null).id === 'piano-calm'
+);
+
+check(
+  'clampReadingVolume restringe el volumen a un rango suave pero audible (0 a 0.65) con default 0.22',
+  clampReadingVolume(0.22) === 0.22 &&
+    clampReadingVolume(1.0) === 0.65 &&
+    clampReadingVolume(-0.5) === 0 &&
+    clampReadingVolume('0.35') === 0.35 &&
+    clampReadingVolume('invalido') === 0.22 &&
+    clampReadingVolume(null) === 0.22
+);
+
+const normalizedAmbientDefault = normalizeBookAmbientAudio();
+const normalizedAmbientCustom = normalizeBookAmbientAudio({
+  enabled: true,
+  trackId: 'rain-reading',
+  volume: 0.30,
+  customUrl: 'https://example.com/audio.mp3'
+});
+
+check(
+  'normalizeBookAmbientAudio genera estructura consistente con enabled, trackId, volume, customUrl y title',
+  normalizedAmbientDefault.enabled === true &&
+    normalizedAmbientDefault.trackId === 'piano-calm' &&
+    normalizedAmbientDefault.volume === 0.22 &&
+    typeof normalizedAmbientDefault.title === 'string' &&
+    normalizedAmbientCustom.trackId === 'rain-reading' &&
+    normalizedAmbientCustom.volume === 0.30 &&
+    normalizedAmbientCustom.customUrl === 'https://example.com/audio.mp3'
+);
+
+const bookWithAmbient = sanitizeBookForFirestore({
+  title: 'Libro con Música',
+  ambientAudio: {
+    enabled: true,
+    trackId: 'serene-forest',
+    volume: 0.18,
+    customUrl: 'https://example.com/forest.mp3'
+  }
+});
+
+const bookWithOversizedAudio = sanitizeBookForFirestore({
+  title: 'Libro con Audio Pesado',
+  ambientAudio: {
+    enabled: true,
+    trackId: 'custom',
+    customUrl: 'data:audio/mp3;base64,' + 'A'.repeat(60000)
+  }
+});
+
+check(
+  'sanitizeBookForFirestore persiste ambientAudio y campos planos, y descarta URLs data:audio mayores a 50KB para proteger Firestore',
+  bookWithAmbient.ambientAudio.trackId === 'serene-forest' &&
+    bookWithAmbient.ambientAudioTrack === 'serene-forest' &&
+    bookWithAmbient.ambientAudioVolume === 0.18 &&
+    bookWithAmbient.ambientAudio.customUrl === 'https://example.com/forest.mp3' &&
+    bookWithOversizedAudio.ambientAudio.customUrl === ''
+);
+
+const hydratedBook = normalizeBookRecord({
+  title: 'Libro Hidratado',
+  ambientAudioTrack: 'deep-focus',
+  ambientAudioVolume: 0.25,
+  ambientAudioEnabled: false
+});
+
+check(
+  'normalizeBookRecord reconstruye ambientAudio con retrocompatibilidad bidireccional si sólo vienen campos planos',
+  hydratedBook.ambientAudio.enabled === false &&
+    hydratedBook.ambientAudio.trackId === 'deep-focus' &&
+    hydratedBook.ambientAudio.volume === 0.25 &&
+    hydratedBook.ambientAudioTrack === 'deep-focus'
+);
+
+const readingAudioEngineSrc = fs.readFileSync('src/utils/readingAudioEngine.js', 'utf8');
+const booksLibrarySrc = fs.readFileSync('src/components/BooksLibraryModule.jsx', 'utf8');
+const latestTasksTabSrc = fs.readFileSync('src/components/TasksTab.jsx', 'utf8');
+
+check(
+  'readingAmbientPlayer admite duraciones de fade-in (~2.2s) y fade-out (~1.2s), control de volumen, mute y no crashea en node',
+  readingAmbientPlayer &&
+    typeof readingAmbientPlayer.start === 'function' &&
+    typeof readingAmbientPlayer.stop === 'function' &&
+    typeof readingAmbientPlayer.setVolume === 'function' &&
+    typeof readingAmbientPlayer.toggleMute === 'function' &&
+    readingAudioEngineSrc.includes('DEFAULT_FADE_IN_SECONDS = 2.2') &&
+    readingAudioEngineSrc.includes('DEFAULT_FADE_OUT_SECONDS = 1.2') &&
+    readingAudioEngineSrc.includes('DEFAULT_READING_VOLUME = 0.22')
+);
+
+check(
+  'Flipbook3DModal.jsx implementa fade-in suave al abrir, fade-out progresivo al cerrar, ecualizador visual, atajo A y popover de pistas',
+  flipbookModalSrc.includes('readingAmbientPlayer.start(') &&
+    flipbookModalSrc.includes('readingAmbientPlayer.stop(') &&
+    flipbookModalSrc.includes('fadeInDuration: 2.2') &&
+    flipbookModalSrc.includes('fadeOutDuration: 1.2') &&
+    flipbookModalSrc.includes('readingAmbientPlayer.toggleMute()') &&
+    flipbookModalSrc.includes('Música de lectura') &&
+    flipbookModalSrc.includes("if (e.key === 'a' || e.key === 'A')")
+);
+
+check(
+  'BooksLibraryModule.jsx y TasksTab.jsx incluyen selector de pista ambiental, botón de prueba, control de volumen y persistencia',
+  booksLibrarySrc.includes('Música de fondo') &&
+    booksLibrarySrc.includes('handleTogglePreviewAmbient') &&
+    booksLibrarySrc.includes('ambientAudioTrack') &&
+    latestTasksTabSrc.includes('Música de fondo') &&
+    latestTasksTabSrc.includes('handleToggleBook3dPreviewAmbient') &&
+    latestTasksTabSrc.includes('book3dAmbientTrack') &&
+    latestTasksTabSrc.includes('ambientAudioPayload')
 );
 
 console.log(`\n========================================`);
