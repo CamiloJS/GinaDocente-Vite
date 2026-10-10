@@ -5,12 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "check": "node scripts/check.mjs && node scripts/test-ai-eval.mjs && node scripts/test-scoring.mjs && node scripts/test-formato.mjs && node scripts/test-feedback.mjs && node scripts/test-narracion.mjs && node scripts/test-kahoot.mjs && node scripts/test-slides.mjs && node scripts/test-flipbook.mjs",
-    "prebuild": "node scripts/check.mjs && node scripts/test-ai-eval.mjs && node scripts/test-scoring.mjs && node scripts/test-formato.mjs && node scripts/test-feedback.mjs && node scripts/test-narracion.mjs && node scripts/test-kahoot.mjs && node scripts/test-slides.mjs && node scripts/test-flipbook.mjs",
+    "check": "node scripts/check.mjs && node scripts/test-ai-eval.mjs && node scripts/test-scoring.mjs && node scripts/test-formato.mjs && node scripts/test-feedback.mjs && node scripts/test-narracion.mjs && node scripts/test-kahoot.mjs && node scripts/test-slides.mjs && node scripts/test-flipbook.mjs && node scripts/test-notes.mjs",
+    "prebuild": "node scripts/check.mjs && node scripts/test-ai-eval.mjs && node scripts/test-scoring.mjs && node scripts/test-formato.mjs && node scripts/test-feedback.mjs && node scripts/test-narracion.mjs && node scripts/test-kahoot.mjs && node scripts/test-slides.mjs && node scripts/test-flipbook.mjs && node scripts/test-notes.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "smoke": "vite --port 5199 --host 127.0.0.1",
-    "test": "node scripts/test-ai-eval.mjs && node scripts/test-scoring.mjs && node scripts/test-formato.mjs && node scripts/test-feedback.mjs && node scripts/test-narracion.mjs && node scripts/test-kahoot.mjs && node scripts/test-slides.mjs && node scripts/test-flipbook.mjs"
+    "test": "node scripts/test-ai-eval.mjs && node scripts/test-scoring.mjs && node scripts/test-formato.mjs && node scripts/test-feedback.mjs && node scripts/test-narracion.mjs && node scripts/test-kahoot.mjs && node scripts/test-slides.mjs && node scripts/test-flipbook.mjs && node scripts/test-notes.mjs"
   },
   "dependencies": {
     "canvas-confetti": "^1.9.4",

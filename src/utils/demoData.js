@@ -941,6 +941,211 @@ export const DEMO_BOOKS = [
   }
 ];
 
+export const DEMO_NOTES = [
+  {
+    id: 'demo-note-shared-1',
+    title: 'Sesión 1: Indicadores Macroeconómicos (GDP, CPI & Interest Rates)',
+    scope: 'shared',
+    content: '<p><strong>Objetivos de la sesión:</strong> Comprender la relación entre el <span style="color: #2563eb;">Gross Domestic Product (GDP)</span>, el <span style="color: #059669;">Consumer Price Index (CPI)</span> y las tasas de intervención del Banco Central.</p><ul><li><strong>Hawkish stance:</strong> Política monetaria contractiva enfocada en controlar la inflación subiendo tasas.</li><li><strong>Dovish stance:</strong> Política monetaria expansiva para estimular el empleo y el crecimiento económico.</li><li><strong>First Conditional aplicado:</strong> <em>"If the Central Bank raises interest rates by 50 basis points, borrowing costs will increase."</em></li></ul>',
+    fontFamily: 'sans',
+    fontSize: 'base',
+    paperTheme: 'sky',
+    isPinned: true,
+    isLocked: true,
+    lockedBy: 'teacher',
+    lockedByName: 'GinaDocente',
+    lockedByRole: 'teacher',
+    lockedAt: Date.now() - 1000 * 60 * 60 * 3,
+    authorId: 'teacher',
+    authorName: 'GinaDocente',
+    authorRole: 'teacher',
+    teacherId: 'teacher',
+    targetGroupId: DEMO_SUBJECT_ID,
+    targetGroupName: DEMO_SUBJECT_NAME,
+    links: [
+      {
+        id: 'demo-link-yt-1',
+        url: 'https://www.youtube.com/watch?v=PHe0bXAIuk0',
+        label: 'How The Economic Machine Works (Ray Dalio - 30 min)',
+        mediaType: 'youtube',
+        youtubeId: 'PHe0bXAIuk0',
+        renderMode: 'youtube'
+      },
+      {
+        id: 'demo-link-img-1',
+        url: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=900&q=80',
+        label: 'Gráfico de comportamiento bursátil y tasas de referencia',
+        mediaType: 'image',
+        youtubeId: null,
+        renderMode: 'image'
+      }
+    ],
+    auditLog: [
+      {
+        id: 'demo-audit-1',
+        action: 'lock',
+        actorId: 'teacher',
+        actorName: 'GinaDocente',
+        actorRole: 'teacher',
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
+        summary: 'Activó el candado de seguridad en la sesión',
+        previousTitle: 'Sesión 1: Indicadores Macroeconómicos (GDP, CPI & Interest Rates)',
+        newTitle: 'Sesión 1: Indicadores Macroeconómicos (GDP, CPI & Interest Rates)',
+        previousTextPreview: 'Objetivos de la sesión: Comprender la relación entre el Gross Domestic Product (GDP)...',
+        newTextPreview: 'Objetivos de la sesión: Comprender la relación entre el Gross Domestic Product (GDP)...'
+      },
+      {
+        id: 'demo-audit-2',
+        action: 'create',
+        actorId: 'teacher',
+        actorName: 'GinaDocente',
+        actorRole: 'teacher',
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString(),
+        summary: 'Creó la nota compartida con video de YouTube y gráfico de referencia',
+        previousTitle: '',
+        newTitle: 'Sesión 1: Indicadores Macroeconómicos (GDP, CPI & Interest Rates)',
+        previousTextPreview: '',
+        newTextPreview: 'Objetivos de la sesión: Comprender la relación entre el Gross Domestic Product (GDP)...'
+      }
+    ],
+    createdAt: Date.now() - 1000 * 60 * 60 * 4,
+    updatedAt: Date.now() - 1000 * 60 * 60 * 3
+  },
+  {
+    id: 'demo-note-shared-2',
+    title: 'Apuntes de Laura: Verbos de precisión para tendencias de mercado',
+    scope: 'shared',
+    content: '<p>Resumen de verbos técnicos vistos hoy en clase para describir gráficas financieras:</p><ul><li><span style="color: #059669;"><strong>To surge / To skyrocket:</strong></span> Subir drásticamente en un periodo corto.</li><li><span style="color: #e11d48;"><strong>To plummet / To plunge:</strong></span> Caer abruptamente (ej. caída del precio del petróleo).</li><li><span style="color: #4f46e5;"><strong>To plateau / To stabilize:</strong></span> Mantenerse estable tras una tendencia alcista.</li></ul><p><em>Nota asegurada con candado de sesión por Laura Restrepo.</em></p>',
+    fontFamily: 'serif',
+    fontSize: 'base',
+    paperTheme: 'emerald',
+    isPinned: false,
+    isLocked: true,
+    lockedBy: 'laura_restrepo',
+    lockedByName: 'Laura Restrepo',
+    lockedByRole: 'student',
+    lockedAt: Date.now() - 1000 * 60 * 90,
+    authorId: 'laura_restrepo',
+    authorName: 'Laura Restrepo',
+    authorRole: 'student',
+    teacherId: 'teacher',
+    targetGroupId: DEMO_SUBJECT_ID,
+    targetGroupName: DEMO_SUBJECT_NAME,
+    links: [],
+    auditLog: [
+      {
+        id: 'demo-audit-3',
+        action: 'lock',
+        actorId: 'laura_restrepo',
+        actorName: 'Laura Restrepo',
+        actorRole: 'student',
+        timestamp: new Date(Date.now() - 1000 * 60 * 90).toISOString(),
+        summary: 'Aseguró sus apuntes de sesión con candado para evitar borrados accidentales',
+        previousTitle: 'Apuntes de Laura: Verbos de precisión para tendencias de mercado',
+        newTitle: 'Apuntes de Laura: Verbos de precisión para tendencias de mercado',
+        previousTextPreview: 'Resumen de verbos técnicos vistos hoy en clase para describir gráficas financieras...',
+        newTextPreview: 'Resumen de verbos técnicos vistos hoy en clase para describir gráficas financieras...'
+      }
+    ],
+    createdAt: Date.now() - 1000 * 60 * 110,
+    updatedAt: Date.now() - 1000 * 60 * 90
+  },
+  {
+    id: 'demo-note-shared-3',
+    title: 'Pizarra Abierta: Lluvia de ideas — Debate sobre Aranceles y FOB vs. CIF',
+    scope: 'shared',
+    content: '<p>Espacio colaborativo abierto para anotar argumentos del debate del viernes:</p><ul><li><strong>Grupo Exportadores:</strong> Analyzing how currency depreciation boosts competitiveness in agricultural exports.</li><li><strong>Grupo Importadores:</strong> Impact of higher tariffs on raw materials and industrial machinery.</li></ul><p>¡Pueden agregar sus ejemplos y enlaces de referencia aquí!</p>',
+    fontFamily: 'sans',
+    fontSize: 'base',
+    paperTheme: 'warm',
+    isPinned: false,
+    isLocked: false,
+    lockedBy: null,
+    lockedByName: null,
+    lockedByRole: null,
+    lockedAt: null,
+    authorId: 'carlos_mendoza',
+    authorName: 'Carlos Mendoza',
+    authorRole: 'student',
+    teacherId: 'teacher',
+    targetGroupId: DEMO_SUBJECT_ID,
+    targetGroupName: DEMO_SUBJECT_NAME,
+    links: [
+      {
+        id: 'demo-link-web-1',
+        url: 'https://www.investopedia.com/terms/f/fob.asp',
+        label: 'Investopedia: Free On Board (FOB) Explained',
+        mediaType: 'link',
+        youtubeId: null,
+        renderMode: 'link'
+      }
+    ],
+    auditLog: [
+      {
+        id: 'demo-audit-4',
+        action: 'edit',
+        actorId: 'mateo_gomez',
+        actorName: 'Mateo Gómez',
+        actorRole: 'student',
+        timestamp: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
+        summary: 'Editó el contenido de la nota compartida (modificó el segundo punto)',
+        previousTitle: 'Pizarra Abierta: Lluvia de ideas — Debate sobre Aranceles y FOB vs. CIF',
+        newTitle: 'Pizarra Abierta: Lluvia de ideas — Debate sobre Aranceles y FOB vs. CIF',
+        previousContent: '<p>Espacio colaborativo abierto para anotar argumentos del debate del viernes:</p><ul><li><strong>Grupo Exportadores:</strong> Analyzing how currency depreciation boosts competitiveness in agricultural exports.</li><li><strong>Grupo Importadores:</strong> No sé qué poner todavía jajaja borrar luego.</li></ul>',
+        newContent: '<p>Espacio colaborativo abierto para anotar argumentos del debate del viernes:</p><ul><li><strong>Grupo Exportadores:</strong> Analyzing how currency depreciation boosts competitiveness in agricultural exports.</li><li><strong>Grupo Importadores:</strong> Impact of higher tariffs on raw materials and industrial machinery.</li></ul><p>¡Pueden agregar sus ejemplos y enlaces de referencia aquí!</p>',
+        previousTextPreview: 'Espacio colaborativo abierto... Grupo Importadores: No sé qué poner todavía jajaja borrar luego.',
+        newTextPreview: 'Espacio colaborativo abierto... Grupo Importadores: Impact of higher tariffs on raw materials and industrial machinery.'
+      }
+    ],
+    createdAt: Date.now() - 1000 * 60 * 50,
+    updatedAt: Date.now() - 1000 * 60 * 25
+  },
+  {
+    id: 'demo-note-private-guest',
+    title: 'Mis apuntes personales para el Quiz de pronunciación económica',
+    scope: 'private',
+    content: '<p>Recordar practicar la pronunciación antes de grabar el audio del Workshop 1:</p><ul><li><strong>Inflation:</strong> /ɪnˈfleɪ.ʃən/</li><li><strong>Equilibrium:</strong> /ˌiː.kwɪˈlɪb.ri.əm/</li><li><strong>Subsidiary:</strong> /səbˈsɪd.i.er.i/</li></ul>',
+    fontFamily: 'handwriting',
+    fontSize: 'md',
+    paperTheme: 'violet',
+    isPinned: true,
+    isLocked: false,
+    ownerId: 'invitado',
+    authorId: 'invitado',
+    authorName: 'Estudiante Invitado',
+    authorRole: 'student',
+    teacherId: 'teacher',
+    targetGroupId: DEMO_SUBJECT_ID,
+    targetGroupName: DEMO_SUBJECT_NAME,
+    links: [],
+    auditLog: [],
+    createdAt: Date.now() - 1000 * 60 * 40,
+    updatedAt: Date.now() - 1000 * 60 * 40
+  },
+  {
+    id: 'demo-note-private-teacher',
+    title: 'Planeación privada docente: Retroalimentación del Workshop 1',
+    scope: 'private',
+    content: '<p>Puntos a reforzar en la próxima sesión con el grupo de <strong>Inglés Técnico Económico</strong>:</p><ul><li>Revisar el uso de <em>unless</em> vs. <em>if not</em> en proyecciones de inflación.</li><li>Felicitar a Laura y Carlos por sus intervenciones en el foro.</li></ul>',
+    fontFamily: 'sans',
+    fontSize: 'base',
+    paperTheme: 'default',
+    isPinned: true,
+    isLocked: false,
+    ownerId: 'teacher',
+    authorId: 'teacher',
+    authorName: 'GinaDocente',
+    authorRole: 'teacher',
+    teacherId: 'teacher',
+    targetGroupId: DEMO_SUBJECT_ID,
+    targetGroupName: DEMO_SUBJECT_NAME,
+    links: [],
+    auditLog: [],
+    createdAt: Date.now() - 1000 * 60 * 80,
+    updatedAt: Date.now() - 1000 * 60 * 80
+  }
+];
+
 export const DEMO_GUIDE_TOUR = [
   {
     title: 'Muro de Clase',
@@ -1019,6 +1224,10 @@ export const DEMO_TAB_INFO = {
   tools: {
     title: 'Herramientas',
     summary: 'OVA Studio y ruleta de participación.'
+  },
+  notes: {
+    title: 'Notas de Clase',
+    summary: 'Cuaderno compartido de la sesión y apuntes personales privados.'
   }
 };
 
@@ -1030,6 +1239,10 @@ export const DEMO_TEACHER_TAB_INFO = {
   books: {
     title: 'Libros',
     summary: 'Sube y gestiona libros en PDF para tus estudiantes.'
+  },
+  notes: {
+    title: 'Notas y Apuntes',
+    summary: 'Cuaderno compartido de clase con seguro de sesión, apuntes privados y registro de últimos cambios.'
   },
   evaluaciones: {
     title: 'Evaluaciones',
@@ -1728,6 +1941,7 @@ export const DEMO_SANDBOX_CATEGORIES = [
   'syllabus',
   'reviews',
   'books',
+  'notes',
   'academicGroups',
   'grades',
   'ovas',
@@ -1749,6 +1963,7 @@ export function loadDemoSandbox(now = Date.now()) {
     syllabus: [],
     reviews: [],
     books: [],
+    notes: [],
     academicGroups: [],
     grades: [],
     ovas: [],

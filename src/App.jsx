@@ -74,6 +74,7 @@ import {
   DEMO_SYLLABUS,
   DEMO_REVIEWS,
   DEMO_BOOKS,
+  DEMO_NOTES,
   DEMO_ACADEMIC_GROUPS,
   DEMO_USER_MAPPINGS,
   DEMO_USER_PRESENCE,
@@ -99,6 +100,7 @@ import {
 const TasksTab = React.lazy(() => import('./components/TasksTab.jsx'))
 const ReviewsModule = React.lazy(() => import('./components/ReviewsModule.jsx'))
 const BooksLibraryModule = React.lazy(() => import('./components/BooksLibraryModule.jsx'))
+const NotesModule = React.lazy(() => import('./components/NotesModule.jsx'))
 const GifPickerModal = React.lazy(() => import('./components/GifPickerModal.jsx'))
 
 // --- CONSTANTES DE DISEÑO Y PERSONALIZACIÓN DE GRUPOS ---
@@ -235,7 +237,7 @@ function App() {
       const kahootInfo = parseKahootUrlInfo(window.location.hash, window.location.search);
 
       return {
-        tab: ['tasks', 'reviews', 'books', 'syllabus', 'evaluations', 'directory', 'groups', 'inbox', 'profile', 'settings', 'tools'].includes(mainTab) ? mainTab : 'tasks',
+        tab: ['tasks', 'reviews', 'books', 'notes', 'syllabus', 'evaluations', 'directory', 'groups', 'inbox', 'profile', 'settings', 'tools'].includes(mainTab) ? mainTab : 'tasks',
         profileId: profileId || null,
         ovaId: ovaId || null,
         kahootRoute: kahootInfo.isKahootRoute,
@@ -720,6 +722,7 @@ function App() {
   const [alerts, setAlerts] = useState(() => initialIsDemo ? DEMO_ALERTS : []);
   const [rawReviews, setReviews] = useState(() => initialIsDemo ? DEMO_REVIEWS : []);
   const [rawBooks, setRawBooks] = useState(() => initialIsDemo ? DEMO_BOOKS : []);
+  const [rawNotes, setRawNotes] = useState(() => initialIsDemo ? DEMO_NOTES : []);
   const [inboxTab, setInboxTab] = useState('suggestions');
   const [inboxFilter, setInboxFilter] = useState('all');
   const [inboxSearch, setInboxSearch] = useState('');
@@ -1091,6 +1094,30 @@ function App() {
       return isGlobal ? matchesStudentTeacher(b) : true;
     });
   }, [rawBooks, isDemoMode, role, currentTeacherId, matchesStudentTeacher]);
+
+  const notes = useMemo(() => {
+    const list = rawNotes || [];
+    const myCleanId = String(myChatId || '').trim().toLowerCase();
+    return list.filter(n => {
+      if (!n) return false;
+      if (n.scope === 'private') {
+        const owner = String(n.ownerId || n.authorId || '').trim().toLowerCase();
+        return Boolean(myCleanId) && owner === myCleanId;
+      }
+      if (isDemoMode || String(n?.id || '').startsWith('demo')) return true;
+      if (role === 'teacher') {
+        return getItemTeacherId(n) === currentTeacherId;
+      }
+      // Estudiante en notas compartidas:
+      const author = String(n.authorId || '').trim().toLowerCase();
+      if (myCleanId && author === myCleanId) return true;
+      const gId = String(n.targetGroupId || '').trim();
+      if (gId && gId.toLowerCase() !== 'all') {
+        return studentEnrolledGroups.some(g => String(g.id) === gId || `acad_${g.id}` === gId);
+      }
+      return matchesStudentTeacher(n);
+    });
+  }, [rawNotes, isDemoMode, role, myChatId, currentTeacherId, studentEnrolledGroups, matchesStudentTeacher]);
 
   const removeStudentFromGroupHelper = async (groupId, studentKey) => {
     if (!groupId || !studentKey) return;
@@ -2214,7 +2241,7 @@ function App() {
               setViewingProfileId(null);
               try { sessionStorage.removeItem('englishTech_viewingProfileId'); } catch(e) {}
             }
-          } else if (mainTab && ['tasks', 'reviews', 'books', 'syllabus', 'evaluations', 'directory', 'groups', 'inbox', 'profile', 'settings', 'tools'].includes(mainTab)) {
+          } else if (mainTab && ['tasks', 'reviews', 'books', 'notes', 'syllabus', 'evaluations', 'directory', 'groups', 'inbox', 'profile', 'settings', 'tools'].includes(mainTab)) {
             setActiveTab(mainTab);
           } else if (!hash) {
             setActiveTab('tasks');
@@ -2329,6 +2356,7 @@ function App() {
       tasks: 'Anuncios',
       reviews: 'Diapositivas',
       books: 'Libros',
+      notes: 'Notas',
       syllabus: 'Contenidos',
       evaluations: 'Evaluaciones',
       directory: 'Directorio',
@@ -2356,7 +2384,7 @@ function App() {
               if (tabName === 'chat') {
                   isActive = (isChatAppOpen || (!!activeChat && !isChatMinimized)) && !isMobileMenuOpen;
               } else if (tabName === 'menu') {
-                  isActive = isMobileMenuOpen || (!isChatAppOpen && (!activeChat || isChatMinimized) && ['reviews', 'books', 'syllabus', 'directory', 'evaluations', 'tools'].includes(activeTab));
+                  isActive = isMobileMenuOpen || (!isChatAppOpen && (!activeChat || isChatMinimized) && ['reviews', 'books', 'notes', 'syllabus', 'directory', 'evaluations', 'tools'].includes(activeTab));
               } else {
                   isActive = activeTab === tabName && !isChatAppOpen && (!activeChat || isChatMinimized) && !isMobileMenuOpen;
               }
@@ -3135,6 +3163,7 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
             setSyllabus(DEMO_SYLLABUS.slice().sort((a, b) => (Number(a.week) || 0) - (Number(b.week) || 0)));
             setReviews(DEMO_REVIEWS);
             setRawBooks(DEMO_BOOKS);
+            setRawNotes(DEMO_NOTES);
             setGrades([]);
             setActiveTakingEval(null);
             setViewingResultsFor(null);
@@ -3184,6 +3213,7 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
                 setSyllabus(mergeDemoItemsWithBase(DEMO_SYLLABUS, [], 'syllabus').slice().sort((a, b) => (Number(a.week) || 0) - (Number(b.week) || 0)));
                 setReviews(mergeDemoItemsWithBase(DEMO_REVIEWS, [], 'reviews'));
                 setRawBooks(mergeDemoItemsWithBase(DEMO_BOOKS, [], 'books'));
+                setRawNotes(mergeDemoItemsWithBase(DEMO_NOTES, [], 'notes'));
                 setGrades(mergeDemoItemsWithBase([], [], 'grades'));
                 setTasksLoading(false);
               }
@@ -3618,6 +3648,7 @@ useEffect(() => {
     setSyllabus(mergeDemoItemsWithBase(DEMO_SYLLABUS, [], 'syllabus').slice().sort((a, b) => (Number(a.week) || 0) - (Number(b.week) || 0)));
     setReviews(mergeDemoItemsWithBase(DEMO_REVIEWS, [], 'reviews'));
     setRawBooks(mergeDemoItemsWithBase(DEMO_BOOKS, [], 'books'));
+    setRawNotes(mergeDemoItemsWithBase(DEMO_NOTES, [], 'notes'));
     setGrades(mergeDemoItemsWithBase([], [], 'grades'));
     setUserPosts(mergeDemoItemsWithBase(DEMO_USER_POSTS, [], 'userPosts'));
     setSuggestions(mergeDemoItemsWithBase(DEMO_SUGGESTIONS, [], 'suggestions'));
@@ -3741,6 +3772,15 @@ useEffect(() => {
     const uBooks = onSnapshot(q, s => setRawBooks(s.docs.map(d => ({ id: d.id, ...d.data() }))), err => console.error(err));
     return () => uBooks();
 }, [hasEntered, myChatId, needsBooksSubscription, isDemoMode]);
+
+// 4c. PESTAÑA: NOTAS (Cuaderno compartido y Notas privadas)
+const needsNotesSubscription = activeTab === 'notes';
+useEffect(() => {
+    if (!hasEntered || !myChatId || isDemoMode || !needsNotesSubscription) return;
+    const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'notes'), limit(150));
+    const uNotes = onSnapshot(q, s => setRawNotes(s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0))), err => console.error(err));
+    return () => uNotes();
+}, [hasEntered, myChatId, needsNotesSubscription, isDemoMode]);
 
 // 5. PESTAÑA: SYLLABUS
 useEffect(() => {
@@ -6452,6 +6492,71 @@ useEffect(() => {
             />
             </React.Suspense>
           );
+
+          const renderNotes = () => {
+            const visibleNoteGroups = role === 'teacher' ? academicGroups : studentEnrolledGroups;
+            const resolvedTeacherId =
+              role === 'teacher'
+                ? currentTeacherId
+                : (Array.from(studentTeacherIds)[0] || 'teacher');
+
+            const handleSaveNoteItem = async (noteItem) => {
+              if (!noteItem || !noteItem.id) return;
+              const matchedGroup = (academicGroups || []).find(g => String(g.id) === String(noteItem.targetGroupId));
+              const noteWithTeacher = {
+                ...noteItem,
+                teacherId: matchedGroup ? getItemTeacherId(matchedGroup) : (noteItem.teacherId || resolvedTeacherId)
+              };
+
+              if (isDemoMode || String(noteWithTeacher.id).startsWith('demo')) {
+                const savedDemo = saveDemoSandboxItem('notes', noteWithTeacher);
+                setRawNotes(prev => [savedDemo, ...(prev || []).filter(n => String(n.id) !== String(savedDemo.id))]);
+                return;
+              }
+
+              setRawNotes(prev => [noteWithTeacher, ...(prev || []).filter(n => String(n.id) !== String(noteWithTeacher.id))]);
+              try {
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notes', String(noteWithTeacher.id)), noteWithTeacher, { merge: true });
+              } catch (err) {
+                console.error('Error guardando nota:', err);
+                showMessage('No se pudo sincronizar la nota con la nube.');
+              }
+            };
+
+            const handleDeleteNoteItem = async (noteId) => {
+              if (!noteId) return;
+              if (isDemoMode || String(noteId).startsWith('demo')) {
+                removeDemoSandboxItem('notes', noteId);
+                setRawNotes(prev => (prev || []).filter(n => String(n.id) !== String(noteId)));
+                return;
+              }
+
+              setRawNotes(prev => (prev || []).filter(n => String(n.id) !== String(noteId)));
+              try {
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notes', String(noteId)));
+              } catch (err) {
+                console.error('Error eliminando nota:', err);
+                showMessage('No se pudo eliminar la nota de la base de datos.');
+              }
+            };
+
+            return (
+              <React.Suspense fallback={<div className="space-y-4 p-4">{[1,2,3].map(i => <div key={i} className="p-4 rounded-2xl border animate-pulse bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800"><div className="flex items-center gap-3 mb-4"><div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700" /><div className="flex-1 space-y-2"><div className="h-3 w-1/3 rounded bg-gray-200 dark:bg-gray-700" /></div></div><div className="h-4 w-full rounded mb-2 bg-gray-200 dark:bg-gray-700" /><div className="h-4 w-5/6 rounded bg-gray-200 dark:bg-gray-700" /></div>)}</div>}>
+                <NotesModule
+                  notes={notes}
+                  role={role}
+                  myChatId={myChatId}
+                  currentUserName={myDisplayName || loggedInName || myChatId || 'Usuario'}
+                  activeTeacherId={resolvedTeacherId}
+                  academicGroups={visibleNoteGroups}
+                  isDarkMode={isDarkMode}
+                  onSaveNote={handleSaveNoteItem}
+                  onDeleteNote={handleDeleteNoteItem}
+                  showNotify={(msg) => showMessage(msg)}
+                />
+              </React.Suspense>
+            );
+          };
 
           const renderSyllabus = () => {
             // Manejador del procesamiento de PDF con IA
@@ -13206,6 +13311,9 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                               <button onClick={() => changeTab('books')} className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-bold rounded-xl transition-colors ${activeTab === 'books' ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' : isDarkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-100 text-gray-700'}`}>
                                   <Book size={18} className="text-amber-500" /> Libros
                               </button>
+                              <button onClick={() => changeTab('notes')} className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-bold rounded-xl transition-colors ${activeTab === 'notes' ? 'bg-sky-50 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400' : isDarkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-100 text-gray-700'}`}>
+                                  <PenTool size={18} className="text-sky-500" /> Notas
+                              </button>
                               <button onClick={() => changeTab('syllabus')} className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-bold rounded-xl transition-colors ${activeTab === 'syllabus' ? 'bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400' : isDarkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-100 text-gray-700'}`}>
                                   <NavFile size={18} className="text-green-500" /> Contenidos
                               </button>
@@ -13257,7 +13365,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                   </aside>
 
                   {/* CENTER CONTENT */}
-                  <main className={`flex-1 ${activeTab === 'tools' || activeTab === 'books' ? 'max-w-5xl xl:max-w-6xl' : 'max-w-[680px]'} min-w-0 w-full p-2 md:p-6 pb-28 md:pb-8 relative z-10 shrink-0 mx-auto`}>
+                  <main className={`flex-1 ${activeTab === 'tools' || activeTab === 'books' || activeTab === 'notes' ? 'max-w-5xl xl:max-w-6xl' : 'max-w-[680px]'} min-w-0 w-full p-2 md:p-6 pb-28 md:pb-8 relative z-10 shrink-0 mx-auto`}>
                       {activeTab === 'tasks' && (
                           <React.Suspense fallback={<div className="space-y-4 p-4">{[1,2,3].map(i => <div key={i} className="p-4 rounded-2xl border animate-pulse bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800"><div className="flex items-center gap-3 mb-4"><div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700" /><div className="flex-1 space-y-2"><div className="h-3 w-1/3 rounded bg-gray-200 dark:bg-gray-700" /></div></div><div className="h-4 w-full rounded mb-2 bg-gray-200 dark:bg-gray-700" /><div className="h-4 w-5/6 rounded bg-gray-200 dark:bg-gray-700" /></div>)}</div>}>
                           <TasksTab 
@@ -13353,6 +13461,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                       )}
                       {activeTab === 'reviews' && renderReviews()}
                       {activeTab === 'books' && renderBooks()}
+                      {activeTab === 'notes' && renderNotes()}
                       {activeTab === 'syllabus' && renderSyllabus()}
                       {activeTab === 'evaluations' && renderEvaluations()}
                       {activeTab === 'directory' && role === 'teacher' && renderDirectory()}
@@ -15799,6 +15908,25 @@ Bot:`;
                                           <div>
                                               <p className="font-extrabold text-xs text-gray-900 dark:text-gray-100">Libros</p>
                                               <p className="text-[10px] text-gray-500 truncate">Lecturas y PDF</p>
+                                          </div>
+                                      </button>
+
+                                      {/* Notas */}
+                                      <button
+                                          type="button"
+                                          onClick={() => { setIsMobileMenuOpen(false); changeTab('notes'); }}
+                                          className={`p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between gap-2 shadow-2xs hover:scale-[1.01] active:scale-95 ${
+                                              activeTab === 'notes'
+                                                  ? (isDarkMode ? 'bg-sky-950/40 border-sky-800' : 'bg-sky-50 border-sky-200')
+                                                  : (isDarkMode ? 'bg-gray-800/80 border-gray-700' : 'bg-white border-gray-200')
+                                          }`}
+                                      >
+                                          <div className="w-9 h-9 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20 flex items-center justify-center shadow-xs">
+                                              <PenTool size={18} />
+                                          </div>
+                                          <div>
+                                              <p className="font-extrabold text-xs text-gray-900 dark:text-gray-100">Notas</p>
+                                              <p className="text-[10px] text-gray-500 truncate">Cuaderno y apuntes</p>
                                           </div>
                                       </button>
 
