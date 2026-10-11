@@ -60,6 +60,7 @@ import { calculateScore, normalizarRespuesta, respuestasValidasDe, permiteVarias
 import { textoPlano } from './utils/textFormat.js';
 import { desordenarPalabras } from './utils/palabras.js'
 import {
+  getUserMappingData,
   getUserPresenceData,
   getPresenceStatus,
   isLastMessageFromStudent,
@@ -1387,13 +1388,13 @@ function App() {
   }, [selectedGroupForFeed?.id, tasks.length, markGroupPostsAsRead]);
 
   // Contactos visibles con privacidad por grupo:
-  // - La docente ve a todos los estudiantes registrados.
-  // - Los estudiantes siempre ven a la docente.
+  // - Los docentes ven a los demás docentes y a todos los estudiantes registrados.
+  // - Los estudiantes siempre ven a su docente.
   // - Los estudiantes solo pueden ver a compañeros que estén en su mismo grupo académico.
   // - Si un estudiante no está en ningún grupo, únicamente verá a la docente.
   const allChatUsers = (() => {
     const rawList = [
-      { id: 'teacher', name: TEACHER_NAME, role: 'teacher', profilePicUrl: userMappings['teacher']?.profilePicUrl || '' },
+      { id: 'teacher', name: TEACHER_NAME, role: 'teacher', profilePicUrl: userMappings['teacher']?.profilePicUrl || userMappings['ginadocente']?.profilePicUrl || '' },
       ...(isDemoMode ? [] : [{ id: 'camilodocente', name: SECOND_TEACHER_NAME, role: 'teacher', profilePicUrl: userMappings['camilodocente']?.profilePicUrl || '' }]),
       ...Object.entries(userMappings || {})
         .filter(([id, data]) => {
@@ -1430,19 +1431,22 @@ function App() {
         })))
     ];
 
-    // Deduplicar por ID único
+    // Deduplicar por ID único y excluir únicamente al propio usuario logueado
     const seenIds = new Set();
+    const myClean = (myChatId || '').toLowerCase().replace('@', '').trim();
     const rawUsers = rawList.filter(u => {
       if (!u || !u.id) return false;
       const clean = String(u.id).toLowerCase().replace('@', '').trim();
-      if (clean === (myChatId || '').toLowerCase().replace('@', '').trim()) return false;
+      if (clean === myClean) return false;
+      if ((myClean === 'teacher' || myClean === 'ginadocente') && (clean === 'teacher' || clean === 'ginadocente')) return false;
+      if (isCamiloTeacher(myClean) && isCamiloTeacher(clean)) return false;
       if (seenIds.has(clean)) return false;
       seenIds.add(clean);
       return true;
     });
 
     if (role === 'teacher') {
-      return rawUsers.filter(u => u.role !== 'teacher' && !isTeacherId(u.id));
+      return rawUsers;
     }
 
     // Estudiante: Obtener materias/grupos en los que está inscrito
@@ -3760,7 +3764,7 @@ useEffect(() => {
 // 3. PESTAÑA: PERFIL (Muro de Pinterest)
 useEffect(() => {
     if (!hasEntered || !myChatId || isDemoMode || activeTab !== 'profile') return;
-    const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'userPosts'), orderBy('createdAt', 'desc'), limit(20));
+    const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'userPosts'), orderBy('createdAt', 'desc'), limit(100));
     const uUserPosts = onSnapshot(q, s => setUserPosts(s.docs.map(d => ({ id: d.id, ...d.data() }))), err => console.error(err));
     return () => uUserPosts();
 }, [hasEntered, myChatId, activeTab, isDemoMode]);
@@ -5988,7 +5992,7 @@ useEffect(() => {
         let targetUserKey = rawTargetId || myChatId || (role === 'teacher' ? 'teacher' : '');
         let userData = null;
 
-        if (!isDemoMode && (isCamiloTeacher(targetUserKey) || (role === 'teacher' && isMyProfile && myChatId === 'camilodocente'))) {
+        if (isCamiloTeacher(targetUserKey) || (role === 'teacher' && isMyProfile && myChatId === 'camilodocente')) {
             userData = {
                 fullName: SECOND_TEACHER_NAME,
                 role: 'teacher',
@@ -6001,7 +6005,7 @@ useEffect(() => {
                 fullName: TEACHER_NAME,
                 role: 'teacher',
                 customLabel: 'Docente',
-                profilePicUrl: userMappings['teacher']?.profilePicUrl || ''
+                profilePicUrl: userMappings['teacher']?.profilePicUrl || userMappings['ginadocente']?.profilePicUrl || ''
             };
             targetUserKey = 'teacher';
         } else {
@@ -6075,8 +6079,11 @@ useEffect(() => {
         const targetUserId = targetUserKey;
 
         // Estado de presencia en tiempo real (conectado, ausente, ocupado, desconectado)
-        const pData = userPresence[targetUserId] || userPresence[targetFilterId] || {};
-        const presenceStatus = (!pData.isOnline || pData.status === 'offline') ? 'offline' : (pData.status || 'offline');
+        const pData = getUserPresenceData(targetUserId, userPresence, userMappings);
+        const presenceStatus = getPresenceStatus(pData);
+        const profileLastConn = (role === 'teacher' && !isMyProfile && presenceStatus === 'offline')
+            ? getLastConnectionTime(targetUserId, userPresence, userMappings, null, lastMessages)
+            : 0;
 
         const isTeacherProfile = isTeacherId(targetFilterId);
         const cleanFilterIdLower = String(targetFilterId || '').toLowerCase().replace(/^@/, '');
@@ -6161,11 +6168,34 @@ useEffect(() => {
                                 <span>
                                     {presenceStatus === 'online' ? 'Conectado' :
                                      presenceStatus === 'away' ? 'Ausente' :
-                                     presenceStatus === 'busy' ? 'Ocupado' : 'Desconectado'}
+                                     presenceStatus === 'busy' ? 'Ocupado' : (profileLastConn > 0 ? formatLastConnection(profileLastConn) : 'Desconectado')}
                                 </span>
                             </span>
                         </div>
-                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mt-1">{profileRole}</p>
+                        <div className="flex items-center justify-center sm:justify-start gap-2.5 flex-wrap mt-1.5">
+                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">{profileRole}</p>
+                            {!isMyProfile && targetUserId && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const dmChatId = `dm_${[myChatId, targetUserId].sort().join('_')}`;
+                                        handleOpenChat({
+                                            id: dmChatId,
+                                            name: profileName,
+                                            type: 'dm',
+                                            role: isTeacherProfile ? 'teacher' : 'student',
+                                            otherUserId: targetUserId,
+                                            targetUserId: targetUserId
+                                        });
+                                        setIsChatMinimized(false);
+                                    }}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-2xs transition-all cursor-pointer active:scale-95"
+                                >
+                                    <MessageCircle size={13} />
+                                    <span>Enviar mensaje</span>
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -13771,11 +13801,13 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                       const photo = u.profilePicUrl || userMappings[u.id]?.profilePicUrl;
 
                                                       return (
-                                                          <button 
-                                                              key={u.id} 
-                                                              type="button"
-                                                              onClick={() => { handleOpenChat({ id: chatId, name: u.name, type: 'dm', role: u.role, otherUserId: u.id, targetUserId: u.id }); setIsChatMinimized(false); }} 
-                                                              className={`w-full flex items-center gap-2.5 p-1.5 rounded-xl transition-all relative ${isDarkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'} ${isDisconnected ? 'opacity-85' : 'opacity-100'}`}
+                                                          <div
+                                                              key={u.id}
+                                                              onClick={() => { handleOpenChat({ id: chatId, name: u.name, type: 'dm', role: u.role, otherUserId: u.id, targetUserId: u.id }); setIsChatMinimized(false); }}
+                                                              role="button"
+                                                              tabIndex={0}
+                                                              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenChat({ id: chatId, name: u.name, type: 'dm', role: u.role, otherUserId: u.id, targetUserId: u.id }); setIsChatMinimized(false); } }}
+                                                              className={`group/contact w-full flex items-center gap-2.5 p-1.5 rounded-xl transition-all relative cursor-pointer ${isDarkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'} ${isDisconnected ? 'opacity-85' : 'opacity-100'}`}
                                                           >
                                                               <div className="relative shrink-0">
                                                                   <div 
@@ -13812,12 +13844,23 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                                           : 'text-gray-500'
                                                                   }`}>{u.role === 'teacher' ? 'Docente' : (u.customLabel || 'Estudiante')}</p>
                                                               </div>
+                                                              <button
+                                                                  type="button"
+                                                                  onClick={(e) => {
+                                                                      e.stopPropagation();
+                                                                      handleOpenProfileByName(u.name, u.id);
+                                                                  }}
+                                                                  title={`Ver perfil de ${u.name}`}
+                                                                  className={`opacity-0 group-hover/contact:opacity-100 p-1 rounded-lg transition-all shrink-0 ${isDarkMode ? 'text-gray-400 hover:text-white hover:bg-gray-700' : 'text-gray-400 hover:text-gray-800 hover:bg-gray-200'}`}
+                                                              >
+                                                                  <UserIcon size={13} />
+                                                              </button>
                                                               {isUnread ? (
                                                                   <span className="w-2 h-2 bg-blue-500 rounded-full shrink-0" title="Mensaje nuevo"></span>
                                                               ) : isUnanswered ? (
                                                                   <span className="w-2 h-2 bg-red-500 rounded-full shrink-0" title="Mensaje sin responder"></span>
                                                               ) : null}
-                                                          </button>
+                                                          </div>
                                                       );
                                                   })}
                                               </div>
@@ -14576,7 +14619,17 @@ Bot:`;
                                           >
                                               <ArrowLeftIcon size={18} />
                                           </button>
-                                          <div className="relative shrink-0">
+                                          <div
+                                              className={`relative shrink-0 ${activeChat.type === 'dm' ? 'cursor-pointer hover:opacity-90 transition-opacity' : ''}`}
+                                              onClick={() => {
+                                                  if (activeChat.type === 'dm') {
+                                                      const targetId = getDmTargetUserId(activeChat, myChatId);
+                                                      setViewingProfileId(targetId);
+                                                      changeTab('profile', targetId);
+                                                  }
+                                              }}
+                                              title={activeChat.type === 'dm' ? `Ver perfil de ${activeChat.name}` : undefined}
+                                          >
                                               <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden flex items-center justify-center text-white shadow-xs ${
                                                   activeChat.type === 'group' 
                                                       ? 'bg-gradient-to-br from-indigo-400 to-purple-500' 
@@ -14589,7 +14642,7 @@ Bot:`;
                                                        return <UsersGroupIcon size={18}/>;
                                                    })() : (() => {
                                                       const tId = getDmTargetUserId(activeChat, myChatId);
-                                                      const photo = userMappings[tId]?.profilePicUrl;
+                                                      const photo = getUserMappingData(tId, userMappings)?.profilePicUrl || userMappings[tId]?.profilePicUrl;
                                                       if (photo) return <img src={photo} alt={activeChat.name} className="w-full h-full object-cover" />;
                                                       return activeChat.role === 'teacher' ? <TeacherIcon size={18}/> : <span className="font-bold text-sm">{activeChat.name?.charAt(0).toUpperCase() || 'U'}</span>;
                                                   })()}
@@ -14654,12 +14707,12 @@ Bot:`;
                                                         }
                                                         if (st === 'away') return 'Ausente';
                                                         if (st === 'busy') return 'Ocupado';
-                                                        if (role === 'teacher' && !isTeacherId(targetId)) {
+                                                        if (role === 'teacher') {
                                                             let lastConn = getLastConnectionTime(targetId, userPresence, userMappings, lastMessages[activeChat.id], lastMessages);
                                                             if (Array.isArray(chatMessages) && chatMessages.length > 0) {
                                                                 for (let i = chatMessages.length - 1; i >= 0; i--) {
                                                                     const m = chatMessages[i];
-                                                                    if (m && isLastMessageFromStudent(targetId, m, myChatId, userMappings) && Number(m.createdAt) > 0) {
+                                                                    if (m && (isLastMessageFromStudent(targetId, m, myChatId, userMappings) || m.authorId === targetId) && Number(m.createdAt) > 0) {
                                                                         lastConn = Math.max(lastConn, Number(m.createdAt));
                                                                         break;
                                                                     }
@@ -15365,7 +15418,7 @@ Bot:`;
                                                                   <button onClick={() => setActiveChatReactionMsgId(activeChatReactionMsgId === m.id ? null : m.id)} className="p-1 rounded-full shadow-xs bg-white/90 text-gray-600 hover:bg-white dark:bg-gray-800 dark:text-gray-300" title="Reaccionar"><SmileIcon size={13}/></button>
                                                                   <button onClick={() => setReplyingTo(m)} className="p-1 rounded-full shadow-xs bg-white/90 text-gray-600 hover:bg-white dark:bg-gray-800 dark:text-gray-300" title="Responder"><ReplyIcon size={13}/></button>
                                                                   {/* Calificar aporte (Exclusivo Docente) */}
-                                                                  {role === 'teacher' && !m.isDeleted && (
+                                                                  {role === 'teacher' && !m.isDeleted && !isTeacher && !isMe && (
                                                                       <button
                                                                           type="button"
                                                                           onClick={() => {

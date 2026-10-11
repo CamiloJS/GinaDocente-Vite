@@ -61,6 +61,16 @@ export const getUserMappingData = (userOrId, userMappings = {}) => {
   if (!rawId && !cleanId) return {};
   if (userMappings[rawId]) return userMappings[rawId];
   if (userMappings[cleanId]) return userMappings[cleanId];
+  if (cleanId === 'teacher' || cleanId === 'ginadocente' || cleanId === 'teacher_gina') {
+    if (userMappings.teacher && userMappings.ginadocente) {
+      return { ...userMappings.ginadocente, ...userMappings.teacher, profilePicUrl: userMappings.teacher.profilePicUrl || userMappings.ginadocente.profilePicUrl || '' };
+    }
+    if (userMappings.teacher) return userMappings.teacher;
+    if (userMappings.ginadocente) return userMappings.ginadocente;
+  }
+  if (isCamiloTeacherId(cleanId) && userMappings.camilodocente) {
+    return userMappings.camilodocente;
+  }
   const matchKey = Object.keys(userMappings).find(
     (k) => k.toLowerCase().replace(/^@/, '').trim() === cleanId
   );
@@ -90,6 +100,24 @@ export const getUserPresenceData = (userOrId, userPresence = {}, userMappings = 
   const uid = String((typeof userOrId === 'object' && userOrId.uid) || mapped.uid || '').trim();
   const email = String((typeof userOrId === 'object' && userOrId.email) || mapped.email || '').trim();
   const emailPrefix = email ? email.split('@')[0].trim() : '';
+
+  if (cleanId === 'teacher' || cleanId === 'ginadocente' || cleanId === 'teacher_gina') {
+    const candidates = [userPresence.teacher, userPresence.ginadocente, userPresence.teacher_gina, uid && userPresence[uid]].filter(Boolean);
+    if (candidates.length > 0) {
+      const onlineCandidate = candidates.find((c) => c.isOnline !== false && c.status && c.status !== 'offline');
+      if (onlineCandidate) return onlineCandidate;
+      return candidates.sort((a, b) => Math.max(toTimestampMs(b.lastPing), toTimestampMs(b.lastSeen)) - Math.max(toTimestampMs(a.lastPing), toTimestampMs(a.lastSeen)))[0];
+    }
+  }
+
+  if (isCamiloTeacherId(cleanId)) {
+    const candidates = [userPresence.camilodocente, userPresence.teacher_camilo, uid && userPresence[uid]].filter(Boolean);
+    if (candidates.length > 0) {
+      const onlineCandidate = candidates.find((c) => c.isOnline !== false && c.status && c.status !== 'offline');
+      if (onlineCandidate) return onlineCandidate;
+      return candidates.sort((a, b) => Math.max(toTimestampMs(b.lastPing), toTimestampMs(b.lastSeen)) - Math.max(toTimestampMs(a.lastPing), toTimestampMs(a.lastSeen)))[0];
+    }
+  }
 
   const direct =
     (rawId && userPresence[rawId]) ||
