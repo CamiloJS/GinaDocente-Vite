@@ -5,7 +5,7 @@ import {
   CheckCheck, CheckCircle2, CheckLine, Clock, Edit3, EyeOff, FileDocIcon, FileText, ImageIcon, Loader2, Lock, Unlock, Share2, MessageSquareText, Mic, PaperclipIcon, Plus, ReplyIcon, Send, SmileIcon, Square, Star, Pin, Trash2, Upload, X, XLine, Volume2, VolumeX, Languages, UserIcon, BookOpen, NavNotebook, Play, Pause, Download, MessageCircle, BarChart2, Vote, Gamepad2, Trophy, Zap, Flame, NavSlides, ClipboardList, Shield, ShieldAlert, AlertTriangle, ChevronLeft, ChevronRight, Maximize2, Layers, MonitorPlay, Globe, Sparkles, RotateCcw, Eye
 } from './Icons.jsx'
 import {
-  compressImage, containsBadWords, checkBadWordsAsync, uploadImageToStorage, uploadRawFileToStorage, TEACHER_NAME, SECOND_TEACHER_NAME, SECOND_TEACHER_ID, isCamiloTeacher, isTeacherId, getCanonicalTeacherId, getTeacherDisplayName, getItemTeacherId, COMMENT_EMOJIS, REACTION_EMOJIS, splitNameFirstAndLast, FALLBACK_MAP, format12HourTime, formatDateTime12H
+  compressImage, containsBadWords, checkBadWordsAsync, uploadImageToStorage, uploadRawFileToStorage, deleteFileFromStorage, deleteAllStorageFilesInObject, deleteReplacedStorageFiles, TEACHER_NAME, SECOND_TEACHER_NAME, SECOND_TEACHER_ID, isCamiloTeacher, isTeacherId, getCanonicalTeacherId, getTeacherDisplayName, getItemTeacherId, COMMENT_EMOJIS, REACTION_EMOJIS, splitNameFirstAndLast, FALLBACK_MAP, format12HourTime, formatDateTime12H
 } from '../utils/helpers.js'
 import { glassCard, glassInput } from '../utils/styles.js'
 import { useClickOutside } from '../utils/hooks.js'
@@ -1220,7 +1220,9 @@ const TaskCard = React.memo(({
     const handleDeleteComment = async (commentId, authorName, forcePermanent = false) => {
         let updatedComments;
         const currentComments = task.comments || [];
+        let targetCommentToPurge = null;
         if (role === 'teacher' || forcePermanent) {
+            targetCommentToPurge = currentComments.find((c, i) => (c.id || `old-${i}`) === commentId) || null;
             updatedComments = currentComments.filter((c, i) => (c.id || `old-${i}`) !== commentId);
         } else {
             updatedComments = currentComments.map((c, i) => {
@@ -1260,6 +1262,9 @@ const TaskCard = React.memo(({
             });
         }
         try {
+            if (!isDemoTask && targetCommentToPurge) {
+                await deleteAllStorageFilesInObject(targetCommentToPurge);
+            }
             await updateTaskDoc({ comments: updatedComments });
         } catch (err) {
             console.error("Error al eliminar comentario:", err);
@@ -1304,6 +1309,12 @@ const TaskCard = React.memo(({
                     allowNicknameChange: currentKahoot.allowNicknameChange !== false,
                     updatedAt: Date.now()
                 };
+            }
+            if (!isDemoTask) {
+                deleteReplacedStorageFiles(
+                    { description: task.description, kahoot: task.kahoot },
+                    { description: updates.description, kahoot: updates.kahoot || task.kahoot }
+                ).catch(() => {});
             }
             await updateTaskDoc(updates);
             setIsEditingTask(false);
@@ -1386,7 +1397,11 @@ const TaskCard = React.memo(({
 
             if (docFiles.length > 0) {
                 const docFile = docFiles[0];
+                const prevFileUrl = commentFileUrl;
                 const firebaseURL = await uploadRawFileToStorage(docFile, 'comments');
+                if (prevFileUrl && prevFileUrl !== firebaseURL) {
+                    deleteFileFromStorage(prevFileUrl).catch(() => {});
+                }
                 setCommentFileUrl(firebaseURL);
                 setCommentFileName(docFile.name);
             }
@@ -1756,6 +1771,9 @@ const TaskCard = React.memo(({
                                         <button onClick={() => confirmAction("¿Desea eliminar esta publicación definitivamente?", async () => {
                                             try {
                                                 if (isEvaluation || isSlides || isBook3D) {
+                                                    if (!isDemoTask && Array.isArray(task.comments) && task.comments.length > 0) {
+                                                        await deleteAllStorageFilesInObject(task.comments);
+                                                    }
                                                     await updateTaskDoc({ isDeletedFromWall: true, isPinned: false });
                                                     showMessage("✅ Publicación retirada del muro.");
                                                     return;
@@ -1768,6 +1786,7 @@ const TaskCard = React.memo(({
                                                     showMessage("✅ Publicación eliminada del entorno Demo.");
                                                     return;
                                                 }
+                                                await deleteAllStorageFilesInObject(task);
                                                 await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id));
                                                 showMessage("✅ Publicación eliminada.");
                                             } catch (e) {
@@ -4523,6 +4542,7 @@ const TaskCard = React.memo(({
                                                     <button 
                                                         type="button" 
                                                         onClick={() => {
+                                                            if (url) deleteFileFromStorage(url).catch(() => {});
                                                             const updated = (commentImageUrls && commentImageUrls.length > 0 ? commentImageUrls : [commentImageUrl]).filter((_, i) => i !== idx);
                                                             setCommentImageUrls(updated);
                                                             setCommentImageUrl(updated[0] || '');

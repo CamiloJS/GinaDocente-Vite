@@ -29,7 +29,7 @@ import {
   generarKahootConIA,
   detectarIntencionAcertijoIA,
 } from '../utils/kahootEngine.js';
-import { compressImage, uploadImageToStorage } from '../utils/helpers.js';
+import { compressImage, uploadImageToStorage, deleteFileFromStorage } from '../utils/helpers.js';
 
 const IDIOMAS_IA = [
   { value: 'en', label: 'Inglés' },
@@ -119,7 +119,11 @@ const KahootBuilder = ({
       showMessage?.('El Kahoot debe tener al menos 1 pregunta.');
       return;
     }
+    const removedQ = safeQuestions[idx];
     const nextList = safeQuestions.filter((_, i) => i !== idx);
+    if (!isDemoMode && removedQ?.imageUrl && !nextList.some((q) => q?.imageUrl === removedQ.imageUrl)) {
+      deleteFileFromStorage(removedQ.imageUrl).catch(() => {});
+    }
     setQuestions(nextList);
     setActiveIndex(Math.max(0, Math.min(idx, nextList.length - 1)));
   };
@@ -189,12 +193,20 @@ const KahootBuilder = ({
     }
     setIsUploadingImg(true);
     try {
+      const prevImageUrl = currentQ.imageUrl;
       const compressed = await compressImage(file, 1000, 1000, 0.78);
       if (isDemoMode) {
         updateQuestionAt(safeIdx, { imageUrl: compressed });
         showMessage?.('Imagen añadida a la pregunta (Modo Demo).');
       } else {
         const url = await uploadImageToStorage(compressed, 'kahoot_images');
+        if (
+          prevImageUrl &&
+          prevImageUrl !== url &&
+          !safeQuestions.some((q, qi) => qi !== safeIdx && q?.imageUrl === prevImageUrl)
+        ) {
+          deleteFileFromStorage(prevImageUrl).catch(() => {});
+        }
         updateQuestionAt(safeIdx, { imageUrl: url });
         showMessage?.('Imagen subida a la pregunta.');
       }
@@ -786,7 +798,17 @@ const KahootBuilder = ({
                 />
                 <button
                   type="button"
-                  onClick={() => updateQuestionAt(safeIdx, { imageUrl: '', imageReveal: 'none' })}
+                  onClick={() => {
+                    const prevUrl = currentQ.imageUrl;
+                    if (
+                      !isDemoMode &&
+                      prevUrl &&
+                      !safeQuestions.some((q, qi) => qi !== safeIdx && q?.imageUrl === prevUrl)
+                    ) {
+                      deleteFileFromStorage(prevUrl).catch(() => {});
+                    }
+                    updateQuestionAt(safeIdx, { imageUrl: '', imageReveal: 'none' });
+                  }}
                   className="absolute -top-2 -right-2 bg-red-600 hover:bg-red-700 text-white rounded-full p-1 shadow-md cursor-pointer"
                   title="Quitar imagen"
                 >

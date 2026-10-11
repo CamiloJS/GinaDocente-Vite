@@ -5,7 +5,7 @@
 import React, { useRef, useState } from 'react'
 import { Mic, Square, Trash2, Upload, Loader2 } from './Icons.jsx'
 import { useVoiceRecorder } from '../utils/useVoiceRecorder.js'
-import { uploadRawFileToStorage } from '../utils/helpers.js'
+import { uploadRawFileToStorage, deleteFileFromStorage } from '../utils/helpers.js'
 
 const AudioQuestionEditor = ({ audioUrl = '', onChange, isDarkMode = false, folder = 'chat_audios', showMessage = () => {} }) => {
   const grabadora = useVoiceRecorder(folder, showMessage)
@@ -14,14 +14,21 @@ const AudioQuestionEditor = ({ audioUrl = '', onChange, isDarkMode = false, fold
 
   // cuando la grabacion termina y se sube, se asigna a la pregunta
   React.useEffect(() => {
-    if (grabadora.audioUrl && grabadora.audioUrl !== audioUrl) onChange(grabadora.audioUrl)
+    if (grabadora.audioUrl && grabadora.audioUrl !== audioUrl) {
+      if (audioUrl) deleteFileFromStorage(audioUrl).catch(() => {})
+      onChange(grabadora.audioUrl)
+    }
   }, [grabadora.audioUrl])
 
   const subirArchivo = async (file) => {
     if (!file) return
     setSubiendo(true)
     try {
+      const prevUrl = audioUrl
       const url = await uploadRawFileToStorage(file, folder)
+      if (prevUrl && prevUrl !== url) {
+        deleteFileFromStorage(prevUrl).catch(() => {})
+      }
       onChange(url)
       showMessage('Audio cargado.')
     } catch (e) {
@@ -40,7 +47,7 @@ const AudioQuestionEditor = ({ audioUrl = '', onChange, isDarkMode = false, fold
       <div className={`p-2.5 rounded-xl border space-y-2 ${isDarkMode ? 'bg-gray-800/60 border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
         <audio controls src={audioUrl} className="w-full h-9" />
         <div className="flex gap-2">
-          <button type="button" onClick={() => onChange('')} className={`${boton} ${claro}`}>
+          <button type="button" onClick={() => { if (audioUrl) deleteFileFromStorage(audioUrl).catch(() => {}); grabadora.setAudioUrl?.(''); onChange(''); }} className={`${boton} ${claro}`}>
             <Trash2 size={12} /> Quitar audio
           </button>
           <button type="button" onClick={() => fileRef.current?.click()} className={`${boton} ${claro}`} disabled={subiendo}>

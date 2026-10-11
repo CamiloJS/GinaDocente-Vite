@@ -1,7 +1,7 @@
 // src/utils/helpers.js
 // Constantes globales y funciones de utilidad (migrado del HTML original)
 
-import { ref, uploadString, uploadBytes, getDownloadURL } from 'firebase/storage'
+import { ref, uploadString, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
 import { storage, appId } from '../firebase/config.js'
 import { autoOptimizeFile, compressImageSilently } from './fileCompressor.js'
 import { segmentosLocales, narrarSegmentos } from './narracion.js';
@@ -218,6 +218,130 @@ export const uploadRawFileToStorage = async (file, folderName) => {
   await uploadBytes(storageRef, optimized)
   return await getDownloadURL(storageRef)
 }
+
+export const extractStoragePathFromUrl = (urlOrPath) => {
+  if (!urlOrPath || typeof urlOrPath !== 'string') return null;
+  const trimmed = urlOrPath.trim();
+  if (!trimmed || trimmed.startsWith('data:') || trimmed.startsWith('blob:') || trimmed.startsWith('/')) {
+    return null;
+  }
+  if (trimmed.startsWith(`${appId}/`)) {
+    return trimmed;
+  }
+  if (trimmed.includes('firebasestorage.googleapis.com') || trimmed.includes('.firebasestorage.app')) {
+    const match = trimmed.match(/\/o\/([^?#]+)/);
+    if (match && match[1]) {
+      try {
+        return decodeURIComponent(match[1]);
+      } catch {
+        return match[1];
+      }
+    }
+  }
+  if (trimmed.startsWith('gs://')) {
+    const withoutScheme = trimmed.slice(5);
+    const slashIdx = withoutScheme.indexOf('/');
+    if (slashIdx !== -1) {
+      return withoutScheme.slice(slashIdx + 1);
+    }
+  }
+  return null;
+};
+
+export const deleteFileFromStorage = async (urlOrPath) => {
+  if (!urlOrPath || isDemoSessionActive()) return false;
+  const storagePath = extractStoragePathFromUrl(urlOrPath);
+  if (!storagePath) return false;
+  try {
+    await deleteObject(ref(storage, storagePath));
+    return true;
+  } catch (err) {
+    if (err?.code !== 'storage/object-not-found') {
+      console.warn('Aviso al eliminar archivo de Storage:', storagePath, err?.code || err?.message);
+    }
+    return false;
+  }
+};
+
+export const deleteFilesFromStorage = async (urlsOrPaths = []) => {
+  if (!Array.isArray(urlsOrPaths) || urlsOrPaths.length === 0 || isDemoSessionActive()) return 0;
+  const uniquePaths = Array.from(
+    new Set(
+      urlsOrPaths
+        .map((u) => extractStoragePathFromUrl(u))
+        .filter(Boolean)
+    )
+  );
+  if (uniquePaths.length === 0) return 0;
+  let deletedCount = 0;
+  const batchSize = 15;
+  for (let i = 0; i < uniquePaths.length; i += batchSize) {
+    const batch = uniquePaths.slice(i, i + batchSize);
+    const results = await Promise.allSettled(
+      batch.map((pathStr) => deleteObject(ref(storage, pathStr)))
+    );
+    results.forEach((r) => {
+      if (r.status === 'fulfilled') deletedCount += 1;
+    });
+  }
+  return deletedCount;
+};
+
+export const extractStorageUrlsFromObject = (input, visited = new Set()) => {
+  const foundPaths = new Set();
+
+  const walk = (val) => {
+    if (!val) return;
+    if (typeof val === 'string') {
+      const directPath = extractStoragePathFromUrl(val);
+      if (directPath) {
+        foundPaths.add(directPath);
+      } else if (val.includes('firebasestorage.googleapis.com')) {
+        const regex = /https:\/\/firebasestorage\.googleapis\.com\/v0\/b\/[^"'\s<>)+]+\/o\/([^?"'\s<>&#)+]+)/g;
+        let m;
+        while ((m = regex.exec(val)) !== null) {
+          try {
+            foundPaths.add(decodeURIComponent(m[1]));
+          } catch {
+            foundPaths.add(m[1]);
+          }
+        }
+      }
+      return;
+    }
+    if (typeof val !== 'object') return;
+    if (visited.has(val)) return;
+    visited.add(val);
+
+    if (Array.isArray(val)) {
+      for (const item of val) walk(item);
+      return;
+    }
+    for (const key of Object.keys(val)) {
+      walk(val[key]);
+    }
+  };
+
+  walk(input);
+  return Array.from(foundPaths);
+};
+
+export const deleteAllStorageFilesInObject = async (obj) => {
+  if (!obj || isDemoSessionActive()) return 0;
+  const paths = extractStorageUrlsFromObject(obj);
+  if (paths.length === 0) return 0;
+  return await deleteFilesFromStorage(paths);
+};
+
+export const deleteReplacedStorageFiles = async (oldObj, newObj) => {
+  if (!oldObj || isDemoSessionActive()) return 0;
+  const oldPaths = extractStorageUrlsFromObject(oldObj);
+  if (oldPaths.length === 0) return 0;
+  const newPathsSet = new Set(extractStorageUrlsFromObject(newObj));
+  const removedPaths = oldPaths.filter((p) => !newPathsSet.has(p));
+  if (removedPaths.length === 0) return 0;
+  return await deleteFilesFromStorage(removedPaths);
+};
 
 export const containsBadWords = (text) => {
   if (!text || typeof text !== 'string') return false;

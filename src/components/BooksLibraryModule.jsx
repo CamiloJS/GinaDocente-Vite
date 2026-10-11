@@ -54,7 +54,9 @@ import {
     getTeacherDisplayName,
     handleForceDownload,
     uploadImageToStorage as defaultUploadImageToStorage,
-    uploadRawFileToStorage as defaultUploadRawFileToStorage
+    uploadRawFileToStorage as defaultUploadRawFileToStorage,
+    deleteAllStorageFilesInObject,
+    deleteReplacedStorageFiles
 } from '../utils/helpers';
 import {
     saveDemoSandboxItem,
@@ -995,6 +997,9 @@ export default function BooksLibraryModule({
                     ...(Array.isArray(prev) ? prev.filter((t) => String(t?.id) !== wallTaskId) : [])
                 ]);
             } else {
+                if (existingRecord) {
+                    deleteReplacedStorageFiles(existingRecord, inMemoryBook).catch(() => {});
+                }
                 await withTimeout(
                     setDoc(
                         doc(effectiveDb, 'artifacts', effectiveAppId, 'public', 'data', 'books', bookId),
@@ -1029,6 +1034,11 @@ export default function BooksLibraryModule({
     const handleDeleteBook = (bookItem) => {
         if (!bookItem?.id) return;
         const performDelete = async () => {
+            const linkedWallTasks = (Array.isArray(tasks) ? tasks : []).filter(
+                (t) =>
+                    String(t?.id) === `book_wall_${bookItem.id}` ||
+                    String(t?.bookId) === String(bookItem.id)
+            );
             effectiveSetBooks?.((prev) =>
                 Array.isArray(prev) ? prev.filter((b) => String(b?.id) !== String(bookItem.id)) : []
             );
@@ -1044,14 +1054,23 @@ export default function BooksLibraryModule({
             if (isDemoMode || bookItem.isDemoCreated || String(bookItem.id).startsWith('demo')) {
                 deleteDemoSandboxItem('books', bookItem.id);
                 deleteDemoSandboxItem('tasks', `book_wall_${bookItem.id}`);
+                linkedWallTasks.forEach((wt) => deleteDemoSandboxItem('tasks', wt.id));
                 notify('🗑️ Libro eliminado.');
                 return;
             }
             try {
+                await deleteAllStorageFilesInObject({ bookItem, linkedWallTasks });
                 await deleteDoc(doc(effectiveDb, 'artifacts', effectiveAppId, 'public', 'data', 'books', bookItem.id));
                 await deleteDoc(
                     doc(effectiveDb, 'artifacts', effectiveAppId, 'public', 'data', 'tasks', `book_wall_${bookItem.id}`)
                 ).catch(() => {});
+                for (const wt of linkedWallTasks) {
+                    if (wt?.id && String(wt.id) !== `book_wall_${bookItem.id}`) {
+                        await deleteDoc(
+                            doc(effectiveDb, 'artifacts', effectiveAppId, 'public', 'data', 'tasks', wt.id)
+                        ).catch(() => {});
+                    }
+                }
                 notify('🗑️ Libro eliminado.');
             } catch (err) {
                 console.error('Error eliminando libro:', err);

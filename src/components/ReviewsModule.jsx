@@ -21,6 +21,8 @@ import {
   getItemTeacherId,
   compressImage,
   uploadImageToStorage,
+  deleteAllStorageFilesInObject,
+  deleteReplacedStorageFiles,
   cleanTextForTTS,
   detectLanguage,
   selectBestFemaleVoice
@@ -8013,6 +8015,10 @@ export const ReviewsModule = ({
         }
         saveDemoSandboxItem('reviews', merged);
       } else {
+        const previousReview = (reviews || []).find(r => String(r?.id) === String(updatedPres.id));
+        if (previousReview) {
+          deleteReplacedStorageFiles(previousReview, firestoreSlides).catch(() => {});
+        }
         if (auth && !auth.currentUser) {
           await signInAnonymously(auth).catch(() => {});
         }
@@ -8088,6 +8094,7 @@ export const ReviewsModule = ({
           if (editingPresentation?.id === id) setEditingPresentation(null);
           return;
         }
+        await deleteAllStorageFilesInObject({ targetReview, linkedWallTasks });
         await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reviews', id));
         for (const wt of linkedWallTasks) {
           try {

@@ -15,7 +15,7 @@ import AudioPlayer, { AudioRecordingVisualizer } from './AudioPlayer.jsx'
 import CustomVideoPlayer from './CustomVideoPlayer.jsx'
 import GeniallyEmbedPlayer, { extractGeniallyUrl } from './GeniallyEmbedPlayer.jsx'
 import { DEMO_TTL_MS, saveDemoSandboxItem } from '../utils/demoData.js'
-import { getCanonicalTeacherId, getItemTeacherId, getTeacherDisplayName, uploadImageToStorage, uploadRawFileToStorage, generateId } from '../utils/helpers.js'
+import { getCanonicalTeacherId, getItemTeacherId, getTeacherDisplayName, uploadImageToStorage, uploadRawFileToStorage, deleteFileFromStorage, generateId } from '../utils/helpers.js'
 import { createDefaultKahootQuestion, validateKahootConfig, generateKahootPin } from '../utils/kahootEngine.js'
 import { BOOK_THEMES, renderPdfToBookPages, uploadBookPagesToStorage, sanitizeBookForFirestore, buildFallbackBookPages, buildBookPagesFromOutline, extractBookOutlinePageTexts, syncBookOutlineMetadata, stripBookHtml, generateAiBookPages, applyCustomCoverToPages, compressBookImageDataUrl, READING_AUDIO_PRESETS, getReadingAudioPreset, clampReadingVolume, readingAmbientPlayer } from '../utils/flipbookEngine.js'
 import Flipbook3DModal from './Flipbook3DModal.jsx'
@@ -1230,6 +1230,7 @@ const TasksTab = React.memo(({
                                                             <button 
                                                                 type="button" 
                                                                 onClick={() => {
+                                                                    if (!isDemoMode && url) deleteFileFromStorage(url).catch(() => {});
                                                                     const updated = currentImgs.filter((_, i) => i !== idx);
                                                                     if (typeof setPostImageUrls === 'function') setPostImageUrls(updated);
                                                                     if (typeof setPostImageUrl === 'function') setPostImageUrl(updated[0] || '');
@@ -1276,7 +1277,7 @@ const TasksTab = React.memo(({
                                     {postFileUrl && (
                                         <div className="flex items-center gap-2 p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-xs font-bold text-blue-700 dark:text-blue-300 w-fit">
                                             <PaperclipIcon size={16} /> {postFileName || 'Documento adjunto'}
-                                            <button type="button" onClick={() => { setPostFileUrl(""); setPostFileName(""); }} className="text-red-500 hover:text-red-700 ml-2"><X size={14}/></button>
+                                            <button type="button" onClick={() => { if (!isDemoMode && postFileUrl) deleteFileFromStorage(postFileUrl).catch(() => {}); setPostFileUrl(""); setPostFileName(""); }} className="text-red-500 hover:text-red-700 ml-2"><X size={14}/></button>
                                         </div>
                                     )}
 

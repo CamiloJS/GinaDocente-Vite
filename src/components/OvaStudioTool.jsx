@@ -8,7 +8,7 @@ import {
 import goldenRatioTemplate from '../templates/goldenRatioOva.json';
 import { db, appId, collection, doc, setDoc, getDocs, deleteDoc, query, orderBy, limit } from '../firebase/config.js';
 import { DEMO_TTL_MS, isDemoItemExpired } from '../utils/demoData.js';
-import { getCanonicalTeacherId, getTeacherDisplayName, getTeacherUsername, getItemTeacherId } from '../utils/helpers.js';
+import { getCanonicalTeacherId, getTeacherDisplayName, getTeacherUsername, getItemTeacherId, deleteAllStorageFilesInObject } from '../utils/helpers.js';
 
 export default function OvaStudioTool({
   isDarkMode = false,
@@ -425,6 +425,7 @@ export default function OvaStudioTool({
       return;
     }
 
+    const ovaToDelete = currentOva;
     const idToDelete = currentOva.id;
     const nextList = ovas.filter(o => o.id !== idToDelete);
     setOvas(nextList);
@@ -435,6 +436,7 @@ export default function OvaStudioTool({
 
     if (!isDemoMode && firestoreDb && activeAppId) {
       try {
+        await deleteAllStorageFilesInObject(ovaToDelete);
         await deleteDoc(doc(firestoreDb, 'artifacts', activeAppId, 'public', 'data', ovaCollName, idToDelete));
       } catch (e) {}
     }

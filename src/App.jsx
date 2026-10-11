@@ -13,7 +13,9 @@ import {
   TEACHER_NAME, SECOND_TEACHER_NAME, isCamiloTeacher, isTeacherId, getCanonicalTeacherId,
   getTeacherDisplayName, getTeacherUsername, getItemTeacherId, isDemoSessionActive,
   compressImage, containsBadWords, checkBadWordsAsync, formatChatDate, formatTime,
-  uploadImageToStorage, uploadRawFileToStorage, speakText, splitNameFirstAndLast, format12HourTime, formatDateTime12H
+  uploadImageToStorage, uploadRawFileToStorage, deleteFileFromStorage, deleteFilesFromStorage,
+  deleteAllStorageFilesInObject, deleteReplacedStorageFiles,
+  speakText, splitNameFirstAndLast, format12HourTime, formatDateTime12H
 } from './utils/helpers.js'
 import {
   glassCard, glassInput, outlineButton, redButton,
@@ -4468,6 +4470,9 @@ useEffect(() => {
               try {
                   // Si es la docente O se solicita eliminación definitiva -> Borrado físico total sin rastro
                   if (role === 'teacher' || forcePermanent) {
+                      if (msgObj) {
+                          await deleteAllStorageFilesInObject(msgObj);
+                      }
                       await deleteDoc(msgRef);
                       const msgsSnapshot = await getDocs(query(collection(db, 'artifacts', appId, 'public', 'data', 'chats', activeChat.id, 'messages'), orderBy('createdAt', 'desc'), limit(1)));
                       if (msgsSnapshot.empty) {
@@ -4831,6 +4836,13 @@ useEffect(() => {
                   return;
               }
               try {
+                  await deleteAllStorageFilesInObject(group);
+                  try {
+                      const msgsSnapshot = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'chats', activeChat.id, 'messages'));
+                      await Promise.all(msgsSnapshot.docs.map(d => deleteAllStorageFilesInObject(d.data())));
+                      await Promise.all(msgsSnapshot.docs.map(d => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chats', activeChat.id, 'messages', d.id))));
+                      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'lastMessages', activeChat.id)).catch(() => {});
+                  } catch (e) {}
                   await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', group.id));
                   setActiveChat(null);
                   showMessage("Grupo eliminado.");
@@ -4852,12 +4864,15 @@ useEffect(() => {
               }
               const msgsSnapshot = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'chats', activeChat.id, 'messages'));
 
+              // Eliminar todos los archivos e imágenes/audios adjuntos en Storage de este chat
+              await Promise.all(msgsSnapshot.docs.map(d => deleteAllStorageFilesInObject(d.data())));
+
               // Esperar a que todos los mensajes se borren correctamente
               const deletePromises = msgsSnapshot.docs.map(d => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chats', activeChat.id, 'messages', d.id)));
               await Promise.all(deletePromises);
 
               setLastMessages(prev => { const next = { ...prev }; delete next[activeChat.id]; return next; });
-              await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'lastMessages', activeChat.id));
+              await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'lastMessages', activeChat.id)).catch(() => {});
               setActiveChat(null);
               showMessage("Historial de chat eliminado.");
           };
@@ -4872,9 +4887,13 @@ useEffect(() => {
       }
       try {
           setIsUploadingGroupAvatar(true);
-          const compressed = await compressImage(file);
-          const url = await uploadImageToStorage(compressed, 'group_avatars');
           const grp = chatGroups.find(g => g.id === activeChat.id || `group_${g.id}` === activeChat.id || `acad_${g.academicGroupId}` === activeChat.id || `acad_${g.id}` === activeChat.id);
+          const prevAvatarUrl = grp?.avatarUrl || activeChat?.avatarUrl || '';
+          const compressed = await compressImage(file, 256, 256, 0.72);
+          const url = await uploadImageToStorage(compressed, 'group_avatars');
+          if (!isDemoMode && prevAvatarUrl && prevAvatarUrl !== url) {
+              deleteFileFromStorage(prevAvatarUrl).catch(() => {});
+          }
           if (grp) {
               if (isDemoMode) {
                   const updatedGrp = { ...grp, avatarUrl: url };
@@ -5351,6 +5370,9 @@ useEffect(() => {
           };
 
           const cancelVoiceRecording = () => {
+              if (!isDemoMode && chatAppAudioUrl) {
+                  deleteFileFromStorage(chatAppAudioUrl).catch(() => {});
+              }
               setIsRecording(false);
               setChatAppAudioUrl("");
               if (recordingRef.current && recordingRef.current.state !== 'inactive') {
@@ -5377,6 +5399,7 @@ useEffect(() => {
              }
              try {
                showMessage("⏳ Procesando imagen...");
+               const prevImgUrl = chatAppImageUrl;
                let finalUrl;
                if (file.type === 'image/gif') {
                  finalUrl = await uploadRawFileToStorage(file, 'chats');
@@ -5384,6 +5407,9 @@ useEffect(() => {
                  // Compresión automática ligera al 90% de calidad
                  const compressed = await compressImage(file, 1600, 1600, 0.90);
                  finalUrl = await uploadImageToStorage(compressed, 'chats');
+               }
+               if (!isDemoMode && prevImgUrl && prevImgUrl !== finalUrl) {
+                 deleteFileFromStorage(prevImgUrl).catch(() => {});
                }
                setChatAppImageUrl(finalUrl);
                setShowChatAppAttachmentMenu(false);
@@ -5401,7 +5427,11 @@ useEffect(() => {
              if (!file) return;
              try {
                showMessage("⏳ Subiendo documento...");
+               const prevDocUrl = chatAppFileUrl;
                const firebaseURL = await uploadRawFileToStorage(file, 'chats');
+               if (!isDemoMode && prevDocUrl && prevDocUrl !== firebaseURL) {
+                 deleteFileFromStorage(prevDocUrl).catch(() => {});
+               }
                setChatAppFileUrl(firebaseURL);
                setChatAppFileName(file.name);
                setShowChatAppAttachmentMenu(false);
@@ -5466,7 +5496,11 @@ useEffect(() => {
 
         if (docFiles.length > 0) {
             const docFile = docFiles[0];
+            const prevDocUrl = postFileUrl;
             const firebaseURL = await uploadRawFileToStorage(docFile, 'posts');
+            if (!isDemoMode && prevDocUrl && prevDocUrl !== firebaseURL) {
+                deleteFileFromStorage(prevDocUrl).catch(() => {});
+            }
             setPostFileUrl(firebaseURL);
             setPostFileName(docFile.name);
         }
@@ -5653,12 +5687,16 @@ useEffect(() => {
               }
               setUploadingQuestionImageIdx(qIndex);
               try {
+                  const prevUrl = evalFormData.questions?.[qIndex]?.imageUrl || '';
                   const base64 = await compressImage(file, 1600, 1600, 0.82);
                   let finalUrl = base64;
                   if (!isDemoMode) {
                       try {
                           const uploadedUrl = await uploadImageToStorage(base64, 'eval_question_images');
                           if (uploadedUrl) finalUrl = uploadedUrl;
+                          if (prevUrl && prevUrl !== finalUrl) {
+                              deleteFileFromStorage(prevUrl).catch(() => {});
+                          }
                       } catch (storageErr) {
                           console.warn('Usando imagen optimizada directa como respaldo:', storageErr);
                       }
@@ -5740,6 +5778,7 @@ useEffect(() => {
             // 🛑 CERRAR EL MODAL INMEDIATAMENTE para evitar congelamientos
             setShowAvatarUploadModal(false); 
             
+            const prevAvatarUrl = userMappings[myChatId]?.profilePicUrl || '';
             const url = await uploadImageToStorage(finalImagePayload, 'avatars');
             if (isDemoMode) {
                 const updatedEntry = { ...(userMappings[myChatId] || { fullName: myDisplayName, role }), profilePicUrl: url };
@@ -5749,6 +5788,9 @@ useEffect(() => {
                 showMessage("Foto de perfil actualizada.");
                 setIsUploadingAvatar(false);
                 return;
+            }
+            if (prevAvatarUrl && prevAvatarUrl !== url) {
+                deleteFileFromStorage(prevAvatarUrl).catch(() => {});
             }
             await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userMappings', myChatId), { profilePicUrl: url }, { merge: true });
             
@@ -5775,8 +5817,12 @@ useEffect(() => {
         }
         setIsPublishingProfile(true);
         try {
+            const prevImg = profilePostImage;
             const compressed = await compressImage(file, 800, 800, 0.7);
             const url = await uploadImageToStorage(compressed, 'userPosts');
+            if (!isDemoMode && prevImg && prevImg !== url) {
+                deleteFileFromStorage(prevImg).catch(() => {});
+            }
             setProfilePostImage(url);
         } catch(err) { 
             console.error("Error al subir foto de perfil:", err);
@@ -6215,7 +6261,7 @@ useEffect(() => {
                         {profilePostImage && (
                             <div className="relative w-fit">
                                 <img src={profilePostImage} alt="Preview" className="h-28 rounded-xl object-cover border border-gray-200 dark:border-gray-700 shadow-xs" />
-                                <button type="button" onClick={() => setProfilePostImage("")} className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 shadow-md hover:bg-red-700"><X size={13}/></button>
+                                <button type="button" onClick={() => { if (!isDemoMode && profilePostImage) deleteFileFromStorage(profilePostImage).catch(() => {}); setProfilePostImage(""); }} className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 shadow-md hover:bg-red-700"><X size={13}/></button>
                             </div>
                         )}
                         <div className="flex justify-between items-center pt-1">
@@ -6245,14 +6291,15 @@ useEffect(() => {
                             {isMyProfile && !isEditingThis && (
                                 <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
                                     <button onClick={() => {setEditingProfilePostId(post.id); setEditProfilePostData({title: post.title || "", text: post.text || ""});}} className="bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-300 p-1.5 rounded-lg shadow-xs hover:bg-blue-100"><Edit3 size={14}/></button>
-                                    <button onClick={() => confirmAction("¿Eliminar publicación de tu perfil?", () => {
+                                    <button onClick={() => confirmAction("¿Eliminar publicación de tu perfil?", async () => {
                                         if (isDemoMode) {
                                             setUserPosts(prev => prev.filter(p => p.id !== post.id));
                                             removeDemoSandboxItem('userPosts', post.id);
                                             showMessage("Publicación eliminada (Modo Demo).");
                                             return;
                                         }
-                                        return deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userPosts', post.id));
+                                        await deleteAllStorageFilesInObject(post);
+                                        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userPosts', post.id));
                                     })} className="bg-red-50 dark:bg-red-950/50 text-red-600 dark:text-red-300 p-1.5 rounded-lg shadow-xs hover:bg-red-100"><Trash2 size={14}/></button>
                                 </div>
                             )}
@@ -6535,6 +6582,7 @@ useEffect(() => {
 
             const handleDeleteNoteItem = async (noteId) => {
               if (!noteId) return;
+              const targetNote = (rawNotes || []).find(n => String(n.id) === String(noteId)) || null;
               if (isDemoMode || String(noteId).startsWith('demo')) {
                 removeDemoSandboxItem('notes', noteId);
                 setRawNotes(prev => (prev || []).filter(n => String(n.id) !== String(noteId)));
@@ -6543,6 +6591,9 @@ useEffect(() => {
 
               setRawNotes(prev => (prev || []).filter(n => String(n.id) !== String(noteId)));
               try {
+                if (targetNote) {
+                  await deleteAllStorageFilesInObject(targetNote);
+                }
                 await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notes', String(noteId)));
               } catch (err) {
                 console.error('Error eliminando nota:', err);
@@ -7500,6 +7551,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                   }
                                   try {
                                     setSyllabus(prev => prev.filter(s => s.id !== item.id));
+                                    await deleteAllStorageFilesInObject(item);
                                     await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'syllabus', item.id));
                                     showMessage("Tema eliminado del cronograma.");
                                   } catch(err) {
@@ -7802,12 +7854,14 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
     const handleSaveStudentEdit = async (e) => {
         e.preventDefault();
         if (!studentEditModal.userKey) return;
+        const prevPicUrl = userMappings[studentEditModal.userKey]?.profilePicUrl || '';
+        const nextPicUrl = studentEditModal.profilePicUrl.trim();
         if (isDemoMode) {
             const updatedStudent = {
                 ...(userMappings[studentEditModal.userKey] || {}),
                 fullName: studentEditModal.fullName.trim(),
                 customLabel: studentEditModal.customLabel.trim(),
-                profilePicUrl: studentEditModal.profilePicUrl.trim(),
+                profilePicUrl: nextPicUrl,
                 email: studentEditModal.email.trim(),
                 role: 'student',
                 updatedAt: Date.now()
@@ -7822,10 +7876,13 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
             return;
         }
         try {
+            if (prevPicUrl && prevPicUrl !== nextPicUrl) {
+                deleteFileFromStorage(prevPicUrl).catch(() => {});
+            }
             await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userMappings', studentEditModal.userKey), {
                 fullName: studentEditModal.fullName.trim(),
                 customLabel: studentEditModal.customLabel.trim(),
-                profilePicUrl: studentEditModal.profilePicUrl.trim(),
+                profilePicUrl: nextPicUrl,
                 email: studentEditModal.email.trim(),
                 role: 'student',
                 updatedAt: Date.now()
@@ -8261,7 +8318,12 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                     <img src={newAcadGroupAvatarUrl} alt="Avatar grupo" className="w-full h-full object-cover" />
                                     <button 
                                         type="button" 
-                                        onClick={() => setNewAcadGroupAvatarUrl("")}
+                                        onClick={() => {
+                                            if (!isDemoMode && newAcadGroupAvatarUrl) {
+                                                deleteFileFromStorage(newAcadGroupAvatarUrl).catch(() => {});
+                                            }
+                                            setNewAcadGroupAvatarUrl("");
+                                        }}
                                         className="absolute inset-0 bg-black/60 text-white flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity"
                                         title="Quitar foto"
                                     >
@@ -8288,9 +8350,13 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                         if (!file) return;
                                         if (file.size > 4 * 1024 * 1024) return showMessage("La imagen no debe superar los 4MB.");
                                         try {
+                                            const prevUrl = newAcadGroupAvatarUrl;
                                             showMessage("Subiendo imagen...");
-                                            const compressed = await compressImage(file, 400, 400, 0.7);
+                                            const compressed = await compressImage(file, 256, 256, 0.72);
                                             const url = await uploadImageToStorage(compressed, 'group_avatars');
+                                            if (!isDemoMode && prevUrl && prevUrl !== url) {
+                                                deleteFileFromStorage(prevUrl).catch(() => {});
+                                            }
                                             setNewAcadGroupAvatarUrl(url);
                                         } catch (err) {
                                             console.error(err);
@@ -8424,24 +8490,38 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                         return;
                                                     }
                                                     try {
-                                                        // 1. Borrar todas las tareas, publicaciones y foros asociados a esta materia
+                                                        // 1. Borrar todas las tareas, publicaciones y foros asociados a esta materia (y sus archivos en Storage)
                                                         const tasksSnap = await getDocs(query(collection(db, 'artifacts', appId, 'public', 'data', 'tasks'), where('targetGroupId', '==', g.id)));
                                                         const acadTasksSnap = await getDocs(query(collection(db, 'artifacts', appId, 'public', 'data', 'tasks'), where('targetGroupId', '==', `acad_${g.id}`)));
                                                         const allTaskDocs = [...tasksSnap.docs, ...acadTasksSnap.docs];
+                                                        await Promise.all(allTaskDocs.map(d => deleteAllStorageFilesInObject(d.data())));
                                                         await Promise.all(allTaskDocs.map(d => deleteDoc(d.ref)));
                                                         
-                                                        // 2. Borrar evaluaciones asociadas al grupo
+                                                        // 2. Borrar evaluaciones asociadas al grupo (y sus imágenes/audios en Storage)
                                                         const evalSnap = await getDocs(query(collection(db, 'artifacts', appId, 'public', 'data', 'evaluations'), where('targetGroupId', '==', g.id)));
+                                                        await Promise.all(evalSnap.docs.map(d => deleteAllStorageFilesInObject(d.data())));
                                                         await Promise.all(evalSnap.docs.map(d => deleteDoc(d.ref)));
 
                                                         // 3. Borrar contenidos programáticos (syllabus) del grupo
                                                         const syllabusSnap = await getDocs(query(collection(db, 'artifacts', appId, 'public', 'data', 'syllabus'), where('targetGroupId', '==', g.id)));
+                                                        await Promise.all(syllabusSnap.docs.map(d => deleteAllStorageFilesInObject(d.data())));
                                                         await Promise.all(syllabusSnap.docs.map(d => deleteDoc(d.ref)));
 
-                                                        // 4. Borrar sala de chat grupal
+                                                        // 4. Borrar sala de chat grupal y sus mensajes/archivos en Storage
+                                                        for (const gChatId of [`acad_${g.id}`, `group_acad_${g.id}`, g.id]) {
+                                                            try {
+                                                                const gMsgsSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'chats', gChatId, 'messages'));
+                                                                if (!gMsgsSnap.empty) {
+                                                                    await Promise.all(gMsgsSnap.docs.map(d => deleteAllStorageFilesInObject(d.data())));
+                                                                    await Promise.all(gMsgsSnap.docs.map(d => deleteDoc(d.ref)));
+                                                                }
+                                                                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'lastMessages', gChatId)).catch(() => {});
+                                                            } catch (e) {}
+                                                        }
                                                         try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chatGroups', `acad_${g.id}`)); } catch (e) {}
                                                         
-                                                        // 5. Borrar documento del grupo académico
+                                                        // 5. Borrar archivos (avatar/portada) y documento del grupo académico
+                                                        await deleteAllStorageFilesInObject(g);
                                                         await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', g.id));
 
                                                         // 6. Actualizar estados locales inmediatamente
@@ -8776,6 +8856,40 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                     return;
                                                 }
                                                 try {
+                                                // 1. Eliminar foto de perfil y archivos en Storage del perfil del estudiante
+                                                await deleteAllStorageFilesInObject(data);
+
+                                                // 2. Eliminar publicaciones de perfil (userPosts) del estudiante y sus fotos en Storage
+                                                try {
+                                                    const postsByUserSnap = await getDocs(query(collection(db, 'artifacts', appId, 'public', 'data', 'userPosts'), where('authorUsername', '==', userKey)));
+                                                    await Promise.all(postsByUserSnap.docs.map(d => deleteAllStorageFilesInObject(d.data())));
+                                                    await Promise.all(postsByUserSnap.docs.map(d => deleteDoc(d.ref)));
+                                                } catch (e) {}
+
+                                                // 3. Eliminar notas privadas del estudiante
+                                                try {
+                                                    const notesSnap = await getDocs(query(collection(db, 'artifacts', appId, 'public', 'data', 'notes'), where('authorId', '==', userKey)));
+                                                    const privateDocs = notesSnap.docs.filter(d => d.data()?.scope === 'private');
+                                                    await Promise.all(privateDocs.map(d => deleteAllStorageFilesInObject(d.data())));
+                                                    await Promise.all(privateDocs.map(d => deleteDoc(d.ref)));
+                                                } catch (e) {}
+
+                                                // 4. Eliminar conversaciones directas (DM) y sus archivos/audios en Storage
+                                                const dmPartnerIds = new Set(['teacher', 'ginadocente', 'camilodocente', myChatId].filter(Boolean));
+                                                for (const partnerId of dmPartnerIds) {
+                                                    const dmChatId = `dm_${[partnerId, userKey].sort().join('_')}`;
+                                                    try {
+                                                        const dmMsgsSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'chats', dmChatId, 'messages'));
+                                                        if (!dmMsgsSnap.empty) {
+                                                            await Promise.all(dmMsgsSnap.docs.map(d => deleteAllStorageFilesInObject(d.data())));
+                                                            await Promise.all(dmMsgsSnap.docs.map(d => deleteDoc(d.ref)));
+                                                        }
+                                                        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'lastMessages', dmChatId)).catch(() => {});
+                                                    } catch (e) {}
+                                                }
+
+                                                // 5. Eliminar presencia y mapeo de usuario
+                                                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'presence', userKey)).catch(() => {});
                                                 await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userMappings', userKey));
                                                 for (const g of academicGroups) {
                                                     await removeStudentFromGroupHelper(g.id, userKey);
@@ -8785,7 +8899,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                     try { sessionStorage.removeItem('englishTech_viewingProfileId'); } catch(e) {}
                                                     window.location.hash = 'directory';
                                                 }
-                                                showMessage("Estudiante eliminado y enlace invalidado.");
+                                                showMessage("Estudiante y sus archivos eliminados permanentemente.");
                                                 } catch (err) {
                                                     console.error("Error al eliminar estudiante:", err);
                                                     showMessage("Error al eliminar el estudiante.");
@@ -9279,11 +9393,16 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                     return;
                                                 }
 
+                                                const previousCoverUrl = groupCoverModal.group?.coverUrl || '';
                                                 await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'academicGroups', groupCoverModal.group.id), {
                                                     emoji: groupCoverModal.emoji || 'BookOpen',
                                                     coverPattern: groupCoverModal.coverPattern || 'doodle-1',
                                                     coverUrl: finalCoverUrl || ''
                                                 });
+
+                                                if (previousCoverUrl && previousCoverUrl !== (finalCoverUrl || '')) {
+                                                    await deleteFileFromStorage(previousCoverUrl);
+                                                }
 
                                                 // Actualizar el estado de selectedGroupForFeed
                                                 setSelectedGroupForFeed(prev => ({
@@ -11014,6 +11133,9 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                   />
                                                   <span className="text-[10px] font-bold text-gray-400">pts</span>
                                               <button type="button" onClick={() => {
+                                                  if (!isDemoMode && q) {
+                                                      deleteAllStorageFilesInObject(q).catch(() => {});
+                                                  }
                                                   const newQ = [...evalFormData.questions]; newQ.splice(qIndex, 1);
                                                   setEvalFormData({...evalFormData, questions: newQ});
                                               }} className="text-gray-400 hover:text-red-500 transition-colors p-1 cursor-pointer" title="Eliminar pregunta">
@@ -11099,6 +11221,9 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                   <button
                                                       type="button"
                                                       onClick={() => {
+                                                          if (!isDemoMode && q.imageUrl) {
+                                                              deleteFileFromStorage(q.imageUrl).catch(() => {});
+                                                          }
                                                           const newQ = [...evalFormData.questions];
                                                           const copia = { ...newQ[qIndex] };
                                                           delete copia.imageUrl;
@@ -11480,12 +11605,17 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                                 return;
                                                             }
                                                             try {
+                                                                await deleteAllStorageFilesInObject(ev);
                                                                 const gradeSnap = await getDocs(query(collection(db, 'artifacts', appId, 'public', 'data', 'grades'), where('evaluationId', '==', ev.id)));
+                                                                await Promise.all(gradeSnap.docs.map(d => deleteAllStorageFilesInObject(d.data())));
                                                                 await Promise.all(gradeSnap.docs.map(d => deleteDoc(d.ref)));
                                                                 await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'evaluations', ev.id));
+                                                                const wallTaskObj = (tasks || []).find(t => String(t.id) === wallTaskId);
+                                                                if (wallTaskObj) await deleteAllStorageFilesInObject(wallTaskObj);
                                                                 await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', wallTaskId)).catch(() => {});
                                                                 const linkedTasks = (tasks || []).filter(t => String(t.evaluationId) === String(ev.id) && String(t.id) !== wallTaskId);
                                                                 for (const lt of linkedTasks) {
+                                                                    await deleteAllStorageFilesInObject(lt);
                                                                     await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', lt.id)).catch(() => {});
                                                                 }
                                                                 setEvaluations(prev => prev.filter(e => e.id !== ev.id));
@@ -13989,6 +14119,7 @@ Bot:`;
                                                                   setPinnedTasks(prev => prev.filter(item => item.id !== t.id));
                                                                   return;
                                                               }
+                                                              await deleteAllStorageFilesInObject(t);
                                                               await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', t.id));
                                                           });
                                                           customReply = `Tarea "${t.title}" eliminada.`;
@@ -15495,20 +15626,36 @@ Bot:`;
                                           {/* Previews de adjuntos */}
                                           {chatAppAudioUrl && (
                                               <div className="relative w-fit mt-1">
-                                                  <AudioPlayer src={chatAppAudioUrl} title="" isDarkMode={isDarkMode} onDelete={() => setChatAppAudioUrl("")} compact={true} />
+                                                  <AudioPlayer src={chatAppAudioUrl} title="" isDarkMode={isDarkMode} onDelete={() => {
+                                                      if (!isDemoMode && chatAppAudioUrl) {
+                                                          deleteFileFromStorage(chatAppAudioUrl).catch(() => {});
+                                                      }
+                                                      setChatAppAudioUrl("");
+                                                  }} compact={true} />
                                               </div>
                                           )}
                                           {chatAppImageUrl && (
                                               <div className="relative w-fit mt-1.5">
                                                   <img src={chatAppImageUrl} alt="Preview" className={`h-16 w-16 object-cover rounded-xl border shadow-xs ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`} onError={(e) => e.target.style.display = 'none'} />
-                                                  <button type="button" onClick={() => setChatAppImageUrl("")} className="absolute -top-1.5 -right-1.5 bg-red-600 text-white rounded-full p-0.5 hover:bg-red-700 transition shadow-xs"><X size={12}/></button>
+                                                  <button type="button" onClick={() => {
+                                                      if (!isDemoMode && chatAppImageUrl) {
+                                                          deleteFileFromStorage(chatAppImageUrl).catch(() => {});
+                                                      }
+                                                      setChatAppImageUrl("");
+                                                  }} className="absolute -top-1.5 -right-1.5 bg-red-600 text-white rounded-full p-0.5 hover:bg-red-700 transition shadow-xs"><X size={12}/></button>
                                               </div>
                                           )}
                                           {chatAppFileUrl && (
                                               <div className="relative w-fit mt-1.5 flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 text-xs text-purple-700 dark:text-purple-300 font-bold">
                                                   <FileDocIcon size={14} className="text-purple-500" />
                                                   <span className="max-w-[180px] truncate">{chatAppFileName || 'Documento adjunto'}</span>
-                                                  <button type="button" onClick={() => { setChatAppFileUrl(""); setChatAppFileName(""); }} className="text-red-500 hover:text-red-700 ml-1 p-0.5"><X size={12}/></button>
+                                                  <button type="button" onClick={() => {
+                                                      if (!isDemoMode && chatAppFileUrl) {
+                                                          deleteFileFromStorage(chatAppFileUrl).catch(() => {});
+                                                      }
+                                                      setChatAppFileUrl("");
+                                                      setChatAppFileName("");
+                                                  }} className="text-red-500 hover:text-red-700 ml-1 p-0.5"><X size={12}/></button>
                                               </div>
                                           )}
                                       </form>

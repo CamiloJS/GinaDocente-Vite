@@ -1,6 +1,6 @@
 // src/utils/useVoiceRecorder.js
 import React from 'react'
-import { uploadRawFileToStorage } from './helpers.js'
+import { uploadRawFileToStorage, deleteFileFromStorage } from './helpers.js'
 
 export const useVoiceRecorder = (folderName = 'audio', showMessage = () => {}) => {
   const [isRecording, setIsRecording] = React.useState(false)
@@ -99,6 +99,8 @@ export const useVoiceRecorder = (folderName = 'audio', showMessage = () => {}) =
           if (isMountedRef.current && currentSession === sessionIdRef.current) {
             setAudioUrl(url)
             showMessage('Audio listo para enviar')
+          } else if (url) {
+            deleteFileFromStorage(url).catch(() => {})
           }
         } catch (err) {
           console.error(err)
@@ -130,6 +132,9 @@ export const useVoiceRecorder = (folderName = 'audio', showMessage = () => {}) =
 
   const cancelRecording = () => {
     sessionIdRef.current += 1
+    if (audioUrl) {
+      deleteFileFromStorage(audioUrl).catch(() => {})
+    }
     setAudioUrl('')
     setIsRecording(false)
     setIsUploading(false)
