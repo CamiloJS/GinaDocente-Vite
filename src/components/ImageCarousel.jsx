@@ -79,7 +79,7 @@ export const ImageCarousel = ({ images = [], onImageClick, isDarkMode, compact =
             style={{ minWidth: '100%' }}
             onClick={() => onImageClick && onImageClick(url)}
           >
-            <img 
+            <img loading="lazy" decoding="async" 
               src={url}
               alt={`Imagen ${idx + 1}`}
               loading="lazy"

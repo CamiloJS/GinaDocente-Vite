@@ -6131,7 +6131,7 @@ useEffect(() => {
                     {/* Avatar con Punto de Presencia */}
                     <div className="relative group shrink-0">
                         {targetProfilePic ? (
-                            <img src={targetProfilePic} className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover shadow-md border-2 ${isDarkMode ? 'border-gray-700' : 'border-gray-100'}`} />
+                            <img loading="lazy" decoding="async" src={targetProfilePic} className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover shadow-md border-2 ${isDarkMode ? 'border-gray-700' : 'border-gray-100'}`} />
                         ) : (
                             <div className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center text-blue-600 shadow-md border-2 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-blue-50 border-gray-100'}`}>
                                 <UserIcon size={36} />
@@ -6244,7 +6244,7 @@ useEffect(() => {
                                         }
                                     }}
                                 >
-                                    <img 
+                                    <img loading="lazy" decoding="async" 
                                         ref={cropImageRef}
                                         src={avatarPreviewUrl} 
                                         draggable="false"
@@ -6301,7 +6301,7 @@ useEffect(() => {
                         </div>
                         {profilePostImage && (
                             <div className="relative w-fit">
-                                <img src={profilePostImage} alt="Preview" className="h-28 rounded-xl object-cover border border-gray-200 dark:border-gray-700 shadow-xs" />
+                                <img loading="lazy" decoding="async" src={profilePostImage} alt="Preview" className="h-28 rounded-xl object-cover border border-gray-200 dark:border-gray-700 shadow-xs" />
                                 <button type="button" onClick={() => { if (!isDemoMode && profilePostImage) deleteFileFromStorage(profilePostImage).catch(() => {}); setProfilePostImage(""); }} className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 shadow-md hover:bg-red-700"><X size={13}/></button>
                             </div>
                         )}
@@ -8137,7 +8137,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                             <div className="flex items-center gap-3 min-w-0 flex-1">
                                                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-400/30 flex items-center justify-center shrink-0 overflow-hidden font-bold text-xs text-blue-600 dark:text-blue-300">
                                                     {data.profilePicUrl ? (
-                                                        <img src={data.profilePicUrl} alt={data.fullName} className="w-full h-full object-cover" />
+                                                        <img loading="lazy" decoding="async" src={data.profilePicUrl} alt={data.fullName} className="w-full h-full object-cover" />
                                                     ) : (
                                                         (data.fullName || uk).charAt(0).toUpperCase()
                                                     )}
@@ -8199,7 +8199,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                     <div className="flex items-center gap-3 min-w-0">
                                         <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-400/30 flex items-center justify-center shrink-0 overflow-hidden font-bold text-xs text-blue-600 dark:text-blue-300">
                                             {data.profilePicUrl ? (
-                                                <img src={data.profilePicUrl} alt={data.fullName} className="w-full h-full object-cover" />
+                                                <img loading="lazy" decoding="async" src={data.profilePicUrl} alt={data.fullName} className="w-full h-full object-cover" />
                                             ) : (
                                                 (data.fullName || userKey).substring(0, 2).toUpperCase()
                                             )}
@@ -8356,7 +8356,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                         <div className="flex items-center gap-2">
                             {newAcadGroupAvatarUrl ? (
                                 <div className="relative w-11 h-11 rounded-2xl overflow-hidden border-2 border-blue-500 shrink-0 shadow-xs">
-                                    <img src={newAcadGroupAvatarUrl} alt="Avatar grupo" className="w-full h-full object-cover" />
+                                    <img loading="lazy" decoding="async" src={newAcadGroupAvatarUrl} alt="Avatar grupo" className="w-full h-full object-cover" />
                                     <button 
                                         type="button" 
                                         onClick={() => {
@@ -8818,7 +8818,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                     >
                                         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-400/30 flex items-center justify-center shrink-0 overflow-hidden font-bold text-xs text-blue-600 dark:text-blue-300 group-hover:scale-105 transition-transform shadow-xs">
                                             {data.profilePicUrl ? (
-                                                <img src={data.profilePicUrl} alt={data.fullName} className="w-full h-full object-cover" />
+                                                <img loading="lazy" decoding="async" src={data.profilePicUrl} alt={data.fullName} className="w-full h-full object-cover" />
                                             ) : (
                                                 data.fullName?.charAt(0)?.toUpperCase() || 'E'
                                             )}
@@ -9175,7 +9175,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                         {/* Fondo de Portada (Imagen personalizada o Patrón Doodle) */}
                         {currentGroupData.coverUrl ? (
                             <>
-                                <img 
+                                <img loading="lazy" decoding="async" 
                                     src={currentGroupData.coverUrl} 
                                     alt="Portada del grupo" 
                                     className="absolute inset-0 w-full h-full object-cover object-center" 
@@ -9315,7 +9315,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                             <label className="h-[148px] rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-teal-500 flex flex-col items-center justify-center p-3 text-center cursor-pointer transition-colors bg-gray-50 dark:bg-gray-800/50 relative overflow-hidden">
                                                 {groupCoverModal.coverUrl ? (
                                                     <div className="absolute inset-0">
-                                                        <img src={groupCoverModal.coverUrl} className="w-full h-full object-cover" />
+                                                        <img loading="lazy" decoding="async" src={groupCoverModal.coverUrl} className="w-full h-full object-cover" />
                                                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
                                                             <span className="text-white text-xs font-bold bg-black/60 px-3 py-1.5 rounded-lg backdrop-blur-xs">Cambiar imagen</span>
                                                         </div>
@@ -9634,7 +9634,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                       {q.imageUrl && (
                                           <div className="pl-8 pt-1">
                                               <div className="rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-gray-900/60 max-w-md">
-                                                  <img
+                                                  <img loading="lazy" decoding="async"
                                                       src={q.imageUrl}
                                                       alt={`Imagen de la pregunta ${qIndex + 1}`}
                                                       onClick={() => setFullScreenImage(q.imageUrl)}
@@ -10620,7 +10620,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                       {q.imageUrl && (
                                                           <div className="pl-8 mb-3">
                                                               <div className="rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-gray-900/60 max-w-sm">
-                                                                  <img
+                                                                  <img loading="lazy" decoding="async"
                                                                       src={q.imageUrl}
                                                                       alt={`Imagen de la pregunta ${qIdx + 1}`}
                                                                       onClick={() => setFullScreenImage(q.imageUrl)}
@@ -10891,7 +10891,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                       {q.imageUrl && (
                                                           <div className="pl-8 pt-1">
                                                               <div className="rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-gray-900/60 max-w-sm">
-                                                                  <img
+                                                                  <img loading="lazy" decoding="async"
                                                                       src={q.imageUrl}
                                                                       alt={`Imagen de la pregunta ${qIdx + 1}`}
                                                                       onClick={() => setFullScreenImage(q.imageUrl)}
@@ -11293,7 +11293,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
 
                                           {q.imageUrl && (
                                               <div className="rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-gray-900/60 max-w-sm">
-                                                  <img
+                                                  <img loading="lazy" decoding="async"
                                                       src={q.imageUrl}
                                                       alt={`Vista previa pregunta ${qIndex + 1}`}
                                                       onClick={() => setFullScreenImage(q.imageUrl)}
@@ -12066,7 +12066,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                                         : isDarkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700'
                                                                 }`}>
                                                                     {studentPhoto ? (
-                                                                        <img src={studentPhoto} alt={s.studentName || 'Estudiante'} className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; }} />
+                                                                        <img loading="lazy" decoding="async" src={studentPhoto} alt={s.studentName || 'Estudiante'} className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; }} />
                                                                     ) : (
                                                                         <span>{(s.studentName || 'E').charAt(0).toUpperCase()}</span>
                                                                     )}
@@ -12174,7 +12174,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                       return (
                                                           <div className="w-10 h-10 rounded-2xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-2xs overflow-hidden border border-red-400/40">
                                                               {alertStudentPhoto ? (
-                                                                  <img src={alertStudentPhoto} alt={a.studentName || 'Estudiante'} className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; }} />
+                                                                  <img loading="lazy" decoding="async" src={alertStudentPhoto} alt={a.studentName || 'Estudiante'} className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; }} />
                                                               ) : (
                                                                   <AlertTriangle size={20} />
                                                               )}
@@ -12680,7 +12680,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                     <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600 shrink-0 overflow-hidden border border-white dark:border-gray-700 shadow-xs">
-                                {userMappings[myChatId]?.profilePicUrl ? <img src={userMappings[myChatId].profilePicUrl} className="w-full h-full object-cover" /> : <UserIcon size={22} />}
+                                {userMappings[myChatId]?.profilePicUrl ? <img loading="lazy" decoding="async" src={userMappings[myChatId].profilePicUrl} className="w-full h-full object-cover" /> : <UserIcon size={22} />}
                             </div>
                             <div className="overflow-hidden">
                                 <p className={`font-bold text-xs leading-tight ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{loggedInName}</p>
@@ -12827,7 +12827,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                                : 'bg-gradient-to-br from-blue-500 to-indigo-600'
                                                        }`}>
                                                            {userPhoto ? (
-                                                               <img src={userPhoto} alt={acc.name || 'Usuario'} className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; }} />
+                                                               <img loading="lazy" decoding="async" src={userPhoto} alt={acc.name || 'Usuario'} className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; }} />
                                                            ) : (
                                                                <span>{initial}</span>
                                                            )}
@@ -13044,9 +13044,9 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                       <div className="relative">
                                           <div className="w-20 h-20 rounded-full border-2 border-blue-500 overflow-hidden shadow-md bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-2xl font-bold">
                                               {googleOnboarding.photoChoice === 'google' && googleOnboarding.photoURL ? (
-                                                  <img src={googleOnboarding.photoURL} alt="Google Avatar" className="w-full h-full object-cover" />
+                                                  <img loading="lazy" decoding="async" src={googleOnboarding.photoURL} alt="Google Avatar" className="w-full h-full object-cover" />
                                               ) : googleOnboarding.photoChoice === 'custom' && googleOnboarding.customPhotoUrl ? (
-                                                  <img src={googleOnboarding.customPhotoUrl} alt="Custom Avatar" className="w-full h-full object-cover" onError={(e) => { e.target.style.display='none'; }} />
+                                                  <img loading="lazy" decoding="async" src={googleOnboarding.customPhotoUrl} alt="Custom Avatar" className="w-full h-full object-cover" onError={(e) => { e.target.style.display='none'; }} />
                                               ) : (
                                                   googleOnboarding.fullName ? googleOnboarding.fullName.charAt(0).toUpperCase() : 'E'
                                               )}
@@ -13361,7 +13361,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                         >
                             <div className="w-7 h-7 rounded-full overflow-hidden flex items-center justify-center bg-gradient-to-br from-[#AD3333] to-[#8a2828] text-white text-xs font-bold shrink-0 shadow-xs">
                                 {userMappings[myChatId]?.profilePicUrl ? (
-                                    <img src={userMappings[myChatId].profilePicUrl} alt="Avatar" className="w-full h-full object-cover" />
+                                    <img loading="lazy" decoding="async" src={userMappings[myChatId].profilePicUrl} alt="Avatar" className="w-full h-full object-cover" />
                                 ) : (
                                     loggedInName?.charAt(0).toUpperCase() || 'U'
                                 )}
@@ -13445,7 +13445,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                           <div className={`p-3 rounded-2xl border shadow-xs flex items-center gap-3 transition-colors ${isDarkMode ? 'bg-gray-800/90 border-gray-700/80' : 'bg-white border-gray-200'}`}>
                               <div className="relative shrink-0">
                                   <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 overflow-hidden border border-gray-200 dark:border-gray-700 shadow-2xs">
-                                      {userMappings[myChatId]?.profilePicUrl ? <img src={userMappings[myChatId].profilePicUrl} className="w-full h-full object-cover" /> : <UserIcon size={22} />}
+                                      {userMappings[myChatId]?.profilePicUrl ? <img loading="lazy" decoding="async" src={userMappings[myChatId].profilePicUrl} className="w-full h-full object-cover" /> : <UserIcon size={22} />}
                                   </div>
                                   <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 ${isDarkMode ? 'border-gray-800' : 'border-white'} ${
                                       (!userPresence[myChatId]?.isOnline || userPresence[myChatId]?.status === 'offline') ? 'bg-gray-400' :
@@ -13786,7 +13786,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                           <button key={g.id} onClick={() => { handleOpenChat({ id: chatId, name: g.name, type: 'group' }); setIsChatMinimized(false); }} className={`w-full flex items-center gap-2.5 p-1.5 rounded-xl transition-colors ${isDarkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}>
                                                               <div className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white shrink-0 shadow-2xs">
                                                               {g.avatarUrl ? (
-                                                                  <img src={g.avatarUrl} alt={g.name} className="w-full h-full object-cover" />
+                                                                  <img loading="lazy" decoding="async" src={g.avatarUrl} alt={g.name} className="w-full h-full object-cover" />
                                                               ) : (
                                                                   <UsersGroupIcon size={15}/>
                                                               )}
@@ -13843,7 +13843,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                                       }`}
                                                                   >
                                                                       {photo ? (
-                                                                          <img 
+                                                                          <img loading="lazy" decoding="async" 
                                                                               src={photo} 
                                                                               alt={u.name} 
                                                                               className={`w-full h-full object-cover transition-all duration-300 ${isDisconnected ? 'grayscale opacity-75 contrast-95' : 'grayscale-0 opacity-100'}`} 
@@ -14461,7 +14461,7 @@ Bot:`;
                                       <button key={g.id} onClick={() => { handleOpenChat({ id: `group_${g.id}`, name: g.name, type: 'group' }); setIsChatMinimized(false); }} className={`w-full flex items-center gap-3 p-3 rounded-2xl border transition-all text-left ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200 shadow-xs'}`}>
                                           <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white shrink-0 overflow-hidden shadow-xs">
                                                {g.avatarUrl ? (
-                                                   <img src={g.avatarUrl} alt={g.name} className="w-full h-full object-cover" />
+                                                   <img loading="lazy" decoding="async" src={g.avatarUrl} alt={g.name} className="w-full h-full object-cover" />
                                                ) : (
                                                    g.emoji ? renderGroupVectorIcon(g.emoji, 16, "text-white") : <UsersGroupIcon size={16}/>
                                                )}
@@ -14510,7 +14510,7 @@ Bot:`;
                                                       }`}
                                                   >
                                                       {photo ? (
-                                                          <img 
+                                                          <img loading="lazy" decoding="async" 
                                                               src={photo} 
                                                               alt={u.name} 
                                                               className={`w-full h-full object-cover transition-all duration-300 ${isDisconnected ? 'grayscale opacity-75 contrast-95' : 'grayscale-0 opacity-100'}`} 
@@ -14570,7 +14570,7 @@ Bot:`;
                                           const tId = getDmTargetUserId(activeChat, myChatId);
                                           const photo = userMappings[tId]?.profilePicUrl;
                                           return photo ? (
-                                              <img src={photo} alt={activeChat.name} className="w-full h-full object-cover" />
+                                              <img loading="lazy" decoding="async" src={photo} alt={activeChat.name} className="w-full h-full object-cover" />
                                           ) : (
                                               activeChat.name?.charAt(0).toUpperCase() || 'U'
                                           );
@@ -14663,12 +14663,12 @@ Bot:`;
                                                   {activeChat.type === 'group' ? (() => {
                                                        const grp = chatGroups.find(g => g.id === activeChat.id || `group_${g.id}` === activeChat.id || `acad_${g.academicGroupId}` === activeChat.id || `acad_${g.id}` === activeChat.id);
                                                        const gPhoto = activeChat.avatarUrl || grp?.avatarUrl;
-                                                       if (gPhoto) return <img src={gPhoto} alt={activeChat.name} className="w-full h-full object-cover" />;
+                                                       if (gPhoto) return <img loading="lazy" decoding="async" src={gPhoto} alt={activeChat.name} className="w-full h-full object-cover" />;
                                                        return <UsersGroupIcon size={18}/>;
                                                    })() : (() => {
                                                       const tId = getDmTargetUserId(activeChat, myChatId);
                                                       const photo = getUserMappingData(tId, userMappings)?.profilePicUrl || userMappings[tId]?.profilePicUrl;
-                                                      if (photo) return <img src={photo} alt={activeChat.name} className="w-full h-full object-cover" />;
+                                                      if (photo) return <img loading="lazy" decoding="async" src={photo} alt={activeChat.name} className="w-full h-full object-cover" />;
                                                       return activeChat.role === 'teacher' ? <TeacherIcon size={18}/> : <span className="font-bold text-sm">{activeChat.name?.charAt(0).toUpperCase() || 'U'}</span>;
                                                   })()}
                                               </div>
@@ -14880,7 +14880,7 @@ Bot:`;
                                                            title={grp.avatarUrl ? 'Ver foto completa' : 'Foto de perfil del grupo'}
                                                        >
                                                            {grp.avatarUrl ? (
-                                                               <img src={grp.avatarUrl} alt={grp.name} className="w-full h-full object-cover" />
+                                                               <img loading="lazy" decoding="async" src={grp.avatarUrl} alt={grp.name} className="w-full h-full object-cover" />
                                                            ) : (
                                                                <UsersGroupIcon size={44} className="text-white" />
                                                            )}
@@ -15054,7 +15054,7 @@ Bot:`;
                                                                    <div className="flex items-center gap-2.5 min-w-0">
                                                                        <div className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-br from-[#AD3333] to-[#8a2828] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs border border-white dark:border-gray-700">
                                                                            {teacherPhoto ? (
-                                                                               <img src={teacherPhoto} alt={groupOwnerName} className="w-full h-full object-cover" />
+                                                                               <img loading="lazy" decoding="async" src={teacherPhoto} alt={groupOwnerName} className="w-full h-full object-cover" />
                                                                            ) : (
                                                                                <TeacherIcon size={14} />
                                                                            )}
@@ -15095,7 +15095,7 @@ Bot:`;
                                                                        <div className="relative shrink-0">
                                                                            <div className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-2xs border border-white dark:border-gray-700">
                                                                                {uData.profilePicUrl ? (
-                                                                                   <img src={uData.profilePicUrl} alt={studentDisplayName} className="w-full h-full object-cover" />
+                                                                                   <img loading="lazy" decoding="async" src={uData.profilePicUrl} alt={studentDisplayName} className="w-full h-full object-cover" />
                                                                                ) : (
                                                                                    studentDisplayName.charAt(0).toUpperCase()
                                                                                )}
@@ -15318,7 +15318,7 @@ Bot:`;
                                                                                                   })()}
                                                                                               </p>
                                                                                               {(m.originalImageUrl || m.imageUrl) && (
-                                                                                                  <img src={m.originalImageUrl || m.imageUrl} alt="Adjunto eliminado" className="h-20 w-20 object-cover rounded-xl border mt-1 cursor-pointer" onClick={() => setFullScreenImage(m.originalImageUrl || m.imageUrl)} />
+                                                                                                  <img loading="lazy" decoding="async" src={m.originalImageUrl || m.imageUrl} alt="Adjunto eliminado" className="h-20 w-20 object-cover rounded-xl border mt-1 cursor-pointer" onClick={() => setFullScreenImage(m.originalImageUrl || m.imageUrl)} />
                                                                                               )}
                                                                                           </div>
                                                                                       )}
@@ -15714,7 +15714,7 @@ Bot:`;
                                           )}
                                           {chatAppImageUrl && (
                                               <div className="relative w-fit mt-1.5">
-                                                  <img src={chatAppImageUrl} alt="Preview" className={`h-16 w-16 object-cover rounded-xl border shadow-xs ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`} onError={(e) => e.target.style.display = 'none'} />
+                                                  <img loading="lazy" decoding="async" src={chatAppImageUrl} alt="Preview" className={`h-16 w-16 object-cover rounded-xl border shadow-xs ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`} onError={(e) => e.target.style.display = 'none'} />
                                                   <button type="button" onClick={() => {
                                                       if (!isDemoMode && chatAppImageUrl) {
                                                           deleteFileFromStorage(chatAppImageUrl).catch(() => {});
@@ -16043,7 +16043,7 @@ Bot:`;
                                               role === 'teacher' ? 'bg-gradient-to-br from-[#AD3333] to-[#8a2828]' : 'bg-gradient-to-br from-blue-500 to-indigo-600'
                                           }`}>
                                               {userPhoto ? (
-                                                  <img src={userPhoto} alt={loggedInName} className="w-full h-full object-cover" />
+                                                  <img loading="lazy" decoding="async" src={userPhoto} alt={loggedInName} className="w-full h-full object-cover" />
                                               ) : (
                                                   loggedInName?.charAt(0).toUpperCase() || 'U'
                                               )}
@@ -16394,7 +16394,7 @@ Bot:`;
                                           >
                                               <div className="flex items-center gap-2.5 min-w-0">
                                                   <div className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-bold text-xs flex items-center justify-center shadow-2xs">
-                                                      {data.profilePicUrl ? <img src={data.profilePicUrl} alt={data.fullName} className="w-full h-full object-cover" /> : (data.fullName || uk).charAt(0).toUpperCase()}
+                                                      {data.profilePicUrl ? <img loading="lazy" decoding="async" src={data.profilePicUrl} alt={data.fullName} className="w-full h-full object-cover" /> : (data.fullName || uk).charAt(0).toUpperCase()}
                                                   </div>
                                                   <div className="min-w-0">
                                                       <p className="font-extrabold text-xs truncate">{data.fullName || uk}</p>
@@ -16450,7 +16450,7 @@ Bot:`;
                               <div className="flex items-center gap-3 min-w-0">
                                   <div className="w-10 h-10 rounded-2xl bg-teal-500/10 border border-teal-500/20 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0 overflow-hidden shadow-2xs">
                                       {groupMembersModal.group?.avatarUrl ? (
-                                          <img src={groupMembersModal.group.avatarUrl} alt={groupMembersModal.group.name} className="w-full h-full object-cover" />
+                                          <img loading="lazy" decoding="async" src={groupMembersModal.group.avatarUrl} alt={groupMembersModal.group.name} className="w-full h-full object-cover" />
                                       ) : (
                                           renderGroupVectorIcon(groupMembersModal.group?.emoji || 'BookOpen', 20, "text-teal-600 dark:text-teal-400")
                                       )}
@@ -16554,7 +16554,7 @@ Bot:`;
                                                   <div className="flex items-center gap-3 min-w-0">
                                                       <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-[#AD3333] to-[#8a2828] text-white flex items-center justify-center font-bold text-xs shrink-0 border-2 border-white dark:border-gray-700 shadow-2xs">
                                                           {userMappings[groupOwnerId]?.profilePicUrl ? (
-                                                              <img src={userMappings[groupOwnerId].profilePicUrl} alt={groupOwnerName} className="w-full h-full object-cover" />
+                                                              <img loading="lazy" decoding="async" src={userMappings[groupOwnerId].profilePicUrl} alt={groupOwnerName} className="w-full h-full object-cover" />
                                                           ) : (
                                                               groupOwnerInitial
                                                           )}
@@ -16667,7 +16667,7 @@ Bot:`;
                                                           <div className="relative shrink-0">
                                                               <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center font-bold text-xs border-2 border-white dark:border-gray-700 shadow-2xs group-hover:scale-105 transition-transform">
                                                                   {uData.profilePicUrl ? (
-                                                                      <img src={uData.profilePicUrl} alt={studentDisplayName} className="w-full h-full object-cover" />
+                                                                      <img loading="lazy" decoding="async" src={uData.profilePicUrl} alt={studentDisplayName} className="w-full h-full object-cover" />
                                                                   ) : (
                                                                       studentDisplayName.charAt(0).toUpperCase()
                                                                   )}
@@ -16839,7 +16839,7 @@ Bot:`;
                                                           <div className="flex items-center gap-3 min-w-0 flex-1">
                                                               <div className="w-9 h-9 rounded-full bg-gradient-to-br from-teal-500 to-emerald-600 text-white flex items-center justify-center shrink-0 overflow-hidden font-bold text-xs border border-white dark:border-gray-700 shadow-2xs">
                                                                   {s.profilePicUrl ? (
-                                                                      <img src={s.profilePicUrl} alt={s.fullName} className="w-full h-full object-cover" />
+                                                                      <img loading="lazy" decoding="async" src={s.profilePicUrl} alt={s.fullName} className="w-full h-full object-cover" />
                                                                   ) : (
                                                                       s.fullName.charAt(0).toUpperCase()
                                                                   )}

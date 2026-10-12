@@ -297,7 +297,7 @@ export default function FeedbackIAEvaluacion({
                 {/* Imagen de la pregunta si tiene */}
                 {q?.imageUrl && (
                   <div className="rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-gray-900/60 max-w-md">
-                    <img
+                    <img loading="lazy" decoding="async"
                       src={q.imageUrl}
                       alt={`Ilustración de la pregunta ${qIdx + 1}`}
                       onClick={() => onZoomImage?.(q.imageUrl)}

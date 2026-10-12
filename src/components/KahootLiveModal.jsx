@@ -1938,7 +1938,7 @@ const KahootLiveModal = ({
 
                     {q.imageUrl && (
                       <div className="flex justify-center">
-                        <img
+                        <img loading="lazy" decoding="async"
                           src={q.imageUrl}
                           alt={`Pregunta ${qIdx + 1}`}
                           className="max-h-48 rounded-2xl object-contain border border-white/20 bg-black/20"
@@ -2328,7 +2328,7 @@ const KahootLiveModal = ({
 
               {currentQuestion.imageUrl && (
                 <div className="flex justify-center overflow-hidden rounded-2xl bg-gray-100 border border-gray-200 max-h-64">
-                  <img
+                  <img loading="lazy" decoding="async"
                     src={currentQuestion.imageUrl}
                     alt="Imagen de la pregunta"
                     style={{

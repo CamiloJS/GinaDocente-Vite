@@ -169,6 +169,13 @@ export const isDemoSessionActive = () => {
 export const uploadImageToStorage = async (fileOrBase64, folderName) => {
   if (!fileOrBase64) return '';
   if (typeof fileOrBase64 !== 'string') {
+    // Las imagenes SIEMPRE se comprimen antes de subir (los GIF conservan su animacion).
+    if (fileOrBase64?.type && String(fileOrBase64.type).startsWith('image/')) {
+      try {
+        const comprimida = await compressImage(fileOrBase64);
+        if (comprimida) return await uploadImageToStorage(comprimida, folderName);
+      } catch (e) { /* si algo falla, se sube tal cual para no bloquear */ }
+    }
     return await uploadRawFileToStorage(fileOrBase64, folderName);
   }
   // En Modo Demo, nunca subir imágenes al Firebase Storage de producción

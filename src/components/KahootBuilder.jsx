@@ -788,7 +788,7 @@ const KahootBuilder = ({
           {currentQ.imageUrl ? (
             <div className="flex flex-col sm:flex-row items-center gap-3">
               <div className="relative group shrink-0">
-                <img
+                <img loading="lazy" decoding="async"
                   src={currentQ.imageUrl}
                   alt={`Pregunta ${safeIdx + 1}`}
                   className="h-28 w-44 object-cover rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm"

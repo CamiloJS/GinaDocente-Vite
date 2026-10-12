@@ -1261,7 +1261,7 @@ export default function BooksLibraryModule({
                                     ) : previewPages.length > 0 ? (
                                         <div className="space-y-2.5">
                                             <div className="mx-auto w-32 h-44 rounded-xl overflow-hidden shadow-md border border-white dark:border-slate-700 relative bg-slate-900">
-                                                <img
+                                                <img loading="lazy" decoding="async"
                                                     src={previewPages[0]}
                                                     alt="Portada"
                                                     className="w-full h-full object-cover"
@@ -1317,7 +1317,7 @@ export default function BooksLibraryModule({
                                                 }
                                                 className="mx-auto w-32 h-44 rounded-xl overflow-hidden shadow-md border border-white dark:border-slate-700 relative bg-slate-900 cursor-pointer group"
                                             >
-                                                <img
+                                                <img loading="lazy" decoding="async"
                                                     src={previewPages[0]}
                                                     alt="Portada"
                                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform"
@@ -1329,7 +1329,7 @@ export default function BooksLibraryModule({
 
                                             <div className="flex items-center justify-center gap-1.5 overflow-x-auto py-1">
                                                 {previewPages.slice(0, 5).map((pg, idx) => (
-                                                    <img
+                                                    <img loading="lazy" decoding="async"
                                                         key={idx}
                                                         src={pg}
                                                         alt={`Página ${idx + 1}`}
@@ -1370,7 +1370,7 @@ export default function BooksLibraryModule({
                                                 }}
                                             >
                                                 {customCoverUrl && (
-                                                    <img
+                                                    <img loading="lazy" decoding="async"
                                                         src={customCoverUrl}
                                                         alt="Portada personalizada"
                                                         className="absolute inset-0 w-full h-full object-cover"
@@ -1916,7 +1916,7 @@ export default function BooksLibraryModule({
                                                 }}
                                             />
                                             {coverImg ? (
-                                                <img
+                                                <img loading="lazy" decoding="async"
                                                     src={coverImg}
                                                     alt={bk.title}
                                                     className="w-full h-full object-cover"

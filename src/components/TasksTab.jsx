@@ -877,7 +877,7 @@ const TasksTab = React.memo(({
                     >
                         <div className="flex items-center gap-3">
                             {teacherPic ? (
-                                <img 
+                                <img loading="lazy" decoding="async" 
                                     src={teacherPic} 
                                     alt={loggedInName} 
                                     className="w-11 h-11 rounded-full object-cover shadow-md border-2 border-white dark:border-gray-700 shrink-0" 
@@ -993,7 +993,7 @@ const TasksTab = React.memo(({
                         <div className="flex justify-between items-center pb-3 border-b border-gray-200 dark:border-gray-800">
                             <div className="flex items-center gap-3">
                                 {teacherPic ? (
-                                    <img 
+                                    <img loading="lazy" decoding="async" 
                                         src={teacherPic} 
                                         alt={loggedInName} 
                                         className="w-11 h-11 rounded-full object-cover shadow-md border-2 border-white dark:border-gray-700 shrink-0" 
@@ -1217,7 +1217,7 @@ const TasksTab = React.memo(({
                                                 <div className="flex flex-wrap gap-2.5 items-center">
                                                     {currentImgs.map((url, idx) => (
                                                         <div key={idx} className="relative group/thumb">
-                                                            <img 
+                                                            <img loading="lazy" decoding="async" 
                                                                 src={url} 
                                                                 alt={`Preview ${idx + 1}`} 
                                                                 loading="lazy" 
@@ -1746,7 +1746,7 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                         {book3dPages.length > 0 && (
                                             <div className="flex items-center gap-2 pt-1 overflow-x-auto no-scrollbar">
                                                 {book3dPages.slice(0, 5).map((pg, idx) => (
-                                                    <img
+                                                    <img loading="lazy" decoding="async"
                                                         key={idx}
                                                         src={typeof pg === 'string' ? pg : (pg?.imageUrl || pg?.thumbUrl || '')}
                                                         alt={`Pág. ${idx + 1}`}

@@ -1622,7 +1622,7 @@ export default function NotesModule({
 
                               {item.renderMode === 'image' && (
                                 <div className="rounded-lg overflow-hidden mt-2 bg-slate-100 dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800">
-                                  <img
+                                  <img loading="lazy" decoding="async"
                                     src={item.url}
                                     alt={item.label || 'Imagen'}
                                     loading="lazy"
@@ -1746,7 +1746,7 @@ export default function NotesModule({
                                           />
                                         </div>
                                       ) : entry.link.renderMode === 'image' ? (
-                                        <img
+                                        <img loading="lazy" decoding="async"
                                           src={entry.link.url}
                                           alt={entry.link.label || 'Imagen'}
                                           className="mt-1 rounded-lg max-h-48 object-contain"
@@ -2774,7 +2774,7 @@ export default function NotesModule({
                       )}
                       {item.renderMode === 'image' && (
                         <div className="rounded-lg overflow-hidden mt-2 bg-slate-100 dark:bg-slate-900">
-                          <img
+                          <img loading="lazy" decoding="async"
                             src={item.url}
                             alt={item.label || 'Imagen'}
                             className="w-full max-h-[420px] object-contain mx-auto"

@@ -1748,7 +1748,7 @@ export const SlideCanvasSurface = ({
                 <div className="w-full aspect-video sm:aspect-auto sm:flex-1 rounded-xl overflow-hidden bg-black/5 flex items-center justify-center min-h-[100px] relative group/img">
                   {safeSlide.imageUrl ? (
                     <>
-                      <img
+                      <img loading="lazy" decoding="async"
                         src={safeSlide.imageUrl}
                         alt={safeSlide.imageCaption || safeSlide.title || 'Slide visual'}
                         className="w-full h-full object-cover"
@@ -2588,7 +2588,7 @@ export const SlideCanvasSurface = ({
 
                 {el.type === 'image' ? (
                   <div className="w-full h-full overflow-hidden rounded-xl relative">
-                    <img
+                    <img loading="lazy" decoding="async"
                       src={el.imageUrl}
                       alt={el.caption || 'Slide element'}
                       className="w-full h-full pointer-events-none"
@@ -6068,7 +6068,7 @@ export const SlideEditorModal = ({
                     onClick={() => handleInsertImageUrl(ill.url, 'auto')}
                     className="px-2.5 py-1 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-[#AD3333] text-xs font-bold flex items-center gap-1.5 shrink-0"
                   >
-                    <img src={ill.url} alt={ill.name} className="w-6 h-4 rounded object-cover" />
+                    <img loading="lazy" decoding="async" src={ill.url} alt={ill.name} className="w-6 h-4 rounded object-cover" />
                     <span>{ill.name}</span>
                   </button>
                 ))}
@@ -6996,7 +6996,7 @@ export const SlideEditorModal = ({
                                 onClick={() => handleSlideChange('imageUrl', ill.dataUrl)}
                                 className="p-1.5 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-[#AD3333] flex flex-col items-center gap-1 text-center"
                               >
-                                <img src={ill.dataUrl} alt={ill.label} className="w-full h-10 object-cover rounded-lg" />
+                                <img loading="lazy" decoding="async" src={ill.dataUrl} alt={ill.label} className="w-full h-10 object-cover rounded-lg" />
                                 <span className="text-[9px] font-bold truncate w-full">{ill.label}</span>
                               </button>
                             ))}

@@ -1670,7 +1670,7 @@ const TaskCard = React.memo(({
                         className="w-10 h-10 rounded-full text-white flex items-center justify-center font-bold text-sm shadow-xs shrink-0 border-2 border-white dark:border-gray-700 overflow-hidden hover:scale-105 transition-transform bg-gradient-to-br from-[#AD3333] to-[#8a2828]"
                     >
                         {authorPhoto ? (
-                            <img src={authorPhoto} alt={task.authorName || 'Autor'} className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; }} />
+                            <img loading="lazy" decoding="async" src={authorPhoto} alt={task.authorName || 'Autor'} className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; }} />
                         ) : (
                             task.authorName ? task.authorName.charAt(0).toUpperCase() : 'G'
                         )}
@@ -3041,7 +3041,7 @@ const TaskCard = React.memo(({
 
                     return (
                         <div className="relative w-full h-full bg-[#fdfbf7] overflow-hidden select-none">
-                            <img
+                            <img loading="lazy" decoding="async"
                                 src={displaySrc || fallbackSvg}
                                 alt={`${bk.title} - Pág. ${pageNumber}`}
                                 draggable={false}
@@ -3053,7 +3053,7 @@ const TaskCard = React.memo(({
                                 className="w-full h-full object-contain bg-[#fdfbf7] pointer-events-none"
                             />
                             {overlayInfo?.href && (
-                                <img
+                                <img loading="lazy" decoding="async"
                                     src={overlayInfo.href}
                                     alt={bk.title}
                                     draggable={false}

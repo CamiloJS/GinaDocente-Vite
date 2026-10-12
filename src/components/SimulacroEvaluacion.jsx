@@ -146,7 +146,7 @@ export default function SimulacroEvaluacion({ evaluacion = {}, isDarkMode = fals
                 {q.imageUrl && (
                   <div className="pl-8 pt-2">
                     <div className="rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-gray-900/50 max-w-md">
-                      <img src={q.imageUrl} alt={`Imagen de la pregunta ${i + 1}`} className="w-full max-h-64 object-contain" />
+                      <img loading="lazy" decoding="async" src={q.imageUrl} alt={`Imagen de la pregunta ${i + 1}`} className="w-full max-h-64 object-contain" />
                     </div>
                   </div>
                 )}

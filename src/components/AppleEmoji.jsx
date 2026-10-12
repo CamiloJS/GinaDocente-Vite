@@ -32,7 +32,7 @@ export const AppleEmoji = ({ emoji, size = '1.25em', className = '', alt, style 
   const sizeVal = typeof size === 'number' ? `${size}px` : size;
 
   return (
-    <img
+    <img loading="lazy" decoding="async"
       src={url}
       alt={alt || emoji}
       className={`apple-emoji inline-block object-contain pointer-events-none select-none shrink-0 ${className}`}

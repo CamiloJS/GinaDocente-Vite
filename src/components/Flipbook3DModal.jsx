@@ -886,7 +886,7 @@ export default function Flipbook3DModal({
                 className="relative w-full h-full overflow-hidden select-none"
                 style={{ backgroundColor: theme.pageTint || '#fffdf9' }}
             >
-                <img
+                <img loading="lazy" decoding="async"
                     src={pageSrc}
                     alt={`${normalizedBook.title} - Página ${pageIdx + 1}`}
                     draggable={false}
@@ -914,7 +914,7 @@ export default function Flipbook3DModal({
                     className="w-full h-full object-contain pointer-events-none select-none"
                 />
                 {extImgOverlay && (
-                    <img
+                    <img loading="lazy" decoding="async"
                         src={extImgOverlay.href}
                         alt=""
                         draggable={false}
@@ -1762,7 +1762,7 @@ export default function Flipbook3DModal({
                                         onClick={() => jumpToPage(bPageIdx)}
                                     >
                                         {thumbSrc && (
-                                            <img
+                                            <img loading="lazy" decoding="async"
                                                 src={thumbSrc}
                                                 alt={`Pág. ${bPageIdx + 1}`}
                                                 className="w-10 h-14 object-cover rounded border border-white/20 bg-white shrink-0"
@@ -1813,7 +1813,7 @@ export default function Flipbook3DModal({
                                             : 'border-white/15 opacity-70 hover:opacity-100 hover:border-white/40'
                                     }`}
                                 >
-                                    <img
+                                    <img loading="lazy" decoding="async"
                                         src={thumbUrl}
                                         alt={`Miniatura ${idx + 1}`}
                                         className="w-full h-full object-cover bg-white"

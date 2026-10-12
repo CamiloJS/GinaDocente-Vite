@@ -409,7 +409,7 @@ export default function BookWordEditor({
 
                                 {page?.imageUrl && (
                                     <div className="flex flex-col sm:flex-row items-center gap-3 pt-1">
-                                        <img
+                                        <img loading="lazy" decoding="async"
                                             src={page.imageUrl}
                                             alt={page.imageCaption || 'Imagen de página'}
                                             className="w-28 h-20 object-cover rounded-lg border border-slate-200 dark:border-slate-700 bg-white shadow-2xs shrink-0"
@@ -521,13 +521,13 @@ export default function BookWordEditor({
                                 className="w-36 sm:w-44 aspect-[800/1130] rounded-xl overflow-hidden shadow-md border border-slate-200 dark:border-slate-700 bg-white cursor-pointer group relative"
                                 title="Clic para ampliar esta página"
                             >
-                                <img
+                                <img loading="lazy" decoding="async"
                                     src={renderedPageThumb}
                                     alt={`Hoja ${pageIdx + 1}`}
                                     className="w-full h-full object-contain group-hover:scale-[1.02] transition-transform"
                                 />
                                 {extImgOverlay && (
-                                    <img
+                                    <img loading="lazy" decoding="async"
                                         src={extImgOverlay.href}
                                         alt=""
                                         draggable={false}
