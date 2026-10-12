@@ -72,6 +72,8 @@ export default function FeedbackIAEvaluacion({
   // Historial de trampas tocadas por pregunta: { [qIdx]: [idx1, idx2] }
   const [trampasTocadas, setTrampasTocadas] = useState({});
   const [mostrarDetalle, setMostrarDetalle] = useState(() => Boolean(expandidoInicial));
+  // Detalles extra por pregunta (análisis de opciones + minijuego): cerrados por defecto para que lo primero que se lea sea claro y sencillo
+  const [detalleExtra, setDetalleExtra] = useState({});
 
   const intentosRef = useRef(0);
   const enCursoRef = useRef(false);
@@ -338,6 +340,18 @@ export default function FeedbackIAEvaluacion({
                   <p>{textoPlano(exp || juego.explicacionGeneral)}</p>
                 </div>
 
+                {/* Los detalles finos quedan detrás de un enlace para que la lectura sea clara */}
+                <button
+                  type="button"
+                  onClick={() => setDetalleExtra((prev) => ({ ...prev, [qIdx]: !prev[qIdx] }))}
+                  className="w-full text-left text-[11px] font-black text-blue-600 dark:text-blue-400 hover:underline cursor-pointer py-0.5"
+                >
+                  {detalleExtra[qIdx]
+                    ? '− Ocultar el análisis de cada opción y el minijuego'
+                    : '+ Ver el análisis de cada opción y el minijuego'}
+                </button>
+                {detalleExtra[qIdx] && (
+                  <>
                 {/* Desglose opción por opción: por qué la correcta es la correcta y por qué las otras no iban */}
                 {Array.isArray(juego.analisisOpciones) && juego.analisisOpciones.length > 0 && (
                   <div className="space-y-1.5">
@@ -465,6 +479,8 @@ export default function FeedbackIAEvaluacion({
                       </div>
                     )}
                   </div>
+                )}
+                  </>
                 )}
               </div>
             );

@@ -1,5 +1,14 @@
 // src/App.jsx
 import React, { useState, useEffect, useRef, Suspense, useCallback, useMemo } from 'react'
+
+// True si la evaluacion esta programada pero aun no se ha abierto (apertura en el futuro).
+const esEvaluacionProgramada = (ev) => {
+  try {
+    if (!ev?.startDate) return false;
+    const ini = new Date(`${ev.startDate}T${ev.startTime || '00:00'}`);
+    return !isNaN(ini.getTime()) && new Date() < ini;
+  } catch { return false; }
+};
 import ReactDOM from 'react-dom'
 import confetti from 'canvas-confetti'
 import {
@@ -526,6 +535,8 @@ function App() {
     description: "",
     dueDate: getToday(),
     dueTime: "23:59",
+    startDate: "",
+    startTime: "",
     timeLimit: 30,
     strictAntiCheat: false,
     immediateFeedback: false,
@@ -9500,7 +9511,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                     setIsCreatingEval(false);
                                     setViewingResultsFor(null);
                                     setActiveImmediateFeedback(null);
-                                    setActiveTakingEval(ev);
+                                    (esEvaluacionProgramada(ev) ? showMessage('Esta prueba se abre el ' + ev.startDate + (ev.startTime ? ' a las ' + ev.startTime : '') + '. Aún no está disponible.') : setActiveTakingEval(ev));
                                     setTimeRemaining(safeMinutes * 60);
                                     setStudentAnswers({});
                                     changeTab('evaluations');
@@ -11006,6 +11017,19 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                   
                                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                                       <div>
+                                          <label className="text-xs font-bold text-gray-700 dark:text-gray-300 ml-1">Se abre (opcional)</label>
+                                          <input type="date" value={evalFormData.startDate || ''} onChange={e => setEvalFormData({ ...evalFormData, startDate: e.target.value })} className={`${glassInput} !py-2 text-xs`} required />
+                                      </div>
+                                      <div>
+                                          <label className="text-xs font-bold text-gray-700 dark:text-gray-300 ml-1">Hora de apertura</label>
+                                          <input type="time" value={evalFormData.startTime || ''} onChange={e => setEvalFormData({ ...evalFormData, startTime: e.target.value })} className={`${glassInput} !py-2 text-xs`} required />
+                                      </div>
+                                      <div className="flex items-end pb-1">
+                                          <p className="text-[10px] text-gray-500 font-medium leading-snug">Si dejas la apertura vacía, la prueba queda disponible de inmediato.</p>
+                                      </div>
+                                  </div>
+                                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                                      <div>
                                           <label className="text-xs font-bold text-gray-700 dark:text-gray-300 ml-1">Fecha límite</label>
                                           <input type="date" value={evalFormData.dueDate} onChange={e => setEvalFormData({...evalFormData, dueDate: e.target.value})} className={`${glassInput} !py-2 text-xs`} required />
                                       </div>
@@ -11540,6 +11564,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                       {visibleEvaluations.map(ev => {
                           const deadline = ev.dueDate ? new Date(`${ev.dueDate}T${ev.dueTime || '23:59'}`) : null;
                           const isExpired = deadline && !isNaN(deadline.getTime()) ? new Date() > deadline : false;
+                          const noIniciadaDeEv = esEvaluacionProgramada(ev);
                           const studentGrade = role === 'student' ? grades.find(g => g.evaluationId === ev.id && (g.studentId === user?.uid || g.studentId === myChatId || (user?.email && g.studentEmail === user.email))) : null;
                           const isDone = !!studentGrade;
 
@@ -11585,9 +11610,9 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                   ? 'bg-green-500/15 text-green-600 dark:text-green-400' 
                                                   : isExpired 
                                                       ? 'bg-red-500/15 text-red-600 dark:text-red-400' 
-                                                      : 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
+                                                      : noIniciadaDeEv ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400' : 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
                                           }`}>
-                                              {isDone ? 'Completado' : isExpired ? 'Cerrado' : 'Activo'}
+                                              {isDone ? 'Completado' : isExpired ? 'Cerrado' : noIniciadaDeEv ? 'Programada' : 'Activo'}
                                           </span>
                                       </div>
 
@@ -11763,7 +11788,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                             ? `Esta prueba cuenta con Modo Anti-trampas activo. Tienes ${safeMinutes} minutos para completarla. Por seguridad académica, no debes cambiar de pestaña, salir de la app ni abrir otras ventanas, o la prueba se anulará automáticamente con nota 0.0.`
                                                             : `Tienes ${safeMinutes} minutos para completar la prueba sin pausas.`;
                                                         confirmAction(confirmMsg, () => {
-                                                            setActiveTakingEval(ev);
+                                                            (esEvaluacionProgramada(ev) ? showMessage('Esta prueba se abre el ' + ev.startDate + (ev.startTime ? ' a las ' + ev.startTime : '') + '. Aún no está disponible.') : setActiveTakingEval(ev));
                                                             setTimeRemaining(safeMinutes * 60);
                                                             setStudentAnswers({});
                                                         }, "Empezar", false, "¿Empezar prueba?");
@@ -13574,7 +13599,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                       setIsCreatingEval(false);
                                       setViewingResultsFor(null);
                                       setActiveImmediateFeedback(null);
-                                      setActiveTakingEval(ev);
+                                      (esEvaluacionProgramada(ev) ? showMessage('Esta prueba se abre el ' + ev.startDate + (ev.startTime ? ' a las ' + ev.startTime : '') + '. Aún no está disponible.') : setActiveTakingEval(ev));
                                       setTimeRemaining(safeMinutes * 60);
                                       setStudentAnswers({});
                                       changeTab('evaluations');
