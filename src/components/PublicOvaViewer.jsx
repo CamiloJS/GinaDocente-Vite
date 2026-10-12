@@ -244,7 +244,9 @@ export default function PublicOvaViewer({
             ? ['englishTech_demo_ovas', 'englishTech_demo_ovas_teacher', 'englishTech_demo_ovas_camilodocente']
             : ['englishTech_ovas', 'englishTech_ovas_camilodocente'];
           storageKeys.forEach(storageKey => {
-            const cachedList = JSON.parse(localStorage.getItem(storageKey) || '[]');
+            let cachedListSeguro = [];
+              try { cachedListSeguro = JSON.parse(localStorage.getItem(storageKey) || '[]'); } catch (e) { cachedListSeguro = []; }
+              const cachedList = Array.isArray(cachedListSeguro) ? cachedListSeguro : [];
             const idx = cachedList.findIndex(o => o.id === updatedProject.id);
             if (idx >= 0 || isDemoMode || storageKey === storageKeys[0]) {
               const next = idx >= 0

@@ -12570,7 +12570,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        window.open(`${window.location.origin}${window.location.pathname}#demo`, '_blank');
+                                        window.open(`${window.location.origin}${window.location.pathname}#demo`, '_blank', 'noopener,noreferrer');
                                     }}
                                     className="py-2 px-3 rounded-xl text-xs font-bold border border-purple-300 dark:border-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/40 text-purple-700 dark:text-purple-300 transition-colors flex items-center justify-center gap-1 shrink-0 cursor-pointer"
                                     title="Abrir en nueva pestaña"
@@ -12615,7 +12615,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        window.open(`${window.location.origin}${window.location.pathname}#demo-docente`, '_blank');
+                                        window.open(`${window.location.origin}${window.location.pathname}#demo-docente`, '_blank', 'noopener,noreferrer');
                                     }}
                                     className="py-2 px-3 rounded-xl text-xs font-bold border border-amber-300 dark:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/40 text-amber-700 dark:text-amber-300 transition-colors flex items-center justify-center gap-1 shrink-0 cursor-pointer"
                                     title="Abrir en nueva pestaña"
