@@ -9511,7 +9511,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                     setIsCreatingEval(false);
                                     setViewingResultsFor(null);
                                     setActiveImmediateFeedback(null);
-                                    (esEvaluacionProgramada(ev) ? showMessage('Esta prueba se abre el ' + ev.startDate + (ev.startTime ? ' a las ' + ev.startTime : '') + '. Aún no está disponible.') : setActiveTakingEval(ev));
+                                    (esEvaluacionProgramada(ev) ? showMessage('Esta prueba se abre el ' + ev.startDate + (ev.startTime ? ' a las ' + ev.startTime : '') + '. Aún no está disponible.') : setActiveTakingEval(JSON.parse(JSON.stringify(ev))));
                                     setTimeRemaining(safeMinutes * 60);
                                     setStudentAnswers({});
                                     changeTab('evaluations');
@@ -11788,7 +11788,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                             ? `Esta prueba cuenta con Modo Anti-trampas activo. Tienes ${safeMinutes} minutos para completarla. Por seguridad académica, no debes cambiar de pestaña, salir de la app ni abrir otras ventanas, o la prueba se anulará automáticamente con nota 0.0.`
                                                             : `Tienes ${safeMinutes} minutos para completar la prueba sin pausas.`;
                                                         confirmAction(confirmMsg, () => {
-                                                            (esEvaluacionProgramada(ev) ? showMessage('Esta prueba se abre el ' + ev.startDate + (ev.startTime ? ' a las ' + ev.startTime : '') + '. Aún no está disponible.') : setActiveTakingEval(ev));
+                                                            (esEvaluacionProgramada(ev) ? showMessage('Esta prueba se abre el ' + ev.startDate + (ev.startTime ? ' a las ' + ev.startTime : '') + '. Aún no está disponible.') : setActiveTakingEval(JSON.parse(JSON.stringify(ev))));
                                                             setTimeRemaining(safeMinutes * 60);
                                                             setStudentAnswers({});
                                                         }, "Empezar", false, "¿Empezar prueba?");
@@ -13599,7 +13599,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                       setIsCreatingEval(false);
                                       setViewingResultsFor(null);
                                       setActiveImmediateFeedback(null);
-                                      (esEvaluacionProgramada(ev) ? showMessage('Esta prueba se abre el ' + ev.startDate + (ev.startTime ? ' a las ' + ev.startTime : '') + '. Aún no está disponible.') : setActiveTakingEval(ev));
+                                      (esEvaluacionProgramada(ev) ? showMessage('Esta prueba se abre el ' + ev.startDate + (ev.startTime ? ' a las ' + ev.startTime : '') + '. Aún no está disponible.') : setActiveTakingEval(JSON.parse(JSON.stringify(ev))));
                                       setTimeRemaining(safeMinutes * 60);
                                       setStudentAnswers({});
                                       changeTab('evaluations');
