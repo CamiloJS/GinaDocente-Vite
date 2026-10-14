@@ -231,7 +231,7 @@ const TaskCard = React.memo(({
     const isKahoot = task?.type === 'kahoot' || Boolean(task?.kahoot);
     const isEvaluation = task?.type === 'evaluation' || Boolean(task?.evaluationId);
     const isSlides = task?.type === 'slides' || task?.type === 'review' || Boolean(task?.reviewId);
-    const isBook3D = task?.type === 'book3d' || Boolean(task?.bookId);
+    const isBook3D = task?.type === 'book3d';
     const isPost = task?.type === 'post' || (!isTask && !isForum && !isPoll && !isKahoot && !isEvaluation && !isSlides && !isBook3D);
     const isTaskType = isTask || isForum;
 
@@ -3611,18 +3611,20 @@ const TaskCard = React.memo(({
             )}
 
             {/* Archivo adjunto o Video directo */}
-            {task.fileUrl && !isBook3D && (
-                isDirectVideoUrl(task.fileUrl) ? (
+            {(task.fileUrl || (!isBook3D && task.pdfUrl)) && !isBook3D && (() => {
+                const docUrl = task.fileUrl || task.pdfUrl;
+                const isPdfDoc = (task.fileName || '').toLowerCase().endsWith('.pdf') || docUrl.toLowerCase().includes('.pdf') || docUrl.startsWith('data:application/pdf');
+                return isDirectVideoUrl(docUrl) ? (
                     <div className="mt-3 rounded-2xl overflow-hidden shadow-sm">
                         <CustomVideoPlayer 
-                            src={task.fileUrl} 
+                            src={docUrl} 
                             title={task.fileName || task.title || "Video adjunto"} 
                             isDarkMode={isDarkMode} 
                         />
                     </div>
                 ) : (
                     <div 
-                        onClick={() => setPreviewDoc({ url: task.fileUrl, title: task.fileName || (task.fileUrl.toLowerCase().includes('.pdf') ? 'Documento PDF' : 'Documento adjunto') })}
+                        onClick={() => setPreviewDoc({ url: docUrl, title: task.fileName || (isPdfDoc ? 'Documento PDF' : 'Documento adjunto') })}
                         className={`flex items-center justify-between gap-3 p-3 rounded-2xl border mt-3 w-fit max-w-full transition-all shadow-xs hover:border-blue-400 dark:hover:border-blue-500 hover:scale-[1.01] cursor-pointer select-none ${
                             isDarkMode ? 'bg-gray-800/90 border-gray-700 text-gray-100' : 'bg-white border-gray-200 text-gray-900'
                         }`}
@@ -3634,11 +3636,11 @@ const TaskCard = React.memo(({
                             </div>
                             <div className="flex flex-col min-w-0">
                                 <span className="text-xs font-black truncate max-w-[200px] sm:max-w-[320px]">
-                                    {task.fileName || (task.fileUrl.toLowerCase().includes('.pdf') ? 'Documento PDF' : 'Documento adjunto')}
+                                    {task.fileName || (isPdfDoc ? 'Documento PDF' : 'Documento adjunto')}
                                 </span>
                                 <span className="text-[10px] text-gray-500 font-medium flex items-center gap-1.5 mt-0.5">
                                     <span className="text-blue-600 dark:text-blue-400 font-bold hover:underline">Ver documento</span>
-                                    {((task.fileName || '').toLowerCase().endsWith('.pdf') || task.fileUrl.toLowerCase().includes('.pdf')) && (
+                                    {isPdfDoc && (
                                         <>
                                             <span>•</span>
                                             <span className="text-gray-400">PDF</span>
@@ -3649,8 +3651,8 @@ const TaskCard = React.memo(({
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
                             <a 
-                                href={task.fileUrl} 
-                                download={task.fileName || "documento.pdf"}
+                                href={docUrl} 
+                                download={task.fileName || (isPdfDoc ? "documento.pdf" : "documento")}
                                 target="_blank" 
                                 rel="noopener noreferrer" 
                                 className="p-2 rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
@@ -3660,8 +3662,8 @@ const TaskCard = React.memo(({
                             </a>
                         </div>
                     </div>
-                )
-            )}
+                );
+            })()}
 
             {/* Reacciones */}
             {renderReactions()}

@@ -672,9 +672,9 @@ const TasksTab = React.memo(({
                     return false;
                 }
             }
-            if (t.type === 'book3d' || t.type === 'book' || t.bookId) {
+            if (t.type === 'book3d' && String(t.id || '').startsWith('book_wall_')) {
                 const bkId = String(t.bookId || '').trim();
-                if (bkId && Array.isArray(books) && !bookMap.has(bkId) && String(t.id || '').startsWith('book_wall_')) {
+                if (bkId && Array.isArray(books) && !bookMap.has(bkId)) {
                     return false;
                 }
             }
@@ -838,9 +838,9 @@ const TasksTab = React.memo(({
                 const revId = String(t.reviewId || '').trim();
                 if (revId && Array.isArray(reviews) && !reviewMap.has(revId) && String(t.id || '').startsWith('rev_wall_')) return false;
             }
-            if (t.type === 'book3d' || t.type === 'book' || t.bookId) {
+            if (t.type === 'book3d' && String(t.id || '').startsWith('book_wall_')) {
                 const bkId = String(t.bookId || '').trim();
-                if (bkId && Array.isArray(books) && !bookMap.has(bkId) && String(t.id || '').startsWith('book_wall_')) return false;
+                if (bkId && Array.isArray(books) && !bookMap.has(bkId)) return false;
             }
             return isTaskVisibleForUser(t);
         });

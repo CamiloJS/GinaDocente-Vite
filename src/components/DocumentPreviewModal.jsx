@@ -122,7 +122,7 @@ export const DocumentPreviewModal = ({
         )}
 
         <object
-          data={documentUrl}
+          data={viewerUrl || documentUrl}
           type={isPdf ? 'application/pdf' : undefined}
           className="w-full h-full border-none"
           onLoad={() => setIsLoading(false)}
