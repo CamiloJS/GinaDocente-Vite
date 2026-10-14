@@ -1420,7 +1420,7 @@ function App() {
   const allChatUsers = (() => {
     const rawList = [
       { id: 'teacher', name: TEACHER_NAME, role: 'teacher', profilePicUrl: userMappings['teacher']?.profilePicUrl || userMappings['ginadocente']?.profilePicUrl || '' },
-      ...(isDemoMode ? [] : [{ id: 'camilodocente', name: SECOND_TEACHER_NAME, role: 'teacher', profilePicUrl: userMappings['camilodocente']?.profilePicUrl || '' }]),
+      { id: 'camilodocente', name: SECOND_TEACHER_NAME, role: 'teacher', profilePicUrl: userMappings['camilodocente']?.profilePicUrl || '' },
       ...Object.entries(userMappings || {})
         .filter(([id, data]) => {
           if (!data?.email) return false;
@@ -2704,16 +2704,25 @@ function App() {
                 (v?.uid && v.uid === gUser.uid)
               );
               
-              // Si ya completó onboarding y existe en la base de datos: entrar directo
-              if (existingEntry && existingEntry[1]?.onboardingCompleted) {
-                const userKey = existingEntry[0];
-                const targetFullName = existingEntry[1].fullName || fullName;
-                const targetRole = existingEntry[1].role || 'student';
+              // Detectar si la cuenta pertenece a alguno de los docentes
+              const isCamiloGUser = isCamiloTeacher(email) || isCamiloTeacher(fullName);
+              const isGinaGUser = (email && email.toLowerCase() === 'ginamarcelaquintana19@gmail.com') || (fullName && fullName.toLowerCase().includes('gina marcela'));
+              const isTeacherGoogle = isCamiloGUser || isGinaGUser;
+
+              // Si es docente o ya completó onboarding y existe en la base de datos: entrar directo
+              if (isTeacherGoogle || (existingEntry && existingEntry[1]?.onboardingCompleted)) {
+                const userKey = isCamiloGUser ? 'camilodocente' : (isGinaGUser ? 'teacher' : existingEntry[0]);
+                const targetFullName = isCamiloGUser ? SECOND_TEACHER_NAME : (isGinaGUser ? TEACHER_NAME : (existingEntry[1].fullName || fullName));
+                const targetRole = isTeacherGoogle ? 'teacher' : (existingEntry[1].role || 'student');
                 const finalDisplayName = targetRole === 'teacher' ? getTeacherDisplayName(userKey || targetFullName) : targetFullName;
                 
-                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userMappings', userKey), {
-                  lastLogin: Date.now()
-                }).catch(() => {});
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userMappings', userKey), {
+                  fullName: targetFullName,
+                  email: email,
+                  role: targetRole,
+                  lastLogin: Date.now(),
+                  onboardingCompleted: true
+                }, { merge: true }).catch(() => {});
 
                 const newAcc = { username: userKey, name: finalDisplayName, role: targetRole, email: email, isGoogle: true };
                 const accs = safeGetSavedAccounts();

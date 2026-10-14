@@ -60,7 +60,11 @@ export const isCamiloTeacher = (val) => {
     clean === 'teacher_camilo' ||
     clean === 'camilo jaimes' ||
     clean === 'camilodocente@unipamplona.edu.co' ||
-    clean.includes('camilo jaimes')
+    clean === 'edwincamilojaimes1@gmail.com' ||
+    clean.includes('camilo jaimes') ||
+    clean.includes('camilojaimes') ||
+    clean.includes('edwincamilo') ||
+    clean.includes('edwin camilo')
   )
 }
 

@@ -1295,6 +1295,17 @@ export const DEMO_USER_MAPPINGS = {
     bio: 'Docente de Inglés Técnico Económico — Universidad de Pamplona.',
     isDemoUser: true
   },
+  camilodocente: {
+    id: 'camilodocente',
+    username: 'CamiloDocente',
+    name: 'Prof. Camilo',
+    fullName: 'Camilo Jaimes',
+    email: 'camilodocente@unipamplona.edu.co',
+    role: 'teacher',
+    profilePicUrl: '',
+    bio: 'Docente de Inglés Técnico — Universidad de Pamplona.',
+    isDemoUser: true
+  },
   invitado: {
     id: 'invitado',
     username: 'invitado',
@@ -1359,6 +1370,7 @@ export const DEMO_USER_MAPPINGS = {
 
 export const DEMO_USER_PRESENCE = {
   teacher: { status: 'online', isOnline: true, lastPing: nowMs, lastSeen: nowMs - 60 * 1000, updatedAt: nowMs - 60 * 1000 },
+  camilodocente: { status: 'online', isOnline: true, lastPing: nowMs, lastSeen: nowMs - 30 * 1000, updatedAt: nowMs - 30 * 1000 },
   invitado: { status: 'online', isOnline: true, lastPing: nowMs, lastSeen: nowMs - 30 * 1000, updatedAt: nowMs - 30 * 1000 },
   '@invitado': { status: 'online', isOnline: true, lastPing: nowMs, lastSeen: nowMs - 30 * 1000, updatedAt: nowMs - 30 * 1000 },
   carlos_mendoza: { status: 'online', isOnline: true, lastPing: nowMs, lastSeen: nowMs - 2 * 60 * 1000, updatedAt: nowMs - 2 * 60 * 1000 },
@@ -1862,6 +1874,20 @@ export function getDemoAutoReply(chatOrId, arg2 = 'student', arg3 = '') {
   }
 
   // Direct Message (DM)
+  if (chatId.includes('camilodocente') || chatId.includes('camilo')) {
+    const isOtherTeacherCamilo = senderRole === 'teacher' && !chatId.startsWith('dm_camilodocente_camilodocente');
+    return {
+      author: 'Prof. Camilo',
+      authorId: 'camilodocente',
+      authorRole: 'teacher',
+      senderId: 'camilodocente',
+      senderName: 'Prof. Camilo',
+      text: clean.includes('?')
+        ? '¡Hola colega! Sí, totalmente de acuerdo. Ya estuve revisando el material de la materia y todo marcha excelente. 🤝📚'
+        : '¡Hola profe! Recibido con éxito. Quedo atento a cualquier novedad con los grupos y las actividades. Saludos 👍'
+    };
+  }
+
   const knownStudents = ['carlos_mendoza', 'laura_restrepo', 'mateo_gomez', 'valeria_castro', 'invitado'];
   const matchedStudentId = knownStudents.find((sid) => chatId.includes(sid));
   const matchedStudent = matchedStudentId ? DEMO_USER_MAPPINGS[matchedStudentId] : null;
