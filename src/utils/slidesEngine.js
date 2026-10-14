@@ -2369,3 +2369,223 @@ export const buildFallbackAiSlides = ({ topic = 'Lección Interactiva', language
   }
   return extended.map((s, i) => normalizeSingleSlide(s, i));
 };
+
+// =========================================================================
+// GOOGLE SLIDES Y ARCHIVOS POWERPOINT (.PPTX)
+// =========================================================================
+
+/**
+ * Decodifica entidades XML estándar (&amp;, &lt;, &gt;, &quot;, &apos;).
+ */
+export const decodeXmlEntities = (str) => {
+  if (!str || typeof str !== 'string') return '';
+  return str
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&#x27;/gi, "'")
+    .replace(/&#x2F;/gi, '/');
+};
+
+/**
+ * Detecta si una cadena de texto es una URL de Google Slides.
+ */
+export const isGoogleSlidesUrl = (rawUrl) => {
+  if (!rawUrl || typeof rawUrl !== 'string') return false;
+  return /docs\.google\.com\/presentation\/d\//i.test(rawUrl.trim());
+};
+
+/**
+ * Convierte un enlace compartido de Google Slides a su formato de incrustación de alta calidad:
+ * /embed?start=false&loop=false&delayms=3000
+ */
+export const extractGoogleSlidesEmbedUrl = (rawUrl) => {
+  if (!rawUrl || typeof rawUrl !== 'string') {
+    return { isValid: false, embedUrl: null, error: 'Por favor ingresa un enlace de Google Slides.' };
+  }
+  const trimmed = rawUrl.trim();
+
+  // Caso 1: Presentación publicada en la web (/presentation/d/e/2PACX-.../(pub|embed))
+  const pubMatch = trimmed.match(/docs\.google\.com\/presentation\/d\/e\/([a-zA-Z0-9_-]+)/i);
+  if (pubMatch && pubMatch[1]) {
+    const id = pubMatch[1];
+    return {
+      isValid: true,
+      presentationId: id,
+      embedUrl: `https://docs.google.com/presentation/d/e/${id}/embed?start=false&loop=false&delayms=3000`,
+      originalUrl: trimmed
+    };
+  }
+
+  // Caso 2: Presentación estándar (/presentation/d/ID/...)
+  const stdMatch = trimmed.match(/docs\.google\.com\/presentation\/d\/([a-zA-Z0-9_-]+)/i);
+  if (stdMatch && stdMatch[1]) {
+    const id = stdMatch[1];
+    return {
+      isValid: true,
+      presentationId: id,
+      embedUrl: `https://docs.google.com/presentation/d/${id}/embed?start=false&loop=false&delayms=3000`,
+      originalUrl: trimmed
+    };
+  }
+
+  return {
+    isValid: false,
+    embedUrl: null,
+    error: 'El enlace proporcionado no corresponde a una presentación de Google Slides válida (docs.google.com/presentation/d/...).'
+  };
+};
+
+/**
+ * Parsea un archivo PowerPoint (.pptx) extrayendo sus diapositivas, textos, viñetas,
+ * imágenes embebidas y notas del orador a la estructura nativa de diapositivas.
+ */
+export const parsePptxFile = async (fileOrBuffer, defaultTopic = 'Presentación PowerPoint') => {
+  try {
+    const jszipModule = await import('jszip');
+    const JSZip = jszipModule.default || jszipModule;
+    
+    let buffer = fileOrBuffer;
+    if (typeof File !== 'undefined' && fileOrBuffer instanceof File) {
+      buffer = await fileOrBuffer.arrayBuffer();
+    } else if (typeof Blob !== 'undefined' && fileOrBuffer instanceof Blob) {
+      buffer = await fileOrBuffer.arrayBuffer();
+    }
+
+    const zip = await JSZip.loadAsync(buffer);
+
+    // Identificar archivos de diapositivas y ordenarlos numéricamente
+    const slideFileNames = Object.keys(zip.files)
+      .filter(name => /^ppt\/slides\/slide\d+\.xml$/.test(name))
+      .sort((a, b) => {
+        const numA = parseInt((a.match(/slide(\d+)\.xml/) || [])[1] || '0', 10);
+        const numB = parseInt((b.match(/slide(\d+)\.xml/) || [])[1] || '0', 10);
+        return numA - numB;
+      });
+
+    if (slideFileNames.length === 0) {
+      return {
+        success: false,
+        error: 'El archivo PowerPoint no contiene diapositivas legibles.',
+        slides: buildFallbackAiSlides({ topic: defaultTopic, language: 'Inglés', slideCount: 4 })
+      };
+    }
+
+    const extractedSlides = [];
+    let detectedMainTopic = '';
+
+    for (let idx = 0; idx < slideFileNames.length; idx++) {
+      const slidePath = slideFileNames[idx];
+      const slideNum = idx + 1;
+      const slideXml = await zip.file(slidePath).async('text');
+
+      // Buscar relaciones de este slide (imágenes, notas)
+      const relsPath = `ppt/slides/_rels/slide${slideNum}.xml.rels`;
+      let embeddedImageUrl = '';
+      let speakerNotes = '';
+
+      if (zip.file(relsPath)) {
+        try {
+          const relsXml = await zip.file(relsPath).async('text');
+          
+          // Buscar imagen
+          const imgMatch = relsXml.match(/Target=\"(\.\.\/media\/[^\"]+)\"/i) || relsXml.match(/Target=\"(media\/[^\"]+)\"/i);
+          if (imgMatch && imgMatch[1]) {
+            const cleanMediaName = imgMatch[1].replace(/^\.\.\//, 'ppt/');
+            const mediaFile = zip.file(cleanMediaName);
+            if (mediaFile) {
+              const ext = cleanMediaName.split('.').pop().toLowerCase();
+              const mime = ext === 'png' ? 'image/png' : ext === 'svg' ? 'image/svg+xml' : 'image/jpeg';
+              const b64 = await mediaFile.async('base64');
+              if (b64 && b64.length < 400000) {
+                embeddedImageUrl = `data:${mime};base64,${b64}`;
+              }
+            }
+          }
+
+          // Buscar notas del orador
+          const notesMatch = relsXml.match(/Target=\"(\.\.\/notesSlides\/[^\"]+)\"/i);
+          if (notesMatch && notesMatch[1]) {
+            const cleanNotesPath = notesMatch[1].replace(/^\.\.\//, 'ppt/');
+            const notesFile = zip.file(cleanNotesPath);
+            if (notesFile) {
+              const notesXml = await notesFile.async('text');
+              const noteRuns = [...notesXml.matchAll(/<a:t>([\s\S]*?)<\/a:t>/g)]
+                .map(m => decodeXmlEntities(m[1]))
+                .join(' ')
+                .trim();
+              if (noteRuns) speakerNotes = noteRuns;
+            }
+          }
+        } catch {
+          // Relaciones opcionales
+        }
+      }
+
+      // Extraer párrafos de texto
+      const pMatches = slideXml.match(/<a:p[\s>][\s\S]*?<\/a:p>/g) || [];
+      const paragraphs = [];
+      for (const pXml of pMatches) {
+        const tMatches = [...pXml.matchAll(/<a:t>([\s\S]*?)<\/a:t>/g)]
+          .map(m => decodeXmlEntities(m[1]));
+        const fullText = tMatches.join('').trim();
+        if (fullText) paragraphs.push(fullText);
+      }
+
+      let title = paragraphs[0] || (idx === 0 ? defaultTopic : `Diapositiva ${slideNum}`);
+      if (idx === 0 && paragraphs[0]) {
+        detectedMainTopic = paragraphs[0];
+      }
+
+      let layout = 'bullets';
+      let slideObj = {
+        id: `slide_pptx_${slideNum}_${Date.now()}`,
+        speakerNotes
+      };
+
+      if (idx === 0) {
+        layout = 'title';
+        slideObj.title = title;
+        slideObj.subtitle = paragraphs[1] || 'Presentación importada desde PowerPoint';
+        slideObj.description = paragraphs.slice(2).join(' • ');
+      } else if (embeddedImageUrl) {
+        layout = 'image_text';
+        slideObj.title = title;
+        slideObj.imageUrl = embeddedImageUrl;
+        slideObj.body = paragraphs.slice(1).join('\n') || 'Contenido importado de PowerPoint.';
+      } else if (paragraphs.length <= 2) {
+        layout = 'title_body';
+        slideObj.title = title;
+        slideObj.body = paragraphs[1] || '';
+      } else {
+        layout = 'bullets';
+        slideObj.title = title;
+        slideObj.bullets = paragraphs.slice(1).map(p => ({
+          title: p,
+          text: '',
+          example: ''
+        }));
+      }
+
+      const normalized = normalizeSingleSlide({ ...slideObj, layout }, idx, detectedMainTopic || defaultTopic);
+      extractedSlides.push(normalized);
+    }
+
+    return {
+      success: true,
+      topic: detectedMainTopic || defaultTopic,
+      slideCount: extractedSlides.length,
+      slides: extractedSlides
+    };
+  } catch (err) {
+    console.error('Error parseando archivo PowerPoint (.pptx):', err);
+    return {
+      success: false,
+      error: err?.message || 'Error al procesar el archivo PowerPoint.',
+      slides: buildFallbackAiSlides({ topic: defaultTopic, language: 'Inglés', slideCount: 4 })
+    };
+  }
+};

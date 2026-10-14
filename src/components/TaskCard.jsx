@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import ReactDOM from 'react-dom'
 import {
-  CheckCheck, CheckCircle2, CheckLine, Clock, Edit3, EyeOff, FileDocIcon, FileText, ImageIcon, Loader2, Lock, Unlock, Share2, MessageSquareText, Mic, PaperclipIcon, Plus, ReplyIcon, Send, SmileIcon, Square, Star, Pin, Trash2, Upload, X, XLine, Volume2, VolumeX, Languages, UserIcon, BookOpen, NavNotebook, Play, Pause, Download, MessageCircle, BarChart2, Vote, Gamepad2, Trophy, Zap, Flame, NavSlides, ClipboardList, Shield, ShieldAlert, AlertTriangle, ChevronLeft, ChevronRight, Maximize2, Layers, MonitorPlay, Globe, Sparkles, RotateCcw, Eye
+  CheckCheck, CheckCircle2, CheckLine, Clock, Edit3, EyeOff, FileDocIcon, FileText, ImageIcon, Loader2, Lock, Unlock, Share2, MessageSquareText, Mic, PaperclipIcon, Plus, ReplyIcon, Send, SmileIcon, Square, Star, Pin, Trash2, Upload, X, XLine, Volume2, VolumeX, Languages, UserIcon, BookOpen, NavNotebook, Play, Pause, Download, MessageCircle, BarChart2, Vote, Gamepad2, Trophy, Zap, Flame, NavSlides, ClipboardList, Shield, ShieldAlert, AlertTriangle, ChevronLeft, ChevronRight, Maximize2, Minimize2, ExternalLink, Layers, MonitorPlay, Globe, Sparkles, RotateCcw, Eye
 } from './Icons.jsx'
 import {
   compressImage, containsBadWords, checkBadWordsAsync, uploadImageToStorage, uploadRawFileToStorage, deleteFileFromStorage, deleteAllStorageFilesInObject, deleteReplacedStorageFiles, TEACHER_NAME, SECOND_TEACHER_NAME, SECOND_TEACHER_ID, isCamiloTeacher, isTeacherId, getCanonicalTeacherId, getTeacherDisplayName, getItemTeacherId, COMMENT_EMOJIS, REACTION_EMOJIS, splitNameFirstAndLast, FALLBACK_MAP, format12HourTime, formatDateTime12H
@@ -184,6 +184,22 @@ const TaskCard = React.memo(({
     const [revealedComments, setRevealedComments] = useState({}); 
     const [historyOpenCid, setHistoryOpenCid] = useState(null); 
     const [showCommentModal, setShowCommentModal] = useState(false); 
+    const [isModalExpanded, setIsModalExpanded] = useState(() => {
+        try {
+            return localStorage.getItem('english_tech_task_modal_expanded') === 'true';
+        } catch {
+            return false;
+        }
+    });
+    const toggleModalExpanded = () => {
+        setIsModalExpanded(prev => {
+            const next = !prev;
+            try {
+                localStorage.setItem('english_tech_task_modal_expanded', String(next));
+            } catch {}
+            return next;
+        });
+    };
     const [localFullScreenImage, setLocalFullScreenImage] = useState(null);
     const [replyingTo, setReplyingTo] = useState(null);
     const [gradingCid, setGradingCid] = useState(null);
@@ -443,17 +459,28 @@ const TaskCard = React.memo(({
         if (found) {
             return {
                 ...found,
-                topic: task?.title || found.topic || 'Presentación de Diapositivas'
+                topic: task?.title || found.topic || 'Presentación de Diapositivas',
+                googleSlidesUrl: task?.googleSlidesUrl || found.googleSlidesUrl,
+                googleSlidesOriginalUrl: task?.googleSlidesOriginalUrl || found.googleSlidesOriginalUrl,
+                sourceType: task?.sourceType || found.sourceType,
+                pptxUrl: task?.pptxUrl || found.pptxUrl,
+                fileName: task?.fileName || found.fileName
             };
         }
-        if (Array.isArray(task?.slides) && task.slides.length > 0) {
+        if ((Array.isArray(task?.slides) && task.slides.length > 0) || task?.googleSlidesUrl || task?.pptxUrl) {
             return {
                 id: task?.reviewId || task?.id,
                 topic: task?.title || 'Presentación de Diapositivas',
                 language: task?.language || 'Inglés',
                 theme: task?.theme || 'unipamplona',
-                slides: task.slides,
-                slideCount: task.slides.length,
+                slides: task?.slides || [{ id: 1, layout: 'title', title: task?.title, subtitle: 'Presentación', googleSlidesUrl: task?.googleSlidesUrl }],
+                slideCount: task?.slides?.length || task?.slideCount || 1,
+                sourceType: task?.sourceType || (task?.googleSlidesUrl ? 'google_slides' : task?.pptxUrl ? 'pptx' : 'native'),
+                googleSlidesUrl: task?.googleSlidesUrl,
+                googleSlidesOriginalUrl: task?.googleSlidesOriginalUrl,
+                pptxUrl: task?.pptxUrl,
+                fileName: task?.fileName,
+                fileSize: task?.fileSize,
                 author: task?.authorName || task?.author || TEACHER_NAME,
                 targetGroupId: task?.targetGroupId || 'all',
                 targetGroupName: task?.targetGroupName || 'General',
@@ -2675,6 +2702,8 @@ const TaskCard = React.memo(({
                 const safeSlideIdx = slidesArr.length > 0 ? Math.min(slidePreviewIdx, slidesArr.length - 1) : 0;
                 const currentPreviewSlide = slidesArr[safeSlideIdx] || null;
                 const deckLanguage = rev?.language || task.language || 'Inglés';
+                const isGoogleDeck = Boolean(rev?.googleSlidesUrl || rev?.sourceType === 'google_slides');
+                const isPptxDeck = Boolean(rev?.pptxUrl || rev?.sourceType === 'pptx');
 
                 return (
                     <div className="my-3 rounded-2xl border border-amber-200/80 dark:border-amber-800/50 bg-gradient-to-br from-amber-50/50 via-white to-red-50/30 dark:from-gray-900 dark:via-gray-900/95 dark:to-amber-950/20 shadow-sm overflow-hidden">
@@ -2692,17 +2721,48 @@ const TaskCard = React.memo(({
                                     <Globe size={11} className="text-blue-500" />
                                     {deckLanguage}
                                 </span>
+                                {isGoogleDeck && (
+                                    <span className="inline-flex items-center gap-1 text-[10.5px] font-black px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 shadow-2xs">
+                                        Google Slides
+                                    </span>
+                                )}
+                                {isPptxDeck && (
+                                    <span className="inline-flex items-center gap-1 text-[10.5px] font-black px-2.5 py-0.5 rounded-full bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/30 shadow-2xs">
+                                        PowerPoint
+                                    </span>
+                                )}
                             </div>
 
-                            {slidesArr.length > 0 && (
+                            {!isGoogleDeck && slidesArr.length > 0 && (
                                 <span className="text-[10.5px] font-extrabold text-amber-800 dark:text-amber-300 bg-amber-100/70 dark:bg-amber-950/60 px-2.5 py-0.5 rounded-full border border-amber-200/80 dark:border-amber-800/60">
                                     Diapositiva {safeSlideIdx + 1} de {slidesArr.length}
                                 </span>
                             )}
                         </div>
 
-                        {/* Lienzo 16:9 en vivo de la diapositiva con controles rápidos */}
-                        {rev && currentPreviewSlide && (
+                        {/* Lienzo o iframe en vivo de la diapositiva con controles rápidos */}
+                        {rev?.googleSlidesUrl ? (
+                            <div className="relative aspect-video w-full bg-black overflow-hidden group/slidecard">
+                                <iframe
+                                    src={rev.googleSlidesUrl}
+                                    title={rev.topic || "Google Slides"}
+                                    className="w-full h-full border-0"
+                                    allowFullScreen
+                                    loading="lazy"
+                                />
+                                <div className="absolute top-2.5 right-2.5 z-20">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowSlidePresenter(true)}
+                                        className="px-2.5 py-1 rounded-lg bg-black/75 hover:bg-black/90 backdrop-blur-md text-white text-[10px] font-extrabold border border-white/20 flex items-center gap-1.5 shadow-md cursor-pointer transition-all"
+                                        title="Abrir en pantalla completa interactiva"
+                                    >
+                                        <Maximize2 size={11} />
+                                        <span>Pantalla completa</span>
+                                    </button>
+                                </div>
+                            </div>
+                        ) : rev && currentPreviewSlide ? (
                             <div
                                 onClick={() => setShowSlidePresenter(true)}
                                 className="relative group/slidecard cursor-pointer overflow-hidden bg-slate-950 border-b border-amber-100/80 dark:border-gray-800"
@@ -2751,7 +2811,7 @@ const TaskCard = React.memo(({
                                     <span>Pantalla completa</span>
                                 </div>
                             </div>
-                        )}
+                        ) : null}
 
                         {/* Barra de acciones de la presentación */}
                         <div className="p-3.5 sm:p-4 flex flex-wrap items-center justify-between gap-2.5">
@@ -2779,15 +2839,42 @@ const TaskCard = React.memo(({
                                 )}
 
                                 {rev && (
-                                    <button
-                                        type="button"
-                                        onClick={() => exportReviewToPresentation(rev)}
-                                        className="px-3.5 py-2.5 rounded-xl text-xs font-extrabold bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
-                                        title="Descargar archivo PowerPoint (.pptx)"
+                                    rev.pptxUrl ? (
+                                        <a
+                                            href={rev.pptxUrl}
+                                            download={rev.fileName || `${rev.topic || 'presentacion'}.pptx`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="px-3.5 py-2.5 rounded-xl text-xs font-extrabold bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                                            title="Descargar archivo PowerPoint (.pptx)"
+                                        >
+                                            <Download size={14} className="text-orange-500" />
+                                            <span>Descargar .pptx</span>
+                                        </a>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={() => exportReviewToPresentation(rev)}
+                                            className="px-3.5 py-2.5 rounded-xl text-xs font-extrabold bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                                            title="Descargar archivo PowerPoint (.pptx)"
+                                        >
+                                            <Download size={14} className="text-[#AD3333] dark:text-amber-400" />
+                                            <span>Descargar .pptx</span>
+                                        </button>
+                                    )
+                                )}
+
+                                {rev?.googleSlidesOriginalUrl && (
+                                    <a
+                                        href={rev.googleSlidesOriginalUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-3.5 py-2.5 rounded-xl text-xs font-bold bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/25 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                                        title="Abrir en Google Slides (pestaña nueva)"
                                     >
-                                        <Download size={14} className="text-[#AD3333] dark:text-amber-400" />
-                                        <span>Descargar .pptx</span>
-                                    </button>
+                                        <ExternalLink size={13} />
+                                        <span>Google Slides</span>
+                                    </a>
                                 )}
 
                                 {role === 'teacher' && typeof onOpenReviewsTab === 'function' && (
@@ -3697,7 +3784,11 @@ const TaskCard = React.memo(({
             {/* MODAL DE COMENTARIOS / ENTREGAS / FOROS */}
             {showCommentModal && ReactDOM.createPortal(
                 <div className={`fixed inset-0 z-[9999] flex justify-center items-end md:items-center bg-black/60 backdrop-blur-sm p-0 md:p-4 transition-all ${isDarkMode ? 'dark' : ''}`}>
-                    <div className={`w-full max-w-2xl h-[90vh] md:h-[80vh] flex flex-col p-4 md:p-6 rounded-t-[2rem] md:rounded-3xl shadow-2xl animate-in slide-in-from-bottom-6 fade-in duration-200 overflow-hidden ${
+                    <div className={`w-full ${
+                        isModalExpanded 
+                            ? 'max-w-5xl xl:max-w-6xl 2xl:max-w-7xl h-[92vh] md:h-[92vh]' 
+                            : 'max-w-2xl h-[90vh] md:h-[80vh]'
+                    } flex flex-col p-4 md:p-6 rounded-t-[2rem] md:rounded-3xl shadow-2xl transition-all duration-200 animate-in slide-in-from-bottom-6 fade-in overflow-hidden ${
                         isDarkMode ? 'bg-gray-900 border border-gray-700' : 'bg-white border border-gray-200'
                     }`}>
                         
@@ -3743,6 +3834,20 @@ const TaskCard = React.memo(({
                                         <span className="hidden sm:inline">Convertir a Excel</span>
                                     </button>
                                 )}
+                                <button
+                                    type="button"
+                                    onClick={toggleModalExpanded}
+                                    className={`hidden md:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer border ${
+                                        isDarkMode 
+                                            ? 'bg-gray-800 hover:bg-gray-750 text-gray-200 border-gray-700' 
+                                            : 'bg-gray-100 hover:bg-gray-200 text-gray-700 border-gray-200'
+                                    }`}
+                                    title={isModalExpanded ? "Reducir ventana (Vista estándar)" : "Ampliar ventana (Vista amplia)"}
+                                    aria-label={isModalExpanded ? "Reducir ventana" : "Ampliar ventana"}
+                                >
+                                    {isModalExpanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+                                    <span className="hidden lg:inline">{isModalExpanded ? 'Reducir' : 'Ampliar'}</span>
+                                </button>
                                 <button 
                                     onClick={() => setShowCommentModal(false)} 
                                     className={`p-2 rounded-full transition-all shadow-xs ${

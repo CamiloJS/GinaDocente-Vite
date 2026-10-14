@@ -41,7 +41,11 @@ import {
   buildFallbackAiSlides,
   getTableRows,
   sanitizeSlidesForFirestore,
-  hydrateSlidesFromFirestore
+  hydrateSlidesFromFirestore,
+  decodeXmlEntities,
+  isGoogleSlidesUrl,
+  extractGoogleSlidesEmbedUrl,
+  parsePptxFile
 } from '../src/utils/slidesEngine.js';
 
 import { DEMO_REVIEWS } from '../src/utils/demoData.js';
@@ -672,6 +676,112 @@ check('ReviewsModule sincroniza el título de portada con el tema, auto-enfoca b
   reviewsSrc.includes('focusCanvasField') &&
   reviewsSrc.includes('persistedPresRef') &&
   reviewsSrc.includes('handleQuickSaveInPlace')
+);
+
+console.log('\n== 10. Subida de PowerPoint (.pptx), Enlace Google Slides y Botón de Ampliar Ventana en PC ==');
+check('decodeXmlEntities decodifica entidades XML de PowerPoint correctamente (&amp;, &lt;, &gt;, &quot;, &#39;)',
+  decodeXmlEntities('Business &amp; Trade &lt;Global&gt; &quot;2026&quot; &#39;Notes&#39;') === 'Business & Trade <Global> "2026" \'Notes\'' &&
+  decodeXmlEntities('') === '' &&
+  decodeXmlEntities(null) === ''
+);
+
+const validGSlideEdit = 'https://docs.google.com/presentation/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit#slide=id.p';
+const validGSlidePresent = 'https://docs.google.com/presentation/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/present';
+const validGSlidePub = 'https://docs.google.com/presentation/d/e/2PACX-1vRe123456789/pub?start=false&loop=false';
+const invalidGSlide = 'https://example.com/slides';
+
+check('isGoogleSlidesUrl detecta enlaces válidos de Google Slides (/edit, /present, /pub) y rechaza URLs ajenas o nulas',
+  isGoogleSlidesUrl(validGSlideEdit) === true &&
+  isGoogleSlidesUrl(validGSlidePresent) === true &&
+  isGoogleSlidesUrl(validGSlidePub) === true &&
+  isGoogleSlidesUrl(invalidGSlide) === false &&
+  isGoogleSlidesUrl('https://google.com') === false &&
+  isGoogleSlidesUrl('') === false &&
+  isGoogleSlidesUrl(null) === false
+);
+
+const extractedStandard = extractGoogleSlidesEmbedUrl(validGSlideEdit);
+const extractedPub = extractGoogleSlidesEmbedUrl(validGSlidePub);
+const extractedInvalid = extractGoogleSlidesEmbedUrl('https://not-google.com');
+
+check('extractGoogleSlidesEmbedUrl convierte enlaces estándar y publicados a URLs de incrustación /embed con pantalla completa habilitada',
+  extractedStandard.isValid === true &&
+  extractedStandard.presentationId === '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms' &&
+  extractedStandard.embedUrl.startsWith('https://docs.google.com/presentation/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/embed') &&
+  extractedPub.isValid === true &&
+  extractedPub.embedUrl.startsWith('https://docs.google.com/presentation/d/e/2PACX-1vRe123456789/embed') &&
+  extractedInvalid.isValid === false &&
+  extractedInvalid.embedUrl === null
+);
+
+// Prueba de parseo de archivo PowerPoint (.pptx) real generado al vuelo
+import PptxGenJS from 'pptxgenjs';
+const testPres = new PptxGenJS();
+const testSlide1 = testPres.addSlide();
+testSlide1.addText('International Trade & Logistics', { x: 1, y: 1, fontSize: 24 });
+testSlide1.addText('Core Concepts and Incoterms', { x: 1, y: 2, fontSize: 14 });
+const testSlide2 = testPres.addSlide();
+testSlide2.addText('Key Takeaways', { x: 1, y: 0.8, fontSize: 20 });
+testSlide2.addText('Tariffs reduce imports; quotas restrict volume.', { x: 1, y: 1.8, fontSize: 13 });
+const pptxNodeBuffer = await testPres.write({ outputType: 'nodebuffer' });
+
+const parsedPptxResult = await parsePptxFile(pptxNodeBuffer, 'Prueba Comercio');
+check('parsePptxFile extrae y normaliza diapositivas desde archivo .pptx con títulos, párrafos y layouts válidos',
+  parsedPptxResult.success === true &&
+  parsedPptxResult.slideCount === 2 &&
+  parsedPptxResult.slides[0].layout === 'title' &&
+  parsedPptxResult.slides[0].title.includes('International Trade & Logistics') &&
+  parsedPptxResult.slides[0].subtitle.includes('Core Concepts and Incoterms') &&
+  parsedPptxResult.slides[1].title.includes('Key Takeaways') &&
+  Array.isArray(parsedPptxResult.slides) &&
+  !hasNestedArrayAnywhere(sanitizeSlidesForFirestore(parsedPptxResult.slides))
+);
+
+// Lectura de fuentes actualizadas
+const updatedTaskCardSrc = fs.readFileSync(path.join(rootDir, 'src/components/TaskCard.jsx'), 'utf8');
+const updatedTasksTabSrc = fs.readFileSync(path.join(rootDir, 'src/components/TasksTab.jsx'), 'utf8');
+const updatedAppSrc = fs.readFileSync(path.join(rootDir, 'src/App.jsx'), 'utf8');
+
+check('TaskCard incluye botón de ampliar ventana en PC para comentarios/entregas/foros con persistencia en localStorage (english_tech_task_modal_expanded)',
+  updatedTaskCardSrc.includes('english_tech_task_modal_expanded') &&
+  updatedTaskCardSrc.includes('isModalExpanded') &&
+  updatedTaskCardSrc.includes('toggleModalExpanded') &&
+  updatedTaskCardSrc.includes('hidden md:inline-flex') &&
+  updatedTaskCardSrc.includes('max-w-5xl xl:max-w-6xl 2xl:max-w-7xl h-[92vh] md:h-[92vh]') &&
+  updatedTaskCardSrc.includes('max-w-2xl h-[90vh] md:h-[80vh]')
+);
+
+check('TaskCard soporta previsualización 16:9 interactiva de Google Slides y descarga directa de PowerPoint en el muro',
+  updatedTaskCardSrc.includes('isGoogleDeck') &&
+  updatedTaskCardSrc.includes('isPptxDeck') &&
+  updatedTaskCardSrc.includes('googleSlidesUrl') &&
+  updatedTaskCardSrc.includes('allowFullScreen') &&
+  updatedTaskCardSrc.includes('setShowSlidePresenter(true)') &&
+  updatedTaskCardSrc.includes('rev.pptxUrl')
+);
+
+check('App.jsx y TasksTab implementan ampliación de pantalla en PC para el muro de publicaciones con persistencia en localStorage (english_tech_feed_expanded)',
+  updatedAppSrc.includes('english_tech_feed_expanded') &&
+  updatedAppSrc.includes('isFeedExpanded') &&
+  updatedAppSrc.includes('toggleFeedExpanded') &&
+  updatedAppSrc.includes("activeTab === 'tasks' && isFeedExpanded") &&
+  updatedTasksTabSrc.includes('hidden md:flex') &&
+  updatedTasksTabSrc.includes('toggleFeedExpanded') &&
+  updatedTasksTabSrc.includes('Vista compacta') &&
+  updatedTasksTabSrc.includes('Ampliar muro')
+);
+
+check('ReviewsModule ofrece subida de archivos PowerPoint (.pptx), vinculación de Google Slides y visor en pantalla completa interactivo',
+  reviewsSrc.includes('handlePptxFileUpload') &&
+  reviewsSrc.includes('handleAttachGoogleSlides') &&
+  reviewsSrc.includes('showGoogleSlidesModal') &&
+  reviewsSrc.includes('parsePptxFile') &&
+  reviewsSrc.includes('extractGoogleSlidesEmbedUrl') &&
+  reviewsSrc.includes('allowFullScreen') &&
+  reviewsSrc.includes('isGoogleDeck') &&
+  reviewsSrc.includes('isPptxDeck') &&
+  reviewsSrc.includes('Subir PowerPoint') &&
+  reviewsSrc.includes('Adjuntar Google Slides')
 );
 
 console.log(`\nRESULTADO SLIDES STUDIO: ${okCount} OK, ${failCount} fallos\n`);

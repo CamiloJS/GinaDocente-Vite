@@ -44,7 +44,6 @@ export const AppleEmoji = ({ emoji, size = '1.25em', className = '', alt, style 
         verticalAlign: size === '1.25em' ? '-0.22em' : 'middle',
         ...style
       }}
-      loading="lazy"
       onError={() => setFailedEmoji(emoji)}
     />
   );

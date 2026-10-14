@@ -82,8 +82,6 @@ export const ImageCarousel = ({ images = [], onImageClick, isDarkMode, compact =
             <img loading="lazy" decoding="async" 
               src={url}
               alt={`Imagen ${idx + 1}`}
-              loading="lazy"
-              decoding="async"
               className={`w-full object-contain ${compact ? 'max-h-72 sm:max-h-80' : 'max-h-[480px] sm:max-h-[540px]'} transition-transform duration-200 hover:scale-[1.008]`}
             />
           </div>

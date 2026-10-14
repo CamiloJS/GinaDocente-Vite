@@ -1625,7 +1625,6 @@ export default function NotesModule({
                                   <img loading="lazy" decoding="async"
                                     src={item.url}
                                     alt={item.label || 'Imagen'}
-                                    loading="lazy"
                                     className={`w-full ${isSheet ? 'max-h-96' : 'max-h-64'} object-contain mx-auto`}
                                   />
                                 </div>

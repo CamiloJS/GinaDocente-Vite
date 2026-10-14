@@ -12,7 +12,7 @@ import {
   AlignLeft, AlignCenter, AlignRight, AlignJustify, Type, TableIcon, ColumnsIcon,
   LayoutIcon, Bold, Italic, Underline, Strikethrough, Highlighter,
   List, ListOrdered, Clipboard, Eraser, MonitorPlay, Timer, Sliders, ImageIcon, Upload, Search,
-  Volume2, VolumeX, PenTool, RotateCcw, FileText, Eye
+  Volume2, VolumeX, PenTool, RotateCcw, FileText, Eye, UploadCloud, ExternalLink
 } from './Icons.jsx'
 import {
   TEACHER_NAME,
@@ -21,6 +21,7 @@ import {
   getItemTeacherId,
   compressImage,
   uploadImageToStorage,
+  uploadRawFileToStorage,
   deleteAllStorageFilesInObject,
   deleteReplacedStorageFiles,
   cleanTextForTTS,
@@ -69,10 +70,13 @@ import {
   normalizeSingleSlide,
   getTableRows,
   sanitizeSlidesForFirestore,
-  hydrateSlidesFromFirestore
+  hydrateSlidesFromFirestore,
+  isGoogleSlidesUrl,
+  extractGoogleSlidesEmbedUrl,
+  parsePptxFile
 } from '../utils/slidesEngine.js'
 
-export { resolveSlideLayout }
+export { resolveSlideLayout, isGoogleSlidesUrl, extractGoogleSlidesEmbedUrl, parsePptxFile }
 
 // Helper para comprimir cualquier archivo o DataURL de imagen (incluidos PNG pesados de portapapeles)
 // a un DataURL ligero apto para Firestore (< 90 KB) y modo Demo
@@ -2923,7 +2927,10 @@ export const SlidePresenterViewer = ({ presentation, onClose, onEdit, role, them
     return () => window.removeEventListener('keydown', handleKey);
   }, [total, isFullscreen, showOverviewGrid, onClose]);
 
-  if (!presentation || total === 0 || typeof document === 'undefined' || !document.body) return null;
+  if (!presentation || (total === 0 && !presentation.googleSlidesUrl && !presentation.pptxUrl) || typeof document === 'undefined' || !document.body) return null;
+
+  const isGoogleDeck = Boolean(presentation?.googleSlidesUrl || presentation?.sourceType === 'google_slides');
+  const isPptxDeck = Boolean(presentation?.pptxUrl || presentation?.sourceType === 'pptx');
 
   const viewerBg = isLight ? 'bg-slate-100 text-slate-900' : (isDim ? 'bg-[#0f172a] text-slate-100' : 'bg-neutral-950 text-white');
   const headerBtnBg = isLight
@@ -3006,10 +3013,32 @@ export const SlidePresenterViewer = ({ presentation, onClose, onEdit, role, them
           <h3 className="text-xs sm:text-base font-extrabold truncate max-w-xs sm:max-w-md">
             {displayTitle}
           </h3>
+          {isGoogleDeck && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 shrink-0">
+              <Globe size={11} /> Google Slides
+            </span>
+          )}
+          {isPptxDeck && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/30 shrink-0">
+              <MonitorPlay size={11} /> PowerPoint
+            </span>
+          )}
         </div>
 
         {/* Herramientas en Vivo del Presentador */}
         <div className="flex items-center gap-1.5 flex-wrap">
+          {isGoogleDeck && presentation.googleSlidesOriginalUrl && (
+            <a
+              href={presentation.googleSlidesOriginalUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`p-2 px-2.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors ${headerBtnBg}`}
+              title="Abrir presentación original en Google Slides"
+            >
+              <ExternalLink size={14} />
+              <span className="hidden md:inline">Google Slides</span>
+            </a>
+          )}
           <button
             type="button"
             onClick={() => setShowOverviewGrid(prev => !prev)}
@@ -3138,8 +3167,20 @@ export const SlidePresenterViewer = ({ presentation, onClose, onEdit, role, them
         </div>
       </header>
 
-      {/* Vista Principal: Mosaico de Diapositivas O Lienzo 16:9 */}
-      {showOverviewGrid ? (
+      {/* Vista Principal: Google Slides Embebido O Mosaico de Diapositivas O Lienzo 16:9 */}
+      {isGoogleDeck ? (
+        <main className="flex-1 flex flex-col items-center justify-center min-h-0 py-1 w-full gap-2">
+          <div className="w-full max-w-6xl h-full flex-1 min-h-[60vh] max-h-[82vh] aspect-video relative shadow-2xl rounded-2xl overflow-hidden border border-white/10 bg-black">
+            <iframe
+              src={presentation.googleSlidesUrl}
+              title={displayTitle}
+              className="w-full h-full border-0 rounded-2xl"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+              allowFullScreen
+            />
+          </div>
+        </main>
+      ) : showOverviewGrid ? (
         <main className="flex-1 overflow-y-auto py-4 max-w-6xl w-full mx-auto">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {slides.map((s, idx) => (
@@ -3248,6 +3289,14 @@ export const SlidePresenterViewer = ({ presentation, onClose, onEdit, role, them
       )}
 
       {/* Barra Inferior de Navegación */}
+      {isGoogleDeck ? (
+        <footer className="flex items-center justify-center w-full max-w-md mx-auto pt-1.5 shrink-0 text-xs font-semibold text-gray-400">
+          <span className="flex items-center gap-1.5">
+            <Globe size={13} className="text-amber-500" />
+            <span>Presentación interactiva de Google Slides • Proyección en pantalla completa</span>
+          </span>
+        </footer>
+      ) : (
       <footer className="flex items-center justify-between w-full max-w-md mx-auto pt-1.5 shrink-0">
         <button
           type="button"
@@ -3287,6 +3336,7 @@ export const SlidePresenterViewer = ({ presentation, onClose, onEdit, role, them
           <ChevronRight size={16} />
         </button>
       </footer>
+      )}
     </div>,
     document.body
   );
@@ -7715,6 +7765,124 @@ export const ReviewsModule = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [groupFilter, setGroupFilter] = useState('all');
 
+  const [isUploadingPptx, setIsUploadingPptx] = useState(false);
+  const [showGoogleSlidesModal, setShowGoogleSlidesModal] = useState(false);
+  const [googleSlidesInputUrl, setGoogleSlidesInputUrl] = useState('');
+  const [googleSlidesTitle, setGoogleSlidesTitle] = useState('');
+  const [googleSlidesTargetGroup, setGoogleSlidesTargetGroup] = useState('all');
+  const pptxFileInputRef = useRef(null);
+
+  // Subir archivo PowerPoint (.pptx) y procesar diapositivas
+  const handlePptxFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.pptx')) {
+      showMessage('⚠️ Por favor selecciona un archivo de PowerPoint válido (.pptx).');
+      return;
+    }
+    setIsUploadingPptx(true);
+    try {
+      const defaultTopic = file.name.replace(/\.pptx$/i, '').trim();
+      const parseResult = await parsePptxFile(file, defaultTopic);
+
+      let rawPptxUrl = '';
+      if (!isDemoMode) {
+        try {
+          rawPptxUrl = await uploadRawFileToStorage(file, 'slides_pptx');
+        } catch (uploadErr) {
+          console.warn('No se pudo subir archivo .pptx a Storage, continuando con diapositivas procesadas:', uploadErr);
+        }
+      } else if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+        try {
+          rawPptxUrl = URL.createObjectURL(file);
+        } catch {}
+      }
+
+      const assignedGroupId = reviewTargetGroup || 'all';
+      const assignedGroupName = (academicGroups || []).find(g => g.id === assignedGroupId)?.name || 'General';
+      const effectiveSlides = Array.isArray(parseResult.slides) && parseResult.slides.length > 0
+        ? parseResult.slides
+        : buildFallbackAiSlides({ topic: defaultTopic, language: 'Inglés', slideCount: 4 });
+
+      const newPres = {
+        topic: parseResult.topic || defaultTopic,
+        sourceType: 'pptx',
+        pptxUrl: rawPptxUrl || '',
+        fileName: file.name,
+        fileSize: file.size,
+        language: 'Inglés',
+        theme: 'unipamplona',
+        slides: effectiveSlides,
+        slideCount: effectiveSlides.length,
+        targetGroupId: assignedGroupId,
+        targetGroupName: assignedGroupName,
+        createdAt: Date.now()
+      };
+
+      const savedDoc = await persistNewPresentation(newPres);
+      showMessage(`🎉 PowerPoint "${file.name}" procesado con éxito (${effectiveSlides.length} diapositivas).`);
+      if (savedDoc) {
+        setActivePresentation(savedDoc);
+      }
+    } catch (err) {
+      console.error('Error al subir PowerPoint:', err);
+      showMessage(`Error al procesar el archivo PowerPoint: ${err?.message || 'Intente nuevamente'}`);
+    } finally {
+      setIsUploadingPptx(false);
+      if (pptxFileInputRef.current) pptxFileInputRef.current.value = '';
+    }
+  };
+
+  // Adjuntar enlace de Google Slides
+  const handleAttachGoogleSlides = async (e) => {
+    e?.preventDefault();
+    const parsed = extractGoogleSlidesEmbedUrl(googleSlidesInputUrl);
+    if (!parsed.isValid) {
+      showMessage(`⚠️ ${parsed.error}`);
+      return;
+    }
+
+    const assignedGroupId = googleSlidesTargetGroup || reviewTargetGroup || 'all';
+    const assignedGroupName = (academicGroups || []).find(g => g.id === assignedGroupId)?.name || 'General';
+    const finalTopic = (googleSlidesTitle || '').trim() || 'Presentación de Google Slides';
+
+    const newPres = {
+      topic: finalTopic,
+      sourceType: 'google_slides',
+      googleSlidesUrl: parsed.embedUrl,
+      googleSlidesOriginalUrl: parsed.originalUrl,
+      language: 'Inglés',
+      theme: 'ocean',
+      slides: [
+        {
+          id: 1,
+          layout: 'title',
+          title: finalTopic,
+          subtitle: 'Presentación interactiva vinculada desde Google Slides',
+          googleSlidesUrl: parsed.embedUrl
+        }
+      ],
+      slideCount: 1,
+      targetGroupId: assignedGroupId,
+      targetGroupName: assignedGroupName,
+      createdAt: Date.now()
+    };
+
+    try {
+      const savedDoc = await persistNewPresentation(newPres);
+      setShowGoogleSlidesModal(false);
+      setGoogleSlidesInputUrl('');
+      setGoogleSlidesTitle('');
+      showMessage('🎉 Google Slides vinculado con éxito y publicado en el muro.');
+      if (savedDoc) {
+        setActivePresentation(savedDoc);
+      }
+    } catch (err) {
+      console.error('Error al vincular Google Slides:', err);
+      showMessage(`Error al vincular Google Slides: ${err?.message || 'Intenta nuevamente'}`);
+    }
+  };
+
   // Abre inmediatamente el Estudio de Diapositivas con una presentación lista para construir y editar en vivo
   const handleOpenNewPresentationStudio = (customGroupId, customTemplateId = 'blank_deck') => {
     const tpl = SLIDE_STARTER_TEMPLATES.find(t => t.id === customTemplateId) || SLIDE_STARTER_TEMPLATES[0];
@@ -7846,6 +8014,12 @@ export const ReviewsModule = ({
       createdAt: now,
       reactions: {},
       comments: [],
+      ...(newDoc.sourceType ? { sourceType: newDoc.sourceType } : {}),
+      ...(newDoc.pptxUrl ? { pptxUrl: newDoc.pptxUrl } : {}),
+      ...(newDoc.fileName ? { fileName: newDoc.fileName } : {}),
+      ...(newDoc.fileSize ? { fileSize: newDoc.fileSize } : {}),
+      ...(newDoc.googleSlidesUrl ? { googleSlidesUrl: newDoc.googleSlidesUrl } : {}),
+      ...(newDoc.googleSlidesOriginalUrl ? { googleSlidesOriginalUrl: newDoc.googleSlidesOriginalUrl } : {}),
       ...(isDemoMode ? { isDemoCreated: true, expiresAt: now + DEMO_TTL_MS } : {})
     };
 
@@ -8201,6 +8375,34 @@ export const ReviewsModule = ({
 
             <button
               type="button"
+              onClick={() => pptxFileInputRef.current?.click()}
+              disabled={isUploadingPptx}
+              className="py-2.5 px-4 rounded-xl border border-orange-200 dark:border-orange-800/60 bg-orange-50 hover:bg-orange-100 dark:bg-orange-950/30 dark:hover:bg-orange-950/50 text-orange-700 dark:text-orange-300 text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs disabled:opacity-50"
+              title="Subir archivo PowerPoint (.pptx) para procesar y presentar en pantalla completa"
+            >
+              {isUploadingPptx ? <Loader2 size={15} className="animate-spin text-orange-600" /> : <UploadCloud size={15} className="text-orange-600 dark:text-orange-400" />}
+              <span>{isUploadingPptx ? 'Cargando .pptx...' : 'Subir PowerPoint'}</span>
+            </button>
+            <input
+              ref={pptxFileInputRef}
+              type="file"
+              accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+              onChange={handlePptxFileUpload}
+              className="hidden"
+            />
+
+            <button
+              type="button"
+              onClick={() => setShowGoogleSlidesModal(true)}
+              className="py-2.5 px-4 rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/30 dark:hover:bg-amber-950/50 text-amber-800 dark:text-amber-300 text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs"
+              title="Adjuntar enlace de Google Slides para proyectar en pantalla completa"
+            >
+              <Globe size={15} className="text-amber-600 dark:text-amber-400" />
+              <span>Adjuntar Google Slides</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setCreationMode(prev => prev === 'ai' ? null : 'ai')}
               className={`${redButton} text-xs font-bold py-2.5 px-4 rounded-xl shadow-xs flex items-center gap-1.5 transition-all shrink-0`}
             >
@@ -8421,22 +8623,48 @@ export const ReviewsModule = ({
                 >
                   {/* MINIATURA REAL 16:9 CON TEMA Y TIPOGRAFÍA DE LA PRESENTACIÓN */}
                   <div className="w-full rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden shadow-xs transition-all duration-200 group-hover:scale-[1.01] group-hover:shadow-md relative">
-                    <SlideCanvasSurface
-                      presentation={review}
-                      slide={firstSlide}
-                      slideIdx={0}
-                      totalSlides={totalSlides}
-                      appThemeMode={themeMode}
-                      mode="card"
-                    />
+                    {review.googleSlidesUrl ? (
+                      <div className="relative aspect-video w-full bg-slate-950 flex flex-col items-center justify-center p-4 text-center">
+                        <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-500 flex items-center justify-center mb-2 shadow-xs">
+                          <Globe size={24} />
+                        </div>
+                        <span className="text-xs font-extrabold text-white truncate max-w-[85%]">{displayTitle}</span>
+                        <span className="text-[10px] font-semibold text-amber-400 mt-1">Google Slides • Presentar en pantalla completa</span>
+                        <div className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md bg-black/70 text-white text-[9px] font-bold border border-white/20 flex items-center gap-1">
+                          <Maximize2 size={10} />
+                          <span>Proyectar</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <SlideCanvasSurface
+                        presentation={review}
+                        slide={firstSlide}
+                        slideIdx={0}
+                        totalSlides={totalSlides}
+                        appThemeMode={themeMode}
+                        mode="card"
+                      />
+                    )}
                   </div>
 
                   {/* Fila Inferior: Título y Acciones Rápidas */}
                   <div className="flex items-center justify-between gap-2 px-0.5">
                     <div className="min-w-0 flex-1">
-                      <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100 truncate group-hover:text-[#AD3333] dark:group-hover:text-red-400 transition-colors">
-                        {displayTitle}
-                      </h4>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {review.googleSlidesUrl && (
+                          <span className="px-1.5 py-0.5 rounded text-[9.5px] font-extrabold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 shrink-0">
+                            Google Slides
+                          </span>
+                        )}
+                        {(review.sourceType === 'pptx' || review.pptxUrl) && (
+                          <span className="px-1.5 py-0.5 rounded text-[9.5px] font-extrabold bg-orange-500/15 text-orange-700 dark:text-orange-300 border border-orange-500/30 shrink-0">
+                            PowerPoint
+                          </span>
+                        )}
+                        <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100 truncate group-hover:text-[#AD3333] dark:group-hover:text-red-400 transition-colors">
+                          {displayTitle}
+                        </h4>
+                      </div>
                     </div>
 
                     <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
@@ -8519,6 +8747,102 @@ export const ReviewsModule = ({
           callGemini={callGemini}
           showMessage={showMessage}
         />
+      )}
+
+      {/* MODAL PARA ADJUNTAR ENLACE DE GOOGLE SLIDES */}
+      {showGoogleSlidesModal && createPortal(
+        <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+          <div className={`w-full max-w-lg rounded-3xl p-5 sm:p-6 shadow-2xl border space-y-4 animate-in zoom-in-95 duration-150 ${
+            isDarkMode ? 'bg-gray-900 border-gray-700 text-gray-100' : 'bg-white border-gray-200 text-gray-800'
+          }`}>
+            <div className="flex items-center justify-between pb-3 border-b border-gray-200 dark:border-gray-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                  <Globe size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold">Adjuntar Google Slides</h3>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400">Pega el enlace para proyectar en pantalla completa</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setShowGoogleSlidesModal(false); setGoogleSlidesInputUrl(''); }}
+                className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAttachGoogleSlides} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                  Enlace de la presentación de Google Slides *
+                </label>
+                <input
+                  type="url"
+                  value={googleSlidesInputUrl}
+                  onChange={(e) => setGoogleSlidesInputUrl(e.target.value)}
+                  placeholder="https://docs.google.com/presentation/d/.../edit?usp=sharing"
+                  className={`w-full ${glassInput} text-xs py-2.5 px-3.5`}
+                  required
+                  autoFocus
+                />
+                <p className="text-[10px] text-gray-400 mt-1">
+                  Se convertirá automáticamente al modo interactivo (/embed?start=false&loop=false&delayms=3000).
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                  Título de la presentación (opcional)
+                </label>
+                <input
+                  type="text"
+                  value={googleSlidesTitle}
+                  onChange={(e) => setGoogleSlidesTitle(e.target.value)}
+                  placeholder="Ej: Financial Markets Presentation, Vocabulary Unit 2..."
+                  className={`w-full ${glassInput} text-xs py-2 px-3.5`}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                  Dirigido a
+                </label>
+                <select
+                  value={googleSlidesTargetGroup}
+                  onChange={(e) => setGoogleSlidesTargetGroup(e.target.value)}
+                  className="w-full bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 dark:text-gray-200 outline-none"
+                >
+                  <option value="all">Todos los estudiantes (General)</option>
+                  {(academicGroups || []).map(g => (
+                    <option key={g.id} value={g.id}>{g.name || g.id}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+                <button
+                  type="button"
+                  onClick={() => { setShowGoogleSlidesModal(false); setGoogleSlidesInputUrl(''); }}
+                  className="px-4 py-2 text-xs font-semibold rounded-xl text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={!googleSlidesInputUrl.trim()}
+                  className="px-5 py-2 text-xs font-bold rounded-xl bg-amber-600 hover:bg-amber-700 text-white shadow-xs transition-all disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  <CheckCheck size={14} />
+                  <span>Vincular y Publicar</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
