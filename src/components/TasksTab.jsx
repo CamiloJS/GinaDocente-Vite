@@ -451,6 +451,23 @@ const TasksTab = React.memo(({
     // 4. Verificador estricto de visibilidad de publicaciones y tareas
     const isTaskVisibleForUser = React.useCallback((t) => {
         if (!t) return false;
+
+        // Si la tarea o evaluación tiene estudiantes específicos asignados, verificar pertenencia
+        if (role === 'student' && (t.type === 'evaluation' || t.evaluationId)) {
+            const evId = String(t.evaluationId || '').trim();
+            const targetStudentIds = (Array.isArray(t.targetStudentIds) && t.targetStudentIds.length > 0)
+                ? t.targetStudentIds
+                : (evId && Array.isArray(evaluations) && evaluations.find(e => String(e.id) === evId)?.targetStudentIds);
+
+            if (Array.isArray(targetStudentIds) && targetStudentIds.length > 0) {
+                const isTargeted = targetStudentIds.some(targetId => {
+                    const cleanTId = String(targetId).toLowerCase().replace('@', '').trim();
+                    return studentIdentifiers.has(cleanTId);
+                });
+                if (!isTargeted) return false;
+            }
+        }
+
         const isDemoTask = Boolean(
             isDemoMode ||
             t.isDemoCreated ||
@@ -569,7 +586,7 @@ const TasksTab = React.memo(({
             return myEnrolledGroups.some(g => getItemTeacherId(g) === taskTeacherId);
         }
         return taskTeacherId === 'teacher';
-    }, [role, fixedTargetGroup, academicGroups, myEnrolledGroups, isDemoMode]);
+    }, [role, fixedTargetGroup, academicGroups, myEnrolledGroups, isDemoMode, evaluations, studentIdentifiers]);
 
     // Deduplicación estricta por ID y huella de contenido para evitar duplicados en el feed
     const deduplicateTasks = React.useCallback((list) => {
@@ -686,6 +703,7 @@ const TasksTab = React.memo(({
                 questionCount: Array.isArray(ev.questions) ? ev.questions.length : 0,
                 targetGroupId: ev.targetGroupId || 'all',
                 targetGroupName: ev.targetGroupName || 'General',
+                targetStudentIds: Array.isArray(ev.targetStudentIds) ? ev.targetStudentIds : [],
                 author: teacherDisp,
                 authorName: teacherDisp,
                 authorId: ownerTid,

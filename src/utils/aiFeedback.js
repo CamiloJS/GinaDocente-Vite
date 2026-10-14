@@ -2,6 +2,7 @@
 // Retroalimentacion con IA para las evaluaciones: SIEMPRE en espanol, automatica y para todos los tipos.
 // REGLA CLAVE: se puede generar/mostrar cuando la evaluacion YA VENCIO o cuando tiene activa la opcion de retroalimentacion inmediata.
 // Probado en scripts/test-feedback.mjs
+import { obtenerHuecosDePregunta } from './evalScoring.js';
 
 /** True si la evaluacion ya paso su fecha/hora limite (misma logica que cierra el examen). */
 export function evaluacionVencida(ev, ahora = Date.now()) {
@@ -72,13 +73,24 @@ export function describirPregunta(q, respuesta) {
     acierto = !!esperado && normalizarComparacion(dado) === normalizarComparacion(esperado);
     correcta = esperado;
     delEstudiante = dado || '(en blanco)';
-  } else if (tipo === 'match') {
+  } else if (tipo === 'match' || tipo === 'matching_lines') {
     const pares = q.pairs || [];
     const elegidas = respuesta && typeof respuesta === 'object' ? respuesta : {};
     const aciertos = pares.filter((p, i) => normalizarComparacion(elegidas[i]) === normalizarComparacion(p.right)).length;
     acierto = pares.length > 0 && aciertos === pares.length;
     correcta = pares.map((p) => `${limpio(p.left)} -> ${limpio(p.right)}`).join('; ');
     delEstudiante = pares.map((p, i) => `${limpio(p.left)} -> ${limpio(elegidas[i]) || '(sin elegir)'}`).join('; ');
+    extra = { parcial: aciertos };
+  } else if (tipo === 'fill_blanks' || tipo === 'cloze') {
+    const huecos = obtenerHuecosDePregunta(q);
+    const elegidas = respuesta || {};
+    const aciertos = huecos.filter((h, i) => {
+      const dada = Array.isArray(elegidas) ? elegidas[i] : elegidas[i];
+      return normalizarComparacion(dada) === normalizarComparacion(h);
+    }).length;
+    acierto = huecos.length > 0 && aciertos === huecos.length;
+    correcta = huecos.map((h, i) => `[${i + 1}] ${limpio(h)}`).join(' ');
+    delEstudiante = huecos.map((_, i) => `[${i + 1}] ${limpio(Array.isArray(elegidas) ? elegidas[i] : elegidas[i]) || '(vacio)'}`).join(' ');
     extra = { parcial: aciertos };
   } else {
     const validas = [q?.correctAnswer, ...(Array.isArray(q?.acceptedAnswers) ? q.acceptedAnswers : [])].map(normalizarComparacion).filter(Boolean);

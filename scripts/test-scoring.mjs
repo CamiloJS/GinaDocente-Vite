@@ -1,5 +1,5 @@
 // Pruebas del motor de calificacion de evaluaciones (sin navegador).
-import { permiteVariasRespuestas, calculateScore, normalizarRespuesta, respuestasValidasDe, puntajeDe, tienePreguntasManuales } from "../src/utils/evalScoring.js";
+import { permiteVariasRespuestas, calculateScore, normalizarRespuesta, respuestasValidasDe, puntajeDe, tienePreguntasManuales, obtenerHuecosDePregunta } from "../src/utils/evalScoring.js";
 import { desordenarPalabras } from "../src/utils/palabras.js";
 
 let ok = 0, fallos = 0;
@@ -109,6 +109,50 @@ chequear("varias: 2 correctas sin campo", permiteVariasRespuestas(conDos) === tr
 chequear("unica: 1 correcta sin campo", permiteVariasRespuestas(conUna) === false);
 chequear("el campo manda", permiteVariasRespuestas({ ...conUna, permiteMultiples: true }) === true && permiteVariasRespuestas({ ...conDos, permiteMultiples: false }) === false);
 chequear("sin opciones no hay varias", permiteVariasRespuestas({ type: "multiple" }) === false);
+
+console.log("\n== Rellenar en el texto (fill_blanks / cloze) ==");
+const cloze1 = {
+  type: "fill_blanks",
+  text: "Maria [went] to the store because she [needed] some milk and [bought] bread.",
+  blanks: ["went", "needed", "bought"],
+  options: ["went", "needed", "bought", "goes", "selling"]
+};
+chequear("obtenerHuecosDePregunta extrae de blanks", obtenerHuecosDePregunta(cloze1).length === 3 && obtenerHuecosDePregunta(cloze1)[0] === "went");
+const clozeSinBlanks = {
+  type: "fill_blanks",
+  text: "Yesterday I [saw] a cat and [heard] a bird."
+};
+chequear("obtenerHuecosDePregunta extrae de corchetes en texto", JSON.stringify(obtenerHuecosDePregunta(clozeSinBlanks)) === JSON.stringify(["saw", "heard"]));
+chequear("fill_blanks: todas correctas -> 5.0", calculateScore({ questions: [cloze1] }, { 0: ["went", "needed", "bought"] }) === 5.0);
+chequear("fill_blanks: con objeto {0: 'went', ...} -> 5.0", calculateScore({ questions: [cloze1] }, { 0: { 0: "went", 1: "needed", 2: "bought" } }) === 5.0);
+chequear("fill_blanks: tolera mayusculas y espacios", calculateScore({ questions: [cloze1] }, { 0: ["  WENT  ", "Needed", "BOUGHT"] }) === 5.0);
+chequear("fill_blanks: tolera tildes", calculateScore({ questions: [{ type: "fill_blanks", blanks: ["canción", "comprensión"] }] }, { 0: ["cancion", "comprension"] }) === 5.0);
+chequear("fill_blanks: parcial 2 de 3 -> 3.3", calculateScore({ questions: [cloze1] }, { 0: ["went", "needed", "mal"] }) === 3.3, String(calculateScore({ questions: [cloze1] }, { 0: ["went", "needed", "mal"] })));
+chequear("fill_blanks: parcial 1 de 3 -> 1.7", calculateScore({ questions: [cloze1] }, { 0: ["went", "mal", "mal"] }) === 1.7, String(calculateScore({ questions: [cloze1] }, { 0: ["went", "mal", "mal"] })));
+chequear("fill_blanks: ninguna -> 0.0", calculateScore({ questions: [cloze1] }, { 0: ["x", "y", "z"] }) === 0.0);
+chequear("fill_blanks: sin responder -> 0.0", calculateScore({ questions: [cloze1] }, {}) === 0.0);
+
+console.log("\n== Unir con lineas (matching_lines) ==");
+const matchLines = {
+  type: "matching_lines",
+  text: "Une cada termino con su definicion",
+  pairs: [
+    { left: "Inflation", right: "Rise in general price level" },
+    { left: "Deflation", right: "Decrease in general price level" },
+    { left: "Supply", right: "Quantity of good available" },
+    { left: "Demand", right: "Desire to purchase a good" }
+  ]
+};
+chequear("matching_lines: todo bien -> 5.0", calculateScore({ questions: [matchLines] }, { 0: { 0: "Rise in general price level", 1: "Decrease in general price level", 2: "Quantity of good available", 3: "Desire to purchase a good" } }) === 5.0);
+chequear("matching_lines: parcial 3 de 4 -> 3.8", calculateScore({ questions: [matchLines] }, { 0: { 0: "Rise in general price level", 1: "Decrease in general price level", 2: "Quantity of good available", 3: "Wrong" } }) === 3.8, String(calculateScore({ questions: [matchLines] }, { 0: { 0: "Rise in general price level", 1: "Decrease in general price level", 2: "Quantity of good available", 3: "Wrong" } })));
+chequear("matching_lines: parcial 2 de 4 -> 2.5", calculateScore({ questions: [matchLines] }, { 0: { 0: "Rise in general price level", 1: "Decrease in general price level" } }) === 2.5);
+chequear("matching_lines: tolera mayusculas y espacios", calculateScore({ questions: [matchLines] }, { 0: { 0: " rise in general price level ", 1: "DECREASE IN GENERAL PRICE LEVEL", 2: "quantity of good available", 3: "desire to purchase a good" } }) === 5.0);
+chequear("matching_lines: soporta hasta 20 pares", (() => {
+  const pairs20 = Array.from({ length: 20 }, (_, i) => ({ left: `L${i + 1}`, right: `R${i + 1}` }));
+  const q20 = { type: "matching_lines", pairs: pairs20 };
+  const ans20 = Object.fromEntries(pairs20.map((p, i) => [i, p.right]));
+  return calculateScore({ questions: [q20] }, { 0: ans20 }) === 5.0;
+})());
 
 console.log(`\nRESULTADO: ${ok} OK, ${fallos} fallos\n`);
 process.exit(fallos ? 1 : 0);

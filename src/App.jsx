@@ -64,8 +64,11 @@ import DocumentPreviewModal from './components/DocumentPreviewModal.jsx'
 import CommandPaletteModal from './components/CommandPaletteModal.jsx'
 import FeedbackIAEvaluacion from './components/FeedbackIAEvaluacion.jsx';
 import SimulacroEvaluacion from './components/SimulacroEvaluacion.jsx';
+import TargetStudentsModal from './components/TargetStudentsModal.jsx';
+import FillBlanksQuestion from './components/FillBlanksQuestion.jsx';
+import MatchingLinesQuestion, { MATCHING_LINE_COLORS } from './components/MatchingLinesQuestion.jsx';
 import { extractTextFromPDF } from './utils/pdfExtractor.js'
-import { calculateScore, normalizarRespuesta, respuestasValidasDe, permiteVariasRespuestas } from './utils/evalScoring.js'
+import { calculateScore, normalizarRespuesta, respuestasValidasDe, permiteVariasRespuestas, obtenerHuecosDePregunta } from './utils/evalScoring.js'
 import { textoPlano } from './utils/textFormat.js';
 import { desordenarPalabras } from './utils/palabras.js'
 import {
@@ -558,10 +561,12 @@ function App() {
     immediateFeedback: false,
     targetGroupId: "all",
     targetGroupName: "Todos los estudiantes (Global)",
+    targetStudentIds: [],
     questions: []
   });
   const [showAiEvalModal, setShowAiEvalModal] = useState(false);
   const [showSimulacroEval, setShowSimulacroEval] = useState(false);
+  const [showTargetStudentsModal, setShowTargetStudentsModal] = useState(false);
   const [activeTakingEval, setActiveTakingEval] = useState(null);
   const [activeImmediateFeedback, setActiveImmediateFeedback] = useState(null);
   const [uploadingQuestionImageIdx, setUploadingQuestionImageIdx] = useState(null);
@@ -1070,17 +1075,26 @@ function App() {
 
   const evaluations = useMemo(() => {
     const list = rawEvaluations || [];
-    if (isDemoMode) return list;
     if (role === 'teacher') {
+      if (isDemoMode) return list;
       return list.filter(ev => String(ev?.id || '').startsWith('demo') || getItemTeacherId(ev) === currentTeacherId);
     }
+    const myIds = getMyStudentIdentifiers();
     return list.filter(ev => {
+      if (Array.isArray(ev.targetStudentIds) && ev.targetStudentIds.length > 0) {
+        const isTargeted = ev.targetStudentIds.some(targetId => {
+          const cleanTId = String(targetId).toLowerCase().replace('@', '').trim();
+          return myIds.has(cleanTId);
+        });
+        if (!isTargeted) return false;
+      }
+      if (isDemoMode) return true;
       if (String(ev?.id || '').startsWith('demo')) return true;
       const gId = String(ev.targetGroupId || '').trim().toLowerCase();
       const isGlobal = !gId || gId === 'all';
       return isGlobal ? matchesStudentTeacher(ev) : true;
     });
-  }, [rawEvaluations, isDemoMode, role, currentTeacherId, matchesStudentTeacher]);
+  }, [rawEvaluations, isDemoMode, role, currentTeacherId, matchesStudentTeacher, myChatId, user, userMappings, loggedInUser, loggedInName]);
 
   const grades = useMemo(() => {
     const list = rawGrades || [];
@@ -5589,6 +5603,27 @@ useEffect(() => {
                       }
                   } else if (q.type === 'order') {
                       if (!q.words || q.words.length < 2) { firstError = `Pregunta ${i + 1}: Escribe la oracion completa (al menos 2 palabras).`; break; }
+                  } else if (q.type === 'matching_lines') {
+                      const paresVal = q.pairs || [];
+                      const derechas = new Set(paresVal.map((p) => String(p.right || '').trim().toLowerCase()).filter(Boolean));
+                      if (paresVal.length < 2 || paresVal.some((p) => !String(p.left || '').trim() || !String(p.right || '').trim())) {
+                          firstError = `Pregunta ${i + 1}: Completa al menos 2 parejas para unir con líneas (izquierda y derecha).`;
+                          break;
+                      }
+                      if (paresVal.length > 20) {
+                          firstError = `Pregunta ${i + 1}: Máximo 20 parejas en preguntas de unir con líneas.`;
+                          break;
+                      }
+                      if (derechas.size !== paresVal.length) {
+                          firstError = `Pregunta ${i + 1}: Las respuestas de la columna derecha deben ser distintas entre sí.`;
+                          break;
+                      }
+                  } else if (q.type === 'fill_blanks' || q.type === 'cloze') {
+                      const huecos = obtenerHuecosDePregunta(q);
+                      if (!huecos || huecos.length === 0) {
+                          firstError = `Pregunta ${i + 1}: Debes incluir al menos una palabra entre corchetes [palabra] para rellenar en el texto.`;
+                          break;
+                      }
                   } else if (q.type === 'match') {
                       const paresVal = q.pairs || [];
                       const derechas = new Set(paresVal.map((p) => String(p.right || '').trim().toLowerCase()).filter(Boolean));
@@ -5617,6 +5652,7 @@ useEffect(() => {
                       isArchived: false,
                       targetGroupId: evalFormData.targetGroupId || 'all',
                       targetGroupName: evalFormData.targetGroupName || 'Todos los estudiantes (Global)',
+                      targetStudentIds: Array.isArray(evalFormData.targetStudentIds) ? evalFormData.targetStudentIds : [],
                       createdAt: now,
                       createdBy: myChatId,
                       teacherId: myChatId,
@@ -5638,6 +5674,7 @@ useEffect(() => {
                       questionCount: (newEval.questions || []).length,
                       targetGroupId: newEval.targetGroupId || 'all',
                       targetGroupName: newEval.targetGroupName || 'Todos los estudiantes (Global)',
+                      targetStudentIds: Array.isArray(newEval.targetStudentIds) ? newEval.targetStudentIds : [],
                       author: myDisplayName,
                       authorName: myDisplayName,
                       authorId: myChatId,
@@ -5672,6 +5709,7 @@ useEffect(() => {
                           immediateFeedback: false,
                           targetGroupId: "all",
                           targetGroupName: "Todos los estudiantes (Global)",
+                          targetStudentIds: [],
                           questions: [{ type: 'multiple', text: '', options: [{text: '', isCorrect: false}, {text: '', isCorrect: false}], correctAnswer: '' }]
                       });
                       showMessage("Evaluación creada y publicada en el muro (Modo Demo).");
@@ -5701,6 +5739,7 @@ useEffect(() => {
                       immediateFeedback: false,
                       targetGroupId: "all",
                       targetGroupName: "Todos los estudiantes (Global)",
+                          targetStudentIds: [],
                       questions: [{ type: 'multiple', text: '', options: [{text: '', isCorrect: false}, {text: '', isCorrect: false}], correctAnswer: '' }]
                   });
                   showMessage("Evaluación creada y publicada exitosamente.");
@@ -9741,6 +9780,28 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                   <button type="button" onClick={() => setStudentAnswers({ ...studentAnswers, [qIndex]: [] })} className="text-[11px] font-bold text-gray-500 hover:text-red-500 underline cursor-pointer">{'Borrar todo'}</button>
                                               )}
                                           </div>
+                                      ) : q.type === 'matching_lines' ? (
+                                          <div className="pt-1 pl-4 sm:pl-8">
+                                              <MatchingLinesQuestion
+                                                  question={q}
+                                                  questionIndex={qIndex}
+                                                  answers={studentAnswers[qIndex] || {}}
+                                                  onChange={(val) => setStudentAnswers({ ...studentAnswers, [qIndex]: val })}
+                                                  showCorrect={false}
+                                                  isDarkMode={isDarkMode}
+                                              />
+                                          </div>
+                                      ) : (q.type === 'fill_blanks' || q.type === 'cloze') ? (
+                                          <div className="pt-1 pl-4 sm:pl-8">
+                                              <FillBlanksQuestion
+                                                  question={q}
+                                                  questionIndex={qIndex}
+                                                  answers={studentAnswers[qIndex] || {}}
+                                                  onChange={(val) => setStudentAnswers({ ...studentAnswers, [qIndex]: val })}
+                                                  showCorrect={false}
+                                                  isDarkMode={isDarkMode}
+                                              />
+                                          </div>
                                       ) : q.type === 'match' ? (
                                           <div className="pt-1 pl-8 space-y-2">
                                               <p className="text-[11px] text-gray-500 font-medium">{'Elige la respuesta correcta para cada elemento:'}</p>
@@ -9910,6 +9971,25 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                               studentAnswerText = Array.isArray(qAns) && qAns.length ? qAns.join(' ') : '(Sin respuesta)';
                               correctAnswerText = (q.words || []).join(' ');
                               isCorrect = studentAnswerText !== '(Sin respuesta)' && normalizarRespuesta(studentAnswerText) === normalizarRespuesta(correctAnswerText);
+                          } else if (q.type === 'matching_lines') {
+                              const paresM = q.pairs || [];
+                              const elegidasM = (qAns && typeof qAns === 'object') ? qAns : {};
+                              const aciertosM = paresM.filter((p, pIdx) => elegidasM[pIdx] !== undefined && normalizarRespuesta(elegidasM[pIdx]) === normalizarRespuesta(p.right)).length;
+                              if (!isCorrect && aciertosM > 0) parcialExcel = aciertosM + ' de ' + paresM.length;
+                              studentAnswerText = paresM.map((p, pIdx) => `${p.left} -> ${elegidasM[pIdx] !== undefined ? elegidasM[pIdx] : '(sin unir)'}`).join(' | ');
+                              correctAnswerText = paresM.map((p) => `${p.left} -> ${p.right}`).join(' | ');
+                              isCorrect = paresM.length > 0 && aciertosM === paresM.length;
+                          } else if (q.type === 'fill_blanks' || q.type === 'cloze') {
+                              const huecos = obtenerHuecosDePregunta(q);
+                              const elegidasB = (qAns && typeof qAns === 'object') ? qAns : {};
+                              const aciertosB = huecos.filter((h) => {
+                                  const r = elegidasB[h.index];
+                                  return r && normalizarRespuesta(r) === normalizarRespuesta(h.word);
+                              }).length;
+                              if (!isCorrect && aciertosB > 0) parcialExcel = aciertosB + ' de ' + huecos.length;
+                              studentAnswerText = huecos.map((h) => `[${h.index + 1}]: ${elegidasB[h.index] || '(vacío)'}`).join(' | ');
+                              correctAnswerText = huecos.map((h) => `[${h.index + 1}]: ${h.word}`).join(' | ');
+                              isCorrect = huecos.length > 0 && aciertosB === huecos.length;
                           } else if (q.type === 'match') {
                               const paresM = q.pairs || [];
                               const elegidasM = (qAns && typeof qAns === 'object') ? qAns : {};
@@ -10250,6 +10330,19 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                               } else if (q.type === 'order') {
                                                   const secuencia = Array.isArray(qAns) ? qAns : [];
                                                   if (secuencia.length > 0 && normalizarRespuesta(secuencia.join(' ')) === normalizarRespuesta((q.words || []).join(' '))) correctCount++;
+                                               } else if (q.type === 'matching_lines') {
+                                                   const paresM = q.pairs || [];
+                                                   const elegidasM = (qAns && typeof qAns === 'object') ? qAns : {};
+                                                   const aciertosM = paresM.filter((p, pIdx) => elegidasM[pIdx] !== undefined && normalizarRespuesta(elegidasM[pIdx]) === normalizarRespuesta(p.right)).length;
+                                                   if (paresM.length > 0 && aciertosM === paresM.length) correctCount++;
+                                               } else if (q.type === 'fill_blanks' || q.type === 'cloze') {
+                                                   const huecos = obtenerHuecosDePregunta(q);
+                                                   const elegidasB = (qAns && typeof qAns === 'object') ? qAns : {};
+                                                   const aciertosB = huecos.filter((h) => {
+                                                       const r = elegidasB[h.index];
+                                                       return r && normalizarRespuesta(r) === normalizarRespuesta(h.word);
+                                                   }).length;
+                                                   if (huecos.length > 0 && aciertosB === huecos.length) correctCount++;
                                               } else if (q.type === 'match') {
                                                   const paresM = q.pairs || [];
                                                   const elegidasM = (qAns && typeof qAns === 'object') ? qAns : {};
@@ -10470,6 +10563,19 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                               } else if (q.type === 'order') {
                                                   const secuencia = Array.isArray(qAns) ? qAns : [];
                                                   if (secuencia.length > 0 && normalizarRespuesta(secuencia.join(' ')) === normalizarRespuesta((q.words || []).join(' '))) studentCorrect++;
+                                               } else if (q.type === 'matching_lines') {
+                                                   const paresM = q.pairs || [];
+                                                   const elegidasM = (qAns && typeof qAns === 'object') ? qAns : {};
+                                                   const aciertosM = paresM.filter((p, pIdx) => elegidasM[pIdx] !== undefined && normalizarRespuesta(elegidasM[pIdx]) === normalizarRespuesta(p.right)).length;
+                                                   if (paresM.length > 0 && aciertosM === paresM.length) studentCorrect++;
+                                               } else if (q.type === 'fill_blanks' || q.type === 'cloze') {
+                                                   const huecos = obtenerHuecosDePregunta(q);
+                                                   const elegidasB = (qAns && typeof qAns === 'object') ? qAns : {};
+                                                   const aciertosB = huecos.filter((h) => {
+                                                       const r = elegidasB[h.index];
+                                                       return r && normalizarRespuesta(r) === normalizarRespuesta(h.word);
+                                                   }).length;
+                                                   if (huecos.length > 0 && aciertosB === huecos.length) studentCorrect++;
                                               } else if (q.type === 'match') {
                                                   const paresM = q.pairs || [];
                                                   const elegidasM = (qAns && typeof qAns === 'object') ? qAns : {};
@@ -10548,6 +10654,25 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                   const secuencia = Array.isArray(qAns) ? qAns : [];
                                                   isUnanswered = secuencia.length === 0;
                                                   isCorrect = !isUnanswered && normalizarRespuesta(secuencia.join(' ')) === normalizarRespuesta((q.words || []).join(' '));
+                                               } else if (q.type === 'matching_lines') {
+                                                   const paresR = q.pairs || [];
+                                                   const elegidasR = (qAns && typeof qAns === 'object') ? qAns : {};
+                                                   const aciertosR = paresR.filter((p, pIdx) => elegidasR[pIdx] !== undefined && normalizarRespuesta(elegidasR[pIdx]) === normalizarRespuesta(p.right)).length;
+                                                   isUnanswered = paresR.length > 0 && paresR.every((p, pIdx) => elegidasR[pIdx] === undefined || elegidasR[pIdx] === '');
+                                                   isCorrect = paresR.length > 0 && aciertosR === paresR.length;
+                                                   esParcial = !isCorrect && !isUnanswered && aciertosR > 0;
+                                                   if (esParcial) detalleParcial = aciertosR + ' de ' + paresR.length;
+                                               } else if (q.type === 'fill_blanks' || q.type === 'cloze') {
+                                                   const huecos = obtenerHuecosDePregunta(q);
+                                                   const elegidasB = (qAns && typeof qAns === 'object') ? qAns : {};
+                                                   const aciertosB = huecos.filter((h) => {
+                                                       const r = elegidasB[h.index];
+                                                       return r && normalizarRespuesta(r) === normalizarRespuesta(h.word);
+                                                   }).length;
+                                                   isUnanswered = huecos.length > 0 && huecos.every((h) => !elegidasB[h.index]);
+                                                   isCorrect = huecos.length > 0 && aciertosB === huecos.length;
+                                                   esParcial = !isCorrect && !isUnanswered && aciertosB > 0;
+                                                   if (esParcial) detalleParcial = aciertosB + ' de ' + huecos.length;
                                               } else if (q.type === 'match') {
                                                   const paresR = q.pairs || [];
                                                   const elegidasR = (qAns && typeof qAns === 'object') ? qAns : {};
@@ -10583,7 +10708,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                                   {qIdx + 1}
                                                               </span>
                                                               <span className="text-[11px] font-bold text-gray-500 uppercase">
-                                                                  {esVerdaderoFalso(q) ? 'Verdadero / Falso' : q.type === 'reading' ? 'Comprensión Lectora (Reading)' : q.type === 'multiple' ? 'Selección Múltiple' : q.type === 'order' ? 'Ordenar la Oración' : q.type === 'match' ? 'Relacionar Columnas' : q.type === 'listening' ? 'Listening (Audio)' : q.type === 'dictation' ? 'Dictado' : q.type === 'speaking' ? 'Speaking' : 'Respuesta Escrita'}
+                                                                  {esVerdaderoFalso(q) ? 'Verdadero / Falso' : q.type === 'reading' ? 'Comprensión Lectora (Reading)' : q.type === 'multiple' ? 'Selección Múltiple' : q.type === 'order' ? 'Ordenar la Oración' : q.type === 'matching_lines' ? 'Unir con Líneas' : q.type === 'fill_blanks' || q.type === 'cloze' ? 'Rellenar en el Texto' : q.type === 'match' ? 'Relacionar Columnas' : q.type === 'listening' ? 'Listening (Audio)' : q.type === 'dictation' ? 'Dictado' : q.type === 'speaking' ? 'Speaking' : 'Respuesta Escrita'}
                                                               </span>
                                                           </div>
 
@@ -10719,6 +10844,34 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                                   );
                                                               })}
                                                           </div>
+                                                       ) : q.type === 'matching_lines' ? (
+                                                           <div className="space-y-1.5 pl-8">
+                                                               {(q.pairs || []).map((p, pIdx) => {
+                                                                   const elegida = (qAns && typeof qAns === 'object') ? qAns[pIdx] : '';
+                                                                   const bienPar = elegida !== undefined && normalizarRespuesta(elegida) === normalizarRespuesta(p.right);
+                                                                   return (
+                                                                       <div key={pIdx} className={`p-2.5 rounded-xl border text-xs flex items-center justify-between gap-2 ${bienPar ? 'bg-emerald-100/60 dark:bg-emerald-950/40 border-emerald-400 text-emerald-700 dark:text-emerald-300' : 'bg-red-100/60 dark:bg-red-950/40 border-red-400 text-red-700 dark:text-red-300'}`}>
+                                                                           <span className="font-bold">{p.left}</span>
+                                                                           <span>{elegida !== undefined ? elegida : '(sin unir)'}</span>
+                                                                           {!bienPar && <span className="text-[10px] font-bold">{'Correcto: ' + p.right}</span>}
+                                                                       </div>
+                                                                   );
+                                                               })}
+                                                           </div>
+                                                       ) : (q.type === 'fill_blanks' || q.type === 'cloze') ? (
+                                                           <div className="space-y-1.5 pl-8">
+                                                               {obtenerHuecosDePregunta(q).map((h) => {
+                                                                   const elegida = (qAns && typeof qAns === 'object') ? qAns[h.index] : '';
+                                                                   const bienHueco = elegida && normalizarRespuesta(elegida) === normalizarRespuesta(h.word);
+                                                                   return (
+                                                                       <div key={h.index} className={`p-2.5 rounded-xl border text-xs flex items-center justify-between gap-2 ${bienHueco ? 'bg-emerald-100/60 dark:bg-emerald-950/40 border-emerald-400 text-emerald-700 dark:text-emerald-300' : 'bg-red-100/60 dark:bg-red-950/40 border-red-400 text-red-700 dark:text-red-300'}`}>
+                                                                           <span className="font-bold">Espacio #{h.index + 1}</span>
+                                                                           <span>{elegida || '(vacío)'}</span>
+                                                                           {!bienHueco && <span className="text-[10px] font-bold">{'Correcto: ' + h.word}</span>}
+                                                                       </div>
+                                                                   );
+                                                               })}
+                                                           </div>
                                                       ) : q.type === 'speaking' ? (
                                                           <div className="space-y-2 pl-8">
                                                               {qAns ? (
@@ -11113,6 +11266,39 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                 className="w-4 h-4 accent-blue-600 rounded cursor-pointer shrink-0" 
                                             />
                                         </div>
+
+                                        <div 
+                                            onClick={() => setShowTargetStudentsModal(true)}
+                                            className={`flex items-center justify-between p-3 rounded-2xl border transition-all cursor-pointer select-none ${Array.isArray(evalFormData.targetStudentIds) && evalFormData.targetStudentIds.length > 0 ? 'border-purple-500/50 bg-purple-50/60 dark:bg-purple-950/30 text-purple-900 dark:text-purple-200 shadow-2xs' : 'border-gray-200 dark:border-gray-700 bg-gray-50/70 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200'}`}
+                                        >
+                                            <div className="flex items-start gap-2.5 pr-2">
+                                                <UserCheck size={18} className="text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="text-xs font-bold leading-tight">
+                                                            Asignar a estudiantes específicos
+                                                        </p>
+                                                        {Array.isArray(evalFormData.targetStudentIds) && evalFormData.targetStudentIds.length > 0 && (
+                                                            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-purple-600 text-white">
+                                                                {evalFormData.targetStudentIds.length} {evalFormData.targetStudentIds.length === 1 ? 'estudiante' : 'estudiantes'}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 leading-snug">
+                                                        {Array.isArray(evalFormData.targetStudentIds) && evalFormData.targetStudentIds.length > 0
+                                                            ? 'Solo los estudiantes seleccionados podrán ver y presentar esta evaluación.'
+                                                            : 'Opcional: restringe la evaluación únicamente a ciertos alumnos (por defecto visible para todo el público asignado).'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={(e) => { e.stopPropagation(); setShowTargetStudentsModal(true); }}
+                                                className="text-xs font-bold text-purple-600 dark:text-purple-400 hover:underline px-2 py-1 shrink-0 cursor-pointer"
+                                            >
+                                                {Array.isArray(evalFormData.targetStudentIds) && evalFormData.targetStudentIds.length > 0 ? 'Editar selección' : 'Seleccionar'}
+                                            </button>
+                                        </div>
                                     </div>
                               </div>
 
@@ -11155,6 +11341,21 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                       }}
                                   />
 
+                                   <TargetStudentsModal
+                                       isOpen={showTargetStudentsModal}
+                                       onClose={() => setShowTargetStudentsModal(false)}
+                                       selectedStudentIds={evalFormData.targetStudentIds || []}
+                                       onSave={(ids) => {
+                                           setEvalFormData(prev => ({ ...prev, targetStudentIds: ids }));
+                                           setShowTargetStudentsModal(false);
+                                       }}
+                                       userMappings={userMappings}
+                                       academicGroups={academicGroups}
+                                       targetGroupId={evalFormData.targetGroupId}
+                                       targetGroupName={evalFormData.targetGroupName}
+                                       isDarkMode={isDarkMode}
+                                   />
+
                                   {evalFormData.questions.map((q, qIndex) => (
                                       <div key={qIndex} className={`${glassCard} !p-4 relative rounded-3xl border border-gray-200 dark:border-gray-800 space-y-2.5 animate-in fade-in`}>
                                           <div className="flex items-center justify-between gap-2">
@@ -11175,6 +11376,12 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                       <button type="button" onClick={() => { const newQ = [...evalFormData.questions]; const actual = newQ[qIndex]; const palabras = (actual.words && actual.words.length ? actual.words : String(actual.correctAnswer || '').split(/\s+/).filter(Boolean)); newQ[qIndex] = { ...actual, type: 'order', words: palabras }; setEvalFormData({ ...evalFormData, questions: newQ }); }} className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${q.type === 'order' ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-xs' : 'text-gray-500'}`}>
                                                           {'Ordenar la oraci\u00f3n'}
                                                       </button>
+                                                       <button type="button" onClick={() => { const newQ = [...evalFormData.questions]; const actual = newQ[qIndex]; const pares = (actual.pairs && actual.pairs.length >= 2) ? actual.pairs : [{ left: '', right: '' }, { left: '', right: '' }, { left: '', right: '' }]; newQ[qIndex] = { ...actual, type: 'matching_lines', pairs: pares }; setEvalFormData({ ...evalFormData, questions: newQ }); }} className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${q.type === 'matching_lines' ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-xs' : 'text-gray-500'}`}>
+                                                           Unir con líneas
+                                                       </button>
+                                                       <button type="button" onClick={() => { const newQ = [...evalFormData.questions]; const actual = newQ[qIndex]; newQ[qIndex] = { ...actual, type: 'fill_blanks', text: actual.text || 'The [sun] shines in the [sky].', distractors: Array.isArray(actual.distractors) ? actual.distractors : [] }; setEvalFormData({ ...evalFormData, questions: newQ }); }} className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${q.type === 'fill_blanks' || q.type === 'cloze' ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-xs' : 'text-gray-500'}`}>
+                                                           Rellenar en el texto
+                                                       </button>
                                                       <button type="button" onClick={() => { const newQ = [...evalFormData.questions]; const actual = newQ[qIndex]; const pares = (actual.pairs && actual.pairs.length >= 3) ? actual.pairs : [{ left: '', right: '' }, { left: '', right: '' }, { left: '', right: '' }]; newQ[qIndex] = { ...actual, type: 'match', pairs: pares }; setEvalFormData({ ...evalFormData, questions: newQ }); }} className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${q.type === 'match' ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-xs' : 'text-gray-500'}`}>
                                                           Relacionar columnas
                                                       </button>
@@ -11392,6 +11599,145 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                   />
                                                   <p className="text-[10px] text-gray-500">{(q.words || []).length} palabras</p>
                                               </div>
+                                           ) : q.type === 'matching_lines' ? (
+                                               <div className="space-y-2.5 pl-4 sm:pl-7 border-l-2 border-purple-500/40">
+                                                   <div className="flex items-center justify-between gap-2">
+                                                       <p className="text-[11px] font-bold text-gray-700 dark:text-gray-300">
+                                                           Escribe las parejas a unir con líneas (hasta 20 parejas):
+                                                       </p>
+                                                       <span className="text-[10px] font-semibold text-gray-500">
+                                                           {(q.pairs || []).length}/20 pares
+                                                       </span>
+                                                   </div>
+                                                   <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                                                       Cada pareja se unirá con una línea de color diferente de alto contraste. Mínimo 2 parejas.
+                                                   </p>
+                                                   <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                                                       {(q.pairs || []).map((par, pIndex) => {
+                                                           const colorBadge = MATCHING_LINE_COLORS[pIndex % MATCHING_LINE_COLORS.length];
+                                                           return (
+                                                               <div key={pIndex} className="flex gap-2 items-center">
+                                                                   <span
+                                                                       className="text-[10px] font-black text-white w-5 h-5 rounded-full flex items-center justify-center shrink-0 shadow-2xs"
+                                                                       style={{ backgroundColor: colorBadge }}
+                                                                       title={`Pareja ${pIndex + 1}`}
+                                                                   >
+                                                                       {pIndex + 1}
+                                                                   </span>
+                                                                   <input
+                                                                       value={par.left}
+                                                                       onChange={(e) => {
+                                                                           const newQ = [...evalFormData.questions];
+                                                                           const pares = [...(newQ[qIndex].pairs || [])];
+                                                                           pares[pIndex] = { ...pares[pIndex], left: e.target.value };
+                                                                           newQ[qIndex] = { ...newQ[qIndex], pairs: pares };
+                                                                           setEvalFormData({ ...evalFormData, questions: newQ });
+                                                                       }}
+                                                                       placeholder="Elemento izquierdo (Ej: Dog)"
+                                                                       className={`${glassInput} !py-1.5 flex-1 text-xs`}
+                                                                   />
+                                                                   <span className="text-gray-400 text-xs font-bold">{'→'}</span>
+                                                                   <input
+                                                                       value={par.right}
+                                                                       onChange={(e) => {
+                                                                           const newQ = [...evalFormData.questions];
+                                                                           const pares = [...(newQ[qIndex].pairs || [])];
+                                                                           pares[pIndex] = { ...pares[pIndex], right: e.target.value };
+                                                                           newQ[qIndex] = { ...newQ[qIndex], pairs: pares };
+                                                                           setEvalFormData({ ...evalFormData, questions: newQ });
+                                                                       }}
+                                                                       placeholder="Pareja derecha correcta (Ej: Perro)"
+                                                                       className={`${glassInput} !py-1.5 flex-1 text-xs border-green-500/40 bg-green-500/10`}
+                                                                   />
+                                                                   {(q.pairs || []).length > 2 && (
+                                                                       <button
+                                                                           type="button"
+                                                                           onClick={() => {
+                                                                               const newQ = [...evalFormData.questions];
+                                                                               const pares = [...(newQ[qIndex].pairs || [])];
+                                                                               pares.splice(pIndex, 1);
+                                                                               newQ[qIndex] = { ...newQ[qIndex], pairs: pares };
+                                                                               setEvalFormData({ ...evalFormData, questions: newQ });
+                                                                           }}
+                                                                           className="text-gray-400 hover:text-red-500 p-1 cursor-pointer shrink-0"
+                                                                           title="Eliminar pareja"
+                                                                       >
+                                                                           <X size={14} />
+                                                                       </button>
+                                                                   )}
+                                                               </div>
+                                                           );
+                                                       })}
+                                                   </div>
+                                                   {(q.pairs || []).length < 20 && (
+                                                       <button
+                                                           type="button"
+                                                           onClick={() => {
+                                                               const newQ = [...evalFormData.questions];
+                                                               newQ[qIndex] = { ...newQ[qIndex], pairs: [...(newQ[qIndex].pairs || []), { left: '', right: '' }] };
+                                                               setEvalFormData({ ...evalFormData, questions: newQ });
+                                                           }}
+                                                           className="text-[11px] font-bold text-blue-600 hover:underline pt-1 flex items-center gap-1 cursor-pointer"
+                                                       >
+                                                           <Plus size={12} /> Agregar pareja (hasta 20)
+                                                       </button>
+                                                   )}
+                                               </div>
+                                           ) : (q.type === 'fill_blanks' || q.type === 'cloze') ? (
+                                               <div className="space-y-2.5 pl-4 sm:pl-7 border-l-2 border-emerald-500/40">
+                                                   <div>
+                                                       <p className="text-[11px] font-bold text-gray-700 dark:text-gray-300">
+                                                           Instrucciones para completar el texto:
+                                                       </p>
+                                                       <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                                                           Encierra entre corchetes <strong>[palabra]</strong> en el enunciado superior las palabras que el estudiante deberá rellenar. Ejemplo: <code className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-blue-600 font-mono text-[11px]">The [sun] shines in the [sky].</code>
+                                                       </p>
+                                                   </div>
+                                                   {(() => {
+                                                       const huecosDetectados = obtenerHuecosDePregunta(q);
+                                                       return (
+                                                           <div className="p-2.5 rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 space-y-1.5">
+                                                               <div className="flex items-center justify-between">
+                                                                   <span className="text-[11px] font-bold text-gray-600 dark:text-gray-300">
+                                                                       Espacios detectados ({huecosDetectados.length}):
+                                                                   </span>
+                                                                   {huecosDetectados.length === 0 && (
+                                                                       <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                                                                           ¡Escribe al menos una palabra entre corchetes!
+                                                                       </span>
+                                                                   )}
+                                                               </div>
+                                                               {huecosDetectados.length > 0 && (
+                                                                   <div className="flex flex-wrap gap-1.5">
+                                                                       {huecosDetectados.map((h, hIdx) => (
+                                                                           <span key={hIdx} className="px-2 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 text-xs font-bold">
+                                                                               [{hIdx + 1}] {h.word}
+                                                                           </span>
+                                                                       ))}
+                                                                   </div>
+                                                               )}
+                                                           </div>
+                                                       );
+                                                   })()}
+                                                   <div>
+                                                       <label className="text-[11px] font-bold text-gray-600 dark:text-gray-400">
+                                                           Palabras distractoras adicionales (opcional, separadas por coma):
+                                                       </label>
+                                                       <input
+                                                           value={Array.isArray(q.distractors) ? q.distractors.join(', ') : ''}
+                                                           onChange={(e) => {
+                                                               const newQ = [...evalFormData.questions];
+                                                               newQ[qIndex] = {
+                                                                   ...newQ[qIndex],
+                                                                   distractors: e.target.value.split(',').map(s => s.trim()).filter(Boolean)
+                                                               };
+                                                               setEvalFormData({ ...evalFormData, questions: newQ });
+                                                           }}
+                                                           placeholder="Ej: moon, star, cloud (opciones extra en el banco para mayor dificultad)"
+                                                           className={`${glassInput} !py-1.5 text-xs mt-1`}
+                                                       />
+                                                   </div>
+                                               </div>
                                           ) : q.type === 'match' ? (
                                               <div className="space-y-2 pl-4 sm:pl-7 border-l-2 border-blue-500/30">
                                                   <p className="text-[11px] font-bold text-gray-500">{'Escribe las parejas (izquierda y su respuesta correcta). Mínimo 3:'}</p>
@@ -11493,6 +11839,14 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                   ? evaluations.filter(ev => evalTabFilter === 'archived' ? !!ev.isArchived : !ev.isArchived)
                   : evaluations.filter(ev => {
                       if (ev.isArchived) return false;
+                      if (Array.isArray(ev.targetStudentIds) && ev.targetStudentIds.length > 0) {
+                          const myIds = getMyStudentIdentifiers();
+                          const isTargeted = ev.targetStudentIds.some(targetId => {
+                              const cleanTId = String(targetId).toLowerCase().replace('@', '').trim();
+                              return myIds.has(cleanTId);
+                          });
+                          if (!isTargeted) return false;
+                      }
                       if (isDemoMode || String(ev.id || '').startsWith('demo-')) return true;
                       const evGrpId = String(ev.targetGroupId || '').trim();
                       const evGrpName = String(ev.targetGroupName || '').toLowerCase().trim();
@@ -15989,6 +16343,14 @@ Bot:`;
                     academicGroups={role === 'teacher' ? academicGroups : academicGroups.filter(isStudentInGroup)}
                     evaluations={role === 'teacher' ? evaluations : evaluations.filter(ev => {
                         if (ev.isArchived) return false;
+                      if (Array.isArray(ev.targetStudentIds) && ev.targetStudentIds.length > 0) {
+                          const myIds = getMyStudentIdentifiers();
+                          const isTargeted = ev.targetStudentIds.some(targetId => {
+                              const cleanTId = String(targetId).toLowerCase().replace('@', '').trim();
+                              return myIds.has(cleanTId);
+                          });
+                          if (!isTargeted) return false;
+                      }
                         if (isDemoMode || String(ev.id || '').startsWith('demo-')) return true;
                         const enrolled = academicGroups.filter(isStudentInGroup);
                         const evGrpId = String(ev.targetGroupId || '').trim();

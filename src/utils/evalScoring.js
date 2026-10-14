@@ -17,11 +17,31 @@ export const respuestasValidasDe = (q) =>
 /** Puntaje de la pregunta (por defecto 1). */
 export const puntajeDe = (q) => (Number(q?.points) > 0 ? Number(q.points) : 1);
 
+/** Extrae la lista de huecos/palabras correctas de una pregunta cloze / fill_blanks */
+export function obtenerHuecosDePregunta(q) {
+  if (Array.isArray(q?.blanks) && q.blanks.length > 0) {
+    return q.blanks
+      .map((b) => (typeof b === 'object' && b !== null ? String(b.answer ?? b.text ?? '') : String(b ?? '')))
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  const txt = String(q?.text || q?.question || '');
+  const matches = [];
+  const re = /\[([^\]]+)\]/g;
+  let m;
+  while ((m = re.exec(txt)) !== null) {
+    const val = m[1].trim();
+    if (val) matches.push(val);
+  }
+  return matches;
+}
+
 /**
  * Calcula la nota (0.0 a 5.0).
  * - Respeta el puntaje por pregunta (q.points, por defecto 1).
  * - Las escritas aceptan varias respuestas validas y toleran tildes/mayusculas/espacios.
- * - Relacionar columnas da puntaje parcial por pareja.
+ * - Relacionar columnas (match y matching_lines) da puntaje parcial por pareja.
+ * - Rellenar texto (fill_blanks y cloze) da puntaje parcial por hueco.
  * - Ordenar la oracion compara la secuencia completa.
  * - Las de speaking las califica la docente (no suman al automatico).
  */
@@ -47,11 +67,20 @@ export function calculateScore(evalData, answers) {
       const esperado = (q.words || []).map(normalizarRespuesta).join(' ');
       const dado = (Array.isArray(ans) ? ans : []).map(normalizarRespuesta).join(' ');
       if (esperado && dado === esperado) factor = 1;
-    } else if (q.type === 'match') {
+    } else if (q.type === 'match' || q.type === 'matching_lines') {
       const pares = q.pairs || [];
       if (pares.length > 0 && ans && typeof ans === 'object') {
         const aciertos = pares.filter((p, idx) => normalizarRespuesta(ans[idx]) === normalizarRespuesta(p.right)).length;
         factor = aciertos / pares.length; // puntaje parcial por pareja
+      }
+    } else if (q.type === 'fill_blanks' || q.type === 'cloze') {
+      const huecos = obtenerHuecosDePregunta(q);
+      if (huecos.length > 0 && ans) {
+        const aciertos = huecos.filter((h, idx) => {
+          const dado = Array.isArray(ans) ? ans[idx] : (typeof ans === 'object' ? ans[idx] : ans);
+          return normalizarRespuesta(dado) === normalizarRespuesta(h);
+        }).length;
+        factor = aciertos / huecos.length; // puntaje parcial por hueco
       }
     } else {
       const validas = respuestasValidasDe(q);

@@ -8,6 +8,8 @@ import { glassCard, glassInput } from '../utils/styles.js';
 import { desordenarPalabras } from '../utils/palabras.js';
 import { permiteVariasRespuestas } from '../utils/evalScoring.js';
 import { Clock, X, Eye, EyeOff, CheckCircle2, ShieldAlert, Mic, Volume2 } from './Icons.jsx';
+import FillBlanksQuestion from './FillBlanksQuestion.jsx';
+import MatchingLinesQuestion from './MatchingLinesQuestion.jsx';
 
 const dosDigitos = (n) => String(Math.max(0, Math.floor(Number(n) || 0))).padStart(2, '0');
 
@@ -251,6 +253,28 @@ export default function SimulacroEvaluacion({ evaluacion = {}, isDarkMode = fals
                     {mostrarCorrectas && (q.words || []).length > 0 && (
                       <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">Orden correcto: {(q.words || []).join(' ')}</p>
                     )}
+                  </div>
+                ) : q.type === 'matching_lines' ? (
+                  <div className="pt-1 pl-4 sm:pl-8">
+                    <MatchingLinesQuestion
+                      question={q}
+                      questionIndex={i}
+                      answers={respuestas[i] || {}}
+                      onChange={(val) => cambiar(i, val)}
+                      showCorrect={mostrarCorrectas}
+                      isDarkMode={isDarkMode}
+                    />
+                  </div>
+                ) : (q.type === 'fill_blanks' || q.type === 'cloze') ? (
+                  <div className="pt-1 pl-4 sm:pl-8">
+                    <FillBlanksQuestion
+                      question={q}
+                      questionIndex={i}
+                      answers={respuestas[i] || {}}
+                      onChange={(val) => cambiar(i, val)}
+                      showCorrect={mostrarCorrectas}
+                      isDarkMode={isDarkMode}
+                    />
                   </div>
                 ) : q.type === 'match' ? (
                   <div className="pt-1 pl-8 space-y-2">
