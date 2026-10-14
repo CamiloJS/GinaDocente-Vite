@@ -1,56 +1,44 @@
 // src/components/DocumentPreviewModal.jsx
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
-import { X, Download, FileDocIcon, Loader2, BookOpen } from './Icons.jsx';
-import Flipbook3DModal from './Flipbook3DModal.jsx';
+import { X, Download, FileDocIcon, Loader2, ExternalLink } from './Icons.jsx';
 
 export const DocumentPreviewModal = ({
   documentUrl,
   documentTitle = 'Documento PDF',
-  bookPages = null,
   onClose,
   isDarkMode = false
 }) => {
   const [isLoading, setIsLoading] = useState(true);
-  const [show3DMode, setShow3DMode] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape' && !show3DMode) onClose?.();
+      if (e.key === 'Escape') onClose?.();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, show3DMode]);
+  }, [onClose]);
 
   useEffect(() => {
     setIsLoading(true);
     const timeout = setTimeout(() => {
       setIsLoading(false);
-    }, 8000);
+    }, 3500);
     return () => clearTimeout(timeout);
   }, [documentUrl]);
 
   if (!documentUrl || typeof document === 'undefined' || !document.body || typeof documentUrl !== 'string') return null;
 
-  if (show3DMode) {
-    return (
-      <Flipbook3DModal
-        book={{
-          title: documentTitle || 'Documento PDF',
-          pdfUrl: documentUrl,
-          fileUrl: documentUrl,
-          fileName: documentTitle || 'documento.pdf',
-          bookPages: Array.isArray(bookPages) ? bookPages : []
-        }}
-        onClose={onClose}
-      />
-    );
-  }
-
-  // Si es URL local (blob/data) se visualiza directamente en el iframe; si es remota se usa el visor de Google Docs
   const isLocalOrData = documentUrl.startsWith('blob:') || documentUrl.startsWith('data:');
-  const viewerUrl = isLocalOrData 
-    ? documentUrl 
+  const isPdf = isLocalOrData ||
+    documentUrl.toLowerCase().includes('.pdf') ||
+    (documentTitle || '').toLowerCase().endsWith('.pdf') ||
+    documentUrl.startsWith('data:application/pdf');
+
+  // Si es PDF o local/data, se usa el visor nativo del navegador directamente en el iframe/object
+  // Si es otro formato de documento (Word, PowerPoint, Excel), se usa el visor de Google Docs
+  const viewerUrl = isPdf
+    ? (isLocalOrData ? documentUrl : `${documentUrl}#toolbar=1&navpanes=0`)
     : ('https://docs.google.com/viewer?url=' + encodeURIComponent(documentUrl) + '&embedded=true');
 
   return ReactDOM.createPortal(
@@ -72,11 +60,11 @@ export const DocumentPreviewModal = ({
             <FileDocIcon size={20} />
           </div>
           <div className="flex flex-col min-w-0">
-            <h3 className="font-extrabold text-sm sm:text-base truncate max-w-[220px] sm:max-w-md md:max-w-xl">
-              {documentTitle || 'Documento'}
+            <h3 className="font-extrabold text-sm sm:text-base truncate max-w-[200px] sm:max-w-md md:max-w-xl">
+              {documentTitle || 'Documento PDF'}
             </h3>
             <span className="text-[10px] text-gray-500 font-semibold flex items-center gap-1">
-              <span>Visor de Google</span>
+              <span>{isPdf ? 'Visor de PDF' : 'Documento adjunto'}</span>
               <span>•</span>
               <span className="hidden sm:inline">Presiona Esc para cerrar</span>
             </span>
@@ -85,35 +73,36 @@ export const DocumentPreviewModal = ({
 
         {/* Acciones */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          <button
-            type="button"
-            onClick={() => setShow3DMode(true)}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 active:scale-95 shadow-md transition-all cursor-pointer"
-            title="Abrir como libro"
+          <a
+            href={documentUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-200 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 transition-all cursor-pointer"
+            title="Abrir en pestaña nueva"
           >
-            <BookOpen size={15} />
-            <span>Modo libro</span>
-          </button>
+            <ExternalLink size={14} />
+            <span className="hidden sm:inline">Abrir en pestaña</span>
+          </a>
 
           <a
             href={documentUrl}
             download={documentTitle || 'documento.pdf'}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 active:scale-95 shadow-md transition-all"
+            className="flex items-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 active:scale-95 shadow-md transition-all cursor-pointer"
             title="Descargar archivo"
           >
-            <Download size={15} />
+            <Download size={14} />
             <span className="hidden sm:inline">Descargar</span>
           </a>
 
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-xl text-gray-400 hover:text-white hover:bg-red-600 transition-colors active:scale-95 flex items-center justify-center"
+            className="p-2 rounded-xl text-gray-400 hover:text-white hover:bg-red-600 transition-colors active:scale-95 flex items-center justify-center cursor-pointer"
             title="Cerrar vista previa (Esc)"
           >
-            <X size={22} />
+            <X size={20} />
           </button>
         </div>
       </div>
@@ -127,18 +116,25 @@ export const DocumentPreviewModal = ({
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10 bg-black/10 dark:bg-black/50 backdrop-blur-xs">
             <Loader2 className="animate-spin text-blue-500" size={36} />
             <span className="text-xs font-bold text-gray-700 dark:text-gray-200">
-              Cargando documento con el Visor de Google...
+              Cargando documento...
             </span>
           </div>
         )}
 
-        <iframe
-          src={viewerUrl}
-          title={documentTitle}
+        <object
+          data={documentUrl}
+          type={isPdf ? 'application/pdf' : undefined}
           className="w-full h-full border-none"
           onLoad={() => setIsLoading(false)}
-          onError={() => setIsLoading(false)}
-        />
+        >
+          <iframe
+            src={viewerUrl}
+            title={documentTitle}
+            className="w-full h-full border-none"
+            onLoad={() => setIsLoading(false)}
+            onError={() => setIsLoading(false)}
+          />
+        </object>
       </div>
     </div>,
     document.body

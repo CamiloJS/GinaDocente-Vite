@@ -231,7 +231,7 @@ const TaskCard = React.memo(({
     const isKahoot = task?.type === 'kahoot' || Boolean(task?.kahoot);
     const isEvaluation = task?.type === 'evaluation' || Boolean(task?.evaluationId);
     const isSlides = task?.type === 'slides' || task?.type === 'review' || Boolean(task?.reviewId);
-    const isBook3D = task?.type === 'book3d' || Boolean(task?.bookId) || (Array.isArray(task?.bookPages) && task.bookPages.length > 0);
+    const isBook3D = task?.type === 'book3d' || Boolean(task?.bookId);
     const isPost = task?.type === 'post' || (!isTask && !isForum && !isPoll && !isKahoot && !isEvaluation && !isSlides && !isBook3D);
     const isTaskType = isTask || isForum;
 
@@ -3617,59 +3617,43 @@ const TaskCard = React.memo(({
                     </div>
                 ) : (
                     <div 
-                        onClick={() => setPreviewDoc({ url: task.fileUrl, title: task.fileName || 'Documento adjunto' })}
-                        className={`flex flex-wrap items-center gap-3.5 p-3 rounded-2xl border mt-3 w-fit max-w-full transition-all shadow-xs hover:scale-[1.01] cursor-pointer select-none ${
-                            isDarkMode ? 'bg-gray-800/90 border-gray-700 hover:bg-gray-750 text-gray-100' : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-900'
+                        onClick={() => setPreviewDoc({ url: task.fileUrl, title: task.fileName || (task.fileUrl.toLowerCase().includes('.pdf') ? 'Documento PDF' : 'Documento adjunto') })}
+                        className={`flex items-center justify-between gap-3 p-3 rounded-2xl border mt-3 w-fit max-w-full transition-all shadow-xs hover:border-blue-400 dark:hover:border-blue-500 hover:scale-[1.01] cursor-pointer select-none ${
+                            isDarkMode ? 'bg-gray-800/90 border-gray-700 text-gray-100' : 'bg-white border-gray-200 text-gray-900'
                         }`}
-                        title="Clic para abrir vista previa"
+                        title="Clic para abrir vista previa del documento"
                     >
-                        <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 flex items-center justify-center shrink-0 shadow-2xs">
-                            <FileDocIcon size={22} className="text-[#AD3333] dark:text-red-400" />
+                        <div className="flex items-center gap-3 min-w-0 pr-2">
+                            <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 flex items-center justify-center shrink-0 shadow-2xs">
+                                <FileDocIcon size={22} className="text-[#AD3333] dark:text-red-400" />
+                            </div>
+                            <div className="flex flex-col min-w-0">
+                                <span className="text-xs font-black truncate max-w-[200px] sm:max-w-[320px]">
+                                    {task.fileName || (task.fileUrl.toLowerCase().includes('.pdf') ? 'Documento PDF' : 'Documento adjunto')}
+                                </span>
+                                <span className="text-[10px] text-gray-500 font-medium flex items-center gap-1.5 mt-0.5">
+                                    <span className="text-blue-600 dark:text-blue-400 font-bold hover:underline">Ver documento</span>
+                                    {((task.fileName || '').toLowerCase().endsWith('.pdf') || task.fileUrl.toLowerCase().includes('.pdf')) && (
+                                        <>
+                                            <span>•</span>
+                                            <span className="text-gray-400">PDF</span>
+                                        </>
+                                    )}
+                                </span>
+                            </div>
                         </div>
-                        <div className="flex flex-col min-w-0 pr-3">
-                            <span className="text-xs font-black truncate max-w-[220px] sm:max-w-[320px]">
-                                {task.fileName || (task.fileUrl.toLowerCase().includes('.pdf') ? 'Documento PDF' : 'Documento adjunto')}
-                            </span>
-                            <span className="text-[10px] text-gray-500 font-medium flex items-center gap-1.5 mt-0.5">
-                                <span className="text-blue-600 dark:text-blue-400 font-bold hover:underline">Abrir</span>
-                            </span>
-                        </div>
-                        {((task.fileName || '').toLowerCase().endsWith('.pdf') || task.fileUrl.toLowerCase().includes('.pdf')) && (
-                            <button
-                                type="button"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    setActiveFlipbookModal({
-                                        book: {
-                                            id: `pdf_book_${task.id}`,
-                                            title: task.title || task.fileName || 'Libro',
-                                            description: task.description || '',
-                                            pdfUrl: task.fileUrl,
-                                            fileUrl: task.fileUrl,
-                                            fileName: task.fileName || 'documento.pdf',
-                                            bookPages: Array.isArray(task.bookPages) ? task.bookPages : []
-                                        },
-                                        initialPage: 0
-                                    });
-                                }}
-                                className="px-2.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold flex items-center gap-1.5 shrink-0 shadow-xs transition-all cursor-pointer"
-                                title="Abrir como libro"
+                        <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                            <a 
+                                href={task.fileUrl} 
+                                download={task.fileName || "documento.pdf"}
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="p-2 rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                                title="Descargar archivo"
                             >
-                                <BookOpen size={13} />
-                                <span>Abrir libro</span>
-                            </button>
-                        )}
-                        <a 
-                            href={task.fileUrl} 
-                            download={task.fileName || "documento"}
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            onClick={(e) => e.stopPropagation()}
-                            className="p-2 rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 shrink-0 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                            title="Descargar archivo"
-                        >
-                            <Download size={15} />
-                        </a>
+                                <Download size={15} />
+                            </a>
+                        </div>
                     </div>
                 )
             )}
