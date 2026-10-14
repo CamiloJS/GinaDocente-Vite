@@ -13923,7 +13923,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                   </aside>
 
                   {/* CENTER CONTENT */}
-                  <main className={`flex-1 ${activeTab === 'tools' || activeTab === 'books' || activeTab === 'notes' || activeTab === 'tasks' ? 'max-w-5xl xl:max-w-6xl' : 'max-w-[680px]'} min-w-0 w-full p-2 md:p-6 pb-28 md:pb-8 relative shrink-0 mx-auto transition-all duration-300`}>
+                  <main className={`flex-1 ${activeTab === 'tools' || activeTab === 'books' || activeTab === 'notes' || activeTab === 'tasks' || activeTab === 'reviews' ? 'max-w-5xl xl:max-w-6xl' : 'max-w-[680px]'} min-w-0 w-full p-2 md:p-6 pb-28 md:pb-8 relative mx-auto transition-all duration-300`}>
                       {activeTab === 'tasks' && (
                           <React.Suspense fallback={<div className="space-y-4 p-4">{[1,2,3].map(i => <div key={i} className="p-4 rounded-2xl border animate-pulse bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800"><div className="flex items-center gap-3 mb-4"><div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700" /><div className="flex-1 space-y-2"><div className="h-3 w-1/3 rounded bg-gray-200 dark:bg-gray-700" /></div></div><div className="h-4 w-full rounded mb-2 bg-gray-200 dark:bg-gray-700" /><div className="h-4 w-5/6 rounded bg-gray-200 dark:bg-gray-700" /></div>)}</div>}>
                           <TasksTab 

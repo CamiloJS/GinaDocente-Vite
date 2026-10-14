@@ -760,8 +760,10 @@ check('TaskCard soporta previsualización 16:9 interactiva de Google Slides y de
   updatedTaskCardSrc.includes('rev.pptxUrl')
 );
 
-check('App.jsx mantiene el muro de publicaciones ampliado por defecto en PC (max-w-5xl xl:max-w-6xl)',
-  updatedAppSrc.includes("activeTab === 'tools' || activeTab === 'books' || activeTab === 'notes' || activeTab === 'tasks' ? 'max-w-5xl xl:max-w-6xl'")
+check('App.jsx mantiene el muro de publicaciones y diapositivas ampliado por defecto en PC (max-w-5xl xl:max-w-6xl)',
+  updatedAppSrc.includes("max-w-5xl xl:max-w-6xl") &&
+  updatedAppSrc.includes("activeTab === 'tasks'") &&
+  updatedAppSrc.includes("activeTab === 'reviews'")
 );
 
 check('ReviewsModule ofrece subida de archivos PowerPoint (.pptx), vinculación de Google Slides y visor en pantalla completa interactivo',

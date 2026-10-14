@@ -8352,9 +8352,9 @@ export const ReviewsModule = ({
   return (
     <div className="space-y-6 pb-20 md:pb-6 max-w-6xl mx-auto">
       {/* Encabezado Principal */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-extrabold text-gray-900 dark:text-gray-100">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
+        <div className="min-w-0">
+          <h2 className="text-xl sm:text-2xl font-extrabold text-gray-900 dark:text-gray-100">
             Diapositivas
           </h2>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
@@ -8363,25 +8363,25 @@ export const ReviewsModule = ({
         </div>
 
         {role === 'teacher' && (
-          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-center gap-2 w-full md:w-auto">
             <button
               type="button"
               onClick={() => handleOpenNewPresentationStudio()}
-              className="py-2.5 px-4 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-[#AD3333] text-gray-800 dark:text-gray-100 text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs"
+              className="h-10 sm:h-9 px-3 sm:px-3.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750 hover:border-gray-300 dark:hover:border-gray-600 text-gray-700 dark:text-gray-200 text-xs font-bold inline-flex items-center justify-center gap-2 transition-all shadow-2xs active:scale-95 cursor-pointer"
             >
-              <Plus size={15} className="text-[#AD3333]" />
-              <span>Nueva presentación</span>
+              <Plus size={15} className="text-[#AD3333] shrink-0" />
+              <span className="truncate">Nueva presentación</span>
             </button>
 
             <button
               type="button"
               onClick={() => pptxFileInputRef.current?.click()}
               disabled={isUploadingPptx}
-              className="py-2.5 px-4 rounded-xl border border-orange-200 dark:border-orange-800/60 bg-orange-50 hover:bg-orange-100 dark:bg-orange-950/30 dark:hover:bg-orange-950/50 text-orange-700 dark:text-orange-300 text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs disabled:opacity-50"
+              className="h-10 sm:h-9 px-3 sm:px-3.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750 hover:border-gray-300 dark:hover:border-gray-600 text-gray-700 dark:text-gray-200 text-xs font-bold inline-flex items-center justify-center gap-2 transition-all shadow-2xs active:scale-95 cursor-pointer disabled:opacity-50"
               title="Subir archivo PowerPoint (.pptx) para procesar y presentar en pantalla completa"
             >
-              {isUploadingPptx ? <Loader2 size={15} className="animate-spin text-orange-600" /> : <UploadCloud size={15} className="text-orange-600 dark:text-orange-400" />}
-              <span>{isUploadingPptx ? 'Cargando .pptx...' : 'Subir PowerPoint'}</span>
+              {isUploadingPptx ? <Loader2 size={15} className="animate-spin text-orange-500 shrink-0" /> : <UploadCloud size={15} className="text-orange-500 shrink-0" />}
+              <span className="truncate">{isUploadingPptx ? 'Cargando .pptx...' : 'Subir PowerPoint'}</span>
             </button>
             <input
               ref={pptxFileInputRef}
@@ -8394,20 +8394,25 @@ export const ReviewsModule = ({
             <button
               type="button"
               onClick={() => setShowGoogleSlidesModal(true)}
-              className="py-2.5 px-4 rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/30 dark:hover:bg-amber-950/50 text-amber-800 dark:text-amber-300 text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs"
-              title="Adjuntar enlace de Google Slides para proyectar en pantalla completa"
+              className="h-10 sm:h-9 px-3 sm:px-3.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750 hover:border-gray-300 dark:hover:border-gray-600 text-gray-700 dark:text-gray-200 text-xs font-bold inline-flex items-center justify-center gap-2 transition-all shadow-2xs active:scale-95 cursor-pointer"
+              title="Adjuntar Google Slides para proyectar en pantalla completa"
             >
-              <Globe size={15} className="text-amber-600 dark:text-amber-400" />
-              <span>Adjuntar Google Slides</span>
+              <Globe size={15} className="text-amber-500 shrink-0" />
+              <span className="truncate">Google Slides</span>
             </button>
 
             <button
               type="button"
               onClick={() => setCreationMode(prev => prev === 'ai' ? null : 'ai')}
-              className={`${redButton} text-xs font-bold py-2.5 px-4 rounded-xl shadow-xs flex items-center gap-1.5 transition-all shrink-0`}
+              className={`h-10 sm:h-9 px-3 sm:px-3.5 rounded-xl border text-xs font-bold inline-flex items-center justify-center gap-2 transition-all shadow-2xs active:scale-95 cursor-pointer ${
+                creationMode === 'ai'
+                  ? 'border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300'
+                  : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750 hover:border-gray-300 dark:hover:border-gray-600 text-gray-700 dark:text-gray-200'
+              }`}
+              title="Generar presentación con inteligencia artificial"
             >
-              <Sparkles size={15} />
-              <span>Crear con IA</span>
+              <Sparkles size={15} className="text-purple-500 shrink-0" />
+              <span className="truncate">Crear con IA</span>
             </button>
           </div>
         )}
