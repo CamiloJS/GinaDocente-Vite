@@ -3783,12 +3783,12 @@ const TaskCard = React.memo(({
 
             {/* MODAL DE COMENTARIOS / ENTREGAS / FOROS */}
             {showCommentModal && ReactDOM.createPortal(
-                <div className={`fixed inset-0 z-[9999] flex justify-center items-end md:items-center bg-black/60 backdrop-blur-sm p-0 md:p-4 transition-all ${isDarkMode ? 'dark' : ''}`}>
+                <div className={`fixed inset-0 z-[9999] flex justify-center items-end md:items-center bg-black/60 backdrop-blur-sm ${isModalExpanded ? 'p-0' : 'p-0 md:p-4'} transition-all ${isDarkMode ? 'dark' : ''}`}>
                     <div className={`w-full ${
                         isModalExpanded 
-                            ? 'max-w-5xl xl:max-w-6xl 2xl:max-w-7xl h-[92vh] md:h-[92vh]' 
-                            : 'max-w-2xl h-[90vh] md:h-[80vh]'
-                    } flex flex-col p-4 md:p-6 rounded-t-[2rem] md:rounded-3xl shadow-2xl transition-all duration-200 animate-in slide-in-from-bottom-6 fade-in overflow-hidden ${
+                            ? 'fixed inset-0 z-[9999] w-screen h-screen max-w-none rounded-none m-0 p-4 md:p-8' 
+                            : 'max-w-2xl h-[90vh] md:h-[80vh] rounded-t-[2rem] md:rounded-3xl p-4 md:p-6'
+                    } flex flex-col shadow-2xl transition-all duration-200 animate-in slide-in-from-bottom-6 fade-in overflow-hidden ${
                         isDarkMode ? 'bg-gray-900 border border-gray-700' : 'bg-white border border-gray-200'
                     }`}>
                         
@@ -3837,16 +3837,15 @@ const TaskCard = React.memo(({
                                 <button
                                     type="button"
                                     onClick={toggleModalExpanded}
-                                    className={`hidden md:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer border ${
+                                    className={`hidden md:inline-flex items-center justify-center p-2 rounded-xl transition-all shadow-xs cursor-pointer border ${
                                         isDarkMode 
-                                            ? 'bg-gray-800 hover:bg-gray-750 text-gray-200 border-gray-700' 
-                                            : 'bg-gray-100 hover:bg-gray-200 text-gray-700 border-gray-200'
+                                            ? 'bg-gray-800 hover:bg-gray-750 text-gray-300 hover:text-white border-gray-700' 
+                                            : 'bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-900 border-gray-200'
                                     }`}
-                                    title={isModalExpanded ? "Reducir ventana (Vista estándar)" : "Ampliar ventana (Vista amplia)"}
-                                    aria-label={isModalExpanded ? "Reducir ventana" : "Ampliar ventana"}
+                                    title={isModalExpanded ? "Pantalla normal" : "Pantalla completa"}
+                                    aria-label={isModalExpanded ? "Pantalla normal" : "Pantalla completa"}
                                 >
-                                    {isModalExpanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-                                    <span className="hidden lg:inline">{isModalExpanded ? 'Reducir' : 'Ampliar'}</span>
+                                    {isModalExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
                                 </button>
                                 <button 
                                     onClick={() => setShowCommentModal(false)} 

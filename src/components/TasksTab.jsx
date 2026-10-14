@@ -1,7 +1,7 @@
 // src/components/TasksTab.jsx
 import React, { useState, useRef } from 'react'
 import {
-  Book, BookOpen, CheckCheck, CheckCircle2, ChevronRight, Globe, ImageIcon, Mic, NavNotebook, PaperclipIcon, Plus, SearchIcon, Sparkles, Square, Target, Loader2, Undo2, UploadCloud, X, Play, Pause, MessageCircle, BarChart2, Vote, Gamepad2, ClipboardList, NavSlides, Music, Volume2, VolumeX, Maximize2, Minimize2
+  Book, BookOpen, CheckCheck, CheckCircle2, ChevronRight, Globe, ImageIcon, Mic, NavNotebook, PaperclipIcon, Plus, SearchIcon, Sparkles, Square, Target, Loader2, Undo2, UploadCloud, X, Play, Pause, MessageCircle, BarChart2, Vote, Gamepad2, ClipboardList, NavSlides, Music, Volume2, VolumeX
 } from './Icons.jsx'
 import TaskCard from './TaskCard.jsx'
 import KahootBuilder from './KahootBuilder.jsx'
@@ -22,7 +22,6 @@ import Flipbook3DModal from './Flipbook3DModal.jsx'
 import BookWordEditor from './BookWordEditor.jsx'
 
 const TasksTab = React.memo(({
-    isFeedExpanded = false, toggleFeedExpanded,
     role, glassCard, glassInput, redButton, postType, setPostType, taskTitle, setTaskTitle,
     taskDesc, setTaskDesc, showImageInput, setShowImageInput, postImageUrl, setPostImageUrl, postImageUrls = [], setPostImageUrls,
     postFileUrl, setPostFileUrl, postFileName, setPostFileName, showPostAttachmentMenu,
@@ -2547,28 +2546,7 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                 </div>
             )}
 
-            {/* BARRA DE HERRAMIENTAS SUPERIOR DEL MURO (VISTA EXPANDIDA EN ESCRITORIO) */}
-            <div className="hidden md:flex items-center justify-between gap-2 px-1 py-1">
-                <div className="flex items-center gap-2 text-xs font-bold text-gray-500 dark:text-gray-400">
-                    <span>Muro de publicaciones</span>
-                </div>
-                {typeof toggleFeedExpanded === 'function' && (
-                    <button
-                        type="button"
-                        onClick={toggleFeedExpanded}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-2xs border cursor-pointer ${
-                            isFeedExpanded 
-                                ? 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800' 
-                                : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-800 dark:hover:bg-gray-750 dark:text-gray-300 dark:border-gray-700'
-                        }`}
-                        title={isFeedExpanded ? "Volver a vista normal del muro" : "Ampliar vista del muro (pantalla más ancha)"}
-                        aria-label={isFeedExpanded ? "Volver a vista normal" : "Ampliar vista"}
-                    >
-                        {isFeedExpanded ? <Minimize2 size={13} className="text-blue-600 dark:text-blue-400" /> : <Maximize2 size={13} />}
-                        <span>{isFeedExpanded ? 'Vista compacta' : 'Ampliar muro'}</span>
-                    </button>
-                )}
-            </div>
+
 
             {wallSearchTerm.trim() && (
                 <div className="flex items-center justify-between px-3.5 py-2 rounded-2xl bg-blue-500/10 border border-blue-400/20 text-xs font-semibold text-blue-600 dark:text-blue-400 mb-3 animate-in fade-in">

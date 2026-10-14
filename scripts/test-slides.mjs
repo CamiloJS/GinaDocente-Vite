@@ -742,12 +742,12 @@ const updatedTaskCardSrc = fs.readFileSync(path.join(rootDir, 'src/components/Ta
 const updatedTasksTabSrc = fs.readFileSync(path.join(rootDir, 'src/components/TasksTab.jsx'), 'utf8');
 const updatedAppSrc = fs.readFileSync(path.join(rootDir, 'src/App.jsx'), 'utf8');
 
-check('TaskCard incluye botón de ampliar ventana en PC para comentarios/entregas/foros con persistencia en localStorage (english_tech_task_modal_expanded)',
+check('TaskCard incluye botón de pantalla completa en PC para comentarios/entregas/foros con persistencia en localStorage (english_tech_task_modal_expanded)',
   updatedTaskCardSrc.includes('english_tech_task_modal_expanded') &&
   updatedTaskCardSrc.includes('isModalExpanded') &&
   updatedTaskCardSrc.includes('toggleModalExpanded') &&
   updatedTaskCardSrc.includes('hidden md:inline-flex') &&
-  updatedTaskCardSrc.includes('max-w-5xl xl:max-w-6xl 2xl:max-w-7xl h-[92vh] md:h-[92vh]') &&
+  updatedTaskCardSrc.includes('w-screen h-screen max-w-none rounded-none') &&
   updatedTaskCardSrc.includes('max-w-2xl h-[90vh] md:h-[80vh]')
 );
 
@@ -760,15 +760,8 @@ check('TaskCard soporta previsualización 16:9 interactiva de Google Slides y de
   updatedTaskCardSrc.includes('rev.pptxUrl')
 );
 
-check('App.jsx y TasksTab implementan ampliación de pantalla en PC para el muro de publicaciones con persistencia en localStorage (english_tech_feed_expanded)',
-  updatedAppSrc.includes('english_tech_feed_expanded') &&
-  updatedAppSrc.includes('isFeedExpanded') &&
-  updatedAppSrc.includes('toggleFeedExpanded') &&
-  updatedAppSrc.includes("activeTab === 'tasks' && isFeedExpanded") &&
-  updatedTasksTabSrc.includes('hidden md:flex') &&
-  updatedTasksTabSrc.includes('toggleFeedExpanded') &&
-  updatedTasksTabSrc.includes('Vista compacta') &&
-  updatedTasksTabSrc.includes('Ampliar muro')
+check('App.jsx mantiene el muro de publicaciones ampliado por defecto en PC (max-w-5xl xl:max-w-6xl)',
+  updatedAppSrc.includes("activeTab === 'tools' || activeTab === 'books' || activeTab === 'notes' || activeTab === 'tasks' ? 'max-w-5xl xl:max-w-6xl'")
 );
 
 check('ReviewsModule ofrece subida de archivos PowerPoint (.pptx), vinculación de Google Slides y visor en pantalla completa interactivo',
