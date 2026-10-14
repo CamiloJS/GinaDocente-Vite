@@ -7,6 +7,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Search, CheckCircle2, UserCheck, UsersIcon } from './Icons.jsx';
 import { glassCard, glassInput } from '../utils/styles.js';
+import { DEMO_USER_MAPPINGS } from '../utils/demoData.js';
 
 export default function TargetStudentsModal({
   isOpen,
@@ -51,8 +52,9 @@ export default function TargetStudentsModal({
       return lower.includes('docente') || lower.includes('teacher') || lower === 'gina' || lower === 'camilo';
     };
 
-    // 1. Desde userMappings
-    Object.entries(userMappings || {}).forEach(([key, u]) => {
+    // 1. Desde userMappings o datos demo
+    const activeMap = (userMappings && Object.keys(userMappings).length > 0) ? userMappings : DEMO_USER_MAPPINGS;
+    Object.entries(activeMap || {}).forEach(([key, u]) => {
       if (!u || u.role === 'teacher' || isTeacherKey(key) || isTeacherKey(u.username) || isTeacherKey(u.id)) return;
       const id = String(u.id || key).trim();
       if (!id) return;

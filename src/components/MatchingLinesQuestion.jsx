@@ -148,9 +148,22 @@ export default function MatchingLinesQuestion({
     const handleResize = () => updateLines();
     window.addEventListener('resize', handleResize);
     window.addEventListener('scroll', handleResize, true);
+
+    let ro;
+    if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
+      ro = new ResizeObserver(() => updateLines());
+      ro.observe(containerRef.current);
+    }
+
+    const rafId = requestAnimationFrame(() => updateLines());
+    const timer = setTimeout(() => updateLines(), 120);
+
     return () => {
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('scroll', handleResize, true);
+      if (ro) ro.disconnect();
+      cancelAnimationFrame(rafId);
+      clearTimeout(timer);
     };
   }, [updateLines]);
 
@@ -333,7 +346,7 @@ export default function MatchingLinesQuestion({
                   >
                     {leftIdx + 1}
                   </span>
-                  <span className="truncate leading-snug">{p.left}</span>
+                  <span className="break-words line-clamp-3 leading-snug" title={p.left}>{p.left}</span>
                 </div>
 
                 {/* Circulito de anclaje derecho de la columna izquierda */}
@@ -418,7 +431,7 @@ export default function MatchingLinesQuestion({
                 </div>
 
                 <div className="flex items-center justify-between gap-1.5 min-w-0 flex-1 pl-1">
-                  <span className="truncate leading-snug">{r.text}</span>
+                  <span className="break-words line-clamp-3 leading-snug" title={r.text}>{r.text}</span>
                   {isConnected && (
                     <span
                       className="w-4 h-4 rounded-full text-[9px] font-black text-white flex items-center justify-center shrink-0 shadow-2xs"

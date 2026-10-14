@@ -6,73 +6,10 @@
 
 import React, { useState, useMemo } from 'react';
 import { desordenarPalabras } from '../utils/palabras.js';
-import { obtenerHuecosDePregunta, normalizarRespuesta } from '../utils/evalScoring.js';
+import { obtenerHuecosDePregunta, normalizarRespuesta, parsearSegmentosTexto } from '../utils/evalScoring.js';
 import { X, CheckCircle2, RotateCcw } from './Icons.jsx';
 
-/**
- * Parsea el texto del enunciado para separar segmentos de texto plano y huecos [1], [palabra], etc.
- */
-export function parsearSegmentosTexto(textoCompleto, huecosDeclarados = []) {
-  const texto = String(textoCompleto || '').trim();
-  const huecos = Array.isArray(huecosDeclarados) && huecosDeclarados.length > 0
-    ? huecosDeclarados.map((h) => (typeof h === 'string' ? h : (h?.word || '')))
-    : obtenerHuecosDePregunta({ text: texto }).map((h) => (typeof h === 'string' ? h : (h?.word || '')));
-
-  const segmentos = [];
-  const regex = /\[([^\]]+)\]/g;
-  let match;
-  let ultimoIndice = 0;
-  let slotIdx = 0;
-
-  while ((match = regex.exec(texto)) !== null) {
-    if (match.index > ultimoIndice) {
-      segmentos.push({
-        type: 'text',
-        content: texto.slice(ultimoIndice, match.index)
-      });
-    }
-
-    const valorEsperado = huecos[slotIdx] || match[1].trim();
-    segmentos.push({
-      type: 'blank',
-      slotIndex: slotIdx,
-      expected: valorEsperado,
-      originalToken: match[0]
-    });
-
-    slotIdx++;
-    ultimoIndice = regex.lastIndex;
-  }
-
-  if (ultimoIndice < texto.length) {
-    segmentos.push({
-      type: 'text',
-      content: texto.slice(ultimoIndice)
-    });
-  }
-
-  // Fallback si no había corchetes pero había huecos declarados o líneas bajas '___'
-  if (segmentos.length === 0 && texto) {
-    if (/_{2,}/.test(texto)) {
-      const partes = texto.split(/_{2,}/);
-      partes.forEach((p, idx) => {
-        if (p) segmentos.push({ type: 'text', content: p });
-        if (idx < partes.length - 1) {
-          segmentos.push({
-            type: 'blank',
-            slotIndex: idx,
-            expected: huecos[idx] || '',
-            originalToken: '___'
-          });
-        }
-      });
-    } else {
-      segmentos.push({ type: 'text', content: texto });
-    }
-  }
-
-  return { segmentos, totalHuecos: slotIdx > 0 ? slotIdx : huecos.length };
-}
+export { parsearSegmentosTexto };
 
 export default function FillBlanksQuestion({
   question = {},
@@ -154,7 +91,7 @@ export default function FillBlanksQuestion({
 
   // Manejador para insertar una palabra en el espacio activo
   const handleSelectWord = (word) => {
-    if (readOnly || !onChange) return;
+    if (readOnly || !onChange || totalHuecos <= 0) return;
 
     // Buscar el espacio objetivo: el activeSlot si está libre, o el primer hueco libre
     let target = activeSlot;

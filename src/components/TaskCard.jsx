@@ -2529,6 +2529,11 @@ const TaskCard = React.memo(({
                                             <Sparkles size={10} /> Retroalimentación IA
                                         </span>
                                     )}
+                                    {((Array.isArray(ev.targetStudentIds) && ev.targetStudentIds.length > 0) || (Array.isArray(task.targetStudentIds) && task.targetStudentIds.length > 0)) && (
+                                        <span className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-purple-100/80 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60" title={`Asignada a ${ev.targetStudentIds?.length || task.targetStudentIds?.length} estudiante(s) específico(s)`}>
+                                            <UserIcon size={10} /> {(ev.targetStudentIds || task.targetStudentIds).length} {((ev.targetStudentIds || task.targetStudentIds).length === 1) ? 'estudiante' : 'estudiantes'}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
 

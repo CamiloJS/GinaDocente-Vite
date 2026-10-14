@@ -1,5 +1,4 @@
-// Pruebas del motor de calificacion de evaluaciones (sin navegador).
-import { permiteVariasRespuestas, calculateScore, normalizarRespuesta, respuestasValidasDe, puntajeDe, tienePreguntasManuales, obtenerHuecosDePregunta } from "../src/utils/evalScoring.js";
+import { permiteVariasRespuestas, calculateScore, normalizarRespuesta, respuestasValidasDe, puntajeDe, tienePreguntasManuales, obtenerHuecosDePregunta, obtenerHuecosDetallados, parsearSegmentosTexto } from "../src/utils/evalScoring.js";
 import { desordenarPalabras } from "../src/utils/palabras.js";
 
 let ok = 0, fallos = 0;
@@ -123,6 +122,54 @@ const clozeSinBlanks = {
   text: "Yesterday I [saw] a cat and [heard] a bird."
 };
 chequear("obtenerHuecosDePregunta extrae de corchetes en texto", JSON.stringify(obtenerHuecosDePregunta(clozeSinBlanks)) === JSON.stringify(["saw", "heard"]));
+
+// Pruebas de obtenerHuecosDetallados
+const clozeObjBlanks = {
+  type: "fill_blanks",
+  blanks: [{ word: "apple" }, { answer: "banana" }, { text: "cherry" }]
+};
+const detallados = obtenerHuecosDetallados(clozeObjBlanks);
+chequear("obtenerHuecosDetallados retorna [{ index, word }, ...] soportando word, answer y text",
+  detallados.length === 3 &&
+  detallados[0].index === 0 && detallados[0].word === "apple" &&
+  detallados[1].index === 1 && detallados[1].word === "banana" &&
+  detallados[2].index === 2 && detallados[2].word === "cherry"
+);
+
+// Pruebas de parsearSegmentosTexto
+const clozePuntuacion = "I like [cats], and [dogs].";
+const { segmentos: segsPunt, totalHuecos: totalPunt } = parsearSegmentosTexto(clozePuntuacion);
+chequear("parsearSegmentosTexto preserva signos de puntuación pegados a los corchetes (, .)",
+  totalPunt === 2 &&
+  segsPunt.length === 5 &&
+  segsPunt[0].type === "text" && segsPunt[0].content === "I like " &&
+  segsPunt[1].type === "blank" && segsPunt[1].expected === "cats" &&
+  segsPunt[2].type === "text" && segsPunt[2].content === ", and " &&
+  segsPunt[3].type === "blank" && segsPunt[3].expected === "dogs" &&
+  segsPunt[4].type === "text" && segsPunt[4].content === "."
+);
+
+const clozeUnderscores = "The sun is ___ and water is ___.";
+const { segmentos: segsUnder, totalHuecos: totalUnder } = parsearSegmentosTexto(clozeUnderscores, ["yellow", "blue"]);
+chequear("parsearSegmentosTexto fallback con líneas bajas '___' y huecos declarados",
+  totalUnder === 2 &&
+  segsUnder.some((s) => s.type === "blank" && s.expected === "yellow") &&
+  segsUnder.some((s) => s.type === "blank" && s.expected === "blue")
+);
+
+// Palabras duplicadas en huecos distintos
+const clozeDuplicados = {
+  type: "fill_blanks",
+  text: "The [sun] is hot and the [sun] is bright.",
+  blanks: ["sun", "sun"]
+};
+chequear("fill_blanks con palabras duplicadas en distintos huecos: ambas bien -> 5.0",
+  calculateScore({ questions: [clozeDuplicados] }, { 0: { 0: "sun", 1: "sun" } }) === 5.0
+);
+chequear("fill_blanks con palabras duplicadas: primera bien, segunda mal -> 2.5",
+  calculateScore({ questions: [clozeDuplicados] }, { 0: { 0: "sun", 1: "moon" } }) === 2.5
+);
+
 chequear("fill_blanks: todas correctas -> 5.0", calculateScore({ questions: [cloze1] }, { 0: ["went", "needed", "bought"] }) === 5.0);
 chequear("fill_blanks: con objeto {0: 'went', ...} -> 5.0", calculateScore({ questions: [cloze1] }, { 0: { 0: "went", 1: "needed", 2: "bought" } }) === 5.0);
 chequear("fill_blanks: tolera mayusculas y espacios", calculateScore({ questions: [cloze1] }, { 0: ["  WENT  ", "Needed", "BOUGHT"] }) === 5.0);

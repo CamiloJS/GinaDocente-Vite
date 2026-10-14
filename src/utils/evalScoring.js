@@ -21,7 +21,7 @@ export const puntajeDe = (q) => (Number(q?.points) > 0 ? Number(q.points) : 1);
 export function obtenerHuecosDePregunta(q) {
   if (Array.isArray(q?.blanks) && q.blanks.length > 0) {
     return q.blanks
-      .map((b) => (typeof b === 'object' && b !== null ? String(b.answer ?? b.text ?? '') : String(b ?? '')))
+      .map((b) => (typeof b === 'object' && b !== null ? String(b.answer ?? b.text ?? b.word ?? '') : String(b ?? '')))
       .map((s) => s.trim())
       .filter(Boolean);
   }
@@ -34,6 +34,76 @@ export function obtenerHuecosDePregunta(q) {
     if (val) matches.push(val);
   }
   return matches;
+}
+
+/** Extrae la lista detallada de huecos con índice y palabra: [{ index: 0, word: 'sun' }, ...] */
+export function obtenerHuecosDetallados(q) {
+  return obtenerHuecosDePregunta(q).map((word, index) => ({ index, word }));
+}
+
+/**
+ * Parsea el texto del enunciado para separar segmentos de texto plano y huecos [1], [palabra], o '___'.
+ */
+export function parsearSegmentosTexto(textoCompleto, huecosDeclarados = []) {
+  const texto = String(textoCompleto || '').trim();
+  const huecos = Array.isArray(huecosDeclarados) && huecosDeclarados.length > 0
+    ? huecosDeclarados.map((h) => (typeof h === 'string' ? h : (h?.word || h?.answer || '')))
+    : obtenerHuecosDePregunta({ text: texto }).map((h) => (typeof h === 'string' ? h : (h?.word || h?.answer || '')));
+
+  const segmentos = [];
+  const regex = /\[([^\]]+)\]/g;
+  let match;
+  let ultimoIndice = 0;
+  let slotIdx = 0;
+
+  while ((match = regex.exec(texto)) !== null) {
+    if (match.index > ultimoIndice) {
+      segmentos.push({
+        type: 'text',
+        content: texto.slice(ultimoIndice, match.index)
+      });
+    }
+
+    const valorEsperado = huecos[slotIdx] || match[1].trim();
+    segmentos.push({
+      type: 'blank',
+      slotIndex: slotIdx,
+      expected: valorEsperado,
+      originalToken: match[0]
+    });
+
+    slotIdx++;
+    ultimoIndice = regex.lastIndex;
+  }
+
+  if (ultimoIndice < texto.length) {
+    segmentos.push({
+      type: 'text',
+      content: texto.slice(ultimoIndice)
+    });
+  }
+
+  // Fallback si no había corchetes pero había líneas bajas '___'
+  if (slotIdx === 0 && texto) {
+    if (/_{2,}/.test(texto)) {
+      segmentos.length = 0;
+      const partes = texto.split(/_{2,}/);
+      partes.forEach((p, idx) => {
+        if (p) segmentos.push({ type: 'text', content: p });
+        if (idx < partes.length - 1) {
+          segmentos.push({
+            type: 'blank',
+            slotIndex: idx,
+            expected: huecos[idx] || '',
+            originalToken: '___'
+          });
+          slotIdx++;
+        }
+      });
+    }
+  }
+
+  return { segmentos, totalHuecos: slotIdx > 0 ? slotIdx : huecos.length };
 }
 
 /**

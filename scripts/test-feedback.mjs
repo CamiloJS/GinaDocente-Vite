@@ -76,6 +76,21 @@ chequear("order genera analisis de orden correcto vs orden del estudiante", mjOr
 const mjMatch = armarMinijuegoPregunta({ type: 'match', text: 'Une', pairs: [{ left: 'dog', right: 'perro' }, { left: 'cat', right: 'gato' }] }, { 0: 'perro', 1: 'perro' });
 chequear("match genera analisis por pareja y minijuego de 3 opciones", mjMatch.analisisOpciones.length === 2 && mjMatch.opcionesJuego.length === 3);
 
+const mjMatchingLines = armarMinijuegoPregunta({
+  type: 'matching_lines',
+  text: 'Une con lineas',
+  pairs: [{ left: 'cat', right: 'gato' }, { left: 'dog', right: 'perro' }]
+}, { 0: 'gato', 1: 'perro' });
+chequear("matching_lines genera analisis de parejas y minijuego", mjMatchingLines.analisisOpciones.length === 2 && mjMatchingLines.opcionesJuego.length === 3);
+
+const mjCloze = armarMinijuegoPregunta({
+  type: 'fill_blanks',
+  text: 'I [like] apples and [eat] bread.',
+  blanks: ['like', 'eat'],
+  options: ['like', 'eat', 'sleep']
+}, { 0: 'like', 1: 'sleep' });
+chequear("fill_blanks genera analisis por hueco y minijuego anti-confusion", mjCloze.analisisOpciones.length === 2 && mjCloze.opcionesJuego.length === 3 && mjCloze.analisisOpciones[1].esCorrecta === false);
+
 const mjText = armarMinijuegoPregunta({ type: 'text', text: 'Pasado de buy', correctAnswer: 'bought' }, 'buyed');
 chequear("text genera analisis de respuesta correcta vs error del estudiante", mjText.analisisOpciones.length === 2 && mjText.opcionesJuego.length === 3);
 

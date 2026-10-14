@@ -115,7 +115,9 @@ export function construirPromptFeedback({ titulo = '', items = [] }) {
       ].join('\n');
     }
     const estado = it.acierto ? 'CORRECTA' : 'INCORRECTA';
-    const parcial = Number.isFinite(it.parcial) && it.parcial > 0 && !it.acierto ? ` (acerto ${it.parcial} de las parejas)` : '';
+    const parcial = Number.isFinite(it.parcial) && it.parcial > 0 && !it.acierto
+      ? (it.tipo === 'fill_blanks' || it.tipo === 'cloze' ? ` (acerto ${it.parcial} de los huecos)` : ` (acerto ${it.parcial} de las parejas)`)
+      : '';
     return [
       `${i + 1}) [${estado}${parcial}] Enunciado: ${it.enunciado || '(sin enunciado)'}`,
       it.opciones ? `   Opciones: ${it.opciones}` : '',
@@ -230,7 +232,7 @@ export function armarMinijuegoPregunta(q, respuesta, explicacion = '', minijuego
         razon,
       };
     });
-  } else if (detalle.tipo === 'match' && Array.isArray(q?.pairs) && q.pairs.length > 0) {
+  } else if ((detalle.tipo === 'match' || detalle.tipo === 'matching_lines') && Array.isArray(q?.pairs) && q.pairs.length > 0) {
     const elegidas = respuesta && typeof respuesta === 'object' ? respuesta : {};
     analisisOpciones = q.pairs.map((p, idx) => {
       const izq = limpio(p?.left, 100);
@@ -247,6 +249,25 @@ export function armarMinijuegoPregunta(q, respuesta, explicacion = '', minijuego
         razon: razonIA || (bien
           ? `¡Bien relacionado! «${izq}» corresponde exactamente a «${der}» y las demás opciones definían otros conceptos.`
           : `Pusiste «${dada || 'sin elegir'}», pero esa opción no iba con «${izq}» (correspondía a otro término). La pareja correcta de «${izq}» es «${der}».`),
+      };
+    });
+  } else if (detalle.tipo === 'fill_blanks' || detalle.tipo === 'cloze') {
+    const huecos = obtenerHuecosDePregunta(q);
+    const elegidas = respuesta && typeof respuesta === 'object' ? respuesta : {};
+    analisisOpciones = huecos.map((h, idx) => {
+      const dada = Array.isArray(elegidas) ? elegidas[idx] : elegidas[idx];
+      const dadaLimpia = limpio(dada, 100);
+      const bien = Boolean(dadaLimpia && normalizarComparacion(dadaLimpia) === normalizarComparacion(h));
+      const razonIA = razonesIA[idx] || '';
+      return {
+        etiqueta: `Espacio [${idx + 1}]`,
+        texto: `${h}`,
+        esCorrecta: bien,
+        elegida: Boolean(dadaLimpia),
+        fueElegida: Boolean(dadaLimpia),
+        razon: razonIA || (bien
+          ? `¡Correcto! En el espacio [${idx + 1}] va «${h}» y completa con precisión el sentido de la frase.`
+          : `Pusiste «${dadaLimpia || 'sin completar'}» en el espacio [${idx + 1}], pero la palabra que correspondía era «${h}».`),
       };
     });
   } else if (detalle.tipo === 'order') {
@@ -297,7 +318,9 @@ export function armarMinijuegoPregunta(q, respuesta, explicacion = '', minijuego
     } else if (detalle.acierto) {
       explicacionGeneral = `¡Muy bien! «${detalle.correcta}» es la respuesta correcta para «${enunciadoCorto}», mientras que las demás opciones no cumplían lo pedido.`;
     } else if (detalle.parcial > 0) {
-      explicacionGeneral = `Acertaste ${detalle.parcial} de las parejas. Revisa las que se cruzaron: la relación correcta completa es ${detalle.correcta}.`;
+      explicacionGeneral = (detalle.tipo === 'fill_blanks' || detalle.tipo === 'cloze')
+        ? `Acertaste ${detalle.parcial} de los huecos. Revisa el texto completo: la solución correcta es ${detalle.correcta}.`
+        : `Acertaste ${detalle.parcial} de las parejas. Revisa las que se cruzaron: la relación correcta completa es ${detalle.correcta}.`;
     } else {
       explicacionGeneral = `Tu respuesta fue «${detalle.delEstudiante}», pero no iba en este caso. La respuesta correcta es «${detalle.correcta}» porque se ajusta a lo que pide la pregunta.`;
     }
@@ -338,7 +361,7 @@ export function armarMinijuegoPregunta(q, respuesta, explicacion = '', minijuego
           feedback: '¡Casi caes en la trampa! Solo repetir la pregunta no cuenta como respuesta. Elige otra opción.',
         },
       ];
-    } else if (detalle.tipo === 'match' && Array.isArray(q?.pairs) && q.pairs.length > 0) {
+    } else if ((detalle.tipo === 'match' || detalle.tipo === 'matching_lines') && Array.isArray(q?.pairs) && q.pairs.length > 0) {
       const elegidas = respuesta && typeof respuesta === 'object' ? respuesta : {};
       const idxFallo = q.pairs.findIndex((p, i) => normalizarComparacion(elegidas[i]) !== normalizarComparacion(p?.right));
       const idxFoco = idxFallo >= 0 ? idxFallo : 0;
@@ -374,6 +397,45 @@ export function armarMinijuegoPregunta(q, respuesta, explicacion = '', minijuego
           texto: `«${derFoco}» era un distractor sobrante y la relación principal de «${izqFoco}» siempre era «${distractorDer}».`,
           esCorrecta: false,
           feedback: `¡Trampa detectada! Esa afirmación buscaba hacerte dudar: «${derFoco}» sí es la definición exacta de «${izqFoco}». ¡Intenta de nuevo!`,
+        },
+      ];
+    } else if (detalle.tipo === 'fill_blanks' || detalle.tipo === 'cloze') {
+      const huecos = obtenerHuecosDePregunta(q);
+      const elegidas = respuesta && typeof respuesta === 'object' ? respuesta : {};
+      const idxFallo = huecos.findIndex((h, i) => {
+        const dada = Array.isArray(elegidas) ? elegidas[i] : elegidas[i];
+        return normalizarComparacion(dada) !== normalizarComparacion(h);
+      });
+      const idxFoco = idxFallo >= 0 ? idxFallo : 0;
+      const correctaFoco = limpio(huecos[idxFoco], 80) || 'la palabra correcta';
+      const dadaFoco = limpio(Array.isArray(elegidas) ? elegidas[idxFoco] : elegidas[idxFoco], 80);
+      const distractor = (dadaFoco && normalizarComparacion(dadaFoco) !== normalizarComparacion(correctaFoco))
+        ? dadaFoco
+        : (limpio(Array.isArray(q?.options) ? q.options.find((o) => normalizarComparacion(o) !== normalizarComparacion(correctaFoco)) : '', 80) || 'otra palabra');
+
+      preguntaTrampa = preguntaTrampa || (
+        idxFallo >= 0
+          ? `¡Cuidado, intentaremos confundirte! En el espacio [${idxFoco + 1}], ¿por qué la palabra «${distractor}» NO iba y por qué la correcta es «${correctaFoco}»?`
+          : `¡Reto anti-confusión! Si alguien te dice que en el espacio [${idxFoco + 1}] debía colocarse «${distractor}», ¿por qué esa opción NO iba y por qué la correcta es «${correctaFoco}»?`
+      );
+
+      opcionesIA = [
+        {
+          texto: expLimpia
+            ? `${expLimpia} Por eso en el espacio [${idxFoco + 1}] va «${correctaFoco}» y no «${distractor}».`
+            : `Porque «${correctaFoco}» completa el significado y la concordancia del texto, mientras que «${distractor}» no encaja gramaticalmente en esa oración.`,
+          esCorrecta: true,
+          feedback: `¡Excelente, no caíste en la trampa! Tienes totalmente claro por qué «${correctaFoco}» va en ese espacio y por qué «${distractor}» no iba ahí.`,
+        },
+        {
+          texto: `En realidad daba lo mismo poner «${distractor}» o «${correctaFoco}» porque cualquier palabra del banco encaja en cualquier espacio.`,
+          esCorrecta: false,
+          feedback: `¡Caíste en la trampa! Cada hueco exige un significado y concordancia específicos. La palabra exacta es «${correctaFoco}». ¡Prueba otra opción!`,
+        },
+        {
+          texto: `«${correctaFoco}» estaba incorrecta en el texto y siempre debía ponerse «${distractor}».`,
+          esCorrecta: false,
+          feedback: `¡Trampa detectada! Esa opción era para hacerte dudar: «${correctaFoco}» sí es la palabra correcta del espacio. ¡Intenta de nuevo!`,
         },
       ];
     } else if ((detalle.tipo === 'multiple' || detalle.tipo === 'listening' || detalle.tipo === 'reading') && Array.isArray(q?.options) && q.options.length >= 2) {

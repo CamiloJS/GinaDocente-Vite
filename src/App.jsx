@@ -68,7 +68,7 @@ import TargetStudentsModal from './components/TargetStudentsModal.jsx';
 import FillBlanksQuestion from './components/FillBlanksQuestion.jsx';
 import MatchingLinesQuestion, { MATCHING_LINE_COLORS } from './components/MatchingLinesQuestion.jsx';
 import { extractTextFromPDF } from './utils/pdfExtractor.js'
-import { calculateScore, normalizarRespuesta, respuestasValidasDe, permiteVariasRespuestas, obtenerHuecosDePregunta } from './utils/evalScoring.js'
+import { calculateScore, normalizarRespuesta, respuestasValidasDe, permiteVariasRespuestas, obtenerHuecosDePregunta, obtenerHuecosDetallados } from './utils/evalScoring.js'
 import { textoPlano } from './utils/textFormat.js';
 import { desordenarPalabras } from './utils/palabras.js'
 import {
@@ -9591,7 +9591,8 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                     setEvalFormData(prev => ({
                                         ...prev,
                                         targetGroupId: targetGrpId,
-                                        targetGroupName: targetGrpName || (targetGrpId === 'all' ? 'Todos los estudiantes (Global)' : 'Grupo')
+                                        targetGroupName: targetGrpName || (targetGrpId === 'all' ? 'Todos los estudiantes (Global)' : 'Grupo'),
+                                        targetStudentIds: []
                                     }));
                                     setIsCreatingEval(true);
                                 } else {
@@ -9973,7 +9974,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                               correctAnswerText = paresM.map((p) => `${p.left} -> ${p.right}`).join(' | ');
                               isCorrect = paresM.length > 0 && aciertosM === paresM.length;
                           } else if (q.type === 'fill_blanks' || q.type === 'cloze') {
-                              const huecos = obtenerHuecosDePregunta(q);
+                              const huecos = obtenerHuecosDetallados(q);
                               const elegidasB = (qAns && typeof qAns === 'object') ? qAns : {};
                               const aciertosB = huecos.filter((h) => {
                                   const r = elegidasB[h.index];
@@ -10329,7 +10330,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                    const aciertosM = paresM.filter((p, pIdx) => elegidasM[pIdx] !== undefined && normalizarRespuesta(elegidasM[pIdx]) === normalizarRespuesta(p.right)).length;
                                                    if (paresM.length > 0 && aciertosM === paresM.length) correctCount++;
                                                } else if (q.type === 'fill_blanks' || q.type === 'cloze') {
-                                                   const huecos = obtenerHuecosDePregunta(q);
+                                                   const huecos = obtenerHuecosDetallados(q);
                                                    const elegidasB = (qAns && typeof qAns === 'object') ? qAns : {};
                                                    const aciertosB = huecos.filter((h) => {
                                                        const r = elegidasB[h.index];
@@ -10562,7 +10563,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                    const aciertosM = paresM.filter((p, pIdx) => elegidasM[pIdx] !== undefined && normalizarRespuesta(elegidasM[pIdx]) === normalizarRespuesta(p.right)).length;
                                                    if (paresM.length > 0 && aciertosM === paresM.length) studentCorrect++;
                                                } else if (q.type === 'fill_blanks' || q.type === 'cloze') {
-                                                   const huecos = obtenerHuecosDePregunta(q);
+                                                   const huecos = obtenerHuecosDetallados(q);
                                                    const elegidasB = (qAns && typeof qAns === 'object') ? qAns : {};
                                                    const aciertosB = huecos.filter((h) => {
                                                        const r = elegidasB[h.index];
@@ -10656,7 +10657,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                    esParcial = !isCorrect && !isUnanswered && aciertosR > 0;
                                                    if (esParcial) detalleParcial = aciertosR + ' de ' + paresR.length;
                                                } else if (q.type === 'fill_blanks' || q.type === 'cloze') {
-                                                   const huecos = obtenerHuecosDePregunta(q);
+                                                   const huecos = obtenerHuecosDetallados(q);
                                                    const elegidasB = (qAns && typeof qAns === 'object') ? qAns : {};
                                                    const aciertosB = huecos.filter((h) => {
                                                        const r = elegidasB[h.index];
@@ -10853,7 +10854,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                            </div>
                                                        ) : (q.type === 'fill_blanks' || q.type === 'cloze') ? (
                                                            <div className="space-y-1.5 pl-8">
-                                                               {obtenerHuecosDePregunta(q).map((h) => {
+                                                               {obtenerHuecosDetallados(q).map((h) => {
                                                                    const elegida = (qAns && typeof qAns === 'object') ? qAns[h.index] : '';
                                                                    const bienHueco = elegida && normalizarRespuesta(elegida) === normalizarRespuesta(h.word);
                                                                    return (
@@ -11687,7 +11688,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                        </p>
                                                    </div>
                                                    {(() => {
-                                                       const huecosDetectados = obtenerHuecosDePregunta(q);
+                                                       const huecosDetectados = obtenerHuecosDetallados(q);
                                                        return (
                                                            <div className="p-2.5 rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 space-y-1.5">
                                                                <div className="flex items-center justify-between">
@@ -11878,6 +11879,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                       immediateFeedback: false,
                                       targetGroupId: "all",
                                       targetGroupName: "Todos los estudiantes (Global)",
+                                      targetStudentIds: [],
                                       questions: [{ type: 'multiple', text: '', options: [{text: '', isCorrect: false}, {text: '', isCorrect: false}], correctAnswer: '' }]
                                   });
                                   setIsCreatingEval(true);
@@ -11959,6 +11961,11 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                    {ev.immediateFeedback && (
                                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-md border border-blue-200/60 dark:border-blue-800/60">
                                                            <Lightbulb size={10} /> Retroalimentación inmediata
+                                                       </span>
+                                                   )}
+                                                   {Array.isArray(ev.targetStudentIds) && ev.targetStudentIds.length > 0 && (
+                                                       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 px-2 py-0.5 rounded-md border border-purple-200/60 dark:border-purple-800/60" title={`Asignada a ${ev.targetStudentIds.length} estudiante(s) específico(s)`}>
+                                                           <UserCheck size={10} /> {ev.targetStudentIds.length} {ev.targetStudentIds.length === 1 ? 'estudiante' : 'estudiantes'}
                                                        </span>
                                                    )}
                                                    {ev.isArchived && (
@@ -13994,7 +14001,8 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                       setEvalFormData(prev => ({
                                           ...prev,
                                           targetGroupId: targetGrpId,
-                                          targetGroupName: targetGrpName || (targetGrpId === 'all' ? 'Todos los estudiantes (Global)' : 'Grupo')
+                                          targetGroupName: targetGrpName || (targetGrpId === 'all' ? 'Todos los estudiantes (Global)' : 'Grupo'),
+                                          targetStudentIds: []
                                       }));
                                       setIsCreatingEval(true);
                                   } else {
