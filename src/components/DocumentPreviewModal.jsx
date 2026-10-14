@@ -29,13 +29,16 @@ export const DocumentPreviewModal = ({
 
   if (!documentUrl || typeof document === 'undefined' || !document.body || typeof documentUrl !== 'string') return null;
 
-  const isLocalOrData = documentUrl.startsWith('blob:') || documentUrl.startsWith('data:');
-  const isPdf = isLocalOrData ||
-    documentUrl.toLowerCase().includes('.pdf') ||
-    (documentTitle || '').toLowerCase().endsWith('.pdf') ||
-    documentUrl.startsWith('data:application/pdf');
+  const cleanUrl = (documentUrl || '').toLowerCase();
+  const cleanTitle = (documentTitle || '').toLowerCase().trim();
+  const isPdf = cleanUrl.includes('.pdf') ||
+    cleanTitle.endsWith('.pdf') ||
+    cleanTitle.includes('.pdf') ||
+    cleanUrl.startsWith('data:application/pdf');
 
-  // Si es PDF o local/data, se usa el visor nativo del navegador directamente en el iframe/object
+  const isLocalOrData = documentUrl.startsWith('blob:') || documentUrl.startsWith('data:');
+
+  // Si es PDF, se usa el visor nativo del navegador directamente en el iframe/object
   // Si es otro formato de documento (Word, PowerPoint, Excel), se usa el visor de Google Docs
   const viewerUrl = isPdf
     ? (isLocalOrData ? documentUrl : `${documentUrl}#toolbar=1&navpanes=0`)
@@ -113,7 +116,7 @@ export const DocumentPreviewModal = ({
         onClick={(e) => e.stopPropagation()}
       >
         {isLoading && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10 bg-black/10 dark:bg-black/50 backdrop-blur-xs">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10 bg-black/10 dark:bg-black/50 backdrop-blur-xs pointer-events-none">
             <Loader2 className="animate-spin text-blue-500" size={36} />
             <span className="text-xs font-bold text-gray-700 dark:text-gray-200">
               Cargando documento...

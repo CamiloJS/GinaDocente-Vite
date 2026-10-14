@@ -3611,9 +3611,10 @@ const TaskCard = React.memo(({
             )}
 
             {/* Archivo adjunto o Video directo */}
-            {(task.fileUrl || (!isBook3D && task.pdfUrl)) && !isBook3D && (() => {
+            {!isBook3D && (task.fileUrl || task.pdfUrl) && (() => {
                 const docUrl = task.fileUrl || task.pdfUrl;
-                const isPdfDoc = (task.fileName || '').toLowerCase().endsWith('.pdf') || docUrl.toLowerCase().includes('.pdf') || docUrl.startsWith('data:application/pdf');
+                const cleanName = (task.fileName || '').trim().toLowerCase();
+                const isPdfDoc = cleanName.endsWith('.pdf') || cleanName.includes('.pdf') || docUrl.toLowerCase().includes('.pdf') || docUrl.startsWith('data:application/pdf');
                 return isDirectVideoUrl(docUrl) ? (
                     <div className="mt-3 rounded-2xl overflow-hidden shadow-sm">
                         <CustomVideoPlayer 
