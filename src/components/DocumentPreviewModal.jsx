@@ -1,7 +1,31 @@
 // src/components/DocumentPreviewModal.jsx
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
-import { X, Download, FileDocIcon, Loader2, ExternalLink } from './Icons.jsx';
+import { X, Download, FileDocIcon, Loader2, ExternalLink, RotateCcw } from './Icons.jsx';
+
+export const getGoogleDocViewerUrl = (url) => {
+  if (!url || typeof url !== 'string') return '';
+  const trimmed = url.trim();
+
+  // Si ya es un enlace de Google Drive
+  const driveMatch = trimmed.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/i);
+  if (driveMatch && driveMatch[1]) {
+    return `https://drive.google.com/file/d/${driveMatch[1]}/preview`;
+  }
+
+  // Si ya es un enlace de visor o previsualización
+  if (trimmed.includes('docs.google.com/viewer') || trimmed.includes('/preview')) {
+    return trimmed;
+  }
+
+  // Para enlaces HTTP / HTTPS (Firebase Storage, AWS, enlaces web públicos)
+  if (/^https?:\/\//i.test(trimmed)) {
+    return `https://docs.google.com/viewer?url=${encodeURIComponent(trimmed)}&embedded=true`;
+  }
+
+  // Archivos locales blob: o data:
+  return trimmed;
+};
 
 export const DocumentPreviewModal = ({
   documentUrl,
@@ -10,6 +34,7 @@ export const DocumentPreviewModal = ({
   isDarkMode = false
 }) => {
   const [isLoading, setIsLoading] = useState(true);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -23,9 +48,9 @@ export const DocumentPreviewModal = ({
     setIsLoading(true);
     const timeout = setTimeout(() => {
       setIsLoading(false);
-    }, 3500);
+    }, 2800);
     return () => clearTimeout(timeout);
-  }, [documentUrl]);
+  }, [documentUrl, reloadKey]);
 
   if (!documentUrl || typeof document === 'undefined' || !document.body || typeof documentUrl !== 'string') return null;
 
@@ -36,13 +61,7 @@ export const DocumentPreviewModal = ({
     cleanTitle.includes('.pdf') ||
     cleanUrl.startsWith('data:application/pdf');
 
-  const isLocalOrData = documentUrl.startsWith('blob:') || documentUrl.startsWith('data:');
-
-  // Si es PDF, se usa el visor nativo del navegador directamente en el iframe/object
-  // Si es otro formato de documento (Word, PowerPoint, Excel), se usa el visor de Google Docs
-  const viewerUrl = isPdf
-    ? (isLocalOrData ? documentUrl : `${documentUrl}#toolbar=1&navpanes=0`)
-    : ('https://docs.google.com/viewer?url=' + encodeURIComponent(documentUrl) + '&embedded=true');
+  const viewerUrl = getGoogleDocViewerUrl(documentUrl);
 
   return ReactDOM.createPortal(
     <div 
@@ -64,10 +83,10 @@ export const DocumentPreviewModal = ({
           </div>
           <div className="flex flex-col min-w-0">
             <h3 className="font-extrabold text-sm sm:text-base truncate max-w-[200px] sm:max-w-md md:max-w-xl">
-              {documentTitle || 'Documento PDF'}
+              {documentTitle || (isPdf ? 'Documento PDF' : 'Documento adjunto')}
             </h3>
             <span className="text-[10px] text-gray-500 font-semibold flex items-center gap-1">
-              <span>{isPdf ? 'Visor de PDF' : 'Documento adjunto'}</span>
+              <span>{isPdf ? 'Documento PDF' : 'Documento adjunto'}</span>
               <span>•</span>
               <span className="hidden sm:inline">Presiona Esc para cerrar</span>
             </span>
@@ -76,6 +95,19 @@ export const DocumentPreviewModal = ({
 
         {/* Acciones */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <button
+            type="button"
+            onClick={() => {
+              setIsLoading(true);
+              setReloadKey((prev) => prev + 1);
+            }}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-200 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 transition-all cursor-pointer"
+            title="Recargar vista previa"
+          >
+            <RotateCcw size={14} />
+            <span className="hidden md:inline">Recargar</span>
+          </button>
+
           <a
             href={documentUrl}
             target="_blank"
@@ -124,20 +156,16 @@ export const DocumentPreviewModal = ({
           </div>
         )}
 
-        <object
-          data={viewerUrl || documentUrl}
-          type={isPdf ? 'application/pdf' : undefined}
-          className="w-full h-full border-none"
+        <iframe
+          key={`${viewerUrl}-${reloadKey}`}
+          src={viewerUrl}
+          title={documentTitle || 'Documento'}
+          className="w-full h-full border-0 bg-white"
           onLoad={() => setIsLoading(false)}
-        >
-          <iframe
-            src={viewerUrl}
-            title={documentTitle}
-            className="w-full h-full border-none"
-            onLoad={() => setIsLoading(false)}
-            onError={() => setIsLoading(false)}
-          />
-        </object>
+          onError={() => setIsLoading(false)}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        />
       </div>
     </div>,
     document.body
