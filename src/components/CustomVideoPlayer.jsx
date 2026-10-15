@@ -12,9 +12,13 @@ export const extractYouTubeId = (url) => {
 
 export const isDirectVideoUrl = (url) => {
   if (!url) return false;
-  // Solo consideramos video si tiene extensión de video explícita o blob de video
+  // Solo consideramos video si tiene extensión de video explícita, blob de video o data:video
   const cleanUrl = String(url).toLowerCase();
-  return /\.(mp4|webm|ogg|mov|m4v|mkv|avi)(\?.*)?$/i.test(cleanUrl) || cleanUrl.startsWith('blob:video') || (cleanUrl.startsWith('blob:') && !cleanUrl.includes('audio') && !cleanUrl.includes('pdf'));
+  return /\.(mp4|webm|ogg|mov|m4v|mkv|avi)(\?.*)?$/i.test(cleanUrl) 
+    || cleanUrl.startsWith('blob:video') 
+    || cleanUrl.startsWith('data:video/') 
+    || (cleanUrl.startsWith('blob:') && !cleanUrl.includes('audio') && !cleanUrl.includes('pdf'))
+    || (cleanUrl.includes('firebasestorage.googleapis.com') && (cleanUrl.includes('video') || cleanUrl.includes('.mp4') || cleanUrl.includes('.webm') || cleanUrl.includes('.mov')));
 };
 
 const CustomVideoPlayer = ({ src, url, videoId: propVideoId, title = "Video de la clase", isDarkMode = false, className = "" }) => {

@@ -41,7 +41,7 @@ import {
   ChevronDown, ChevronUp, Minus, HelpCircle, Lightbulb, GraduationCap, Laptop, PenTool,
   Compass, Atom, Award, Star, Bookmark, Terminal, Folder, Globe, Target, Layers, RotateCcw,
   Archive, ShieldAlert, Unlock, Menu, UserPlus, Camera, Upload, Phone, PhoneOff,
-  Lock, Key, ClipboardList, BarChart3, Music
+  Lock, Key, ClipboardList, BarChart3, Music, Video, Film
 } from './components/Icons.jsx'
 import AudioPlayer, { AudioRecordingVisualizer } from './components/AudioPlayer.jsx'
 import AudioCall from './components/AudioCall.jsx'
@@ -53,6 +53,7 @@ import LinkifyText from './components/LinkifyText.jsx'
 import AppleEmoji from './components/AppleEmoji.jsx'
 import AiEvalGeneratorModal from './components/AiEvalGeneratorModal.jsx'
 import AudioQuestionEditor from './components/AudioQuestionEditor.jsx'
+import CustomVideoPlayer from './components/CustomVideoPlayer.jsx'
 import { useVoiceRecorder } from './utils/useVoiceRecorder.js'
 import RichTextToolbar from './components/RichTextToolbar.jsx'
 import TeacherToolsTab from './components/TeacherToolsTab.jsx'
@@ -546,6 +547,7 @@ function App() {
     targetGroupId: "all",
     targetGroupName: "Todos los estudiantes (Global)",
     targetStudentIds: [],
+    videoUrl: "",
     questions: []
   });
   const [showAiEvalModal, setShowAiEvalModal] = useState(false);
@@ -554,6 +556,8 @@ function App() {
   const [activeTakingEval, setActiveTakingEval] = useState(null);
   const [activeImmediateFeedback, setActiveImmediateFeedback] = useState(null);
   const [uploadingQuestionImageIdx, setUploadingQuestionImageIdx] = useState(null);
+  const [uploadingQuestionVideoIdx, setUploadingQuestionVideoIdx] = useState(null);
+  const [uploadingEvalGeneralVideo, setUploadingEvalGeneralVideo] = useState(false);
   const [studentAnswers, setStudentAnswers] = useState({});
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [viewingResultsFor, setViewingResultsFor] = useState(null);
@@ -5665,6 +5669,7 @@ useEffect(() => {
                       strictAntiCheat: Boolean(newEval.strictAntiCheat),
                       immediateFeedback: Boolean(newEval.immediateFeedback),
                       questionCount: (newEval.questions || []).length,
+                      videoUrl: newEval.videoUrl || '',
                       targetGroupId: newEval.targetGroupId || 'all',
                       targetGroupName: newEval.targetGroupName || 'Todos los estudiantes (Global)',
                       targetStudentIds: Array.isArray(newEval.targetStudentIds) ? newEval.targetStudentIds : [],
@@ -5703,6 +5708,7 @@ useEffect(() => {
                           targetGroupId: "all",
                           targetGroupName: "Todos los estudiantes (Global)",
                           targetStudentIds: [],
+                          videoUrl: "",
                           questions: [{ type: 'multiple', text: '', options: [{text: '', isCorrect: false}, {text: '', isCorrect: false}], correctAnswer: '' }]
                       });
                       showMessage("Evaluación creada y publicada en el muro (Modo Demo).");
@@ -5732,7 +5738,8 @@ useEffect(() => {
                       immediateFeedback: false,
                       targetGroupId: "all",
                       targetGroupName: "Todos los estudiantes (Global)",
-                          targetStudentIds: [],
+                      targetStudentIds: [],
+                      videoUrl: "",
                       questions: [{ type: 'multiple', text: '', options: [{text: '', isCorrect: false}, {text: '', isCorrect: false}], correctAnswer: '' }]
                   });
                   showMessage("Evaluación creada y publicada exitosamente.");
@@ -5776,6 +5783,95 @@ useEffect(() => {
                   showMessage("No se pudo cargar la imagen. Intenta con otra.");
               } finally {
                   setUploadingQuestionImageIdx(null);
+              }
+          };
+
+          const handleQuestionVideoUpload = async (file, qIndex) => {
+              if (!file) return;
+              const isVideo = (file.type && file.type.startsWith('video/')) || /\.(mp4|webm|ogg|mov|m4v|mkv|avi)$/i.test(file.name || '');
+              if (!isVideo) {
+                  showMessage("Selecciona un archivo de video válido (MP4, WebM, MOV, etc.).");
+                  return;
+              }
+              if (file.size > 100 * 1024 * 1024) {
+                  showMessage("El video supera los 100MB. Para videos extensos te sugerimos usar un link de YouTube.");
+                  return;
+              }
+              setUploadingQuestionVideoIdx(qIndex);
+              try {
+                  const prevUrl = evalFormData.questions?.[qIndex]?.videoUrl || '';
+                  let finalUrl = '';
+                  if (isDemoMode) {
+                      if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+                          finalUrl = URL.createObjectURL(file);
+                      } else {
+                          finalUrl = await new Promise((resolve, reject) => {
+                              const reader = new FileReader();
+                              reader.onload = (e) => resolve(e.target.result);
+                              reader.onerror = reject;
+                              reader.readAsDataURL(file);
+                          });
+                      }
+                  } else {
+                      finalUrl = await uploadRawFileToStorage(file, 'eval_question_videos');
+                      if (prevUrl && prevUrl !== finalUrl && !prevUrl.includes('youtube') && !prevUrl.includes('youtu.be')) {
+                          deleteFileFromStorage(prevUrl).catch(() => {});
+                      }
+                  }
+                  setEvalFormData((prev) => {
+                      const nuevas = [...(prev.questions || [])];
+                      if (!nuevas[qIndex]) return prev;
+                      nuevas[qIndex] = { ...nuevas[qIndex], videoUrl: finalUrl };
+                      return { ...prev, questions: nuevas };
+                  });
+                  showMessage("Video agregado a la pregunta.");
+              } catch (err) {
+                  console.error(err);
+                  showMessage("No se pudo cargar el video. Puedes intentar con otro archivo o pegar un link de YouTube.");
+              } finally {
+                  setUploadingQuestionVideoIdx(null);
+              }
+          };
+
+          const handleEvalGeneralVideoUpload = async (file) => {
+              if (!file) return;
+              const isVideo = (file.type && file.type.startsWith('video/')) || /\.(mp4|webm|ogg|mov|m4v|mkv|avi)$/i.test(file.name || '');
+              if (!isVideo) {
+                  showMessage("Selecciona un archivo de video válido (MP4, WebM, MOV, etc.).");
+                  return;
+              }
+              if (file.size > 100 * 1024 * 1024) {
+                  showMessage("El video supera los 100MB. Para videos extensos te sugerimos usar un link de YouTube.");
+                  return;
+              }
+              setUploadingEvalGeneralVideo(true);
+              try {
+                  const prevUrl = evalFormData.videoUrl || '';
+                  let finalUrl = '';
+                  if (isDemoMode) {
+                      if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+                          finalUrl = URL.createObjectURL(file);
+                      } else {
+                          finalUrl = await new Promise((resolve, reject) => {
+                              const reader = new FileReader();
+                              reader.onload = (e) => resolve(e.target.result);
+                              reader.onerror = reject;
+                              reader.readAsDataURL(file);
+                          });
+                      }
+                  } else {
+                      finalUrl = await uploadRawFileToStorage(file, 'eval_general_videos');
+                      if (prevUrl && prevUrl !== finalUrl && !prevUrl.includes('youtube') && !prevUrl.includes('youtu.be')) {
+                          deleteFileFromStorage(prevUrl).catch(() => {});
+                      }
+                  }
+                  setEvalFormData((prev) => ({ ...prev, videoUrl: finalUrl }));
+                  showMessage("Video agregado a la evaluación.");
+              } catch (err) {
+                  console.error(err);
+                  showMessage("No se pudo cargar el video. Puedes intentar con otro archivo o pegar un link de YouTube.");
+              } finally {
+                  setUploadingEvalGeneralVideo(false);
               }
           };
 
@@ -9646,6 +9742,17 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                               </div>
                           </div>
 
+                          {/* Video introductorio de la evaluación */}
+                          {activeTakingEval.videoUrl && (
+                              <div className="rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-black max-w-xl mx-auto shadow-md">
+                                  <CustomVideoPlayer 
+                                      src={activeTakingEval.videoUrl} 
+                                      title={activeTakingEval.title || "Video de la evaluación"} 
+                                      isDarkMode={isDarkMode} 
+                                  />
+                              </div>
+                          )}
+
                           {/* Temporizador pequeño flotante en esquina inferior (sin título, sin tapar preguntas ni clics) */}
                           <div className={`fixed bottom-[74px] ${activeChat ? 'md:bottom-16' : 'md:bottom-5'} right-3 md:right-5 z-[130] pointer-events-none`}>
                               <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border border-red-500/35 text-[#AD3333] dark:text-red-400 px-2.5 py-1 rounded-full font-black font-mono text-xs flex items-center gap-1.5 shadow-md">
@@ -9688,6 +9795,18 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                       alt={`Imagen de la pregunta ${qIndex + 1}`}
                                                       onClick={() => setFullScreenImage(q.imageUrl)}
                                                       className="w-full max-h-64 object-contain cursor-pointer hover:opacity-95 transition-opacity"
+                                                  />
+                                              </div>
+                                          </div>
+                                      )}
+
+                                      {q.videoUrl && (
+                                          <div className="pl-8 pt-1">
+                                              <div className="rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-black max-w-lg shadow-sm">
+                                                  <CustomVideoPlayer 
+                                                      src={q.videoUrl} 
+                                                      title={`Video de la pregunta ${qIndex + 1}`} 
+                                                      isDarkMode={isDarkMode} 
                                                   />
                                               </div>
                                           </div>
@@ -10765,6 +10884,18 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                           </div>
                                                       )}
 
+                                                      {q.videoUrl && (
+                                                          <div className="pl-8 mb-3">
+                                                              <div className="rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-black max-w-sm shadow-sm">
+                                                                  <CustomVideoPlayer 
+                                                                      src={q.videoUrl} 
+                                                                      title={`Video de la pregunta ${qIdx + 1}`} 
+                                                                      isDarkMode={isDarkMode} 
+                                                                  />
+                                                              </div>
+                                                          </div>
+                                                      )}
+
                                                       {/* Respuestas detalladas */}
                                                       {((q.type === 'multiple' || q.type === 'listening' || q.type === 'reading') && Array.isArray(q.options) && q.options.length >= 2) ? (
                                                           <div className="space-y-1.5 pl-8">
@@ -11064,6 +11195,18 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                           </div>
                                                       )}
 
+                                                      {q.videoUrl && (
+                                                          <div className="pl-8 pt-1">
+                                                              <div className="rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-black max-w-sm shadow-sm">
+                                                                  <CustomVideoPlayer 
+                                                                      src={q.videoUrl} 
+                                                                      title={`Video de la pregunta ${qIdx + 1}`} 
+                                                                      isDarkMode={isDarkMode} 
+                                                                  />
+                                                              </div>
+                                                          </div>
+                                                      )}
+
                                                       {((q.type === 'multiple' || q.type === 'listening' || q.type === 'reading') && Array.isArray(q.options) && q.options.length >= 2) ? (
                                                           <div className="space-y-1.5 pl-8">
                                                               {(q.options || []).map((opt, oIdx) => (
@@ -11176,6 +11319,77 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                   <div>
                                       <label className="text-xs font-bold text-gray-700 dark:text-gray-300 ml-1">Instrucciones</label>
                                       <textarea value={evalFormData.description} onChange={e => setEvalFormData({...evalFormData, description: e.target.value})} placeholder="Instrucciones para los estudiantes..." className={`${glassInput} !py-2 text-xs h-20 resize-none`} required />
+                                  </div>
+
+                                  {/* Video general opcional de la evaluación */}
+                                  <div className="space-y-1.5">
+                                      <label className="text-xs font-bold text-gray-700 dark:text-gray-300 ml-1 flex items-center gap-1.5">
+                                          <Video size={13} className="text-red-500" />
+                                          <span>Video de la prueba (opcional)</span>
+                                      </label>
+                                      <div className="flex flex-wrap items-center gap-2">
+                                          <label className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-bold transition-all cursor-pointer ${
+                                              isDarkMode
+                                                  ? 'border-gray-700 bg-gray-800/70 text-gray-200 hover:bg-gray-800'
+                                                  : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
+                                          }`}>
+                                              {uploadingEvalGeneralVideo ? (
+                                                  <>
+                                                      <Loader2 size={13} className="animate-spin text-red-500" />
+                                                      <span>Subiendo video...</span>
+                                                  </>
+                                              ) : (
+                                                  <>
+                                                      <Video size={13} className="text-red-500" />
+                                                      <span>{evalFormData.videoUrl ? 'Cambiar video' : 'Subir archivo de video'}</span>
+                                                  </>
+                                              )}
+                                              <input
+                                                  type="file"
+                                                  accept="video/*"
+                                                  className="hidden"
+                                                  disabled={uploadingEvalGeneralVideo}
+                                                  onChange={(e) => {
+                                                      const file = e.target.files?.[0];
+                                                      if (file) handleEvalGeneralVideoUpload(file);
+                                                      e.target.value = '';
+                                                  }}
+                                              />
+                                          </label>
+                                          <input
+                                              type="url"
+                                              value={evalFormData.videoUrl && !String(evalFormData.videoUrl).startsWith('data:') && !String(evalFormData.videoUrl).startsWith('blob:') ? evalFormData.videoUrl : ''}
+                                              onChange={(e) => {
+                                                  const val = e.target.value.trim();
+                                                  setEvalFormData(prev => ({ ...prev, videoUrl: val }));
+                                              }}
+                                              placeholder="O pega link de YouTube o video (https://...)"
+                                              className={`${glassInput} !py-1.5 !px-2.5 flex-1 min-w-[200px] text-[11px]`}
+                                          />
+                                          {evalFormData.videoUrl && (
+                                              <button
+                                                  type="button"
+                                                  onClick={() => {
+                                                      if (!isDemoMode && evalFormData.videoUrl && !evalFormData.videoUrl.includes('youtube') && !evalFormData.videoUrl.includes('youtu.be')) {
+                                                          deleteFileFromStorage(evalFormData.videoUrl).catch(() => {});
+                                                      }
+                                                      setEvalFormData(prev => ({ ...prev, videoUrl: '' }));
+                                                  }}
+                                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-bold text-red-600 dark:text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/25 transition-colors cursor-pointer"
+                                              >
+                                                  <Trash2 size={12} /> Quitar video
+                                              </button>
+                                          )}
+                                      </div>
+                                      {evalFormData.videoUrl && (
+                                          <div className="rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-black max-w-lg shadow-sm mt-2">
+                                              <CustomVideoPlayer 
+                                                  src={evalFormData.videoUrl} 
+                                                  title={evalFormData.title || "Video de la evaluación"} 
+                                                  isDarkMode={isDarkMode} 
+                                              />
+                                          </div>
+                                      )}
                                   </div>
                                   
                                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
@@ -11519,6 +11733,81 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                               </div>
                                           )}
 
+                                          {/* Video opcional por pregunta (YouTube o archivo) */}
+                                          <div className="flex flex-wrap items-center gap-2">
+                                              <label className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-bold transition-all cursor-pointer ${
+                                                  isDarkMode
+                                                      ? 'border-gray-700 bg-gray-800/70 text-gray-200 hover:bg-gray-800'
+                                                      : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
+                                              }`}>
+                                                  {uploadingQuestionVideoIdx === qIndex ? (
+                                                      <>
+                                                          <Loader2 size={13} className="animate-spin text-red-500" />
+                                                          <span>Subiendo video...</span>
+                                                      </>
+                                                  ) : (
+                                                      <>
+                                                          <Video size={13} className="text-red-500" />
+                                                          <span>{q.videoUrl ? 'Cambiar video' : 'Agregar video (opcional)'}</span>
+                                                      </>
+                                                  )}
+                                                  <input
+                                                      type="file"
+                                                      accept="video/*"
+                                                      className="hidden"
+                                                      disabled={uploadingQuestionVideoIdx === qIndex}
+                                                      onChange={(e) => {
+                                                          const file = e.target.files?.[0];
+                                                          if (file) handleQuestionVideoUpload(file, qIndex);
+                                                          e.target.value = '';
+                                                      }}
+                                                  />
+                                              </label>
+                                              <input
+                                                  type="url"
+                                                  value={q.videoUrl && !String(q.videoUrl).startsWith('data:') && !String(q.videoUrl).startsWith('blob:') ? q.videoUrl : ''}
+                                                  onChange={(e) => {
+                                                      const val = e.target.value.trim();
+                                                      const newQ = [...evalFormData.questions];
+                                                      const copia = { ...newQ[qIndex] };
+                                                      if (val) copia.videoUrl = val;
+                                                      else delete copia.videoUrl;
+                                                      newQ[qIndex] = copia;
+                                                      setEvalFormData({ ...evalFormData, questions: newQ });
+                                                  }}
+                                                  placeholder="O pega link de YouTube o video (https://...)"
+                                                  className={`${glassInput} !py-1.5 !px-2.5 flex-1 min-w-[180px] text-[11px]`}
+                                              />
+                                              {q.videoUrl && (
+                                                  <button
+                                                      type="button"
+                                                      onClick={() => {
+                                                          if (!isDemoMode && q.videoUrl && !q.videoUrl.includes('youtube') && !q.videoUrl.includes('youtu.be')) {
+                                                              deleteFileFromStorage(q.videoUrl).catch(() => {});
+                                                          }
+                                                          const newQ = [...evalFormData.questions];
+                                                          const copia = { ...newQ[qIndex] };
+                                                          delete copia.videoUrl;
+                                                          newQ[qIndex] = copia;
+                                                          setEvalFormData({ ...evalFormData, questions: newQ });
+                                                      }}
+                                                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-bold text-red-600 dark:text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/25 transition-colors cursor-pointer"
+                                                  >
+                                                      <Trash2 size={12} /> Quitar video
+                                                  </button>
+                                              )}
+                                          </div>
+
+                                          {q.videoUrl && (
+                                              <div className="rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-black max-w-md shadow-sm">
+                                                  <CustomVideoPlayer 
+                                                      src={q.videoUrl} 
+                                                      title={`Video pregunta ${qIndex + 1}`} 
+                                                      isDarkMode={isDarkMode} 
+                                                  />
+                                              </div>
+                                          )}
+
                                           {(q.type === 'listening' || q.type === 'dictation') && (
                                               <div className="pl-4 sm:pl-7 pt-1 space-y-1">
                                                   <p className="text-[11px] font-bold text-gray-500">Audio de la pregunta <span className="text-red-500">*</span></p>
@@ -11789,7 +12078,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                       <button 
                                           type="button" 
                                           onClick={() => {
-                                              setEvalFormData({...evalFormData, questions: [...evalFormData.questions, { type: 'multiple', text: '', options: [{text: '', isCorrect: false}, {text: '', isCorrect: false}], correctAnswer: '' }]});
+                                              setEvalFormData({...evalFormData, questions: [...evalFormData.questions, { type: 'multiple', text: '', imageUrl: '', videoUrl: '', options: [{text: '', isCorrect: false}, {text: '', isCorrect: false}], correctAnswer: '' }]});
                                           }} 
                                           className={`w-full py-3 border-2 border-dashed rounded-2xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
                                               isDarkMode ? 'border-gray-700 text-gray-400 hover:border-blue-500 hover:text-blue-400' : 'border-gray-300 text-gray-600 hover:border-blue-600 hover:text-blue-600'
@@ -11872,6 +12161,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                   setEvalFormData({
                                       title: "",
                                       description: "",
+                                      videoUrl: "",
                                       dueDate: getToday(),
                                       dueTime: "23:59",
                                       timeLimit: 30,
@@ -11880,7 +12170,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                       targetGroupId: "all",
                                       targetGroupName: "Todos los estudiantes (Global)",
                                       targetStudentIds: [],
-                                      questions: [{ type: 'multiple', text: '', options: [{text: '', isCorrect: false}, {text: '', isCorrect: false}], correctAnswer: '' }]
+                                      questions: [{ type: 'multiple', text: '', imageUrl: '', videoUrl: '', options: [{text: '', isCorrect: false}, {text: '', isCorrect: false}], correctAnswer: '' }]
                                   });
                                   setIsCreatingEval(true);
                               }} 

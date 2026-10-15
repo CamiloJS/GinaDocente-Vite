@@ -10,6 +10,7 @@ import { permiteVariasRespuestas } from '../utils/evalScoring.js';
 import { Clock, X, Eye, EyeOff, CheckCircle2, ShieldAlert, Mic, Volume2 } from './Icons.jsx';
 import FillBlanksQuestion from './FillBlanksQuestion.jsx';
 import MatchingLinesQuestion from './MatchingLinesQuestion.jsx';
+import CustomVideoPlayer from './CustomVideoPlayer.jsx';
 
 const dosDigitos = (n) => String(Math.max(0, Math.floor(Number(n) || 0))).padStart(2, '0');
 
@@ -100,6 +101,11 @@ export default function SimulacroEvaluacion({ evaluacion = {}, isDarkMode = fals
             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${isDarkMode ? 'border-gray-700 text-gray-300' : 'border-gray-200 text-gray-600'}`}>Respondidas: {respondidas}/{preguntas.length}</span>
           </div>
           <p className="text-[10px] text-gray-400 font-medium mt-2">El cronómetro se activa cuando la evaluación se publica.</p>
+          {evaluacion.videoUrl && (
+            <div className="mt-3 rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-black/5 dark:bg-black/30">
+              <CustomVideoPlayer url={evaluacion.videoUrl} title={evaluacion.title || 'Video de la evaluación'} />
+            </div>
+          )}
         </div>
 
         {/* Temporizador pequeño flotante en esquina inferior (sin título, sin tapar preguntas ni respuestas) */}
@@ -149,6 +155,14 @@ export default function SimulacroEvaluacion({ evaluacion = {}, isDarkMode = fals
                   <div className="pl-8 pt-2">
                     <div className="rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-gray-900/50 max-w-md">
                       <img loading="lazy" decoding="async" src={q.imageUrl} alt={`Imagen de la pregunta ${i + 1}`} className="w-full max-h-64 object-contain" />
+                    </div>
+                  </div>
+                )}
+
+                {q.videoUrl && (
+                  <div className="pl-8 pt-2">
+                    <div className="rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-black/5 dark:bg-black/30 max-w-xl">
+                      <CustomVideoPlayer url={q.videoUrl} title={`Video de la pregunta ${i + 1}`} />
                     </div>
                   </div>
                 )}
