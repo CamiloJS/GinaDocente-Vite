@@ -20,6 +20,7 @@ import { createDefaultKahootQuestion, validateKahootConfig, generateKahootPin } 
 import { BOOK_THEMES, renderPdfToBookPages, uploadBookPagesToStorage, sanitizeBookForFirestore, buildFallbackBookPages, buildBookPagesFromOutline, extractBookOutlinePageTexts, syncBookOutlineMetadata, stripBookHtml, generateAiBookPages, applyCustomCoverToPages, compressBookImageDataUrl, READING_AUDIO_PRESETS, getReadingAudioPreset, clampReadingVolume, readingAmbientPlayer } from '../utils/flipbookEngine.js'
 import Flipbook3DModal from './Flipbook3DModal.jsx'
 import BookWordEditor from './BookWordEditor.jsx'
+import UniversalImage from './UniversalImage.jsx'
 
 const TasksTab = React.memo(({
     role, glassCard, glassInput, redButton, postType, setPostType, taskTitle, setTaskTitle,
@@ -1234,11 +1235,10 @@ const TasksTab = React.memo(({
                                                 <div className="flex flex-wrap gap-2.5 items-center">
                                                     {currentImgs.map((url, idx) => (
                                                         <div key={idx} className="relative group/thumb">
-                                                            <img loading="lazy" decoding="async" 
+                                                            <UniversalImage 
                                                                 src={url} 
                                                                 alt={`Preview ${idx + 1}`} 
                                                                 className="h-24 w-24 object-cover rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-black/5 shadow-xs" 
-                                                                onError={(e) => e.target.style.display = 'none'} 
                                                             />
                                                             <span className="absolute bottom-1 left-1 bg-black/70 text-white text-[9px] font-bold px-1.5 py-0.2 rounded-md">
                                                                 {idx + 1}
@@ -1266,7 +1266,7 @@ const TasksTab = React.memo(({
                                                             <input 
                                                                 type="file" 
                                                                 multiple 
-                                                                accept="image/*" 
+                                                                accept="image/*,.heic,.heif,image/heic,image/heif" 
                                                                 className="hidden" 
                                                                 onChange={(e) => handlePostLocalFileUpload(e)} 
                                                             />
@@ -1428,7 +1428,7 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                             </button>
                                             <label className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold cursor-pointer transition-colors text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
                                                 <ImageIcon size={16} /> Subir imagen
-                                                <input type="file" multiple accept="image/*" className="hidden" onChange={(e) => { handlePostLocalFileUpload(e); setShowPostAttachmentMenu(false); }} />
+                                                <input type="file" multiple accept="image/*,.heic,.heif,image/heic,image/heif" className="hidden" onChange={(e) => { handlePostLocalFileUpload(e); setShowPostAttachmentMenu(false); }} />
                                             </label>
                                             <button type="button" onClick={() => {
                                                 window.openGifPicker?.((url) => {

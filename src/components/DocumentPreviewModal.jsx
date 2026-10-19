@@ -1,7 +1,9 @@
 // src/components/DocumentPreviewModal.jsx
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
-import { X, Download, FileDocIcon, Loader2, ExternalLink, RotateCcw } from './Icons.jsx';
+import { X, Download, FileDocIcon, Loader2, ExternalLink, RotateCcw, ImageIcon } from './Icons.jsx';
+import UniversalImage from './UniversalImage.jsx';
+import { isImageLikeUrl, isHeicUrl } from '../utils/heicConverter.js';
 
 export const getGoogleDocViewerUrl = (url) => {
   if (!url || typeof url !== 'string') return '';
@@ -56,6 +58,10 @@ export const DocumentPreviewModal = ({
 
   const cleanUrl = (documentUrl || '').toLowerCase();
   const cleanTitle = (documentTitle || '').toLowerCase().trim();
+  const isImage = isImageLikeUrl(documentUrl) ||
+    isHeicUrl(documentUrl) ||
+    /\.(jpe?g|png|webp|gif|bmp|heic|heif|svg|avif)$/i.test(cleanTitle) ||
+    cleanUrl.startsWith('data:image/');
   const isPdf = cleanUrl.includes('.pdf') ||
     cleanTitle.endsWith('.pdf') ||
     cleanTitle.includes('.pdf') ||
@@ -78,15 +84,19 @@ export const DocumentPreviewModal = ({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-3 min-w-0 pr-3">
-          <div className="w-9 h-9 rounded-xl bg-red-500/10 text-red-600 dark:text-red-400 flex items-center justify-center shrink-0 border border-red-500/20 shadow-xs">
-            <FileDocIcon size={20} />
+          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border shadow-xs ${
+            isImage 
+              ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' 
+              : 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20'
+          }`}>
+            {isImage ? <ImageIcon size={20} /> : <FileDocIcon size={20} />}
           </div>
           <div className="flex flex-col min-w-0">
             <h3 className="font-extrabold text-sm sm:text-base truncate max-w-[200px] sm:max-w-md md:max-w-xl">
-              {documentTitle || (isPdf ? 'Documento PDF' : 'Documento adjunto')}
+              {documentTitle || (isImage ? 'Fotografía' : (isPdf ? 'Documento PDF' : 'Documento adjunto'))}
             </h3>
             <span className="text-[10px] text-gray-500 font-semibold flex items-center gap-1">
-              <span>{isPdf ? 'Documento PDF' : 'Documento adjunto'}</span>
+              <span>{isImage ? 'Imagen adjunta' : (isPdf ? 'Documento PDF' : 'Documento adjunto')}</span>
               <span>•</span>
               <span className="hidden sm:inline">Presiona Esc para cerrar</span>
             </span>
@@ -121,7 +131,7 @@ export const DocumentPreviewModal = ({
 
           <a
             href={documentUrl}
-            download={documentTitle || 'documento.pdf'}
+            download={documentTitle || (isImage ? 'imagen.jpg' : 'documento.pdf')}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 active:scale-95 shadow-md transition-all cursor-pointer"
@@ -147,25 +157,37 @@ export const DocumentPreviewModal = ({
         className="relative flex-1 w-full h-full bg-gray-100 dark:bg-gray-950 overflow-hidden flex items-center justify-center"
         onClick={(e) => e.stopPropagation()}
       >
-        {isLoading && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10 bg-black/10 dark:bg-black/50 backdrop-blur-xs pointer-events-none">
-            <Loader2 className="animate-spin text-blue-500" size={36} />
-            <span className="text-xs font-bold text-gray-700 dark:text-gray-200">
-              Cargando documento...
-            </span>
+        {isImage ? (
+          <div className="w-full h-full p-4 sm:p-8 flex items-center justify-center overflow-auto">
+            <UniversalImage
+              src={documentUrl}
+              alt={documentTitle || 'Imagen adjunta'}
+              className="max-w-[95vw] max-h-[85vh] object-contain rounded-2xl shadow-2xl"
+            />
           </div>
-        )}
+        ) : (
+          <>
+            {isLoading && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10 bg-black/10 dark:bg-black/50 backdrop-blur-xs pointer-events-none">
+                <Loader2 className="animate-spin text-blue-500" size={36} />
+                <span className="text-xs font-bold text-gray-700 dark:text-gray-200">
+                  Cargando documento...
+                </span>
+              </div>
+            )}
 
-        <iframe
-          key={`${viewerUrl}-${reloadKey}`}
-          src={viewerUrl}
-          title={documentTitle || 'Documento'}
-          className="w-full h-full border-0 bg-white"
-          onLoad={() => setIsLoading(false)}
-          onError={() => setIsLoading(false)}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-        />
+            <iframe
+              key={`${viewerUrl}-${reloadKey}`}
+              src={viewerUrl}
+              title={documentTitle || 'Documento'}
+              className="w-full h-full border-0 bg-white"
+              onLoad={() => setIsLoading(false)}
+              onError={() => setIsLoading(false)}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          </>
+        )}
       </div>
     </div>,
     document.body

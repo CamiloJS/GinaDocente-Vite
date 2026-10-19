@@ -5,6 +5,9 @@ import { ref, uploadString, uploadBytes, getDownloadURL, deleteObject } from 'fi
 import { storage, appId } from '../firebase/config.js'
 import { autoOptimizeFile, compressImageSilently } from './fileCompressor.js'
 import { segmentosLocales, narrarSegmentos } from './narracion.js';
+import { isImageLikeFile, isHeicFile, isHeicUrl, convertHeicToJpeg, resolveHeicUrlToDisplayable } from './heicConverter.js';
+
+export { isImageLikeFile, isHeicFile, isHeicUrl, convertHeicToJpeg, resolveHeicUrlToDisplayable };
 
 // --- Constantes globales ---
 export const BAD_WORDS = [
@@ -174,7 +177,7 @@ export const uploadImageToStorage = async (fileOrBase64, folderName) => {
   if (!fileOrBase64) return '';
   if (typeof fileOrBase64 !== 'string') {
     // Las imagenes SIEMPRE se comprimen antes de subir (los GIF conservan su animacion).
-    if (fileOrBase64?.type && String(fileOrBase64.type).startsWith('image/')) {
+    if (isImageLikeFile(fileOrBase64) || (fileOrBase64?.type && String(fileOrBase64.type).startsWith('image/'))) {
       try {
         const comprimida = await compressImage(fileOrBase64);
         if (comprimida) return await uploadImageToStorage(comprimida, folderName);

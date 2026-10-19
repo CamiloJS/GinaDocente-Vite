@@ -24,8 +24,10 @@ import {
   compressImage, containsBadWords, checkBadWordsAsync, formatChatDate, formatTime,
   uploadImageToStorage, uploadRawFileToStorage, deleteFileFromStorage, deleteFilesFromStorage,
   deleteAllStorageFilesInObject, deleteReplacedStorageFiles,
-  speakText, splitNameFirstAndLast, format12HourTime, formatDateTime12H
+  speakText, splitNameFirstAndLast, format12HourTime, formatDateTime12H,
+  isImageLikeFile, isHeicFile, convertHeicToJpeg
 } from './utils/helpers.js'
+import UniversalImage from './components/UniversalImage.jsx'
 import {
   glassCard, glassInput, outlineButton, redButton,
 } from './utils/styles.js'
@@ -2783,14 +2785,15 @@ function App() {
           };
 
           const handleOnboardingPhotoFile = async (e) => {
-            const file = e.target.files?.[0];
-            if (!file) return;
-            if (!file.type.match(/^image\/(png|jpeg|jpg|webp)$/i)) {
-              showMessage("Formato no permitido. Solo se aceptan imágenes PNG, JPG o WebP.");
-              if (e.target) e.target.value = '';
-              return;
-            }
+            const rawFile = e.target.files?.[0];
+            if (!rawFile) return;
             try {
+              const file = isImageLikeFile(rawFile) ? await convertHeicToJpeg(rawFile) : rawFile;
+              if (!file.type.match(/^image\/(png|jpeg|jpg|webp)$/i)) {
+                showMessage("Formato no permitido. Solo se aceptan imágenes PNG, JPG o WebP.");
+                if (e.target) e.target.value = '';
+                return;
+              }
               const compressed = await compressImage(file, 256, 256, 0.72);
               setGoogleOnboarding(p => ({
                 ...p,
@@ -4920,14 +4923,15 @@ useEffect(() => {
           };
             
           const handleUpdateGroupPhoto = async (e) => {
-      const file = e.target.files?.[0];
-      if (!file || !activeChat) return;
-      if (!file.type.startsWith('image/')) {
+      const rawFile = e.target.files?.[0];
+      if (!rawFile || !activeChat) return;
+      if (!isImageLikeFile(rawFile) && !rawFile.type.startsWith('image/')) {
           showMessage("Selecciona un archivo de imagen válido.");
           if (e.target) e.target.value = '';
           return;
       }
       try {
+          const file = await convertHeicToJpeg(rawFile);
           setIsUploadingGroupAvatar(true);
           const grp = chatGroups.find(g => g.id === activeChat.id || `group_${g.id}` === activeChat.id || `acad_${g.academicGroupId}` === activeChat.id || `acad_${g.id}` === activeChat.id);
           const prevAvatarUrl = grp?.avatarUrl || activeChat?.avatarUrl || '';
@@ -5433,14 +5437,15 @@ useEffect(() => {
           };
 
           const handleChatAppImageUpload = async (e) => {
-             const file = e.target.files?.[0];
-             if (!file) return;
-             if (!file.type.startsWith('image/')) {
+             const rawFile = e.target.files?.[0];
+             if (!rawFile) return;
+             if (!isImageLikeFile(rawFile) && !rawFile.type.startsWith('image/')) {
                showMessage("Selecciona un archivo de imagen válido.");
                return;
              }
              try {
                showMessage("⏳ Procesando imagen...");
+               const file = await convertHeicToJpeg(rawFile);
                const prevImgUrl = chatAppImageUrl;
                let finalUrl;
                if (file.type === 'image/gif') {
@@ -5491,8 +5496,8 @@ useEffect(() => {
     if (files.length === 0) return;
     try {
         setIsAiLoading(true);
-        const imageFiles = files.filter(f => f.type.startsWith('image/'));
-        const docFiles = files.filter(f => !f.type.startsWith('image/'));
+        const imageFiles = files.filter(f => isImageLikeFile(f));
+        const docFiles = files.filter(f => !isImageLikeFile(f));
 
         if (imageFiles.length > 0) {
             const currentList = (Array.isArray(postImageUrlsRef.current) && postImageUrlsRef.current.length > 0)
@@ -5513,7 +5518,8 @@ useEffect(() => {
             const filesToUpload = imageFiles.slice(0, remainingSlots);
             const uploadedUrls = [];
 
-            for (const file of filesToUpload) {
+            for (const rawFile of filesToUpload) {
+                const file = await convertHeicToJpeg(rawFile);
                 if (file.type !== 'image/gif') {
                     const compressed = await compressImage(file, 1200, 1200, 0.75);
                     const firebaseURL = await uploadImageToStorage(compressed, 'posts');
@@ -5537,7 +5543,8 @@ useEffect(() => {
         }
 
         if (docFiles.length > 0) {
-            const docFile = docFiles[0];
+            const rawDoc = docFiles[0];
+            const docFile = isImageLikeFile(rawDoc) ? await convertHeicToJpeg(rawDoc) : rawDoc;
             const prevDocUrl = postFileUrl;
             const firebaseURL = await uploadRawFileToStorage(docFile, 'posts');
             if (!isDemoMode && prevDocUrl && prevDocUrl !== firebaseURL) {
@@ -5749,14 +5756,15 @@ useEffect(() => {
               }
           };
 
-          const handleQuestionImageUpload = async (file, qIndex) => {
-              if (!file) return;
-              if (!file.type || !file.type.startsWith('image/')) {
+          const handleQuestionImageUpload = async (rawFile, qIndex) => {
+              if (!rawFile) return;
+              if (!isImageLikeFile(rawFile) && (!rawFile.type || !rawFile.type.startsWith('image/'))) {
                   showMessage("Selecciona un archivo de imagen válido (JPG, PNG, GIF o WebP).");
                   return;
               }
               setUploadingQuestionImageIdx(qIndex);
               try {
+                  const file = await convertHeicToJpeg(rawFile);
                   const prevUrl = evalFormData.questions?.[qIndex]?.imageUrl || '';
                   const base64 = await compressImage(file, 1600, 1600, 0.82);
                   let finalUrl = base64;
@@ -5876,22 +5884,28 @@ useEffect(() => {
           };
 
           // --- LÓGICA DE FOTO DE PERFIL ---
-    const handleAvatarSelect = (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        if (!file.type.startsWith('image/')) {
+    const handleAvatarSelect = async (e) => {
+        const rawFile = e.target.files?.[0];
+        if (!rawFile) return;
+        if (!isImageLikeFile(rawFile) && !rawFile.type.startsWith('image/')) {
             showMessage("Selecciona un archivo de imagen válido.");
             if (e.target) e.target.value = '';
             return;
         }
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            setAvatarPreviewUrl(event.target.result);
-            setCropZoom(1); setCropOffset({ x: 0, y: 0 });
-            setShowAvatarUploadModal(true);
-        };
-        reader.readAsDataURL(file);
-        if (e.target) e.target.value = '';
+        try {
+            const file = await convertHeicToJpeg(rawFile);
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                setAvatarPreviewUrl(event.target.result);
+                setCropZoom(1); setCropOffset({ x: 0, y: 0 });
+                setShowAvatarUploadModal(true);
+            };
+            reader.readAsDataURL(file);
+        } catch {
+            showMessage("Error al procesar la imagen seleccionada.");
+        } finally {
+            if (e.target) e.target.value = '';
+        }
     };
 
     const saveAvatar = async () => {
@@ -5967,15 +5981,16 @@ useEffect(() => {
 
     // --- LÓGICA DE PUBLICACIONES DE PERFIL ---
     const handleProfileImageUpload = async (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        if (!file.type.startsWith('image/')) {
+        const rawFile = e.target.files?.[0];
+        if (!rawFile) return;
+        if (!isImageLikeFile(rawFile) && !rawFile.type.startsWith('image/')) {
             showMessage("Selecciona un archivo de imagen válido.");
             if (e.target) e.target.value = '';
             return;
         }
         setIsPublishingProfile(true);
         try {
+            const file = await convertHeicToJpeg(rawFile);
             const prevImg = profilePostImage;
             const compressed = await compressImage(file, 800, 800, 0.7);
             const url = await uploadImageToStorage(compressed, 'userPosts');
@@ -6299,7 +6314,7 @@ useEffect(() => {
                         {isMyProfile && (
                             <label className="absolute inset-0 bg-black/50 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity backdrop-blur-xs">
                                 <Edit3 className="text-white" size={20} />
-                                <input type="file" accept="image/*" className="hidden" onChange={handleAvatarSelect} />
+                                <input type="file" accept="image/*,.heic,.heif,image/heic,image/heif" className="hidden" onChange={handleAvatarSelect} />
                             </label>
                         )}
                     </div>
@@ -6445,7 +6460,7 @@ useEffect(() => {
                         </div>
                         {profilePostImage && (
                             <div className="relative w-fit">
-                                <img loading="lazy" decoding="async" src={profilePostImage} alt="Preview" className="h-28 rounded-xl object-cover border border-gray-200 dark:border-gray-700 shadow-xs" />
+                                <UniversalImage src={profilePostImage} alt="Preview" className="h-28 rounded-xl object-cover border border-gray-200 dark:border-gray-700 shadow-xs" />
                                 <button type="button" onClick={() => { if (!isDemoMode && profilePostImage) deleteFileFromStorage(profilePostImage).catch(() => {}); setProfilePostImage(""); }} className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 shadow-md hover:bg-red-700"><X size={13}/></button>
                             </div>
                         )}
@@ -6453,7 +6468,7 @@ useEffect(() => {
                             <label className={`cursor-pointer px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border ${isDarkMode ? 'bg-gray-800 border-gray-700 hover:bg-gray-700 text-gray-300' : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'}`}>
                                 <ImageIcon size={16} className="text-emerald-500" /> 
                                 <span>Foto</span>
-                                <input type="file" accept="image/*" className="hidden" onChange={handleProfileImageUpload} disabled={isPublishingProfile} />
+                                <input type="file" accept="image/*,.heic,.heif,image/heic,image/heif" className="hidden" onChange={handleProfileImageUpload} disabled={isPublishingProfile} />
                             </label>
                             <button type="submit" disabled={isPublishingProfile || (!profilePostTitle && !profilePostText && !profilePostImage)} className={`${redButton} text-xs font-bold py-1.5 px-4 rounded-xl disabled:opacity-50 flex items-center gap-1.5 shadow-xs`}>
                                 {isPublishingProfile ? <Loader2 className="animate-spin" size={16}/> : <Send size={15}/>} 
@@ -8528,13 +8543,14 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                 <span className="hidden sm:inline">Subir</span>
                                 <input 
                                     type="file" 
-                                    accept="image/*" 
+                                    accept="image/*,.heic,.heif,image/heic,image/heif" 
                                     className="hidden" 
                                     onChange={async (e) => {
-                                        const file = e.target.files?.[0];
-                                        if (!file) return;
-                                        if (file.size > 4 * 1024 * 1024) return showMessage("La imagen no debe superar los 4MB.");
+                                        const rawFile = e.target.files?.[0];
+                                        if (!rawFile) return;
+                                        if (rawFile.size > 15 * 1024 * 1024) return showMessage("La imagen no debe superar los 15MB.");
                                         try {
+                                            const file = isImageLikeFile(rawFile) ? await convertHeicToJpeg(rawFile) : rawFile;
                                             const prevUrl = newAcadGroupAvatarUrl;
                                             showMessage("Subiendo imagen...");
                                             const compressed = await compressImage(file, 256, 256, 0.72);
@@ -9477,12 +9493,13 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                 )}
                                                 <input 
                                                     type="file" 
-                                                    accept="image/*" 
+                                                    accept="image/*,.heic,.heif,image/heic,image/heif" 
                                                     className="hidden" 
                                                     onChange={async (e) => {
-                                                        const file = e.target.files?.[0];
-                                                        if (file) {
+                                                        const rawFile = e.target.files?.[0];
+                                                        if (rawFile) {
                                                             try {
+                                                                const file = isImageLikeFile(rawFile) ? await convertHeicToJpeg(rawFile) : rawFile;
                                                                 const compressedBase64 = await compressImage(file, 1400, 480, 0.90);
                                                                 setGroupCoverModal(prev => ({
                                                                     ...prev,
@@ -11677,7 +11694,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                   )}
                                                   <input
                                                       type="file"
-                                                      accept="image/*"
+                                                      accept="image/*,.heic,.heif,image/heic,image/heif"
                                                       className="hidden"
                                                       disabled={uploadingQuestionImageIdx === qIndex}
                                                       onChange={(e) => {
@@ -15561,10 +15578,10 @@ Bot:`;
                                                        )}
                                                        <input 
                                                            type="file" 
-                                                           ref={groupAvatarFileInputRef} 
-                                                           onChange={handleUpdateGroupPhoto} 
-                                                           accept="image/*" 
-                                                           className="hidden" 
+                                                           ref={groupAvatarFileInputRef}
+                                                            onChange={handleUpdateGroupPhoto}
+                                                            accept="image/*,.heic,.heif,image/heic,image/heif"
+                                                            className="hidden" 
                                                        />
                                                    </div>
 
@@ -16287,9 +16304,9 @@ Bot:`;
                                               <div className="relative">
                                                   <input 
                                                       type="file" 
-                                                      ref={chatImageInputRef} 
-                                                      accept="image/*" 
-                                                      onChange={handleChatAppImageUpload} 
+                                                      ref={chatImageInputRef}
+                                                       accept="image/*,.heic,.heif,image/heic,image/heif"
+                                                       onChange={handleChatAppImageUpload} 
                                                       className="hidden" 
                                                   />
                                                   <input 

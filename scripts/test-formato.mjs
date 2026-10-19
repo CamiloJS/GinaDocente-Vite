@@ -1,6 +1,6 @@
-// Pruebas del normalizador de marcado (que no se vean etiquetas crudas).
 import { normalizarMarcado, textoPlano } from "../src/utils/textFormat.js";
 import { URL_REGEX, extraerUrls, esPublicacionLarga } from "../src/utils/postLinks.js";
+import { isHeicFile, isHeicUrl, isImageLikeFile, isImageLikeUrl } from "../src/utils/heicConverter.js";
 
 let ok = 0, fallos = 0;
 const chequear = (nombre, cond, extra = "") => {
@@ -299,6 +299,42 @@ chequear(
   containsBadWords("!d!0t4!") === true &&
   containsBadWords("p3nd3j0!") === true &&
   containsBadWords("¡Hola clase, bienvenidos!") === false
+);
+
+console.log("\n== Detección Universal de HEIC/HEIF (iPhone / iOS) ==");
+chequear(
+  "isHeicFile detecta tipo MIME image/heic e image/heif",
+  isHeicFile({ type: "image/heic", name: "IMG_001.heic" }) === true &&
+  isHeicFile({ type: "image/heif", name: "IMG_002.heif" }) === true
+);
+chequear(
+  "isHeicFile detecta archivos de iPhone con type vacío pero extensión .heic/.heif",
+  isHeicFile({ type: "", name: "IMG_1234.HEIC" }) === true &&
+  isHeicFile({ type: "application/octet-stream", name: "photo.heif" }) === true
+);
+chequear(
+  "isHeicFile no clasifica erróneamente PNG o JPEG",
+  isHeicFile({ type: "image/jpeg", name: "foto.jpg" }) === false &&
+  isHeicFile({ type: "image/png", name: "captura.png" }) === false
+);
+chequear(
+  "isHeicUrl detecta URLs remotas con .heic y con parámetros de consulta de Firebase",
+  isHeicUrl("https://firebasestorage.googleapis.com/v0/b/app/o/posts%2Fphoto.heic?alt=media&token=123") === true &&
+  isHeicUrl("https://englishtech.vercel.app/uploads/test.HEIC#page=1") === true &&
+  isHeicUrl("https://englishtech.vercel.app/foto.jpg") === false
+);
+chequear(
+  "isImageLikeFile reconoce imágenes estándar y HEIC incluso con MIME ausente",
+  isImageLikeFile({ name: "tarea_foto.HEIC", type: "" }) === true &&
+  isImageLikeFile({ name: "documento.pdf", type: "application/pdf" }) === false &&
+  isImageLikeFile({ name: "trabajo.docx", type: "" }) === false
+);
+chequear(
+  "isImageLikeUrl identifica URLs directas de imagen",
+  isImageLikeUrl("https://example.com/imagen.jpg") === true &&
+  isImageLikeUrl("https://example.com/photo.heic?alt=media") === true &&
+  isImageLikeUrl("data:image/png;base64,iVBORw0KGgo=") === true &&
+  isImageLikeUrl("https://example.com/documento.pdf") === false
 );
 
 console.log(`\nRESULTADO: ${ok} OK, ${fallos} fallos\n`);

@@ -1,5 +1,6 @@
 // src/utils/fileCompressor.js
 // Compresión y optimización automática y sutil de imágenes (<= 10MB) y documentos (<= 30MB)
+import { isHeicFile, isHeicBlobAsync, convertHeicToJpeg, isImageLikeFile } from './heicConverter.js';
 
 const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 const MAX_DOC_SIZE_BYTES = 30 * 1024 * 1024;   // 30 MB
@@ -9,6 +10,17 @@ const MAX_DOC_SIZE_BYTES = 30 * 1024 * 1024;   // 30 MB
  * Mantiene alta fidelidad visual y dimensiones nítidas (hasta 2560px)
  */
 export async function compressImageSilently(file, maxDimension = 2560, initialQuality = 0.85, forceJpeg = false) {
+  if (!file) return file;
+
+  // Convertir imágenes HEIC/HEIF de iPhones a JPEG universal antes de cualquier procesamiento
+  if (isHeicFile(file) || (await isHeicBlobAsync(file))) {
+    try {
+      file = await convertHeicToJpeg(file, initialQuality || 0.85);
+    } catch (e) {
+      console.warn("No se pudo convertir HEIC en compressImageSilently:", e);
+    }
+  }
+
   // Preservar GIFs animados intactos
   if (file.type === 'image/gif' || file.name?.toLowerCase().endsWith('.gif')) {
     return file;
@@ -150,8 +162,13 @@ export async function autoOptimizeFile(file) {
   if (!file) return file;
 
   try {
+    // Si es imagen HEIC/HEIF de iPhone
+    if (isHeicFile(file) || (await isHeicBlobAsync(file))) {
+      file = await convertHeicToJpeg(file, 0.85);
+    }
+
     // Si es imagen
-    if (file.type?.startsWith('image/') || /\.(jpe?g|png|webp|bmp|heic)$/i.test(file.name || '')) {
+    if (isImageLikeFile(file) || file.type?.startsWith('image/') || /\.(jpe?g|png|webp|bmp|heic|heif)$/i.test(file.name || '')) {
       return await compressImageSilently(file, 2560, 0.85);
     }
 

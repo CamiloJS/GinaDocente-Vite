@@ -5,8 +5,10 @@ import {
   CheckCheck, CheckCircle2, CheckLine, Clock, Edit3, EyeOff, FileDocIcon, FileText, ImageIcon, Loader2, Lock, Unlock, Share2, MessageSquareText, Mic, PaperclipIcon, Plus, ReplyIcon, Send, SmileIcon, Square, Star, Pin, Trash2, Upload, X, XLine, Volume2, VolumeX, Languages, UserIcon, BookOpen, NavNotebook, Play, Pause, Download, MessageCircle, BarChart2, Vote, Gamepad2, Trophy, Zap, Flame, NavSlides, ClipboardList, Shield, ShieldAlert, AlertTriangle, ChevronLeft, ChevronRight, Maximize2, Minimize2, ExternalLink, Layers, MonitorPlay, Globe, Sparkles, RotateCcw, Eye
 } from './Icons.jsx'
 import {
-  compressImage, containsBadWords, checkBadWordsAsync, uploadImageToStorage, uploadRawFileToStorage, deleteFileFromStorage, deleteAllStorageFilesInObject, deleteReplacedStorageFiles, TEACHER_NAME, SECOND_TEACHER_NAME, SECOND_TEACHER_ID, isCamiloTeacher, isTeacherId, getCanonicalTeacherId, getTeacherDisplayName, getItemTeacherId, COMMENT_EMOJIS, REACTION_EMOJIS, splitNameFirstAndLast, FALLBACK_MAP, format12HourTime, formatDateTime12H
+  compressImage, containsBadWords, checkBadWordsAsync, uploadImageToStorage, uploadRawFileToStorage, deleteFileFromStorage, deleteAllStorageFilesInObject, deleteReplacedStorageFiles, TEACHER_NAME, SECOND_TEACHER_NAME, SECOND_TEACHER_ID, isCamiloTeacher, isTeacherId, getCanonicalTeacherId, getTeacherDisplayName, getItemTeacherId, COMMENT_EMOJIS, REACTION_EMOJIS, splitNameFirstAndLast, FALLBACK_MAP, format12HourTime, formatDateTime12H,
+  isImageLikeFile, convertHeicToJpeg
 } from '../utils/helpers.js'
+import UniversalImage from './UniversalImage.jsx'
 import { glassCard, glassInput } from '../utils/styles.js'
 import { useClickOutside } from '../utils/hooks.js'
 import ImageCarousel from './ImageCarousel.jsx'
@@ -1380,8 +1382,8 @@ const TaskCard = React.memo(({
         if (files.length === 0) return;
         try {
             setIsProcessing(true);
-            const imageFiles = files.filter(f => f.type.startsWith('image/'));
-            const docFiles = files.filter(f => !f.type.startsWith('image/'));
+            const imageFiles = files.filter(f => isImageLikeFile(f));
+            const docFiles = files.filter(f => !isImageLikeFile(f));
 
             if (imageFiles.length > 0) {
                 const baseImages = (Array.isArray(commentImageUrls) && commentImageUrls.length > 0)
@@ -1400,7 +1402,8 @@ const TaskCard = React.memo(({
                     const filesToUpload = imageFiles.slice(0, remainingSlots);
                     const uploadedUrls = [];
 
-                    for (const file of filesToUpload) {
+                    for (const rawFile of filesToUpload) {
+                        const file = await convertHeicToJpeg(rawFile);
                         if (file.type !== 'image/gif') {
                             const compressed = await compressImage(file, 1200, 1200, 0.75);
                             const firebaseURL = await uploadImageToStorage(compressed, 'comments');
@@ -1423,7 +1426,8 @@ const TaskCard = React.memo(({
             }
 
             if (docFiles.length > 0) {
-                const docFile = docFiles[0];
+                const rawDoc = docFiles[0];
+                const docFile = isImageLikeFile(rawDoc) ? await convertHeicToJpeg(rawDoc) : rawDoc;
                 const prevFileUrl = commentFileUrl;
                 const firebaseURL = await uploadRawFileToStorage(docFile, 'comments');
                 if (prevFileUrl && prevFileUrl !== firebaseURL) {
@@ -4026,7 +4030,13 @@ const TaskCard = React.memo(({
                                                     return (
                                                         <div className="flex flex-wrap gap-2">
                                                             {imgs.map((imgSrc, imgIdx) => (
-                                                                <img key={imgIdx} src={imgSrc} loading="lazy" decoding="async" alt={`Adjunto ${imgIdx + 1}`} onClick={() => setLocalFullScreenImage(imgSrc)} className="w-24 h-24 rounded-xl border object-cover shadow-xs cursor-pointer hover:opacity-80 transition-opacity" onError={(e) => { e.target.style.display = 'none'; }} />
+                                                                <UniversalImage 
+                                                                    key={imgIdx} 
+                                                                    src={imgSrc} 
+                                                                    alt={`Adjunto ${imgIdx + 1}`} 
+                                                                    onClick={() => setLocalFullScreenImage(imgSrc)} 
+                                                                    className="w-24 h-24 rounded-xl border object-cover shadow-xs cursor-pointer hover:opacity-80 transition-opacity" 
+                                                                />
                                                             ))}
                                                         </div>
                                                     );
@@ -4416,7 +4426,7 @@ const TaskCard = React.memo(({
                                           </button>
                                           <label className="flex items-center gap-2 px-2.5 py-2 rounded-xl text-xs font-bold hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-left">
                                               <ImageIcon size={15} /> Subir foto
-                                              <input type="file" multiple accept="image/*" className="hidden" onChange={(e) => { handleLocalFileUpload(e); setShowAttachmentMenu(false); }} />
+                                              <input type="file" multiple accept="image/*,.heic,.heif,image/heic,image/heif" className="hidden" onChange={(e) => { handleLocalFileUpload(e); setShowAttachmentMenu(false); }} />
                                           </label>
                                           <button type="button" onClick={() => {
                                               window.openGifPicker?.((url) => {
@@ -4521,7 +4531,7 @@ const TaskCard = React.memo(({
                                         <div className="flex flex-wrap gap-2 items-center">
                                             {(commentImageUrls && commentImageUrls.length > 0 ? commentImageUrls : [commentImageUrl]).map((url, idx) => (
                                                 <div key={idx} className="relative group/chip">
-                                                    <img src={url} alt={`Preview ${idx + 1}`} loading="lazy" className="h-16 w-16 object-cover rounded-xl border border-gray-200 dark:border-gray-700 shadow-xs" onError={(e) => e.target.style.display = 'none'} />
+                                                    <UniversalImage src={url} alt={`Preview ${idx + 1}`} className="h-16 w-16 object-cover rounded-xl border border-gray-200 dark:border-gray-700 shadow-xs" />
                                                     <span className="absolute bottom-0.5 left-0.5 bg-black/70 text-white text-[8px] font-bold px-1 rounded">
                                                         {idx + 1}
                                                     </span>
@@ -4544,7 +4554,7 @@ const TaskCard = React.memo(({
                                                 <label className="h-16 w-16 border border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-500 rounded-xl flex flex-col items-center justify-center gap-0.5 cursor-pointer text-gray-400 hover:text-blue-500 transition-colors" title="Añadir otra imagen (máximo 4)">
                                                     <Plus size={16} />
                                                     <span className="text-[9px] font-bold">{(commentImageUrls && commentImageUrls.length > 0 ? commentImageUrls.length : (commentImageUrl ? 1 : 0))}/4</span>
-                                                    <input type="file" multiple accept="image/*" className="hidden" onChange={handleLocalFileUpload} />
+                                                    <input type="file" multiple accept="image/*,.heic,.heif,image/heic,image/heif" className="hidden" onChange={handleLocalFileUpload} />
                                                 </label>
                                             )}
                                         </div>
@@ -4588,7 +4598,7 @@ const TaskCard = React.memo(({
             {localFullScreenImage && ReactDOM.createPortal(
                 <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setLocalFullScreenImage(null)}>
                     <button className="absolute top-4 md:top-8 right-4 md:right-8 text-white/70 hover:text-white bg-black/50 hover:bg-red-600 p-2 rounded-full transition-all shadow-lg"><X size={28}/></button>
-                    <img src={localFullScreenImage} loading="lazy" className="w-auto h-auto max-w-[95vw] max-h-[90vh] object-contain rounded-2xl shadow-2xl" onClick={e => e.stopPropagation()} />
+                    <UniversalImage src={localFullScreenImage} className="w-auto h-auto max-w-[95vw] max-h-[90vh] object-contain rounded-2xl shadow-2xl" onClick={e => e.stopPropagation()} />
                 </div>
             , document.body)}
 

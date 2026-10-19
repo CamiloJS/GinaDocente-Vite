@@ -1,6 +1,7 @@
 // src/components/ImageCarousel.jsx
 import React, { useState, useRef } from 'react';
 import { ChevronLeft, ChevronRight } from './Icons.jsx';
+import UniversalImage from './UniversalImage.jsx';
 
 export const ImageCarousel = ({ images = [], onImageClick, isDarkMode, compact = false, className = '' }) => {
   // Filtrar URLs válidas
@@ -79,7 +80,7 @@ export const ImageCarousel = ({ images = [], onImageClick, isDarkMode, compact =
             style={{ minWidth: '100%' }}
             onClick={() => onImageClick && onImageClick(url)}
           >
-            <img loading="lazy" decoding="async" 
+            <UniversalImage 
               src={url}
               alt={`Imagen ${idx + 1}`}
               className={`w-full object-contain ${compact ? 'max-h-72 sm:max-h-80' : 'max-h-[480px] sm:max-h-[540px]'} transition-transform duration-200 hover:scale-[1.008]`}
