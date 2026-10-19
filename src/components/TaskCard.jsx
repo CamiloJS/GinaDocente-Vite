@@ -6,7 +6,7 @@ import {
 } from './Icons.jsx'
 import {
   compressImage, containsBadWords, checkBadWordsAsync, uploadImageToStorage, uploadRawFileToStorage, deleteFileFromStorage, deleteAllStorageFilesInObject, deleteReplacedStorageFiles, TEACHER_NAME, SECOND_TEACHER_NAME, SECOND_TEACHER_ID, isCamiloTeacher, isTeacherId, getCanonicalTeacherId, getTeacherDisplayName, getItemTeacherId, COMMENT_EMOJIS, REACTION_EMOJIS, splitNameFirstAndLast, FALLBACK_MAP, format12HourTime, formatDateTime12H,
-  isImageLikeFile, convertHeicToJpeg
+  isImageLikeFile, convertHeicToJpeg, resolveUserDisplayName
 } from '../utils/helpers.js'
 import UniversalImage from './UniversalImage.jsx'
 import { glassCard, glassInput } from '../utils/styles.js'
@@ -505,17 +505,18 @@ const TaskCard = React.memo(({
         const myComments = (task.comments || []).filter(c => {
             if (c.isDeleted) return false;
             const authorLower = (c.author || '').trim().toLowerCase();
+            const authorDisplayName = resolveUserDisplayName(c, userMappings, c.author).trim().toLowerCase();
             const authorIdLower = (c.authorId || '').trim().toLowerCase();
             const authorUsernameLower = (c.authorUsername || '').trim().toLowerCase();
             const cUidLower = (c.uid || '').trim().toLowerCase();
 
-            return (myName && authorLower === myName) ||
+            return (myName && (authorLower === myName || authorDisplayName === myName)) ||
                    (myUid && (authorIdLower === myUid || cUidLower === myUid)) ||
                    (myUserKey && (authorIdLower === myUserKey || authorUsernameLower === myUserKey)) ||
                    (myEmailPrefix && (authorUsernameLower === myEmailPrefix || authorLower === myEmailPrefix));
         });
         return myComments.slice().reverse().find(c => c.grade !== undefined && c.grade !== null && c.grade !== '') || myComments[myComments.length - 1] || null;
-    }, [task, isTask, role, loggedInName, currentUserId, currentUser]);
+    }, [task, isTask, role, loggedInName, currentUserId, currentUser, userMappings]);
 
     const myDeliveryIsLate = React.useMemo(() => {
         if (!myDelivery || !task?.dueDate) return false;
@@ -988,14 +989,21 @@ const TaskCard = React.memo(({
 
         const doesCommentMatchStudent = (c, st) => {
             if (!c || !st || isTeacherComment(c)) return false;
-            const cAuthor = normalizePersonKey(c.author);
+            const resolvedCAuthor = resolveUserDisplayName(c, userMappings, c.author);
+            const cAuthorResolved = normalizePersonKey(resolvedCAuthor);
+            const cAuthorRaw = normalizePersonKey(c.author);
             const stName = normalizePersonKey(st.name);
-            if (cAuthor && stName && cAuthor === stName) return true;
+            if (cAuthorResolved && stName && cAuthorResolved === stName) return true;
+            if (cAuthorRaw && stName && cAuthorRaw === stName) return true;
             const cUser = String(c.authorUsername || c.authorId || '').toLowerCase().replace('@', '').trim();
             const stUser = String(st.username || '').toLowerCase().replace('@', '').trim();
             const stUid = String(st.uid || '').toLowerCase().trim();
             if (cUser && ((stUser && cUser === stUser) || (stUid && cUser === stUid))) return true;
-            const partsC = splitNameFirstAndLast(c.author || '');
+
+            const authorWords = cAuthorRaw.split(/\s+/).filter(w => w.length >= 3);
+            if (authorWords.length >= 2 && authorWords.every(w => stName.includes(w))) return true;
+
+            const partsC = splitNameFirstAndLast(resolvedCAuthor || c.author || '');
             const partsSt = splitNameFirstAndLast(st.name || '');
             const firstC = normalizePersonKey(partsC.first).split(/\s+/)[0];
             const firstSt = normalizePersonKey(partsSt.first).split(/\s+/)[0];
@@ -1008,10 +1016,11 @@ const TaskCard = React.memo(({
         // Incluir a cualquier estudiante que haya hecho entrega en los comentarios
         (task.comments || []).forEach(c => {
             if (!isTeacherComment(c)) {
+                const authorDisplayName = resolveUserDisplayName(c, userMappings, c.author ? c.author.trim() : '');
                 const alreadyMatched = Object.values(allStudentsMap).some(st => doesCommentMatchStudent(c, st));
-                if (!alreadyMatched && !allStudentsMap[c.author.trim()]) {
-                    allStudentsMap[c.author.trim()] = {
-                        name: c.author.trim(),
+                if (!alreadyMatched && authorDisplayName && !allStudentsMap[authorDisplayName]) {
+                    allStudentsMap[authorDisplayName] = {
+                        name: authorDisplayName,
                         username: c.authorUsername || c.authorId || '',
                         uid: c.authorId || '',
                         email: ''
@@ -1462,7 +1471,7 @@ const TaskCard = React.memo(({
 
             const newComment = { 
                 id: Date.now().toString() + Math.random().toString(36).substr(2, 5), 
-                author: role === 'teacher' ? (loggedInName || getTeacherDisplayName(activeTeacherId)) : loggedInName, 
+                author: role === 'teacher' ? (loggedInName || getTeacherDisplayName(activeTeacherId)) : resolveUserDisplayName(loggedInName, userMappings, loggedInName), 
                 authorUsername: role === 'teacher' ? (activeTeacherId || 'teacher') : (currentUser?.email ? currentUser.email.split('@')[0] : (currentUserId || '')),
                 authorId: role === 'teacher' ? (activeTeacherId || 'teacher') : (currentUserId || currentUser?.uid || ''),
                 authorRole: role,
@@ -1477,7 +1486,14 @@ const TaskCard = React.memo(({
                 isDeleted: false, 
                 reactions: {},
                 ratings: {},
-                replyTo: replyingTo ? { id: replyingTo.id, text: replyingTo.text || '', author: replyingTo.author || '', imageUrl: replyingTo.imageUrl || '' } : null
+                replyTo: replyingTo ? { 
+                    id: replyingTo.id, 
+                    text: replyingTo.text || '', 
+                    author: resolveUserDisplayName(replyingTo, userMappings, replyingTo.author || ''), 
+                    authorUsername: replyingTo.authorUsername || replyingTo.authorId || '',
+                    authorId: replyingTo.authorId || replyingTo.uid || '',
+                    imageUrl: replyingTo.imageUrl || '' 
+                } : null
             };
             
             const withTimeout = (promise, ms = 12000) => Promise.race([
@@ -3801,6 +3817,8 @@ const TaskCard = React.memo(({
 
                             const renderCommentCard = (c, isReply = false) => {
                                 const cid = c._cid || c.id; 
+                                const authorDisplayName = resolveUserDisplayName(c, userMappings, c.author);
+                                const authorDisplayNameLower = authorDisplayName.trim().toLowerCase();
                                 const authorNameLower = (c.author || '').trim().toLowerCase();
                                 const loggedInNameLower = (loggedInName || '').trim().toLowerCase();
                                 const authorIdLower = (c.authorId || c.authorUsername || '').trim().toLowerCase();
@@ -3808,7 +3826,7 @@ const TaskCard = React.memo(({
                                 const isTeacherAuthor = c.authorRole === 'teacher' || c.role === 'teacher' || isTeacherId(authorIdLower) || authorIdLower === 'teacher_gina' || authorIdLower === 'teacher_camilo' || (c.author && (c.author.trim() === TEACHER_NAME || c.author.trim() === SECOND_TEACHER_NAME)) || authorNameLower === 'profesora' || authorNameLower === 'profesor' || authorNameLower === 'la profe' || authorNameLower === 'docente gina' || authorNameLower === 'profesora gina' || authorNameLower === 'docente camilo' || authorNameLower === 'profesor camilo';
 
                                 const isOwner = (
-                                    (loggedInNameLower && authorNameLower === loggedInNameLower) ||
+                                    (loggedInNameLower && (authorNameLower === loggedInNameLower || authorDisplayNameLower === loggedInNameLower)) ||
                                     (currentUserIdLower && (authorIdLower === currentUserIdLower || (c.uid && currentUser?.uid && c.uid === currentUser.uid))) ||
                                     (role === 'teacher' && isTeacherAuthor)
                                 );
@@ -3824,7 +3842,7 @@ const TaskCard = React.memo(({
                                             <div key={cid} className={`p-3 rounded-2xl text-xs border transition-all ${isDarkMode ? 'bg-gray-850/80 bg-gray-800/60 border-red-900/40 text-gray-300' : 'bg-red-50/50 border-red-200/70 text-gray-800'}`}>
                                                 <div className="flex justify-between items-center">
                                                     <div className="flex items-center gap-1.5">
-                                                        <span className="font-bold text-gray-700 dark:text-gray-200">{c.author}</span>
+                                                        <span className="font-bold text-gray-700 dark:text-gray-200">{authorDisplayName}</span>
                                                         <span className="italic text-gray-400 dark:text-gray-500">• Mensaje eliminado</span>
                                                     </div>
                                                     <div className="flex gap-2 items-center">
@@ -3884,7 +3902,7 @@ const TaskCard = React.memo(({
                                     // Para estudiantes: muestra "🚫 Mensaje eliminado"
                                     return (
                                         <div key={cid} className={`p-2.5 rounded-xl text-xs italic border flex items-center gap-1.5 ${isDarkMode ? 'bg-gray-800/30 border-gray-700/50 text-gray-500' : 'bg-gray-100/70 border-gray-200/60 text-gray-500'}`}>
-                                            <span className="font-semibold">{c.author}:</span>
+                                            <span className="font-semibold">{authorDisplayName}:</span>
                                             <span>Mensaje eliminado</span>
                                         </div>
                                     );
@@ -3907,8 +3925,8 @@ const TaskCard = React.memo(({
                                         }`}>
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-2">
-                                                    <button onClick={() => handleOpenProfileByName(c.author, c.authorUsername || c.authorId)} className={`font-bold text-xs hover:underline text-left ${isDarkMode ? 'text-gray-100' : 'text-gray-800'}`}>
-                                                        {c.author}
+                                                    <button onClick={() => handleOpenProfileByName(authorDisplayName, c.authorUsername || c.authorId)} className={`font-bold text-xs hover:underline text-left ${isDarkMode ? 'text-gray-100' : 'text-gray-800'}`}>
+                                                        {authorDisplayName}
                                                     </button>
                                                     <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
                                                         isLateC
@@ -3938,8 +3956,8 @@ const TaskCard = React.memo(({
                                     }`}>
                                         <div className="flex justify-between items-start">
                                             <div className="flex items-center gap-1.5 flex-wrap">
-                                                <button onClick={() => handleOpenProfileByName(c.author, c.authorUsername || c.authorId)} className={`font-bold text-xs hover:underline text-left ${isTeacherAuthor ? 'text-[#AD3333]' : (isDarkMode ? 'text-gray-100' : 'text-gray-800')}`}>
-                                                    {c.author}
+                                                <button onClick={() => handleOpenProfileByName(authorDisplayName, c.authorUsername || c.authorId)} className={`font-bold text-xs hover:underline text-left ${isTeacherAuthor ? 'text-[#AD3333]' : (isDarkMode ? 'text-gray-100' : 'text-gray-800')}`}>
+                                                    {authorDisplayName}
                                                 </button>
                                                 {isTask && isStudentAuthor && (() => {
                                                     const isLateC = Boolean(
@@ -3966,7 +3984,7 @@ const TaskCard = React.memo(({
                                                 {isReply && c.replyTo?.author && (
                                                     <span className="text-[10.5px] text-gray-400 dark:text-gray-500 font-medium inline-flex items-center gap-0.5">
                                                         <span>respondió a</span>
-                                                        <span className="font-bold text-emerald-600 dark:text-emerald-400 hover:underline">@{String(c.replyTo.author || '').split(' ')[0]}</span>
+                                                        <span className="font-bold text-emerald-600 dark:text-emerald-400 hover:underline">@{String(resolveUserDisplayName(c.replyTo, userMappings, c.replyTo.author) || '').split(' ')[0]}</span>
                                                     </span>
                                                 )}
 
@@ -4106,7 +4124,7 @@ const TaskCard = React.memo(({
                                                     <div className="flex flex-col gap-2.5 p-3 rounded-2xl border bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-sm animate-in fade-in">
                                                         <div className="flex items-center justify-between">
                                                             <span className="text-xs font-bold text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
-                                                                <Star size={13} className="text-amber-500" /> Calificar a {c.author}
+                                                                <Star size={13} className="text-amber-500" /> Calificar a {authorDisplayName}
                                                             </span>
                                                             <button onClick={() => setGradingCid(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"><X size={14}/></button>
                                                         </div>
@@ -4361,7 +4379,7 @@ const TaskCard = React.memo(({
                             {replyingTo && (
                                 <div className={`flex justify-between items-center px-3 py-1.5 rounded-xl border-l-2 border-blue-500 text-xs ${isDarkMode ? 'bg-gray-800 text-gray-300' : 'bg-blue-50 text-gray-700'}`}>
                                     <div className="flex flex-col min-w-0">
-                                        <span className="font-bold text-blue-500">Respondiendo a {replyingTo.author}</span>
+                                        <span className="font-bold text-blue-500">Respondiendo a {resolveUserDisplayName(replyingTo, userMappings, replyingTo.author)}</span>
                                         <span className="truncate opacity-80 text-[10px]">{replyingTo.text || 'Archivo adjunto'}</span>
                                     </div>
                                     <button type="button" onClick={() => setReplyingTo(null)} className="text-gray-400 hover:text-red-500 p-0.5"><X size={14}/></button>

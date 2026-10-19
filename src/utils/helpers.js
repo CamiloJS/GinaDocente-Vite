@@ -125,6 +125,126 @@ export const FALLBACK_MAP = {
   camilodocente: { email: 'camilodocente@unipamplona.edu.co', name: 'Camilo Jaimes', fullName: 'Camilo Jaimes', role: 'teacher', profilePicUrl: '' },
 }
 
+/**
+ * Resuelve dinámicamente el nombre completo actual y visible de un usuario o autor
+ * (para comentarios, entregas, foros y publicaciones) consultando userMappings.
+ * Si el nombre del estudiante fue corregido o actualizado por el docente, siempre
+ * devuelve el nombre completo actualizado en lugar de cadenas obsoletas estáticas.
+ */
+export const resolveUserDisplayName = (itemOrId, userMappings, fallbackName = '') => {
+  if (!itemOrId && !fallbackName) return '';
+
+  let rawAuthor = '';
+  let authorUsername = '';
+  let authorId = '';
+  let uid = '';
+  let email = '';
+
+  if (typeof itemOrId === 'object' && itemOrId !== null) {
+    rawAuthor = String(itemOrId.author || itemOrId.authorName || itemOrId.senderName || itemOrId.name || itemOrId.fullName || '').trim();
+    authorUsername = String(itemOrId.authorUsername || itemOrId.username || itemOrId.userKey || '').trim().replace(/^@/, '');
+    authorId = String(itemOrId.authorId || itemOrId.userId || itemOrId.senderId || itemOrId.id || '').trim().replace(/^@/, '');
+    uid = String(itemOrId.uid || '').trim();
+    email = String(itemOrId.email || '').trim().toLowerCase();
+  } else {
+    const str = String(itemOrId).trim();
+    rawAuthor = str;
+    authorUsername = str.replace(/^@/, '');
+    authorId = str.replace(/^@/, '');
+  }
+
+  const effectiveFallback = fallbackName || rawAuthor || authorUsername || authorId || 'Usuario';
+
+  // Si es alguno de los docentes oficiales, resolver con sus nombres oficiales
+  if (isCamiloTeacher(authorUsername) || isCamiloTeacher(authorId) || isCamiloTeacher(rawAuthor)) {
+    return SECOND_TEACHER_NAME;
+  }
+  const rawAuthorLower = rawAuthor.toLowerCase();
+  if (
+    authorUsername.toLowerCase() === 'teacher' || 
+    authorUsername.toLowerCase() === 'ginadocente' || 
+    authorId.toLowerCase() === 'teacher' || 
+    authorId.toLowerCase() === 'ginadocente' ||
+    rawAuthorLower === 'profesora' || 
+    rawAuthorLower === 'profesor' || 
+    rawAuthorLower === 'la profe' || 
+    rawAuthorLower === 'docente' || 
+    rawAuthorLower === 'docente gina' ||
+    rawAuthorLower.includes('gina marcela')
+  ) {
+    return TEACHER_NAME;
+  }
+
+  if (!userMappings || typeof userMappings !== 'object') {
+    return effectiveFallback;
+  }
+
+  // 1. Búsqueda directa por username / userKey
+  const cleanUsername = authorUsername.toLowerCase();
+  if (cleanUsername) {
+    if (userMappings[cleanUsername]?.fullName) {
+      return userMappings[cleanUsername].fullName.trim();
+    }
+    const keyMatch = Object.keys(userMappings).find(k => k.toLowerCase() === cleanUsername);
+    if (keyMatch && userMappings[keyMatch]?.fullName) {
+      return userMappings[keyMatch].fullName.trim();
+    }
+  }
+
+  // 2. Búsqueda por authorId / uid
+  const cleanId = authorId.toLowerCase();
+  if (cleanId) {
+    const idKeyMatch = Object.keys(userMappings).find(k => k.toLowerCase() === cleanId);
+    if (idKeyMatch && userMappings[idKeyMatch]?.fullName) {
+      return userMappings[idKeyMatch].fullName.trim();
+    }
+    const uidMatch = Object.values(userMappings).find(u => (u?.uid && u.uid.toLowerCase() === cleanId) || (uid && u?.uid === uid));
+    if (uidMatch?.fullName) {
+      return uidMatch.fullName.trim();
+    }
+  }
+
+  // 3. Búsqueda por correo electrónico
+  if (email) {
+    const emailMatch = Object.values(userMappings).find(u => u?.email && u.email.toLowerCase() === email);
+    if (emailMatch?.fullName) {
+      return emailMatch.fullName.trim();
+    }
+  }
+
+  // 4. Búsqueda por nombre previo / parcial (para comentarios antiguos que solo guardaron el nombre previo)
+  if (rawAuthor) {
+    const norm = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const rawNorm = norm(rawAuthor);
+
+    // a) Coincidencia exacta de nombre
+    const exactNameMatch = Object.values(userMappings).find(u => {
+      const uNorm = norm(u?.fullName);
+      return uNorm && uNorm === rawNorm;
+    });
+    if (exactNameMatch?.fullName) {
+      return exactNameMatch.fullName.trim();
+    }
+
+    // b) Si el nuevo nombre completo del estudiante en userMappings contiene todas las palabras clave del nombre anterior
+    // Por ejemplo: rawAuthor = "Camila Rodríguez", palabras: ["camila", "rodriguez"]
+    // u.fullName = "Maria Camila Rodríguez Monterrey" (contiene "camila" y "rodriguez")
+    const authorWords = rawNorm.split(/\s+/).filter(w => w.length >= 3);
+    if (authorWords.length >= 2) {
+      const candidate = Object.values(userMappings).find(u => {
+        const uNorm = norm(u?.fullName);
+        if (!uNorm) return false;
+        return authorWords.every(w => uNorm.includes(w));
+      });
+      if (candidate?.fullName) {
+        return candidate.fullName.trim();
+      }
+    }
+  }
+
+  return effectiveFallback;
+};
+
 // --- Funciones de utilidad ---
 export const compressImage = async (file, maxWidth = 2048, maxHeight = 2048, quality = 0.85) => {
   if (!file) return null;

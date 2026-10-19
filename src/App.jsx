@@ -25,7 +25,7 @@ import {
   uploadImageToStorage, uploadRawFileToStorage, deleteFileFromStorage, deleteFilesFromStorage,
   deleteAllStorageFilesInObject, deleteReplacedStorageFiles,
   speakText, splitNameFirstAndLast, format12HourTime, formatDateTime12H,
-  isImageLikeFile, isHeicFile, convertHeicToJpeg
+  isImageLikeFile, isHeicFile, convertHeicToJpeg, resolveUserDisplayName
 } from './utils/helpers.js'
 import UniversalImage from './components/UniversalImage.jsx'
 import {
@@ -6289,14 +6289,21 @@ useEffect(() => {
         const post = userPosts.find(p => p.id === postId);
         if (!post) return;
         const rep = profileReplyingTo[postId];
+        const resolvedAuthor = resolveUserDisplayName(loggedInName, userMappings, loggedInName);
         const newComment = {
             id: Date.now().toString(),
-            author: loggedInName,
+            author: resolvedAuthor,
             authorUsername: myChatId,
             authorId: user?.uid || myChatId,
             text: text.trim(),
             createdAt: Date.now(),
-            replyTo: rep ? { id: rep.id, author: rep.author, text: rep.text } : null
+            replyTo: rep ? { 
+                id: rep.id, 
+                author: resolveUserDisplayName(rep, userMappings, rep.author), 
+                authorUsername: rep.authorUsername || rep.authorId || '',
+                authorId: rep.authorId || rep.uid || '',
+                text: rep.text 
+            } : null
         };
         if (isDemoMode) {
             const updated = { ...post, comments: [...(post.comments || []), newComment] };
@@ -6811,27 +6818,30 @@ useEffect(() => {
                             {/* Sección de Comentarios Perfectamente Contenida */}
                             <div className="flex flex-col gap-2 mt-1 bg-gray-50 dark:bg-gray-800/40 p-3 rounded-xl border border-gray-100 dark:border-gray-800/60 w-full min-w-0 box-border">
                                 <div className="max-h-48 overflow-y-auto space-y-2 pr-1 w-full min-w-0">
-                                    {(post.comments || []).map(c => (
+                                    {(post.comments || []).map(c => {
+                                        const commentAuthorName = resolveUserDisplayName(c, userMappings, c.author);
+                                        const replyAuthorName = c.replyTo ? resolveUserDisplayName(c.replyTo, userMappings, c.replyTo.author) : '';
+                                        return (
                                         <div key={c.id} className={`p-2 rounded-xl text-xs w-full min-w-0 break-words ${isDarkMode ? 'bg-gray-800 text-gray-300' : 'bg-white text-gray-700 shadow-2xs border border-gray-100'}`}>
                                             {c.replyTo && (
                                                 <div className={`mb-1 pl-2 border-l-2 py-0.5 ${isDarkMode ? 'border-blue-500 bg-gray-900/50 text-gray-400' : 'border-blue-400 bg-gray-50 text-gray-500'} text-[10px] opacity-90 rounded-r-md truncate`}>
-                                                    <span className="font-bold text-blue-500 mr-1">{c.replyTo.author}</span>
+                                                    <span className="font-bold text-blue-500 mr-1">{replyAuthorName}</span>
                                                     <span className="truncate">{c.replyTo.text}</span>
                                                 </div>
                                             )}
                                             <div className="flex justify-between items-start gap-1 group/pcomm">
                                                 <div className="min-w-0 flex-1 break-words">
-                                                    <button onClick={() => handleOpenProfileByName(c.author, c.authorUsername || c.authorId)} className="font-bold text-blue-500 mb-0.5 hover:underline text-left block truncate">{c.author}</button>
+                                                    <button onClick={() => handleOpenProfileByName(commentAuthorName, c.authorUsername || c.authorId)} className="font-bold text-blue-500 mb-0.5 hover:underline text-left block truncate">{commentAuthorName}</button>
                                                     <p className="break-words leading-relaxed">{c.text}</p>
                                                 </div>
                                                 <button onClick={() => setProfileReplyingTo({...profileReplyingTo, [post.id]: c})} className="opacity-0 group-hover/pcomm:opacity-100 text-gray-400 hover:text-blue-500 transition-opacity p-1 shrink-0"><ReplyIcon size={12}/></button>
                                             </div>
                                         </div>
-                                    ))}
+                                    )})}
                                 </div>
                                 {profileReplyingTo[post.id] && (
                                     <div className={`flex justify-between items-center px-2.5 py-1 rounded-lg border text-[11px] ${isDarkMode ? 'bg-gray-700 border-gray-600 text-gray-300' : 'bg-gray-200 border-gray-300 text-gray-700'}`}>
-                                        <span className="truncate">Respondiendo a <b className="text-blue-500">{profileReplyingTo[post.id].author}</b></span>
+                                        <span className="truncate">Respondiendo a <b className="text-blue-500">{resolveUserDisplayName(profileReplyingTo[post.id], userMappings, profileReplyingTo[post.id].author)}</b></span>
                                         <button type="button" onClick={() => setProfileReplyingTo({...profileReplyingTo, [post.id]: null})}><X size={13}/></button>
                                     </div>
                                 )}
@@ -8229,6 +8239,50 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
         const trimmedCustomLabel = studentEditModal.customLabel.trim();
         const trimmedEmail = studentEditModal.email.trim();
 
+        const oldFullName = (currentStudentData?.fullName || '').trim();
+        const studentKey = studentEditModal.userKey;
+        const studentUid = currentStudentData?.uid || '';
+        const norm = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+        const oldNorm = norm(oldFullName);
+        const oldWords = oldNorm.split(/\s+/).filter(w => w.length >= 3);
+
+        const isStudentAuthor = (item) => {
+            if (!item) return false;
+            const itemUser = String(item.authorUsername || item.username || item.userKey || item.authorId || item.userId || '').toLowerCase().replace('@', '').trim();
+            if (itemUser && (itemUser === studentKey.toLowerCase() || (studentUid && itemUser === studentUid.toLowerCase()))) return true;
+            if (item.uid && studentUid && String(item.uid).toLowerCase().trim() === studentUid.toLowerCase()) return true;
+            if (item.email && trimmedEmail && String(item.email).toLowerCase().trim() === trimmedEmail.toLowerCase()) return true;
+            const itemAuthor = String(item.author || item.authorName || item.name || item.fullName || '');
+            const itemNorm = norm(itemAuthor);
+            if (oldNorm && itemNorm === oldNorm) return true;
+            if (oldWords.length >= 2 && oldWords.every(w => itemNorm.includes(w))) return true;
+            return false;
+        };
+
+        const updateCommentsWithNewName = (comments) => {
+            if (!Array.isArray(comments) || comments.length === 0) return { changed: false, comments };
+            let hasChanged = false;
+            const updated = comments.map(c => {
+                let changedC = false;
+                let nextC = { ...c };
+                if (isStudentAuthor(c)) {
+                    if (nextC.author !== trimmedFullName) {
+                        nextC.author = trimmedFullName;
+                        changedC = true;
+                    }
+                }
+                if (c.replyTo && isStudentAuthor(c.replyTo)) {
+                    if (nextC.replyTo?.author !== trimmedFullName) {
+                        nextC.replyTo = { ...nextC.replyTo, author: trimmedFullName };
+                        changedC = true;
+                    }
+                }
+                if (changedC) hasChanged = true;
+                return nextC;
+            });
+            return { changed: hasChanged, comments: updated };
+        };
+
         if (isDemoMode) {
             const updatedStudent = {
                 ...currentStudentData,
@@ -8245,6 +8299,32 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                 [studentEditModal.userKey]: updatedStudent
             }));
             saveDemoSandboxItem('userMappings', { id: studentEditModal.userKey, ...updatedStudent });
+
+            setUserPosts(prev => prev.map(post => {
+                const { changed, comments } = updateCommentsWithNewName(post.comments);
+                const postIsStudent = isStudentAuthor(post);
+                if (changed || (postIsStudent && (post.author !== trimmedFullName || post.authorName !== trimmedFullName))) {
+                    const nextPost = {
+                        ...post,
+                        ...(changed ? { comments } : {}),
+                        ...(postIsStudent ? { author: trimmedFullName, authorName: trimmedFullName } : {})
+                    };
+                    saveDemoSandboxItem('userPosts', nextPost);
+                    return nextPost;
+                }
+                return post;
+            }));
+
+            setTasks(prev => prev.map(t => {
+                const { changed, comments } = updateCommentsWithNewName(t.comments);
+                if (changed) {
+                    const nextTask = { ...t, comments };
+                    saveDemoSandboxItem('tasks', nextTask);
+                    return nextTask;
+                }
+                return t;
+            }));
+
             showMessage("Perfil de estudiante actualizado.");
             setStudentEditModal({ isOpen: false, userKey: '', fullName: '', customLabel: '', email: '', profilePicUrl: '' });
             return;
@@ -8275,6 +8355,31 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                     onboardingCompleted: true,
                     updatedAt: Date.now()
                 }
+            }));
+
+            setUserPosts(prev => prev.map(post => {
+                const { changed, comments } = updateCommentsWithNewName(post.comments);
+                const postIsStudent = isStudentAuthor(post);
+                if (changed || (postIsStudent && (post.author !== trimmedFullName || post.authorName !== trimmedFullName))) {
+                    const payload = {
+                        ...(changed ? { comments } : {}),
+                        ...(postIsStudent ? { author: trimmedFullName, authorName: trimmedFullName } : {})
+                    };
+                    updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userPosts', post.id), payload)
+                        .catch(err => console.warn('Could not update userPost comments on student edit:', err));
+                    return { ...post, ...payload };
+                }
+                return post;
+            }));
+
+            setTasks(prev => prev.map(t => {
+                const { changed, comments } = updateCommentsWithNewName(t.comments);
+                if (changed) {
+                    updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', t.id), { comments })
+                        .catch(err => console.warn('Could not update task comments on student edit:', err));
+                    return { ...t, comments };
+                }
+                return t;
             }));
 
             showMessage("Perfil de estudiante actualizado.");

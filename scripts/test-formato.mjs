@@ -477,6 +477,105 @@ chequear(
   updatedSession.name === "Pepito Carlos Perez Gonzalez" && updatedSession.userKey === "pepito"
 );
 
+// Caso 5: Resolución dinámica del nombre completo del estudiante en comentarios (resolveUserDisplayName)
+import { resolveUserDisplayName, TEACHER_NAME, SECOND_TEACHER_NAME } from "../src/utils/helpers.js";
+
+const testUserMappings = {
+  camila_r: {
+    fullName: "Maria Camila Rodríguez Monterrey",
+    email: "camila.rodriguez@gmail.com",
+    uid: "uid_camila_123",
+    role: "student"
+  },
+  pepito: {
+    fullName: "Pepito Carlos Perez Gonzalez",
+    email: "pepito@gmail.com",
+    uid: "google_uid_12345",
+    role: "student"
+  },
+  camilodocente: {
+    fullName: "Camilo Jaimes",
+    email: "camilodocente@unipamplona.edu.co",
+    role: "teacher"
+  },
+  teacher: {
+    fullName: "Gina Marcela Quintana Delgado",
+    email: "ginadocente@unipamplona.edu.co",
+    role: "teacher"
+  }
+};
+
+// 5.1 Comentario histórico con solo nombre estático previo "Camila Rodríguez"
+const resolvedName1 = resolveUserDisplayName("Camila Rodríguez", testUserMappings, "Camila Rodríguez");
+chequear(
+  "Comentario histórico con string 'Camila Rodríguez' resuelve al nombre completo actualizado 'Maria Camila Rodríguez Monterrey'",
+  resolvedName1 === "Maria Camila Rodríguez Monterrey",
+  resolvedName1
+);
+
+// 5.2 Objeto de comentario con author antiguo
+const commentObj1 = {
+  id: "comm_101",
+  author: "Camila Rodríguez",
+  authorUsername: "camila_r",
+  text: "Te quedo muy lindo <3"
+};
+const resolvedName2 = resolveUserDisplayName(commentObj1, testUserMappings, commentObj1.author);
+chequear(
+  "Objeto de comentario con username 'camila_r' resuelve al nombre completo 'Maria Camila Rodríguez Monterrey'",
+  resolvedName2 === "Maria Camila Rodríguez Monterrey",
+  resolvedName2
+);
+
+// 5.3 Objeto de comentario sin username pero con nombre previo con tildes distintas o palabras clave
+const commentObj2 = {
+  id: "comm_102",
+  author: "Camila Rodriguez",
+  text: "Buen trabajo"
+};
+const resolvedName3 = resolveUserDisplayName(commentObj2, testUserMappings, commentObj2.author);
+chequear(
+  "Objeto de comentario sin username y sin tildes resuelve por coincidencia de palabras al nombre completo",
+  resolvedName3 === "Maria Camila Rodríguez Monterrey",
+  resolvedName3
+);
+
+// 5.4 Comentario de docente Gina Hurtado o Camilo Jaimes
+const teacherComment = {
+  author: "Profesora",
+  authorUsername: "ginadocente"
+};
+const resolvedTeacher = resolveUserDisplayName(teacherComment, testUserMappings);
+chequear(
+  "Comentario de docente resuelve a TEACHER_NAME (" + TEACHER_NAME + ")",
+  resolvedTeacher === TEACHER_NAME,
+  resolvedTeacher
+);
+
+// 5.5 Comentario de Camilo Docente
+const camiloComment = {
+  author: "Camilo Docente",
+  authorUsername: "camilodocente"
+};
+const resolvedCamilo = resolveUserDisplayName(camiloComment, testUserMappings);
+chequear(
+  "Comentario de Camilo resuelve a SECOND_TEACHER_NAME (" + SECOND_TEACHER_NAME + ")",
+  resolvedCamilo === SECOND_TEACHER_NAME,
+  resolvedCamilo
+);
+
+// 5.6 Comentario de usuario desconocido
+const unknownComment = {
+  author: "Invitado Externo",
+  authorUsername: "invitado"
+};
+const resolvedUnknown = resolveUserDisplayName(unknownComment, testUserMappings);
+chequear(
+  "Comentario de usuario no registrado preserva su nombre de autor original",
+  resolvedUnknown === "Invitado Externo",
+  resolvedUnknown
+);
+
 console.log(`\nRESULTADO: ${ok} OK, ${fallos} fallos\n`);
 process.exit(fallos ? 1 : 0);
 
