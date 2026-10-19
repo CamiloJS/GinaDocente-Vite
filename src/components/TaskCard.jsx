@@ -1791,6 +1791,10 @@ const TaskCard = React.memo(({
                                                 geniallyUrl: task?.geniallyUrl || '',
                                                 hideDate: !!task?.hideDate
                                             });
+                                            if (isKahoot && task.kahoot) {
+                                                setEditedKahootQuestions(Array.isArray(task.kahoot.questions) ? task.kahoot.questions : []);
+                                                setIsEditingKahootQuestions(true);
+                                            }
                                             setIsEditingTask(true);
                                         }} className="p-1 rounded-lg text-gray-400 hover:text-blue-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" title="Editar">
                                             <Edit3 size={15} />
@@ -2193,26 +2197,12 @@ const TaskCard = React.memo(({
                                     <Gamepad2 size={20} className="text-white" />
                                 </div>
                                 <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-white/15 border border-white/20 text-fuchsia-200">
-                                        PIN: {formattedPin}
+                                    <span className="text-xs font-black uppercase tracking-wider text-fuchsia-200">
+                                        Kahoot
                                     </span>
                                     <span className="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-indigo-500/30 border border-indigo-400/30 text-indigo-200">
                                         {questions.length} {questions.length === 1 ? 'pregunta' : 'preguntas'}
                                     </span>
-                                    {questions.some((q) => q.type === 'riddle') && (
-                                        <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-purple-500/30 border border-purple-400/40 text-purple-200 flex items-center gap-1">
-                                            💡 Acertijos
-                                        </span>
-                                    )}
-                                    {status === 'finished' ? (
-                                        <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-500/25 border border-amber-400/40 text-amber-300 flex items-center gap-1">
-                                            <Trophy size={11} /> Finalizado
-                                        </span>
-                                    ) : (
-                                        <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-500/25 border border-emerald-400/40 text-emerald-300 flex items-center gap-1 animate-pulse">
-                                            <Zap size={11} /> En vivo
-                                        </span>
-                                    )}
                                 </div>
                             </div>
 
@@ -2262,17 +2252,17 @@ const TaskCard = React.memo(({
                                 </div>
                             )}
 
-                            {/* Botones Principales */}
-                            <div className="flex flex-wrap items-center gap-2.5 pt-1">
+                            {/* Botón Principal */}
+                            <div className="pt-1">
                                 <button
                                     type="button"
                                     onClick={() => {
                                         setKahootModalStartInReview(false);
                                         setShowKahootLiveModal(true);
                                     }}
-                                    className="flex-1 min-w-[180px] py-2.5 px-5 rounded-xl font-black text-xs sm:text-sm bg-gradient-to-r from-fuchsia-500 via-purple-500 to-indigo-500 hover:from-fuchsia-400 hover:via-purple-400 hover:to-indigo-400 text-white shadow-lg shadow-fuchsia-500/30 flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+                                    className="w-full py-3 px-6 rounded-xl font-black text-xs sm:text-sm bg-gradient-to-r from-fuchsia-500 via-purple-500 to-indigo-500 hover:from-fuchsia-400 hover:via-purple-400 hover:to-indigo-400 text-white shadow-lg shadow-fuchsia-500/30 flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
                                 >
-                                    <Gamepad2 size={17} />
+                                    <Gamepad2 size={18} />
                                     <span>
                                         {status === 'finished'
                                             ? (canReview ? 'Volver a jugar' : 'Ver resultados')
@@ -2281,99 +2271,6 @@ const TaskCard = React.memo(({
                                                 : 'Unirse al Kahoot'}
                                     </span>
                                 </button>
-
-                                {canReview && (
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setKahootModalStartInReview(true);
-                                            setShowKahootLiveModal(true);
-                                        }}
-                                        className="py-2.5 px-4 rounded-xl font-extrabold text-xs bg-white/15 hover:bg-white/25 text-white border border-white/20 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                                    >
-                                        <BookOpen size={15} />
-                                        <span>Repasar preguntas</span>
-                                    </button>
-                                )}
-
-                                <button
-                                    type="button"
-                                    onClick={async () => {
-                                        const url = buildPublicKahootUrl(rawPin);
-                                        try {
-                                            await navigator.clipboard.writeText(url);
-                                            showMessage(`🔗 Enlace público copiado: ${url}`);
-                                        } catch {
-                                            showMessage(`🔗 Enlace público: ${url}`);
-                                        }
-                                    }}
-                                    className="py-2.5 px-3.5 rounded-xl font-bold text-xs bg-white/10 hover:bg-white/20 text-purple-200 border border-white/20 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                                    title="Copiar enlace público #kahoot para invitados externos sin cuenta"
-                                >
-                                    <Share2 size={14} />
-                                    <span>Link #kahoot</span>
-                                </button>
-
-                                {role === 'teacher' && (
-                                    <button
-                                        type="button"
-                                        onClick={async () => {
-                                            const nextReview = !Boolean(kahoot.reviewEnabled);
-                                            const nowTs = Date.now();
-                                            const nextKahootObj = {
-                                                ...kahoot,
-                                                reviewEnabled: nextReview,
-                                                updatedAt: nowTs
-                                            };
-                                            try {
-                                                if (isDemoTask) {
-                                                    await updateTaskDoc({ kahoot: nextKahootObj });
-                                                } else {
-                                                    if (!auth?.currentUser) {
-                                                        try { await signInAnonymously(auth); } catch { /* continuar */ }
-                                                    }
-                                                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), {
-                                                        'kahoot.reviewEnabled': nextReview,
-                                                        'kahoot.updatedAt': nowTs
-                                                    });
-                                                    if (typeof setTasks === 'function') {
-                                                        setTasks(prev => (prev || []).map(t => String(t.id) === String(task.id) ? { ...t, kahoot: { ...(t.kahoot || kahoot), reviewEnabled: nextReview, updatedAt: nowTs } } : t));
-                                                    }
-                                                }
-                                                showMessage(
-                                                    nextReview
-                                                        ? '🔓 Repaso habilitado: los participantes ya pueden ver las preguntas y respuestas.'
-                                                        : '🔒 Repaso oculto para los participantes.'
-                                                );
-                                            } catch {
-                                                showMessage('No se pudo actualizar el estado del repaso.');
-                                            }
-                                        }}
-                                        className={`py-2.5 px-3.5 rounded-xl font-bold text-xs border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                                            isReviewEnabled
-                                                ? 'bg-emerald-500/25 hover:bg-emerald-500/35 text-emerald-200 border-emerald-400/40'
-                                                : 'bg-white/10 hover:bg-white/20 text-amber-200 border-white/20'
-                                        }`}
-                                        title={isReviewEnabled ? 'El repaso está visible para los participantes (clic para ocultar)' : 'Habilitar repaso para que los participantes puedan ver las respuestas'}
-                                    >
-                                        {isReviewEnabled ? <Unlock size={14} /> : <Lock size={14} />}
-                                        <span>{isReviewEnabled ? 'Repaso: Activo' : 'Habilitar repaso'}</span>
-                                    </button>
-                                )}
-
-                                {role === 'teacher' && (
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setEditedKahootQuestions(questions);
-                                            setIsEditingKahootQuestions(prev => !prev);
-                                        }}
-                                        className="py-2.5 px-3.5 rounded-xl font-bold text-xs bg-fuchsia-950/60 hover:bg-fuchsia-900/70 text-fuchsia-200 border border-fuchsia-400/30 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                                    >
-                                        <Edit3 size={14} />
-                                        <span>{isEditingKahootQuestions ? 'Cerrar' : 'Editar'}</span>
-                                    </button>
-                                )}
                             </div>
 
                             {/* Editor en línea de preguntas del Kahoot para el docente */}
@@ -2392,8 +2289,11 @@ const TaskCard = React.memo(({
                                     <div className="flex justify-end gap-2 pt-2 border-t border-gray-200 dark:border-gray-800">
                                         <button
                                             type="button"
-                                            onClick={() => setIsEditingKahootQuestions(false)}
-                                            className="px-4 py-2 rounded-xl text-xs font-bold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200"
+                                            onClick={() => {
+                                                setIsEditingKahootQuestions(false);
+                                                if (isEditingTask) setIsEditingTask(false);
+                                            }}
+                                            className="px-4 py-2 rounded-xl text-xs font-bold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 cursor-pointer"
                                         >
                                             Cancelar
                                         </button>
@@ -2519,21 +2419,7 @@ const TaskCard = React.memo(({
                                             {questionTotal} {questionTotal === 1 ? 'pregunta' : 'preguntas'}
                                         </span>
                                     )}
-                                    {hasStrictAntiCheat && (
-                                        <span className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-rose-100/80 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60">
-                                            <Shield size={10} /> Anti-trampas
-                                        </span>
-                                    )}
-                                    {hasImmediateFeedback && (
-                                        <span className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-amber-100/80 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60">
-                                            <Sparkles size={10} /> Retroalimentación IA
-                                        </span>
-                                    )}
-                                    {((Array.isArray(ev.targetStudentIds) && ev.targetStudentIds.length > 0) || (Array.isArray(task.targetStudentIds) && task.targetStudentIds.length > 0)) && (
-                                        <span className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-purple-100/80 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60" title={`Asignada a ${ev.targetStudentIds?.length || task.targetStudentIds?.length} estudiante(s) específico(s)`}>
-                                            <UserIcon size={10} /> {(ev.targetStudentIds || task.targetStudentIds).length} {((ev.targetStudentIds || task.targetStudentIds).length === 1) ? 'estudiante' : 'estudiantes'}
-                                        </span>
-                                    )}
+
                                 </div>
                             </div>
 

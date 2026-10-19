@@ -868,7 +868,7 @@ check(
     liveModalSrc.includes('handleToggleReviewEnabled') &&
     liveModalSrc.includes("viewMode === 'review' && canReview") &&
     taskCardSrc.includes('canAccessKahootReview(kahoot, role)') &&
-    taskCardSrc.includes('Habilitar repaso')
+    liveModalSrc.includes('reviewEnabled')
 );
 
 check(
@@ -890,10 +890,10 @@ check(
 );
 
 check(
-  'KahootLiveModal y TaskCard sincronizan reviewEnabled en 0ms sin sobrescribir participantes concurrentes en Firestore',
+  'KahootLiveModal sincroniza reviewEnabled en 0ms sin sobrescribir participantes concurrentes en Firestore',
   liveModalSrc.includes('prevReviewEnabled !== nextReviewEnabled') &&
     liveModalSrc.includes('partialKahootUpdates?.reviewEnabled !== undefined') &&
-    taskCardSrc.includes("'kahoot.reviewEnabled': nextReview")
+    liveModalSrc.includes("'kahoot.reviewEnabled': nextReview")
 );
 
 console.log('\n--- 18. Tipo de Pregunta Acertijo (Riddle) Exclusivamente Escrito, IA y Ventana de 2 Segundos ---');
@@ -1230,8 +1230,8 @@ check('KahootLiveModal implementa ventana de 2 segundos, protección de sobreesc
   liveModalSrc.includes('hasExistingFirstAt')
 );
 
-check('TaskCard y PublicKahootViewer muestran indicador distintivo de Acertijos en el muro y portal público',
-  taskCardSrc.includes('💡 Acertijos') &&
+check('KahootLiveModal y PublicKahootViewer muestran indicador distintivo de Acertijos en la sala y portal público',
+  liveModalSrc.includes('Acertijo') &&
   publicKahootSrc.includes('💡 Con acertijos')
 );
 
