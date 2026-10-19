@@ -1977,7 +1977,7 @@ const TaskCard = React.memo(({
                                 </button>
                             </div>
                             <div className={`text-sm leading-relaxed whitespace-pre-wrap w-full ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>
-                                <LinkifyText text={translatedDescription} isDarkMode={isDarkMode} colapsable embedVideos={!task.videoUrl && !task.imageUrl && !task.fileUrl && !task.audioUrl} />
+                                <LinkifyText text={translatedDescription} isDarkMode={isDarkMode} colapsable embedVideos={!isEvaluation && !task.videoUrl && !task.imageUrl && !task.fileUrl && !task.audioUrl} />
                             </div>
                         </div>
                     ) : (
@@ -1992,7 +1992,7 @@ const TaskCard = React.memo(({
                                 </button>
                             )}
                             <div className={`text-sm leading-relaxed whitespace-pre-wrap w-full ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>
-                                <LinkifyText text={task.description} isDarkMode={isDarkMode} colapsable embedVideos={!task.videoUrl && !task.imageUrl && !task.fileUrl && !task.audioUrl} />
+                                <LinkifyText text={task.description} isDarkMode={isDarkMode} colapsable embedVideos={!isEvaluation && !task.videoUrl && !task.imageUrl && !task.fileUrl && !task.audioUrl} />
                             </div>
                         </div>
                     )}
@@ -3457,7 +3457,7 @@ const TaskCard = React.memo(({
             })()}
 
             {/* Audio adjunto */}
-            {task.audioUrl && (
+            {!isEvaluation && task.audioUrl && (
                 <div className="mt-2.5">
                     <AudioPlayer src={task.audioUrl} title="Audio adjunto" isDarkMode={isDarkMode} />
                 </div>
@@ -3474,8 +3474,8 @@ const TaskCard = React.memo(({
                 </div>
             )}
 
-            {/* Video adjunto (YouTube o Directo) */}
-            {task.videoUrl && (
+            {/* Video adjunto (YouTube o Directo) - Se oculta en publicaciones de evaluaciones para evitar que los estudiantes vean el audio o hagan trampa antes de iniciar */}
+            {!isEvaluation && task.videoUrl && (
                 <div className="mt-3 rounded-2xl overflow-hidden shadow-sm">
                     <CustomVideoPlayer 
                         src={task.videoUrl} 
@@ -3486,7 +3486,7 @@ const TaskCard = React.memo(({
             )}
 
             {/* Actividad Interactiva Genially */}
-            {task.geniallyUrl && (
+            {!isEvaluation && task.geniallyUrl && (
                 <div className="mt-3">
                     <GeniallyEmbedPlayer 
                         url={task.geniallyUrl} 
@@ -3501,15 +3501,19 @@ const TaskCard = React.memo(({
                 const docUrl = task.fileUrl || task.pdfUrl;
                 const cleanName = (task.fileName || '').trim().toLowerCase();
                 const isPdfDoc = cleanName.endsWith('.pdf') || cleanName.includes('.pdf') || docUrl.toLowerCase().includes('.pdf') || docUrl.startsWith('data:application/pdf');
-                return isDirectVideoUrl(docUrl) ? (
-                    <div className="mt-3 rounded-2xl overflow-hidden shadow-sm">
-                        <CustomVideoPlayer 
-                            src={docUrl} 
-                            title={task.fileName || task.title || "Video adjunto"} 
-                            isDarkMode={isDarkMode} 
-                        />
-                    </div>
-                ) : (
+                if (isDirectVideoUrl(docUrl)) {
+                    if (isEvaluation) return null;
+                    return (
+                        <div className="mt-3 rounded-2xl overflow-hidden shadow-sm">
+                            <CustomVideoPlayer 
+                                src={docUrl} 
+                                title={task.fileName || task.title || "Video adjunto"} 
+                                isDarkMode={isDarkMode} 
+                            />
+                        </div>
+                    );
+                }
+                return (
                     <div 
                         onClick={() => setPreviewDoc({ url: docUrl, title: task.fileName || (isPdfDoc ? 'Documento PDF' : 'Documento adjunto') })}
                         className={`flex items-center justify-between gap-3 p-3 rounded-2xl border mt-3 w-fit max-w-full transition-all shadow-xs hover:border-blue-400 dark:hover:border-blue-500 hover:scale-[1.01] cursor-pointer select-none ${
