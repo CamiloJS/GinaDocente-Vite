@@ -337,6 +337,147 @@ chequear(
   isImageLikeUrl("https://example.com/documento.pdf") === false
 );
 
+console.log("\n== Preservación de Cuentas y Corrección de Nombres de Estudiantes ==");
+
+// Helper de normalización de correos
+const normalizeEmail = (em) => {
+  if (!em) return '';
+  const clean = String(em).trim().toLowerCase();
+  const [local, domain] = clean.split('@');
+  if (!domain) return clean;
+  if (domain === 'gmail.com' || domain === 'googlemail.com') {
+    return local.replace(/\./g, '') + '@gmail.com';
+  }
+  return clean;
+};
+
+chequear(
+  "normalizeEmail normaliza mayúsculas y puntos en Gmail",
+  normalizeEmail("Pepito.Perez@Gmail.COM") === "pepitoperez@gmail.com" &&
+  normalizeEmail("pepito.carlos.perez@googlemail.com") === "pepitocarlosperez@gmail.com" &&
+  normalizeEmail("alumno@unipamplona.edu.co") === "alumno@unipamplona.edu.co"
+);
+
+// Simulación de resolución de cuenta en Google Sign In
+const resolveExistingStudentAccount = (gUser, userMappings) => {
+  const email = gUser.email || '';
+  const fullName = gUser.displayName || 'Estudiante';
+  const normGoogleEmail = normalizeEmail(email);
+
+  const existingEntry = Object.entries(userMappings || {}).find(([k, v]) => 
+    (v?.uid && v.uid === gUser.uid) ||
+    (v?.email && normalizeEmail(v.email) === normGoogleEmail) || 
+    (v?.googleEmail && normalizeEmail(v.googleEmail) === normGoogleEmail)
+  );
+
+  if (existingEntry) {
+    const userKey = existingEntry[0];
+    const targetFullName = existingEntry[1]?.fullName?.trim() || fullName;
+    const targetRole = existingEntry[1]?.role || 'student';
+    return {
+      isExisting: true,
+      shouldPromptOnboarding: false,
+      userKey,
+      fullName: targetFullName,
+      role: targetRole
+    };
+  }
+
+  return {
+    isExisting: false,
+    shouldPromptOnboarding: true,
+    suggestedUsername: email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '') || 'student',
+    fullName
+  };
+};
+
+// Caso 1: Estudiante entra con Google como "Pepito Perez", profesor le corrige el nombre a "Pepito Carlos Perez Gonzalez"
+const mockMappings = {
+  pepito: {
+    fullName: "Pepito Carlos Perez Gonzalez", // Nombre corregido por el docente
+    customLabel: "Alumno",
+    email: "pepito.perez@gmail.com",
+    role: "student",
+    uid: "google_uid_12345",
+    onboardingCompleted: true
+  }
+};
+
+const resolved1 = resolveExistingStudentAccount(
+  { uid: "google_uid_12345", email: "pepitoperez@gmail.com", displayName: "Pepito Perez" },
+  mockMappings
+);
+
+chequear(
+  "Estudiante con nombre corregido por profesor ingresa directo sin pedir usuario nuevo",
+  resolved1.isExisting === true && resolved1.shouldPromptOnboarding === false && resolved1.userKey === "pepito"
+);
+
+chequear(
+  "Se preserva el nombre completo asignado por el docente en lugar del nombre corto de Google",
+  resolved1.fullName === "Pepito Carlos Perez Gonzalez"
+);
+
+// Caso 2: Estudiante creado por docente o sin el flag onboardingCompleted previamente
+const mockMappingsWithoutFlag = {
+  marianagomez: {
+    fullName: "Mariana Gomez Herrera",
+    email: "mariana.gomez@gmail.com",
+    role: "student"
+    // onboardingCompleted es undefined
+  }
+};
+
+const resolved2 = resolveExistingStudentAccount(
+  { uid: "new_google_uid_67890", email: "mariana.gomez@gmail.com", displayName: "Mariana" },
+  mockMappingsWithoutFlag
+);
+
+chequear(
+  "Cuenta existente sin onboardingCompleted NO pide crear usuario nuevo y entra directo",
+  resolved2.isExisting === true && resolved2.shouldPromptOnboarding === false && resolved2.userKey === "marianagomez" && resolved2.fullName === "Mariana Gomez Herrera"
+);
+
+// Caso 3: Coincidencia por correo con puntos alternos de Gmail
+const mockMappingsDots = {
+  carlos_m: {
+    fullName: "Carlos Mateo Mendoza",
+    email: "carlosmendoza@gmail.com",
+    role: "student"
+  }
+};
+
+const resolved3 = resolveExistingStudentAccount(
+  { uid: "uid_dots_abc", email: "carlos.mendoza@gmail.com", displayName: "Carlos" },
+  mockMappingsDots
+);
+
+chequear(
+  "Reconoce cuenta de Google incluso si el correo tiene puntos diferentes en Gmail",
+  resolved3.isExisting === true && resolved3.userKey === "carlos_m"
+);
+
+// Caso 4: Sincronización reactiva de sesión activa cuando el profesor cambia el nombre
+const syncSessionName = (currentSession, userMappings, cleanUser) => {
+  const studentData = userMappings[cleanUser];
+  if (studentData?.fullName && studentData.fullName.trim() !== currentSession.name) {
+    return {
+      ...currentSession,
+      name: studentData.fullName.trim()
+    };
+  }
+  return currentSession;
+};
+
+const initialSession = { email: "pepito@gmail.com", uid: "google_uid_12345", userKey: "pepito", name: "Pepito Perez", role: "student" };
+const updatedSession = syncSessionName(initialSession, mockMappings, "pepito");
+
+chequear(
+  "Sesión activa se actualiza automáticamente con el nuevo nombre completo del estudiante",
+  updatedSession.name === "Pepito Carlos Perez Gonzalez" && updatedSession.userKey === "pepito"
+);
+
 console.log(`\nRESULTADO: ${ok} OK, ${fallos} fallos\n`);
 process.exit(fallos ? 1 : 0);
+
 

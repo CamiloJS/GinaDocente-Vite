@@ -2704,31 +2704,127 @@ function App() {
               const fullName = gUser.displayName || 'Estudiante';
               const photo = gUser.photoURL || '';
               
-              // Buscar si ya existe este usuario registrado por email o uid en userMappings
-              const existingEntry = Object.entries(userMappings || {}).find(([k, v]) => 
-                (v?.email && v.email.toLowerCase() === email.toLowerCase()) || 
-                (v?.uid && v.uid === gUser.uid)
+              // Helper para normalizar correos (ignorando mayúsculas y puntos en Gmail)
+              const normalizeEmail = (em) => {
+                if (!em) return '';
+                const clean = String(em).trim().toLowerCase();
+                const [local, domain] = clean.split('@');
+                if (!domain) return clean;
+                if (domain === 'gmail.com' || domain === 'googlemail.com') {
+                  return local.replace(/\./g, '') + '@gmail.com';
+                }
+                return clean;
+              };
+
+              const normGoogleEmail = normalizeEmail(email);
+
+              // 1. Buscar primero en memoria si ya existe este usuario registrado por email, googleEmail o uid
+              let existingEntry = Object.entries(userMappings || {}).find(([k, v]) => 
+                (v?.uid && v.uid === gUser.uid) ||
+                (v?.email && normalizeEmail(v.email) === normGoogleEmail) || 
+                (v?.googleEmail && normalizeEmail(v.googleEmail) === normGoogleEmail)
               );
-              
+
               // Detectar si la cuenta pertenece a alguno de los docentes
               const isCamiloGUser = isCamiloTeacher(email) || isCamiloTeacher(fullName);
               const isGinaGUser = (email && email.toLowerCase() === 'ginamarcelaquintana19@gmail.com') || (fullName && fullName.toLowerCase().includes('gina marcela'));
               const isTeacherGoogle = isCamiloGUser || isGinaGUser;
 
-              // Si es docente o ya completó onboarding y existe en la base de datos: entrar directo
-              if (isTeacherGoogle || (existingEntry && existingEntry[1]?.onboardingCompleted)) {
+              // 2. Si no es docente y no se encontró en memoria, consultar DIRECTAMENTE en Firestore
+              // (Evita falsos "nuevos usuarios" cuando userMappings aún está cargando o en conexiones lentas)
+              if (!existingEntry && !isTeacherGoogle && !isDemoMode) {
+                try {
+                  const emailPrefix = email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '');
+                  
+                  // a) Buscar si existe documento directo con el nombre de usuario de su correo
+                  if (emailPrefix) {
+                    const directSnap = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userMappings', emailPrefix));
+                    if (directSnap.exists()) {
+                      const dData = directSnap.data();
+                      if (!dData.email || normalizeEmail(dData.email) === normGoogleEmail || dData.uid === gUser.uid) {
+                        existingEntry = [emailPrefix, dData];
+                      }
+                    }
+                  }
+
+                  // b) Buscar por uid en Firestore
+                  if (!existingEntry && gUser.uid) {
+                    const uidQuery = query(collection(db, 'artifacts', appId, 'public', 'data', 'userMappings'), where('uid', '==', gUser.uid));
+                    const uidSnap = await getDocs(uidQuery);
+                    if (!uidSnap.empty) {
+                      const firstDoc = uidSnap.docs[0];
+                      existingEntry = [firstDoc.id, firstDoc.data()];
+                    }
+                  }
+
+                  // c) Buscar por email en Firestore
+                  if (!existingEntry && email) {
+                    const emailQuery = query(collection(db, 'artifacts', appId, 'public', 'data', 'userMappings'), where('email', '==', email.trim().toLowerCase()));
+                    const emailSnap = await getDocs(emailQuery);
+                    if (!emailSnap.empty) {
+                      const firstDoc = emailSnap.docs[0];
+                      existingEntry = [firstDoc.id, firstDoc.data()];
+                    }
+                  }
+
+                  // d) Si aún no se encontró, escanear la colección para comparar correos normalizados
+                  if (!existingEntry) {
+                    const allDocsSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'userMappings'));
+                    for (const d of allDocsSnap.docs) {
+                      const data = d.data();
+                      if (
+                        (data.uid && data.uid === gUser.uid) ||
+                        (data.email && normalizeEmail(data.email) === normGoogleEmail) ||
+                        (data.googleEmail && normalizeEmail(data.googleEmail) === normGoogleEmail)
+                      ) {
+                        existingEntry = [d.id, data];
+                        break;
+                      }
+                    }
+                  }
+                } catch (fsErr) {
+                  console.warn('Fallback Firestore lookup for userMappings warning:', fsErr);
+                }
+              }
+
+              // Si es docente o YA EXISTE en la base de datos (incluso si onboardingCompleted no estaba configurado):
+              // ¡ENTRAR DIRECTO! Jamás pedirle crear usuario nuevo a quien ya tiene cuenta o perfil creado/editado.
+              if (isTeacherGoogle || existingEntry) {
                 const userKey = isCamiloGUser ? 'camilodocente' : (isGinaGUser ? 'teacher' : existingEntry[0]);
-                const targetFullName = isCamiloGUser ? SECOND_TEACHER_NAME : (isGinaGUser ? TEACHER_NAME : (existingEntry[1].fullName || fullName));
-                const targetRole = isTeacherGoogle ? 'teacher' : (existingEntry[1].role || 'student');
+                // IMPORTANTE: Conservar siempre el nombre que el docente haya corregido en la plataforma (fullName existente)
+                const targetFullName = isCamiloGUser 
+                  ? SECOND_TEACHER_NAME 
+                  : (isGinaGUser 
+                      ? TEACHER_NAME 
+                      : (existingEntry[1]?.fullName?.trim() || fullName));
+                const targetRole = isTeacherGoogle ? 'teacher' : (existingEntry[1]?.role || 'student');
                 const finalDisplayName = targetRole === 'teacher' ? getTeacherDisplayName(userKey || targetFullName) : targetFullName;
                 
+                // Actualizar Firestore vinculando permanentemente uid y marcando onboardingCompleted: true
                 await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userMappings', userKey), {
                   fullName: targetFullName,
                   email: email,
+                  googleEmail: email,
+                  uid: gUser.uid,
                   role: targetRole,
                   lastLogin: Date.now(),
                   onboardingCompleted: true
                 }, { merge: true }).catch(() => {});
+
+                // Actualizar inmediatamente en memoria para que no dependa de latencia de red
+                setUserMappings(prev => ({
+                  ...prev,
+                  [userKey]: {
+                    ...(prev[userKey] || existingEntry[1] || {}),
+                    fullName: targetFullName,
+                    email: email,
+                    googleEmail: email,
+                    uid: gUser.uid,
+                    role: targetRole,
+                    lastLogin: Date.now(),
+                    onboardingCompleted: true
+                  }
+                }));
 
                 const newAcc = { username: userKey, name: finalDisplayName, role: targetRole, email: email, isGoogle: true };
                 const accs = safeGetSavedAccounts();
@@ -2829,12 +2925,17 @@ function App() {
               // Validar si el username ya está tomado por OTRO usuario distinto
               const userDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'userMappings', rawUser);
               const existingSnap = await getDoc(userDocRef);
+              let preservedFullName = finalName;
               if (existingSnap.exists()) {
                 const existingData = existingSnap.data();
                 if (existingData.email?.toLowerCase() !== googleOnboarding.email.toLowerCase() && existingData.uid !== googleOnboarding.uid) {
                   showMessage(`El usuario @${rawUser} ya pertenece a otro estudiante. Elige otro.`);
                   setGoogleOnboarding(prev => ({ ...prev, isSaving: false }));
                   return;
+                }
+                // Si el docente ya le había asignado o corregido el nombre completo, conservarlo
+                if (existingData.fullName?.trim()) {
+                  preservedFullName = existingData.fullName.trim();
                 }
               }
 
@@ -2856,8 +2957,9 @@ function App() {
               }
 
               await setDoc(userDocRef, {
-                fullName: finalName,
+                fullName: preservedFullName,
                 email: googleOnboarding.email,
+                googleEmail: googleOnboarding.email,
                 role: 'student',
                 profilePicUrl: finalPhoto,
                 uid: googleOnboarding.uid,
@@ -2866,19 +2968,34 @@ function App() {
                 lastLogin: Date.now()
               }, { merge: true });
 
-              const newAcc = { username: rawUser, name: finalName, role: 'student', email: googleOnboarding.email, isGoogle: true };
+              setUserMappings(prev => ({
+                ...prev,
+                [rawUser]: {
+                  ...(prev[rawUser] || {}),
+                  fullName: preservedFullName,
+                  email: googleOnboarding.email,
+                  googleEmail: googleOnboarding.email,
+                  role: 'student',
+                  profilePicUrl: finalPhoto,
+                  uid: googleOnboarding.uid,
+                  onboardingCompleted: true,
+                  lastLogin: Date.now()
+                }
+              }));
+
+              const newAcc = { username: rawUser, name: preservedFullName, role: 'student', email: googleOnboarding.email, isGoogle: true };
               const accs = safeGetSavedAccounts();
               const filtered = accs.filter(a => a.username !== rawUser); 
               const updatedAccs = [newAcc, ...filtered];
               localStorage.setItem('englishTech_savedAccounts', JSON.stringify(updatedAccs));
               setSavedAccounts(updatedAccs);
 
-              const sessionObj = { email: googleOnboarding.email, uid: googleOnboarding.uid, userKey: rawUser, name: finalName, role: 'student', isGoogle: true };
+              const sessionObj = { email: googleOnboarding.email, uid: googleOnboarding.uid, userKey: rawUser, name: preservedFullName, role: 'student', isGoogle: true };
               localStorage.setItem('englishTech_activeSession', JSON.stringify(sessionObj));
 
               setRole('student');
               setLoggedInUser(`@${rawUser}`);
-              setLoggedInName(finalName);
+              setLoggedInName(preservedFullName);
               setHasEntered(true);
               setGoogleOnboarding({ isOpen: false, uid: '', email: '', fullName: '', username: '', photoURL: '', photoChoice: 'google', customPhotoUrl: '', isSaving: false });
               if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
@@ -3447,14 +3564,40 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
                 }
 
                 if (u && u.email) {
-                    const currentMappings = userMappingsRef.current || {};
-                    const emailLower = u.email.toLowerCase();
+                    const normalizeEmail = (em) => {
+                        if (!em) return '';
+                        const clean = String(em).trim().toLowerCase();
+                        const [local, domain] = clean.split('@');
+                        if (!domain) return clean;
+                        if (domain === 'gmail.com' || domain === 'googlemail.com') {
+                            return local.replace(/\./g, '') + '@gmail.com';
+                        }
+                        return clean;
+                    };
+                    const normUEmail = normalizeEmail(u.email);
+                    let currentMappings = userMappingsRef.current || {};
                     let foundKey = Object.keys(currentMappings).find(k => 
-                        (currentMappings[k]?.email && currentMappings[k].email.toLowerCase() === emailLower) ||
-                        (currentMappings[k]?.uid && currentMappings[k].uid === u.uid)
+                        (currentMappings[k]?.uid && currentMappings[k].uid === u.uid) ||
+                        (currentMappings[k]?.email && normalizeEmail(currentMappings[k].email) === normUEmail) ||
+                        (currentMappings[k]?.googleEmail && normalizeEmail(currentMappings[k].googleEmail) === normUEmail)
                     );
                     if (!foundKey) {
-                        foundKey = Object.keys(FALLBACK_MAP).find(k => FALLBACK_MAP[k]?.email?.toLowerCase() === emailLower);
+                        foundKey = Object.keys(FALLBACK_MAP).find(k => normalizeEmail(FALLBACK_MAP[k]?.email) === normUEmail);
+                    }
+                    if (!foundKey && !isDemoMode) {
+                        try {
+                            const emailPrefix = u.email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '');
+                            if (emailPrefix) {
+                                const directDoc = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userMappings', emailPrefix));
+                                if (directDoc.exists()) {
+                                    const dData = directDoc.data();
+                                    if (!dData.email || normalizeEmail(dData.email) === normUEmail || dData.uid === u.uid) {
+                                        foundKey = emailPrefix;
+                                        currentMappings = { ...currentMappings, [emailPrefix]: dData };
+                                    }
+                                }
+                            }
+                        } catch (err) {}
                     }
 
                     if (foundKey) {
@@ -3474,6 +3617,31 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
             });
             return () => unsubscribe();
           }, []);
+
+          // Sincronizar en tiempo real el nombre del estudiante si el docente se lo corrige en userMappings
+          useEffect(() => {
+            if (!hasEntered || role !== 'student' || !loggedInUser) return;
+            const cleanUser = loggedInUser.replace('@', '').trim().toLowerCase();
+            const studentData = userMappings[cleanUser];
+            if (studentData?.fullName && studentData.fullName.trim() && studentData.fullName.trim() !== loggedInName) {
+              const newName = studentData.fullName.trim();
+              setLoggedInName(newName);
+              try {
+                const rawSession = localStorage.getItem('englishTech_activeSession');
+                if (rawSession) {
+                  const sessionObj = JSON.parse(rawSession);
+                  sessionObj.name = newName;
+                  localStorage.setItem('englishTech_activeSession', JSON.stringify(sessionObj));
+                }
+                const accs = safeGetSavedAccounts();
+                const updated = accs.map(a => a.username === cleanUser ? { ...a, name: newName } : a);
+                localStorage.setItem('englishTech_savedAccounts', JSON.stringify(updated));
+                setSavedAccounts(updated);
+              } catch (err) {
+                console.warn('Error sincronizando nombre corregido por docente:', err);
+              }
+            }
+          }, [userMappings, hasEntered, role, loggedInUser, loggedInName]);
 
           // 1. COSAS GLOBALES (Se necesitan siempre para notificaciones y chats)
 useEffect(() => {
@@ -8054,16 +8222,22 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
     const handleSaveStudentEdit = async (e) => {
         e.preventDefault();
         if (!studentEditModal.userKey) return;
-        const prevPicUrl = userMappings[studentEditModal.userKey]?.profilePicUrl || '';
+        const currentStudentData = userMappings[studentEditModal.userKey] || {};
+        const prevPicUrl = currentStudentData?.profilePicUrl || '';
         const nextPicUrl = studentEditModal.profilePicUrl.trim();
+        const trimmedFullName = studentEditModal.fullName.trim();
+        const trimmedCustomLabel = studentEditModal.customLabel.trim();
+        const trimmedEmail = studentEditModal.email.trim();
+
         if (isDemoMode) {
             const updatedStudent = {
-                ...(userMappings[studentEditModal.userKey] || {}),
-                fullName: studentEditModal.fullName.trim(),
-                customLabel: studentEditModal.customLabel.trim(),
+                ...currentStudentData,
+                fullName: trimmedFullName,
+                customLabel: trimmedCustomLabel,
                 profilePicUrl: nextPicUrl,
-                email: studentEditModal.email.trim(),
+                email: trimmedEmail,
                 role: 'student',
+                onboardingCompleted: true,
                 updatedAt: Date.now()
             };
             setUserMappings(prev => ({
@@ -8080,13 +8254,29 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                 deleteFileFromStorage(prevPicUrl).catch(() => {});
             }
             await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userMappings', studentEditModal.userKey), {
-                fullName: studentEditModal.fullName.trim(),
-                customLabel: studentEditModal.customLabel.trim(),
+                fullName: trimmedFullName,
+                customLabel: trimmedCustomLabel,
                 profilePicUrl: nextPicUrl,
-                email: studentEditModal.email.trim(),
+                email: trimmedEmail,
                 role: 'student',
+                onboardingCompleted: true,
                 updatedAt: Date.now()
             }, { merge: true });
+
+            setUserMappings(prev => ({
+                ...prev,
+                [studentEditModal.userKey]: {
+                    ...(prev[studentEditModal.userKey] || {}),
+                    fullName: trimmedFullName,
+                    customLabel: trimmedCustomLabel,
+                    profilePicUrl: nextPicUrl,
+                    email: trimmedEmail,
+                    role: 'student',
+                    onboardingCompleted: true,
+                    updatedAt: Date.now()
+                }
+            }));
+
             showMessage("Perfil de estudiante actualizado.");
             setStudentEditModal({ isOpen: false, userKey: '', fullName: '', customLabel: '', email: '', profilePicUrl: '' });
         } catch (err) {
@@ -8867,7 +9057,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                         const pass = e.target.password.value;
                         if (!u || !fn || !email || !pass) return;
                         if (isDemoMode) {
-                            const newStudent = { fullName: fn, email: email, role: 'student', createdAt: Date.now(), isDemoCreated: true };
+                            const newStudent = { fullName: fn, email: email, role: 'student', onboardingCompleted: true, createdAt: Date.now(), isDemoCreated: true };
                             setUserMappings(prev => ({
                                 ...prev,
                                 [u]: newStudent
@@ -8881,7 +9071,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                         try {
                             await createUserWithEmailAndPassword(secondaryAuth, email, pass);
                             await signOut(secondaryAuth);
-                            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userMappings', u), { fullName: fn, email: email, role: 'student', createdAt: Date.now() });
+                            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userMappings', u), { fullName: fn, email: email, role: 'student', onboardingCompleted: true, createdAt: Date.now() });
                             e.target.reset();
                             setShowRegisterStudentForm(false);
                             showMessage("Estudiante registrado exitosamente.");
