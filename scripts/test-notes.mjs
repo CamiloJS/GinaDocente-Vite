@@ -13,6 +13,10 @@ import {
   NOTE_PAPER_THEMES,
   NOTE_FORMATS,
   NOTE_SHEET_STYLES,
+  STICKY_NOTE_COLORS,
+  getStickyNoteColor,
+  normalizeSheetPages,
+  buildEmptySheetPage,
   normalizeNoteFormat,
   normalizeNoteSheetStyle,
   extractNoteYouTubeId,
@@ -393,7 +397,6 @@ check(
     normalizeNoteSheetStyle('unknown') === 'blank' &&
     notesModuleSrc.includes('Hoja completa') &&
     notesModuleSrc.includes('getSheetRulingStyle') &&
-    notesModuleSrc.includes('handleToggleNoteFormat') &&
     DEMO_NOTES.some(n => n.noteFormat === 'sheet')
 );
 
@@ -407,6 +410,63 @@ check(
       /^#[0-9a-fA-F]{6}$/.test(t.darkColor || '')
   ) &&
     notesModuleSrc.includes('getPaperSurfaceStyle(activeSheetNote.paperTheme)')
+);
+
+console.log('\n== 6. Separación Estricta de Notas Rápidas y Hojas con Múltiples Páginas ==');
+check(
+  'STICKY_NOTE_COLORS define 7 colores pasteles y getStickyNoteColor resuelve correctamente con fallback seguro a amarillo',
+  Array.isArray(STICKY_NOTE_COLORS) &&
+    STICKY_NOTE_COLORS.length === 7 &&
+    STICKY_NOTE_COLORS.some(c => c.id === 'yellow') &&
+    STICKY_NOTE_COLORS.some(c => c.id === 'green') &&
+    STICKY_NOTE_COLORS.some(c => c.id === 'orange') &&
+    getStickyNoteColor('green').id === 'green' &&
+    getStickyNoteColor('unknown').id === 'yellow' &&
+    getStickyNoteColor(null).id === 'yellow'
+);
+
+check(
+  'normalizeSheetPages asegura retrocompatibilidad con notas legadas (1 página) y respeta páginas múltiples',
+  (() => {
+    const legacy = { id: 'leg-1', title: 'Apunte viejo', content: '<p>Contenido</p>' };
+    const normalizedLegacy = normalizeSheetPages(legacy);
+    const multiPage = {
+      id: 'multi-1',
+      title: 'Nota múltiple',
+      pages: [
+        { id: 'p1', title: 'Hoja 1', content: 'Contenido 1' },
+        { id: 'p2', title: 'Hoja 2', content: 'Contenido 2' }
+      ]
+    };
+    const normalizedMulti = normalizeSheetPages(multiPage);
+    return normalizedLegacy.length === 1 &&
+      normalizedLegacy[0].title === 'Apunte viejo' &&
+      normalizedLegacy[0].content === '<p>Contenido</p>' &&
+      normalizedMulti.length === 2 &&
+      normalizedMulti[1].content === 'Contenido 2';
+  })()
+);
+
+check(
+  'buildEmptySheetPage construye páginas numeradas con título y contenido inicial limpio',
+  (() => {
+    const page2 = buildEmptySheetPage(2);
+    return page2.pageNumber === 2 &&
+      page2.title === '' &&
+      page2.content === '' &&
+      Boolean(page2.id);
+  })()
+);
+
+check(
+  'NotesModule.jsx separa estrictamente Notas Rápidas y Hojas sin conversión de formato ni mutación visual al filtrar',
+  notesModuleSrc.includes("const savedFmt = normalizeNoteFormat(note.noteFormat);") &&
+    notesModuleSrc.includes("if (viewMode === 'sticky' && savedFmt !== 'sticky') return false;") &&
+    notesModuleSrc.includes("if (viewMode === 'sheet' && savedFmt !== 'sheet') return false;") &&
+    !notesModuleSrc.includes("const effectiveFormat = viewMode === 'all' ? savedFormat : viewMode;") &&
+    !notesModuleSrc.includes("handleToggleNoteFormat") &&
+    DEMO_NOTES.some(n => n.noteFormat === 'sheet' && Array.isArray(n.pages) && n.pages.length > 1) &&
+    DEMO_NOTES.some(n => n.noteFormat === 'sticky' && n.stickyColor)
 );
 
 console.log('\n========================================');

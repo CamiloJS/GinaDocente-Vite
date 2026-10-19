@@ -39,7 +39,9 @@ import {
   MessageSquareText,
   FileText,
   Grid,
-  Maximize2
+  Maximize2,
+  ChevronLeft,
+  ChevronRight
 } from './Icons.jsx';
 import CustomVideoPlayer from './CustomVideoPlayer.jsx';
 import {
@@ -50,8 +52,12 @@ import {
   NOTE_PAPER_THEMES,
   NOTE_FORMATS,
   NOTE_SHEET_STYLES,
+  STICKY_NOTE_COLORS,
+  getStickyNoteColor,
   normalizeNoteFormat,
   normalizeNoteSheetStyle,
+  normalizeSheetPages,
+  buildEmptySheetPage,
   classifyNoteUrl,
   sanitizeNoteHtml,
   stripNoteHtml,
@@ -126,12 +132,19 @@ export default function NotesModule({
   const [paperTheme, setPaperTheme] = useState('default');
   const [noteFormat, setNoteFormat] = useState('sticky'); // 'sticky' | 'sheet'
   const [sheetStyle, setSheetStyle] = useState('blank'); // 'blank' | 'lined' | 'grid'
+  const [stickyColor, setStickyColor] = useState('yellow'); // 'yellow' | 'green' | 'blue' | 'purple' | 'rose' | 'orange' | 'white'
+  const [sheetPages, setSheetPages] = useState([{ id: 'p_1', pageNumber: 1, title: '', content: '' }]);
+  const [activeEditorPageIdx, setActiveEditorPageIdx] = useState(0);
   const [isLockedOnSave, setIsLockedOnSave] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
   const [links, setLinks] = useState([]);
 
+  // Navegación de páginas en tarjetas de hojas del muro principal
+  const [cardPageIndices, setCardPageIndices] = useState({});
+
   // Vista ampliada de Hoja Completa Profesional
   const [activeSheetNoteId, setActiveSheetNoteId] = useState(null);
+  const [viewerPageIndex, setViewerPageIndex] = useState(0);
 
   // Barra para insertar enlace inteligente (imagen por URL, YouTube o enlace web)
   const [showLinkInput, setShowLinkInput] = useState(false);
@@ -198,7 +211,7 @@ export default function NotesModule({
     }
   }, [scopeCounts.shared, scopeCounts.private, activeScope]);
 
-  // Filtrar notas visibles según pestaña (compartidas vs privadas), búsqueda y borrado suave de estudiantes
+  // Filtrar notas visibles según pestaña (compartidas vs privadas), tipo (Todo, Notas rápidas, Hojas), búsqueda y borrado suave
   const visibleNotes = useMemo(() => {
     return (Array.isArray(notes) ? notes : [])
       .filter((note) => {
@@ -222,13 +235,22 @@ export default function NotesModule({
           }
         }
 
-        // Búsqueda por texto, título o autor
+        // Filtro estricto por formato sin alterar nunca la nota: 'all' | 'sticky' | 'sheet'
+        const savedFmt = normalizeNoteFormat(note.noteFormat);
+        if (viewMode === 'sticky' && savedFmt !== 'sticky') return false;
+        if (viewMode === 'sheet' && savedFmt !== 'sheet') return false;
+
+        // Búsqueda por texto, título, autor o páginas de hojas
         if (searchQuery.trim()) {
           const q = searchQuery.trim().toLowerCase();
           const inTitle = String(note.title || '').toLowerCase().includes(q);
           const inContent = stripNoteHtml(note.content || '').toLowerCase().includes(q);
+          const inPages = Array.isArray(note.pages) && note.pages.some(p =>
+            String(p?.title || '').toLowerCase().includes(q) ||
+            stripNoteHtml(p?.content || '').toLowerCase().includes(q)
+          );
           const inAuthor = String(note.authorName || '').toLowerCase().includes(q);
-          return inTitle || inContent || inAuthor;
+          return inTitle || inContent || inPages || inAuthor;
         }
 
         return true;
@@ -239,7 +261,7 @@ export default function NotesModule({
         }
         return Number(b.updatedAt || b.createdAt || 0) - Number(a.updatedAt || a.createdAt || 0);
       });
-  }, [notes, activeScope, normalizedUserId, selectedGroupFilter, searchQuery]);
+  }, [notes, activeScope, normalizedUserId, selectedGroupFilter, viewMode, searchQuery]);
 
   // Historial consolidado de últimos cambios (SOLO se calcula y renderiza si isTeacher === true)
   const teacherAuditFeed = useMemo(() => {
@@ -266,7 +288,7 @@ export default function NotesModule({
   }, [isTeacher, notes]);
 
   // Abrir compositor para nueva nota
-  const handleOpenNewNote = (initialScope = activeScope, initialFormat = null) => {
+  const handleOpenNewNote = (initialScope = activeScope, initialFormat = 'sticky') => {
     setEditingNote(null);
     setTitle('');
     setScope(initialScope);
@@ -278,8 +300,12 @@ export default function NotesModule({
     setFontFamily('sans');
     setFontSize('base');
     setPaperTheme('default');
-    setNoteFormat(initialFormat ? normalizeNoteFormat(initialFormat) : (viewMode === 'sheet' ? 'sheet' : 'sticky'));
+    const resolvedFmt = normalizeNoteFormat(initialFormat || (viewMode === 'sheet' ? 'sheet' : 'sticky'));
+    setNoteFormat(resolvedFmt);
+    setStickyColor('yellow');
     setSheetStyle('blank');
+    setSheetPages([{ id: `page_${Date.now()}_1`, pageNumber: 1, title: '', content: '' }]);
+    setActiveEditorPageIdx(0);
     setIsLockedOnSave(initialScope === 'shared');
     setIsPinned(false);
     setLinks([]);
@@ -304,6 +330,8 @@ export default function NotesModule({
       }
       return;
     }
+    const resolvedFmt = normalizeNoteFormat(note.noteFormat);
+    const resolvedPages = normalizeSheetPages(note);
     setEditingNote(note);
     setTitle(note.title || '');
     setScope(note.scope === 'private' ? 'private' : 'shared');
@@ -311,8 +339,11 @@ export default function NotesModule({
     setFontFamily(note.fontFamily || 'sans');
     setFontSize(note.fontSize || 'base');
     setPaperTheme(note.paperTheme || 'default');
-    setNoteFormat(normalizeNoteFormat(note.noteFormat));
+    setNoteFormat(resolvedFmt);
+    setStickyColor(note.stickyColor || note.color || note.paperTheme || 'yellow');
     setSheetStyle(normalizeNoteSheetStyle(note.sheetStyle));
+    setSheetPages(resolvedPages);
+    setActiveEditorPageIdx(0);
     setIsLockedOnSave(Boolean(note.isLocked));
     setIsPinned(Boolean(note.isPinned));
     setLinks(Array.isArray(note.links) ? [...note.links] : []);
@@ -323,9 +354,68 @@ export default function NotesModule({
     setIsComposerOpen(true);
     setTimeout(() => {
       if (editorRef.current) {
-        editorRef.current.innerHTML = note.content || '';
+        editorRef.current.innerHTML = resolvedFmt === 'sheet' ? (resolvedPages[0]?.content || '') : (note.content || '');
       }
     }, 40);
+  };
+
+  const handleSwitchEditorPage = (targetIdx) => {
+    if (targetIdx === activeEditorPageIdx || targetIdx < 0 || targetIdx >= sheetPages.length) return;
+    const currentHtml = editorRef.current ? sanitizeNoteHtml(editorRef.current.innerHTML) : '';
+    setSheetPages((prev) => {
+      const next = [...prev];
+      if (next[activeEditorPageIdx]) {
+        next[activeEditorPageIdx] = {
+          ...next[activeEditorPageIdx],
+          content: currentHtml
+        };
+      }
+      return next;
+    });
+    setActiveEditorPageIdx(targetIdx);
+    setTimeout(() => {
+      if (editorRef.current) {
+        editorRef.current.innerHTML = sheetPages[targetIdx]?.content || '';
+        editorRef.current.focus();
+      }
+    }, 20);
+  };
+
+  const handleAddEditorPage = () => {
+    const currentHtml = editorRef.current ? sanitizeNoteHtml(editorRef.current.innerHTML) : '';
+    const newPageNum = sheetPages.length + 1;
+    const newPage = buildEmptySheetPage(newPageNum);
+    const updatedPages = sheetPages.map((p, idx) =>
+      idx === activeEditorPageIdx ? { ...p, content: currentHtml } : p
+    );
+    setSheetPages([...updatedPages, newPage]);
+    setActiveEditorPageIdx(updatedPages.length);
+    setTimeout(() => {
+      if (editorRef.current) {
+        editorRef.current.innerHTML = '';
+        editorRef.current.focus();
+      }
+    }, 20);
+  };
+
+  const handleDeleteEditorPage = (pageIdxToDelete) => {
+    if (sheetPages.length <= 1) return;
+    const filtered = sheetPages.filter((_, idx) => idx !== pageIdxToDelete).map((p, idx) => ({
+      ...p,
+      pageNumber: idx + 1
+    }));
+    const nextActiveIdx = Math.min(
+      activeEditorPageIdx >= pageIdxToDelete ? Math.max(0, activeEditorPageIdx - 1) : activeEditorPageIdx,
+      filtered.length - 1
+    );
+    setSheetPages(filtered);
+    setActiveEditorPageIdx(nextActiveIdx);
+    setTimeout(() => {
+      if (editorRef.current) {
+        editorRef.current.innerHTML = filtered[nextActiveIdx]?.content || '';
+        editorRef.current.focus();
+      }
+    }, 20);
   };
 
   const saveEditorSelection = () => {
@@ -537,24 +627,55 @@ export default function NotesModule({
   // Guardar nota (nueva o editada)
   const handleSaveComposerNote = async (e) => {
     if (e) e.preventDefault();
-    const rawHtml = editorRef.current ? editorRef.current.innerHTML : '';
-    const autoDiscoveredLinks = extractInlineMediaUrlsFromHtml(rawHtml, links);
-    const mergedLinks = [...links, ...autoDiscoveredLinks];
-    const sanitizedHtml = sanitizeNoteHtml(rawHtml);
-    const plainText = stripNoteHtml(sanitizedHtml);
+    const activeEditorHtml = editorRef.current ? sanitizeNoteHtml(editorRef.current.innerHTML) : '';
 
-    if (!title.trim() && !plainText && mergedLinks.length === 0) {
+    const effectiveFormat = editingNote
+      ? normalizeNoteFormat(editingNote.noteFormat)
+      : normalizeNoteFormat(noteFormat);
+
+    let finalPages = [];
+    let primaryContent = '';
+
+    if (effectiveFormat === 'sheet') {
+      const mergedPages = sheetPages.map((p, idx) =>
+        idx === activeEditorPageIdx ? { ...p, content: activeEditorHtml } : p
+      );
+      finalPages = mergedPages.map((p, idx) => ({
+        id: String(p?.id || `page_${idx + 1}`),
+        pageNumber: idx + 1,
+        title: typeof p?.title === 'string' ? p.title : '',
+        content: sanitizeNoteHtml(p?.content || '')
+      }));
+      primaryContent = finalPages[0]?.content || '';
+    } else {
+      primaryContent = activeEditorHtml;
+      finalPages = [];
+    }
+
+    const autoDiscoveredLinks = extractInlineMediaUrlsFromHtml(primaryContent, links);
+    const mergedLinks = [...links, ...autoDiscoveredLinks];
+    const plainText = stripNoteHtml(primaryContent);
+    const hasAnyPageContent = finalPages.some((p) => stripNoteHtml(p.content).trim() !== '');
+
+    if (!title.trim() && !plainText && !hasAnyPageContent && mergedLinks.length === 0) {
       if (showNotify) {
-        showNotify('Escribe un título, contenido o agrega un enlace antes de guardar la nota.', 'warning');
+        showNotify(
+          effectiveFormat === 'sheet'
+            ? 'Escribe un título o contenido en la hoja antes de guardar.'
+            : 'Escribe un título, contenido o agrega un enlace antes de guardar la nota.',
+          'warning'
+        );
       }
       return;
     }
 
-    // Enlaces de YouTube o imágenes ya fusionados en mergedLinks
-
     const selectedGroupObj = academicGroups.find((g) => String(g.id) === String(targetGroupId));
     const now = Date.now();
-    const finalTitle = title.trim() || (scope === 'private' ? 'Apunte privado' : 'Apuntes de sesión');
+    const finalTitle =
+      title.trim() ||
+      (effectiveFormat === 'sheet'
+        ? (scope === 'private' ? 'Hoja privada' : 'Documento de clase')
+        : (scope === 'private' ? 'Nota rápida' : 'Nota de clase'));
 
     if (editingNote) {
       const auditAction =
@@ -576,7 +697,7 @@ export default function NotesModule({
         previousTitle: editingNote.title || '',
         newTitle: finalTitle,
         previousContent: editingNote.content || '',
-        newContent: sanitizedHtml,
+        newContent: primaryContent,
         previousLinks: editingNote.links || [],
         newLinks: mergedLinks
       });
@@ -585,11 +706,14 @@ export default function NotesModule({
         ...editingNote,
         title: finalTitle,
         scope,
-        content: sanitizedHtml,
+        content: primaryContent,
+        pages: finalPages,
+        pageCount: effectiveFormat === 'sheet' ? Math.max(1, finalPages.length) : 1,
         fontFamily,
         fontSize,
         paperTheme,
-        noteFormat: normalizeNoteFormat(noteFormat),
+        stickyColor: effectiveFormat === 'sticky' ? stickyColor : (editingNote.stickyColor || null),
+        noteFormat: effectiveFormat,
         sheetStyle: normalizeNoteSheetStyle(sheetStyle),
         isPinned: Boolean(isPinned),
         isLocked: scope === 'shared' ? Boolean(isLockedOnSave) : false,
@@ -625,7 +749,12 @@ export default function NotesModule({
         await onSaveNote(updatedNote);
       }
       if (showNotify) {
-        showNotify('Nota actualizada correctamente.', 'success');
+        showNotify(
+          effectiveFormat === 'sheet'
+            ? 'Hoja completa actualizada correctamente.'
+            : 'Nota rápida actualizada correctamente.',
+          'success'
+        );
       }
     } else {
       const initialAudit =
@@ -637,12 +766,12 @@ export default function NotesModule({
                 actorName: currentUserName,
                 actorRole: role,
                 summary: isLockedOnSave
-                  ? 'Creó la nota compartida con candado de sesión activo'
-                  : 'Creó una nueva nota compartida en la clase',
+                  ? `Creó ${effectiveFormat === 'sheet' ? 'la hoja completa' : 'la nota rápida'} con candado de sesión activo`
+                  : `Creó una nueva ${effectiveFormat === 'sheet' ? 'hoja completa' : 'nota rápida'} en la clase`,
                 previousTitle: '',
                 newTitle: finalTitle,
                 previousContent: '',
-                newContent: sanitizedHtml,
+                newContent: primaryContent,
                 previousLinks: [],
                 newLinks: mergedLinks
               })
@@ -653,11 +782,14 @@ export default function NotesModule({
         id: `note_${now}_${Math.random().toString(36).slice(2, 8)}`,
         title: finalTitle,
         scope,
-        content: sanitizedHtml,
+        content: primaryContent,
+        pages: finalPages,
+        pageCount: effectiveFormat === 'sheet' ? Math.max(1, finalPages.length) : 1,
         fontFamily,
         fontSize,
         paperTheme,
-        noteFormat: normalizeNoteFormat(noteFormat),
+        stickyColor: effectiveFormat === 'sticky' ? stickyColor : null,
+        noteFormat: effectiveFormat,
         sheetStyle: normalizeNoteSheetStyle(sheetStyle),
         isPinned: Boolean(isPinned),
         isLocked: scope === 'shared' ? Boolean(isLockedOnSave) : false,
@@ -686,10 +818,10 @@ export default function NotesModule({
       if (showNotify) {
         showNotify(
           scope === 'private'
-            ? 'Nota privada guardada.'
+            ? (effectiveFormat === 'sheet' ? 'Hoja privada guardada.' : 'Nota privada guardada.')
             : isLockedOnSave
-              ? 'Nota compartida publicada y asegurada con candado.'
-              : 'Nota compartida publicada en el cuaderno de clase.',
+              ? (effectiveFormat === 'sheet' ? 'Hoja publicada y asegurada con candado.' : 'Nota rápida publicada y asegurada con candado.')
+              : (effectiveFormat === 'sheet' ? 'Hoja publicada en el cuaderno de clase.' : 'Nota rápida publicada en el cuaderno de clase.'),
           'success'
         );
       }
@@ -761,27 +893,6 @@ export default function NotesModule({
     const updated = {
       ...note,
       isPinned: !note.isPinned,
-      updatedAt: Date.now()
-    };
-    if (onSaveNote) {
-      await onSaveNote(updated);
-    }
-  };
-
-  // Alternar formato entre Nota rápida (sticky) y Hoja completa profesional (sheet)
-  const handleToggleNoteFormat = async (note) => {
-    if (!note) return;
-    if (!canUserEditNote(note, currentUserObj)) {
-      if (showNotify) {
-        showNotify('Esta nota tiene candado. Desbloquéala para cambiar su formato.', 'warning');
-      }
-      return;
-    }
-    const nextFmt = normalizeNoteFormat(note.noteFormat) === 'sheet' ? 'sticky' : 'sheet';
-    const updated = {
-      ...note,
-      noteFormat: nextFmt,
-      sheetStyle: normalizeNoteSheetStyle(note.sheetStyle),
       updatedAt: Date.now()
     };
     if (onSaveNote) {
@@ -1170,8 +1281,13 @@ export default function NotesModule({
 
   const activeSheetNote = useMemo(() => {
     if (!activeSheetNoteId) return null;
-    return visibleNotes.find((n) => String(n.id) === String(activeSheetNoteId)) || null;
-  }, [activeSheetNoteId, visibleNotes]);
+    return (Array.isArray(notes) ? notes : []).find((n) => String(n.id) === String(activeSheetNoteId)) || null;
+  }, [activeSheetNoteId, notes]);
+
+  const viewerPages = useMemo(() => (activeSheetNote ? normalizeSheetPages(activeSheetNote) : []), [activeSheetNote]);
+  const safeViewerPageIdx = Math.min(viewerPageIndex, Math.max(0, viewerPages.length - 1));
+  const currentViewerPage = viewerPages[safeViewerPageIdx] || viewerPages[0];
+  const viewerDisplayContent = currentViewerPage?.content || activeSheetNote?.content || '';
 
   return (
     <div className="w-full space-y-5 pb-16">
@@ -1212,16 +1328,16 @@ export default function NotesModule({
             }`}
           >
             <FileText size={14} className="text-blue-500" />
-            <span>Hoja completa</span>
+            <span>+ Hoja completa</span>
           </button>
 
           <button
             type="button"
             onClick={() => handleOpenNewNote(activeScope, 'sticky')}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-sm transition-all active:scale-95 cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-sm transition-all active:scale-95 cursor-pointer"
           >
             <Plus size={15} />
-            <span>Nueva nota</span>
+            <span>+ Nota rápida</span>
           </button>
         </div>
       </div>
@@ -1386,21 +1502,37 @@ export default function NotesModule({
             const noteEntries = Array.isArray(note.entries) ? note.entries : [];
             const isThreadOpen = expandedThreadNoteId === note.id;
             const savedFormat = normalizeNoteFormat(note.noteFormat);
-            const effectiveFormat = viewMode === 'all' ? savedFormat : viewMode;
-            const isSheet = effectiveFormat === 'sheet';
+            const isSheet = savedFormat === 'sheet';
+            const stickyColorConfig = !isSheet
+              ? getStickyNoteColor(note.stickyColor || note.color || note.paperTheme || 'yellow')
+              : null;
+            const sheetPages = isSheet ? normalizeSheetPages(note) : [];
+            const currentCardPageIdx = isSheet
+              ? Math.min(cardPageIndices[note.id] || 0, Math.max(0, sheetPages.length - 1))
+              : 0;
+            const activeCardPage = isSheet ? (sheetPages[currentCardPageIdx] || sheetPages[0]) : null;
+            const cardDisplayContent = isSheet ? (activeCardPage?.content || '') : note.content;
             const noteSheetStyle = normalizeNoteSheetStyle(note.sheetStyle);
 
             return (
               <article
                 key={note.id}
-                style={getPaperSurfaceStyle(note.paperTheme)}
+                style={isSheet ? getPaperSurfaceStyle(note.paperTheme) : {}}
                 className={`rounded-2xl border flex flex-col justify-between transition-all ${
                   isSheet
-                    ? 'lg:col-span-2 overflow-hidden shadow-sm hover:shadow-md'
-                    : 'p-5 shadow-2xs hover:shadow-sm'
-                } ${getPaperThemeClasses(note.paperTheme)}`}
+                    ? `lg:col-span-2 overflow-hidden shadow-sm hover:shadow-md ${getPaperThemeClasses(note.paperTheme)}`
+                    : `p-5 shadow-sm hover:shadow-md relative ${
+                        isDarkMode
+                          ? `${stickyColorConfig.bgDark} ${stickyColorConfig.borderDark}`
+                          : `${stickyColorConfig.bgLight} ${stickyColorConfig.borderLight}`
+                      }`
+                }`}
               >
                 <div>
+                  {!isSheet && (
+                    <div className="w-10 h-1.5 rounded-full mx-auto -mt-2 mb-2 bg-black/10 dark:bg-white/10" />
+                  )}
+
                   {/* Cabecera de la tarjeta / hoja */}
                   <div className={`flex items-start justify-between gap-2 ${
                     isSheet
@@ -1408,12 +1540,57 @@ export default function NotesModule({
                       : 'mb-2.5'
                   }`}>
                     <div className="flex flex-wrap items-center gap-1.5">
-                      {isSheet && (
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${
-                          isDarkMode ? 'bg-blue-500/15 text-blue-300' : 'bg-blue-500/10 text-blue-700'
-                        }`}>
-                          <FileText size={11} />
-                          <span>Hoja completa</span>
+                      {isSheet ? (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                            isDarkMode ? 'bg-blue-500/15 text-blue-300' : 'bg-blue-500/10 text-blue-700'
+                          }`}>
+                            <FileText size={11} />
+                            <span>Hoja completa</span>
+                          </span>
+
+                          {sheetPages.length > 1 && (
+                            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[11px] font-bold bg-slate-100/90 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
+                              <button
+                                type="button"
+                                disabled={currentCardPageIdx === 0}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setCardPageIndices((prev) => ({
+                                    ...prev,
+                                    [note.id]: Math.max(0, currentCardPageIdx - 1)
+                                  }));
+                                }}
+                                className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                                title="Página anterior"
+                              >
+                                <ChevronLeft size={12} />
+                              </button>
+                              <span className="px-0.5">
+                                Pág. {currentCardPageIdx + 1} de {sheetPages.length}
+                              </span>
+                              <button
+                                type="button"
+                                disabled={currentCardPageIdx >= sheetPages.length - 1}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setCardPageIndices((prev) => ({
+                                    ...prev,
+                                    [note.id]: Math.min(sheetPages.length - 1, currentCardPageIdx + 1)
+                                  }));
+                                }}
+                                className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                                title="Página siguiente"
+                              >
+                                <ChevronRight size={12} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${stickyColorConfig.badge}`}>
+                          <span className={`w-2 h-2 rounded-full ${stickyColorConfig.dot}`} />
+                          <span>Nota rápida</span>
                         </span>
                       )}
 
@@ -1442,27 +1619,17 @@ export default function NotesModule({
 
                     {/* Acciones */}
                     <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => setActiveSheetNoteId(note.id)}
-                        title="Abrir hoja en pantalla completa"
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all cursor-pointer"
-                      >
-                        <Maximize2 size={13} />
-                      </button>
-
-                      {canEdit && (
+                      {isSheet && (
                         <button
                           type="button"
-                          onClick={() => handleToggleNoteFormat(note)}
-                          title={savedFormat === 'sheet' ? 'Cambiar a nota rápida' : 'Cambiar a hoja completa'}
-                          className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                            savedFormat === 'sheet'
-                              ? 'text-blue-600 dark:text-blue-400 bg-blue-500/10'
-                              : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
-                          }`}
+                          onClick={() => {
+                            setViewerPageIndex(currentCardPageIdx);
+                            setActiveSheetNoteId(note.id);
+                          }}
+                          title="Abrir hoja en pantalla completa"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all cursor-pointer"
                         >
-                          <FileText size={13} />
+                          <Maximize2 size={13} />
                         </button>
                       )}
 
@@ -1547,18 +1714,44 @@ export default function NotesModule({
                           : 'text-base mb-2'
                       } ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}
                     >
-                      {note.title}
+                      {isSheet && activeCardPage?.title ? activeCardPage.title : note.title}
                     </h2>
 
                     {/* Cuerpo */}
-                    {note.content && (
+                    {cardDisplayContent && (
                       <div
                         style={getFontFamilyStyle(note.fontFamily)}
                         className={`prose prose-sm max-w-none break-words mb-3 ${getFontSizeClass(note.fontSize)} ${
                           isDarkMode ? 'text-slate-200 prose-invert' : 'text-slate-700'
                         } [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_blockquote]:border-l-4 [&_blockquote]:border-blue-500/50 [&_blockquote]:pl-3 [&_blockquote]:italic [&_a]:text-blue-600 [&_a]:underline`}
-                        dangerouslySetInnerHTML={{ __html: sanitizeNoteHtml(note.content) }}
+                        dangerouslySetInnerHTML={{ __html: sanitizeNoteHtml(cardDisplayContent) }}
                       />
+                    )}
+
+                    {/* Selector rápido de página al pie de la hoja si tiene múltiples páginas */}
+                    {isSheet && sheetPages.length > 1 && (
+                      <div className="flex items-center gap-1.5 pt-2 pb-1 overflow-x-auto">
+                        <span className="text-[10px] font-bold text-slate-400 mr-1 shrink-0">Páginas:</span>
+                        {sheetPages.map((pg, pIdx) => (
+                          <button
+                            key={pg.id || pIdx}
+                            type="button"
+                            onClick={() =>
+                              setCardPageIndices((prev) => ({
+                                ...prev,
+                                [note.id]: pIdx
+                              }))
+                            }
+                            className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                              pIdx === currentCardPageIdx
+                                ? 'bg-blue-600 text-white shadow-2xs'
+                                : (isDarkMode ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')
+                            }`}
+                          >
+                            Pág. {pIdx + 1}
+                          </button>
+                        ))}
+                      </div>
                     )}
 
                     {/* Enlaces adjuntos */}
@@ -1879,8 +2072,8 @@ export default function NotesModule({
                 )}
                 <h3 className="text-sm font-bold">
                   {editingNote
-                    ? (noteFormat === 'sheet' ? 'Editar hoja completa' : 'Editar nota')
-                    : (noteFormat === 'sheet' ? 'Nueva hoja completa' : 'Nueva nota')}
+                    ? (noteFormat === 'sheet' ? 'Editar hoja completa' : 'Editar nota rápida')
+                    : (noteFormat === 'sheet' ? 'Nueva hoja completa' : 'Nueva nota rápida')}
                 </h3>
               </div>
               <button
@@ -1926,26 +2119,35 @@ export default function NotesModule({
                     </button>
                   </div>
 
-                  {/* Selector de Formato: Nota rápida vs Hoja completa */}
-                  <div className={`inline-flex p-1 rounded-xl border ${
-                    isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200'
-                  }`}>
-                    {NOTE_FORMATS.map((fmt) => (
-                      <button
-                        key={fmt.id}
-                        type="button"
-                        onClick={() => setNoteFormat(fmt.id)}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                          noteFormat === fmt.id
-                            ? (isDarkMode ? 'bg-slate-800 text-white' : 'bg-white text-slate-900 shadow-2xs')
-                            : 'text-slate-500'
-                        }`}
-                      >
-                        {fmt.id === 'sheet' ? <FileText size={13} /> : <Grid size={13} />}
-                        <span>{fmt.label}</span>
-                      </button>
-                    ))}
-                  </div>
+                  {/* Selector de Formato: Nota rápida vs Hoja completa (bloqueado en edición para evitar transformar) */}
+                  {editingNote ? (
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold ${
+                      isDarkMode ? 'bg-slate-950 border-slate-800 text-slate-200' : 'bg-slate-100 border-slate-200 text-slate-800'
+                    }`}>
+                      {noteFormat === 'sheet' ? <FileText size={13} className="text-blue-500" /> : <Grid size={13} className="text-amber-500" />}
+                      <span>{noteFormat === 'sheet' ? 'Hoja completa' : 'Nota rápida'}</span>
+                    </span>
+                  ) : (
+                    <div className={`inline-flex p-1 rounded-xl border ${
+                      isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200'
+                    }`}>
+                      {NOTE_FORMATS.map((fmt) => (
+                        <button
+                          key={fmt.id}
+                          type="button"
+                          onClick={() => setNoteFormat(fmt.id)}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                            noteFormat === fmt.id
+                              ? (isDarkMode ? 'bg-slate-800 text-white' : 'bg-white text-slate-900 shadow-2xs')
+                              : 'text-slate-500'
+                          }`}
+                        >
+                          {fmt.id === 'sheet' ? <FileText size={13} /> : <Grid size={13} />}
+                          <span>{fmt.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {scope === 'shared' && academicGroups.length > 0 && (
@@ -1967,12 +2169,94 @@ export default function NotesModule({
                 )}
               </div>
 
+              {/* Selector de color para Nota rápida (post-it) */}
+              {noteFormat === 'sticky' && (
+                <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Color:</span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {STICKY_NOTE_COLORS.map((col) => {
+                      const isSelected = stickyColor === col.id;
+                      return (
+                        <button
+                          key={col.id}
+                          type="button"
+                          onClick={() => {
+                            setStickyColor(col.id);
+                            setPaperTheme(col.id === 'white' ? 'default' : (col.id === 'yellow' ? 'warm' : col.id === 'blue' ? 'sky' : col.id === 'green' ? 'emerald' : col.id === 'purple' ? 'violet' : col.id === 'rose' ? 'rose' : 'warm'));
+                          }}
+                          title={col.label}
+                          style={{ backgroundColor: col.hex }}
+                          className={`w-6 h-6 rounded-full border-2 transition-transform cursor-pointer flex items-center justify-center ${
+                            isSelected ? 'scale-110 border-slate-900 dark:border-white shadow-sm' : 'border-black/15 dark:border-white/20 hover:scale-105'
+                          }`}
+                        >
+                          {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-slate-900 dark:bg-slate-900" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Gestión de múltiples páginas para Hoja completa */}
+              {noteFormat === 'sheet' && (
+                <div className={`p-2 rounded-xl border flex flex-wrap items-center justify-between gap-2 ${
+                  isDarkMode ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-100/90 border-slate-200'
+                }`}>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-xs font-bold text-slate-600 dark:text-slate-300 mr-1 flex items-center gap-1">
+                      <FileText size={13} className="text-blue-500" />
+                      <span>Páginas ({sheetPages.length}):</span>
+                    </span>
+                    {sheetPages.map((page, idx) => {
+                      const isActive = idx === activeEditorPageIdx;
+                      return (
+                        <button
+                          key={page.id || idx}
+                          type="button"
+                          onClick={() => handleSwitchEditorPage(idx)}
+                          className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            isActive
+                              ? 'bg-blue-600 text-white shadow-2xs'
+                              : (isDarkMode ? 'bg-slate-900 text-slate-300 hover:bg-slate-800' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200/80')
+                          }`}
+                        >
+                          Pág. {idx + 1}
+                        </button>
+                      );
+                    })}
+
+                    <button
+                      type="button"
+                      onClick={handleAddEditorPage}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-all cursor-pointer shadow-2xs"
+                      title="Agregar una nueva página a esta hoja"
+                    >
+                      <Plus size={13} />
+                      <span>Página</span>
+                    </button>
+                  </div>
+
+                  {sheetPages.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteEditorPage(activeEditorPageIdx)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-rose-500 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer"
+                      title="Eliminar la página actual de esta hoja"
+                    >
+                      <Trash2 size={12} />
+                      <span>Eliminar Pág. {activeEditorPageIdx + 1}</span>
+                    </button>
+                  )}
+                </div>
+              )}
+
               {/* Título */}
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Título"
+                placeholder={noteFormat === 'sheet' ? "Título del documento" : "Título de la nota rápida (opcional)"}
                 style={getFontFamilyStyle(fontFamily)}
                 className={`w-full px-3.5 py-2.5 rounded-xl text-sm sm:text-base font-bold border outline-none transition-all ${
                   isDarkMode
@@ -2306,7 +2590,7 @@ export default function NotesModule({
                   ...getPaperSurfaceStyle(paperTheme),
                   ...(noteFormat === 'sheet' ? getSheetRulingStyle(sheetStyle) : {})
                 }}
-                data-placeholder="Escribe aquí..."
+                data-placeholder={noteFormat === 'sheet' ? `Escribe el contenido de la página ${activeEditorPageIdx + 1}...` : "Escribe tu nota rápida aquí..."}
                 className={`${
                   noteFormat === 'sheet'
                     ? 'min-h-[320px] sm:min-h-[380px] px-6 sm:px-10 py-6 shadow-inner'
@@ -2368,39 +2652,42 @@ export default function NotesModule({
               {/* Color de hoja, Renglonado (para Hoja completa) y Candado */}
               <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
                 <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex items-center gap-1.5">
-                    {NOTE_PAPER_THEMES.map((theme) => (
-                      <button
-                        key={theme.id}
-                        type="button"
-                        onClick={() => setPaperTheme(theme.id)}
-                        title={theme.label}
-                        className={`w-5 h-5 rounded-full border transition-transform cursor-pointer ${theme.dot} ${
-                          paperTheme === theme.id ? 'ring-2 ring-blue-500 scale-110' : ''
-                        }`}
-                      />
-                    ))}
-                  </div>
-
                   {noteFormat === 'sheet' && (
-                    <div className={`inline-flex p-0.5 rounded-xl border ${
-                      isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200'
-                    }`}>
-                      {NOTE_SHEET_STYLES.map((st) => (
-                        <button
-                          key={st.id}
-                          type="button"
-                          onClick={() => setSheetStyle(st.id)}
-                          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
-                            sheetStyle === st.id
-                              ? (isDarkMode ? 'bg-slate-800 text-white' : 'bg-white text-slate-900 shadow-2xs')
-                              : 'text-slate-500'
-                          }`}
-                        >
-                          {st.label}
-                        </button>
-                      ))}
-                    </div>
+                    <>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 mr-0.5">Fondo:</span>
+                        {NOTE_PAPER_THEMES.map((theme) => (
+                          <button
+                            key={theme.id}
+                            type="button"
+                            onClick={() => setPaperTheme(theme.id)}
+                            title={theme.label}
+                            className={`w-5 h-5 rounded-full border transition-transform cursor-pointer ${theme.dot} ${
+                              paperTheme === theme.id ? 'ring-2 ring-blue-500 scale-110' : ''
+                            }`}
+                          />
+                        ))}
+                      </div>
+
+                      <div className={`inline-flex p-0.5 rounded-xl border ${
+                        isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200'
+                      }`}>
+                        {NOTE_SHEET_STYLES.map((st) => (
+                          <button
+                            key={st.id}
+                            type="button"
+                            onClick={() => setSheetStyle(st.id)}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
+                              sheetStyle === st.id
+                                ? (isDarkMode ? 'bg-slate-800 text-white' : 'bg-white text-slate-900 shadow-2xs')
+                                : 'text-slate-500'
+                            }`}
+                          >
+                            {st.label}
+                          </button>
+                        ))}
+                      </div>
+                    </>
                   )}
                 </div>
 
@@ -2636,159 +2923,215 @@ export default function NotesModule({
           MODAL LECTOR DE HOJA COMPLETA PROFESIONAL
       ======================================================================== */}
       {activeSheetNote && typeof document !== 'undefined' && createPortal(
-        <div
-          className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-6 bg-slate-950/75 backdrop-blur-sm animate-fade-in"
-          onClick={() => setActiveSheetNoteId(null)}
-        >
           <div
-            onClick={(e) => e.stopPropagation()}
-            style={getPaperSurfaceStyle(activeSheetNote.paperTheme)}
-            className={`w-full max-w-4xl max-h-[92vh] flex flex-col rounded-2xl border shadow-2xl overflow-hidden ${
-              isDarkMode ? 'bg-slate-900 text-slate-100' : 'bg-white text-slate-900'
-            } ${getPaperThemeClasses(activeSheetNote.paperTheme)}`}
+            className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-6 bg-slate-950/75 backdrop-blur-sm animate-fade-in"
+            onClick={() => setActiveSheetNoteId(null)}
           >
-            {/* Barra superior de la Hoja */}
-            <div className={`flex flex-wrap items-center justify-between gap-2 px-6 py-3.5 border-b ${
-              isDarkMode ? 'border-slate-800 bg-slate-950 text-slate-100' : 'border-slate-200 bg-white text-slate-900'
-            }`}>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold ${
-                  isDarkMode ? 'bg-blue-500/15 text-blue-300' : 'bg-blue-500/10 text-blue-700'
-                }`}>
-                  <FileText size={13} />
-                  <span>Hoja completa</span>
-                </span>
-                {activeSheetNote.scope === 'shared' && activeSheetNote.targetGroupName && (
-                  <span className={`px-2.5 py-1 rounded-lg text-xs font-medium ${
-                    isDarkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-200/70 text-slate-700'
-                  }`}>
-                    {activeSheetNote.targetGroupName}
-                  </span>
-                )}
-                {activeSheetNote.scope === 'shared' && activeSheetNote.isLocked && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
-                    <Lock size={12} />
-                    <span>{activeSheetNote.lockedByName || 'Con candado'}</span>
-                  </span>
-                )}
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                {canUserEditNote(activeSheetNote, currentUserObj) && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const target = activeSheetNote;
-                      setActiveSheetNoteId(null);
-                      handleOpenEditNote(target);
-                    }}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                      isDarkMode
-                        ? 'bg-slate-900 border-slate-700 text-slate-200 hover:bg-slate-800'
-                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    <Edit3 size={13} />
-                    <span>Editar</span>
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setActiveSheetNoteId(null)}
-                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-            </div>
-
-            {/* Cuerpo de página profesional */}
             <div
-              style={{
-                ...getPaperSurfaceStyle(activeSheetNote.paperTheme),
-                ...getSheetRulingStyle(activeSheetNote.sheetStyle)
-              }}
-              className="flex-1 overflow-y-auto px-6 sm:px-14 py-8 sm:py-10 space-y-5"
+              onClick={(e) => e.stopPropagation()}
+              style={getPaperSurfaceStyle(activeSheetNote.paperTheme)}
+              className={`w-full max-w-4xl max-h-[92vh] flex flex-col rounded-2xl border shadow-2xl overflow-hidden ${
+                isDarkMode ? 'bg-slate-900 text-slate-100' : 'bg-white text-slate-900'
+              } ${getPaperThemeClasses(activeSheetNote.paperTheme)}`}
             >
-              <div className="border-b border-slate-200/80 dark:border-slate-800 pb-4 space-y-1.5">
-                <h1
-                  style={getFontFamilyStyle(activeSheetNote.fontFamily)}
-                  className={`text-xl sm:text-2xl font-extrabold tracking-tight ${
-                    isDarkMode ? 'text-white' : 'text-slate-900'
-                  }`}
-                >
-                  {activeSheetNote.title}
-                </h1>
-                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
-                  <span className="font-semibold text-slate-600 dark:text-slate-300">
-                    {activeSheetNote.authorName || 'Usuario'}
+              {/* Barra superior de la Hoja */}
+              <div className={`flex flex-wrap items-center justify-between gap-2 px-6 py-3.5 border-b ${
+                isDarkMode ? 'border-slate-800 bg-slate-950 text-slate-100' : 'border-slate-200 bg-white text-slate-900'
+              }`}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold ${
+                    isDarkMode ? 'bg-blue-500/15 text-blue-300' : 'bg-blue-500/10 text-blue-700'
+                  }`}>
+                    <FileText size={13} />
+                    <span>Hoja completa</span>
                   </span>
-                  {activeSheetNote.authorRole === 'teacher' && (
-                    <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                      Docente
+
+                  {viewerPages.length > 1 && (
+                    <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold">
+                      <button
+                        type="button"
+                        onClick={() => setViewerPageIndex((prev) => Math.max(0, prev - 1))}
+                        disabled={safeViewerPageIdx === 0}
+                        className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                        title="Página anterior"
+                      >
+                        <ChevronLeft size={14} />
+                      </button>
+                      <span className="px-1 text-slate-700 dark:text-slate-200">
+                        Pág. {safeViewerPageIdx + 1} de {viewerPages.length}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setViewerPageIndex((prev) => Math.min(viewerPages.length - 1, prev + 1))}
+                        disabled={safeViewerPageIdx >= viewerPages.length - 1}
+                        className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                        title="Página siguiente"
+                      >
+                        <ChevronRight size={14} />
+                      </button>
+                    </div>
+                  )}
+
+                  {activeSheetNote.scope === 'shared' && activeSheetNote.targetGroupName && (
+                    <span className={`px-2.5 py-1 rounded-lg text-xs font-medium ${
+                      isDarkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-200/70 text-slate-700'
+                    }`}>
+                      {activeSheetNote.targetGroupName}
                     </span>
                   )}
-                  <span>•</span>
-                  <span>{formatRelativeTime(activeSheetNote.updatedAt || activeSheetNote.createdAt)}</span>
+                  {activeSheetNote.scope === 'shared' && activeSheetNote.isLocked && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+                      <Lock size={12} />
+                      <span>{activeSheetNote.lockedByName || 'Con candado'}</span>
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  {canUserEditNote(activeSheetNote, currentUserObj) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const target = activeSheetNote;
+                        setActiveSheetNoteId(null);
+                        handleOpenEditNote(target);
+                      }}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                        isDarkMode
+                          ? 'bg-slate-900 border-slate-700 text-slate-200 hover:bg-slate-800'
+                          : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Edit3 size={13} />
+                      <span>Editar</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setActiveSheetNoteId(null)}
+                    className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                  >
+                    <X size={18} />
+                  </button>
                 </div>
               </div>
 
-              {activeSheetNote.content && (
-                <div
-                  style={getFontFamilyStyle(activeSheetNote.fontFamily)}
-                  className={`prose prose-sm sm:prose-base max-w-none break-words ${getFontSizeClass(activeSheetNote.fontSize)} ${
-                    isDarkMode ? 'text-slate-100 prose-invert' : 'text-slate-800'
-                  } [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_blockquote]:border-l-4 [&_blockquote]:border-blue-500/50 [&_blockquote]:pl-3 [&_blockquote]:italic [&_a]:text-blue-600 [&_a]:underline`}
-                  dangerouslySetInnerHTML={{ __html: sanitizeNoteHtml(activeSheetNote.content) }}
-                />
-              )}
-
-              {Array.isArray(activeSheetNote.links) && activeSheetNote.links.length > 0 && (
-                <div className="space-y-3 pt-4 border-t border-slate-200/70 dark:border-slate-800">
-                  {activeSheetNote.links.map((item) => (
-                    <div
-                      key={item.id}
-                      className={`rounded-xl border p-3 ${
-                        isDarkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-white/85 border-slate-200/80'
+              {/* Barra de pestañas de páginas si hay más de 1 página */}
+              {viewerPages.length > 1 && (
+                <div className="flex items-center gap-1 px-6 py-2 border-b border-slate-200/60 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/60 overflow-x-auto">
+                  <span className="text-[11px] font-semibold text-slate-400 mr-1 shrink-0">Hojas:</span>
+                  {viewerPages.map((pg, idx) => (
+                    <button
+                      key={pg.id || idx}
+                      type="button"
+                      onClick={() => setViewerPageIndex(idx)}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer shrink-0 ${
+                        idx === safeViewerPageIdx
+                          ? 'bg-blue-600 text-white shadow-2xs'
+                          : (isDarkMode ? 'bg-slate-900 text-slate-300 hover:bg-slate-800' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200/80')
                       }`}
                     >
-                      <a
-                        href={item.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
-                      >
-                        <Globe size={13} />
-                        <span>{item.label || item.url}</span>
-                      </a>
-                      {item.renderMode === 'youtube' && item.youtubeId && (
-                        <div className="rounded-lg overflow-hidden mt-2">
-                          <CustomVideoPlayer
-                            url={item.url}
-                            videoId={item.youtubeId}
-                            title={item.label || 'Video'}
-                            isDarkMode={isDarkMode}
-                          />
-                        </div>
-                      )}
-                      {item.renderMode === 'image' && (
-                        <div className="rounded-lg overflow-hidden mt-2 bg-slate-100 dark:bg-slate-900">
-                          <img loading="lazy" decoding="async"
-                            src={item.url}
-                            alt={item.label || 'Imagen'}
-                            className="w-full max-h-[420px] object-contain mx-auto"
-                          />
-                        </div>
-                      )}
-                    </div>
+                      Página {idx + 1}
+                    </button>
                   ))}
                 </div>
               )}
+
+              {/* Cuerpo de página profesional */}
+              <div
+                style={{
+                  ...getPaperSurfaceStyle(activeSheetNote.paperTheme),
+                  ...getSheetRulingStyle(activeSheetNote.sheetStyle)
+                }}
+                className="flex-1 overflow-y-auto px-6 sm:px-14 py-8 sm:py-10 space-y-5"
+              >
+                <div className="border-b border-slate-200/80 dark:border-slate-800 pb-4 space-y-1.5">
+                  <h1
+                    style={getFontFamilyStyle(activeSheetNote.fontFamily)}
+                    className={`text-xl sm:text-2xl font-extrabold tracking-tight ${
+                      isDarkMode ? 'text-white' : 'text-slate-900'
+                    }`}
+                  >
+                    {activeSheetNote.title}
+                  </h1>
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-slate-600 dark:text-slate-300">
+                        {activeSheetNote.authorName || 'Usuario'}
+                      </span>
+                      {activeSheetNote.authorRole === 'teacher' && (
+                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                          Docente
+                        </span>
+                      )}
+                      <span>•</span>
+                      <span>{formatRelativeTime(activeSheetNote.updatedAt || activeSheetNote.createdAt)}</span>
+                    </div>
+
+                    {viewerPages.length > 1 && (
+                      <span className="font-bold text-blue-600 dark:text-blue-400">
+                        Página {safeViewerPageIdx + 1} de {viewerPages.length}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {viewerDisplayContent && (
+                  <div
+                    style={getFontFamilyStyle(activeSheetNote.fontFamily)}
+                    className={`prose prose-sm sm:prose-base max-w-none break-words ${getFontSizeClass(activeSheetNote.fontSize)} ${
+                      isDarkMode ? 'text-slate-100 prose-invert' : 'text-slate-800'
+                    } [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_blockquote]:border-l-4 [&_blockquote]:border-blue-500/50 [&_blockquote]:pl-3 [&_blockquote]:italic [&_a]:text-blue-600 [&_a]:underline`}
+                    dangerouslySetInnerHTML={{ __html: sanitizeNoteHtml(viewerDisplayContent) }}
+                  />
+                )}
+
+                {Array.isArray(activeSheetNote.links) && activeSheetNote.links.length > 0 && (
+                  <div className="space-y-3 pt-4 border-t border-slate-200/70 dark:border-slate-800">
+                    {activeSheetNote.links.map((item) => (
+                      <div
+                        key={item.id}
+                        className={`rounded-xl border p-3 ${
+                          isDarkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-white/85 border-slate-200/80'
+                        }`}
+                      >
+                        <a
+                          href={item.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                        >
+                          <Globe size={13} />
+                          <span>{item.label || item.url}</span>
+                        </a>
+                        {item.renderMode === 'youtube' && item.youtubeId && (
+                          <div className="rounded-lg overflow-hidden mt-2">
+                            <CustomVideoPlayer
+                              url={item.url}
+                              videoId={item.youtubeId}
+                              title={item.label || 'Video'}
+                              isDarkMode={isDarkMode}
+                            />
+                          </div>
+                        )}
+                        {item.renderMode === 'image' && (
+                          <div className="rounded-lg overflow-hidden mt-2 bg-slate-100 dark:bg-slate-900">
+                            <img loading="lazy" decoding="async"
+                              src={item.url}
+                              alt={item.label || 'Imagen'}
+                              className="w-full max-h-[420px] object-contain mx-auto"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        </div>,
-        document.body
-      )}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

@@ -60,12 +60,141 @@ export const NOTE_SHEET_STYLES = [
   { id: 'grid', label: 'Cuadriculada' }
 ];
 
+export const STICKY_NOTE_COLORS = [
+  {
+    id: 'yellow',
+    label: 'Amarillo',
+    bgLight: 'bg-amber-100/90',
+    borderLight: 'border-amber-300',
+    bgDark: 'bg-amber-950/40',
+    borderDark: 'border-amber-700/60',
+    hex: '#fef08a',
+    headerBg: 'bg-amber-200/70 dark:bg-amber-900/60',
+    dot: 'bg-amber-300',
+    badge: 'bg-amber-200/90 text-amber-900 dark:bg-amber-900/70 dark:text-amber-200',
+    pinColor: 'text-amber-600 dark:text-amber-400'
+  },
+  {
+    id: 'green',
+    label: 'Menta',
+    bgLight: 'bg-emerald-100/85',
+    borderLight: 'border-emerald-300',
+    bgDark: 'bg-emerald-950/40',
+    borderDark: 'border-emerald-700/60',
+    hex: '#bbf7d0',
+    headerBg: 'bg-emerald-200/70 dark:bg-emerald-900/60',
+    dot: 'bg-emerald-300',
+    badge: 'bg-emerald-200/90 text-emerald-900 dark:bg-emerald-900/70 dark:text-emerald-200',
+    pinColor: 'text-emerald-600 dark:text-emerald-400'
+  },
+  {
+    id: 'blue',
+    label: 'Cielo',
+    bgLight: 'bg-sky-100/85',
+    borderLight: 'border-sky-300',
+    bgDark: 'bg-sky-950/40',
+    borderDark: 'border-sky-700/60',
+    hex: '#bae6fd',
+    headerBg: 'bg-sky-200/70 dark:bg-sky-900/60',
+    dot: 'bg-sky-300',
+    badge: 'bg-sky-200/90 text-sky-900 dark:bg-sky-900/70 dark:text-sky-200',
+    pinColor: 'text-sky-600 dark:text-sky-400'
+  },
+  {
+    id: 'purple',
+    label: 'Lavanda',
+    bgLight: 'bg-purple-100/85',
+    borderLight: 'border-purple-300',
+    bgDark: 'bg-purple-950/40',
+    borderDark: 'border-purple-700/60',
+    hex: '#e9d5ff',
+    headerBg: 'bg-purple-200/70 dark:bg-purple-900/60',
+    dot: 'bg-purple-300',
+    badge: 'bg-purple-200/90 text-purple-900 dark:bg-purple-900/70 dark:text-purple-200',
+    pinColor: 'text-purple-600 dark:text-purple-400'
+  },
+  {
+    id: 'rose',
+    label: 'Rosa',
+    bgLight: 'bg-rose-100/85',
+    borderLight: 'border-rose-300',
+    bgDark: 'bg-rose-950/40',
+    borderDark: 'border-rose-700/60',
+    hex: '#fbcfe8',
+    headerBg: 'bg-rose-200/70 dark:bg-rose-900/60',
+    dot: 'bg-rose-300',
+    badge: 'bg-rose-200/90 text-rose-900 dark:bg-rose-900/70 dark:text-rose-200',
+    pinColor: 'text-rose-600 dark:text-rose-400'
+  },
+  {
+    id: 'orange',
+    label: 'Durazno',
+    bgLight: 'bg-orange-100/85',
+    borderLight: 'border-orange-300',
+    bgDark: 'bg-orange-950/40',
+    borderDark: 'border-orange-700/60',
+    hex: '#fed7aa',
+    headerBg: 'bg-orange-200/70 dark:bg-orange-900/60',
+    dot: 'bg-orange-300',
+    badge: 'bg-orange-200/90 text-orange-900 dark:bg-orange-900/70 dark:text-orange-200',
+    pinColor: 'text-orange-600 dark:text-orange-400'
+  },
+  {
+    id: 'white',
+    label: 'Blanco',
+    bgLight: 'bg-white',
+    borderLight: 'border-slate-200',
+    bgDark: 'bg-slate-900',
+    borderDark: 'border-slate-800',
+    hex: '#ffffff',
+    headerBg: 'bg-slate-100 dark:bg-slate-800',
+    dot: 'bg-slate-200',
+    badge: 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200',
+    pinColor: 'text-slate-600 dark:text-slate-400'
+  }
+];
+
+export const getStickyNoteColor = (colorId) => {
+  return STICKY_NOTE_COLORS.find(c => c.id === colorId) || STICKY_NOTE_COLORS[0];
+};
+
 export const normalizeNoteFormat = (fmt) => (fmt === 'sheet' ? 'sheet' : 'sticky');
 
 export const normalizeNoteSheetStyle = (style) => {
   if (style === 'lined' || style === 'grid') return style;
   return 'blank';
 };
+
+/**
+ * Normaliza las páginas de una hoja completa.
+ * Si la nota no tiene páginas, crea una página inicial a partir de su contenido.
+ */
+export const normalizeSheetPages = (note) => {
+  if (!note) return [{ id: 'p_1', pageNumber: 1, title: '', content: '' }];
+  if (Array.isArray(note.pages) && note.pages.length > 0) {
+    return note.pages.map((p, idx) => ({
+      id: String(p?.id || `p_${idx + 1}`),
+      pageNumber: idx + 1,
+      title: typeof p?.title === 'string' ? p.title : '',
+      content: typeof p?.content === 'string' ? p.content : ''
+    }));
+  }
+  return [
+    {
+      id: 'p_1',
+      pageNumber: 1,
+      title: typeof note.title === 'string' ? note.title : '',
+      content: typeof note.content === 'string' ? note.content : ''
+    }
+  ];
+};
+
+export const buildEmptySheetPage = (pageNumber = 1) => ({
+  id: `page_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+  pageNumber,
+  title: '',
+  content: ''
+});
 
 /**
  * Extrae el ID de 11 caracteres de un enlace de YouTube.

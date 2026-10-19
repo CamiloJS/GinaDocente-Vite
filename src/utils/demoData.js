@@ -952,6 +952,24 @@ export const DEMO_NOTES = [
     paperTheme: 'sky',
     noteFormat: 'sheet',
     sheetStyle: 'lined',
+    pages: [
+      {
+        id: 'p1',
+        title: 'Pág. 1: Indicadores Macroeconómicos (GDP & CPI)',
+        content: '<p><strong>Objetivos de la sesión:</strong> Comprender la relación entre el <span style="color: #2563eb;">Gross Domestic Product (GDP)</span>, el <span style="color: #059669;">Consumer Price Index (CPI)</span> y las tasas de intervención del Banco Central.</p><p>El PIB representa el valor monetario de todos los bienes y servicios finales producidos en el país en un periodo determinado.</p>'
+      },
+      {
+        id: 'p2',
+        title: 'Pág. 2: Hawkish vs. Dovish Monetary Policy',
+        content: '<ul><li><strong>Hawkish stance:</strong> Política monetaria contractiva enfocada en controlar la inflación subiendo tasas de interés. Desacelera el crédito y enfría la demanda agregada.</li><li><strong>Dovish stance:</strong> Política monetaria expansiva para estimular el empleo y el crecimiento económico mediante tasas bajas y liquidez.</li></ul>'
+      },
+      {
+        id: 'p3',
+        title: 'Pág. 3: Conditionals en Proyecciones Económicas',
+        content: '<p><strong>First Conditional aplicado a escenarios macro:</strong></p><p><em>"If the Central Bank raises interest rates by 50 basis points, commercial borrowing costs will increase, leading to reduced consumer spending."</em></p><p>Uso de Present Simple en la condición y Future Simple con <em>will</em> en el resultado para proyecciones realistas.</p>'
+      }
+    ],
+    pageCount: 3,
     isPinned: true,
     isLocked: true,
     lockedBy: 'teacher',
@@ -1021,6 +1039,8 @@ export const DEMO_NOTES = [
     fontFamily: 'serif',
     fontSize: 'base',
     paperTheme: 'emerald',
+    noteFormat: 'sticky',
+    stickyColor: 'green',
     isPinned: false,
     isLocked: true,
     lockedBy: 'laura_restrepo',
@@ -1060,6 +1080,8 @@ export const DEMO_NOTES = [
     fontFamily: 'sans',
     fontSize: 'base',
     paperTheme: 'warm',
+    noteFormat: 'sticky',
+    stickyColor: 'orange',
     isPinned: false,
     isLocked: false,
     lockedBy: null,
