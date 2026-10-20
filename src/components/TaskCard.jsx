@@ -140,6 +140,60 @@ const TaskCard = React.memo(({
     const currentUserId = role === 'teacher' 
         ? (activeTeacherId === SECOND_TEACHER_ID ? 'teacher_camilo' : 'teacher_gina') 
         : (currentUser?.uid ? `uid_${currentUser.uid}` : (loggedInName ? `name_${loggedInName.toLowerCase().replace(/[^a-z0-9]/g, '_')}` : 'student_user'));
+
+    const [showViewsModal, setShowViewsModal] = useState(false);
+
+    // Registro automático de visualización para estudiantes (View tracker)
+    useEffect(() => {
+        if (role === 'teacher') return;
+        const studentId = (currentUserId || currentUser?.uid || loggedInName || '').trim();
+        if (!studentId || isTeacherId(studentId) || studentId.toLowerCase().includes('teacher') || studentId.toLowerCase().includes('docente')) return;
+
+        // Si ya está registrado en viewedBy, evitar escrituras innecesarias
+        if (task?.viewedBy && task.viewedBy[studentId]) return;
+
+        const timer = setTimeout(() => {
+            try {
+                const currentViews = task.viewedBy && typeof task.viewedBy === 'object' ? { ...task.viewedBy } : {};
+                if (currentViews[studentId]) return;
+                const studentName = resolveUserDisplayName({ author: loggedInName, authorId: studentId }, userMappings, loggedInName) || loggedInName || 'Estudiante';
+                const studentAvatar = currentUser?.photoURL || '';
+                currentViews[studentId] = {
+                    id: studentId,
+                    name: studentName,
+                    avatar: studentAvatar,
+                    viewedAt: Date.now()
+                };
+                updateTaskDoc({ viewedBy: currentViews }).catch(() => {});
+            } catch {
+                // ignorar errores de red
+            }
+        }, 1200);
+
+        return () => clearTimeout(timer);
+    }, [task?.id, task?.viewedBy, role, currentUserId, currentUser, loggedInName, userMappings]);
+
+    // Lista de estudiantes que han visto esta publicación (solo visible para docentes)
+    const viewedStudents = React.useMemo(() => {
+        if (!task?.viewedBy || typeof task.viewedBy !== 'object') return [];
+        return Object.entries(task.viewedBy)
+            .map(([id, data]) => {
+                if (!data) return null;
+                const rawName = typeof data === 'object' ? (data.name || data.author) : String(data);
+                const resolvedName = resolveUserDisplayName({ author: rawName, authorId: id }, userMappings, rawName) || rawName || 'Estudiante';
+                const avatar = typeof data === 'object' ? (data.avatar || data.photoURL || '') : '';
+                const viewedAt = typeof data === 'object' ? data.viewedAt : null;
+                return {
+                    id,
+                    name: resolvedName,
+                    avatar,
+                    viewedAt
+                };
+            })
+            .filter(Boolean)
+            .sort((a, b) => (b.viewedAt || 0) - (a.viewedAt || 0));
+    }, [task?.viewedBy, userMappings]);
+
     const [commentText, setCommentText] = useState("");
     const [commentImageUrl, setCommentImageUrl] = useState("");
     const [commentImageUrls, setCommentImageUrls] = useState([]);
@@ -1613,6 +1667,19 @@ const TaskCard = React.memo(({
                         </span>
                     )}
                 </div>
+
+                {/* Contador de Vistas por Estudiantes exclusivo para Docentes */}
+                {role === 'teacher' && (
+                    <button
+                        type="button"
+                        onClick={() => setShowViewsModal(true)}
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold transition-all border bg-slate-50 dark:bg-gray-800/80 border-slate-200 dark:border-gray-700 hover:bg-slate-100 dark:hover:bg-gray-750 text-slate-700 dark:text-gray-300 ml-auto shadow-2xs hover:scale-105 cursor-pointer"
+                        title={`Visto por ${viewedStudents.length} estudiante${viewedStudents.length === 1 ? '' : 's'}`}
+                    >
+                        <Eye size={13} className="text-blue-500" />
+                        <span className="text-[11px] font-extrabold">{viewedStudents.length}</span>
+                    </button>
+                )}
             </div>
         );
     };
@@ -1678,6 +1745,19 @@ const TaskCard = React.memo(({
                 </button>
               );
             })}
+
+            {/* Contador de Vistas por Estudiantes exclusivo para Docentes */}
+            {role === 'teacher' && (
+              <button
+                type="button"
+                onClick={() => setShowViewsModal(true)}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold transition-all border bg-slate-50 dark:bg-gray-800/80 border-slate-200 dark:border-gray-700 hover:bg-slate-100 dark:hover:bg-gray-750 text-slate-700 dark:text-gray-300 ml-auto sm:ml-1 shadow-2xs hover:scale-105 cursor-pointer"
+                title={`Visto por ${viewedStudents.length} estudiante${viewedStudents.length === 1 ? '' : 's'}`}
+              >
+                <Eye size={13} className="text-blue-500" />
+                <span className="text-[11px] font-extrabold">{viewedStudents.length}</span>
+              </button>
+            )}
           </div>
         );
     };
@@ -2618,39 +2698,6 @@ const TaskCard = React.memo(({
 
                 return (
                     <div className="my-3 rounded-2xl border border-amber-200/80 dark:border-amber-800/50 bg-gradient-to-br from-amber-50/50 via-white to-red-50/30 dark:from-gray-900 dark:via-gray-900/95 dark:to-amber-950/20 shadow-sm overflow-hidden">
-                        {/* Cabecera de la Presentación */}
-                        <div className="px-4 py-3 border-b border-amber-100/80 dark:border-amber-900/40 flex flex-wrap items-center justify-between gap-2 bg-gradient-to-r from-amber-500/10 via-transparent to-red-500/5">
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#AD3333] to-amber-600 text-white flex items-center justify-center shadow-xs shrink-0">
-                                    <NavSlides size={16} />
-                                </div>
-                                <span className="inline-flex items-center gap-1 text-[10.5px] font-extrabold px-2.5 py-0.5 rounded-full bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700 shadow-2xs">
-                                    <Layers size={11} className="text-[#AD3333] dark:text-amber-400" />
-                                    {totalSlidesCount} {totalSlidesCount === 1 ? 'diapositiva' : 'diapositivas'}
-                                </span>
-                                <span className="inline-flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-0.5 rounded-full bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 shadow-2xs">
-                                    <Globe size={11} className="text-blue-500" />
-                                    {deckLanguage}
-                                </span>
-                                {isGoogleDeck && (
-                                    <span className="inline-flex items-center gap-1 text-[10.5px] font-black px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 shadow-2xs">
-                                        Google Slides
-                                    </span>
-                                )}
-                                {isPptxDeck && (
-                                    <span className="inline-flex items-center gap-1 text-[10.5px] font-black px-2.5 py-0.5 rounded-full bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/30 shadow-2xs">
-                                        PowerPoint
-                                    </span>
-                                )}
-                            </div>
-
-                            {!isGoogleDeck && slidesArr.length > 0 && (
-                                <span className="text-[10.5px] font-extrabold text-amber-800 dark:text-amber-300 bg-amber-100/70 dark:bg-amber-950/60 px-2.5 py-0.5 rounded-full border border-amber-200/80 dark:border-amber-800/60">
-                                    Diapositiva {safeSlideIdx + 1} de {slidesArr.length}
-                                </span>
-                            )}
-                        </div>
-
                         {/* Lienzo o iframe en vivo de la diapositiva con controles rápidos */}
                         {rev?.googleSlidesUrl ? (
                             <div className="relative aspect-video w-full bg-black overflow-hidden group/slidecard">
@@ -2732,9 +2779,10 @@ const TaskCard = React.memo(({
                                         type="button"
                                         onClick={() => setShowSlidePresenter(true)}
                                         className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-[#AD3333] to-amber-700 hover:from-[#932828] hover:to-amber-800 text-white shadow-sm flex items-center justify-center gap-2 transition-all hover:scale-[1.01] cursor-pointer"
+                                        title="Ver presentación"
                                     >
                                         <Play size={14} />
-                                        <span>Ver presentación</span>
+                                        <span>Ver</span>
                                     </button>
                                 ) : (
                                     typeof onOpenReviewsTab === 'function' && (
@@ -2742,9 +2790,10 @@ const TaskCard = React.memo(({
                                             type="button"
                                             onClick={() => onOpenReviewsTab()}
                                             className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-[#AD3333] to-amber-700 hover:from-[#932828] hover:to-amber-800 text-white shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
+                                            title="Ver presentación"
                                         >
-                                            <NavSlides size={14} />
-                                            <span>Abrir en Diapositivas</span>
+                                            <Play size={14} />
+                                            <span>Ver</span>
                                         </button>
                                     )
                                 )}
@@ -2760,7 +2809,7 @@ const TaskCard = React.memo(({
                                             title="Descargar archivo PowerPoint (.pptx)"
                                         >
                                             <Download size={14} className="text-orange-500" />
-                                            <span>Descargar .pptx</span>
+                                            <span>Descargar</span>
                                         </a>
                                     ) : (
                                         <button
@@ -2770,7 +2819,7 @@ const TaskCard = React.memo(({
                                             title="Descargar archivo PowerPoint (.pptx)"
                                         >
                                             <Download size={14} className="text-[#AD3333] dark:text-amber-400" />
-                                            <span>Descargar .pptx</span>
+                                            <span>Descargar</span>
                                         </button>
                                     )
                                 )}
@@ -2786,17 +2835,6 @@ const TaskCard = React.memo(({
                                         <ExternalLink size={13} />
                                         <span>Google Slides</span>
                                     </a>
-                                )}
-
-                                {role === 'teacher' && typeof onOpenReviewsTab === 'function' && (
-                                    <button
-                                        type="button"
-                                        onClick={() => onOpenReviewsTab(rev)}
-                                        className="px-3.5 py-2.5 rounded-xl text-xs font-bold bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/25 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                                    >
-                                        <Edit3 size={13} />
-                                        <span>Estudio de Diapositivas</span>
-                                    </button>
                                 )}
                             </div>
                         </div>
@@ -4678,6 +4716,100 @@ const TaskCard = React.memo(({
                     } : null}
                     userId={myChatId || currentUser?.uid || currentUser?.email || loggedInName || currentUserId || role}
                 />
+            )}
+
+            {/* MODAL DE VISTO POR ESTUDIANTES (EXCLUSIVO DOCENTES) */}
+            {showViewsModal && role === 'teacher' && ReactDOM.createPortal(
+                <div 
+                    onClick={() => setShowViewsModal(false)}
+                    className={`fixed inset-0 z-[99999] flex justify-center items-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs select-none animate-in fade-in duration-150 ${isDarkMode ? 'dark' : ''}`}
+                >
+                    <div 
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full max-w-md rounded-3xl p-5 sm:p-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-150"
+                    >
+                        {/* Cabecera */}
+                        <div className="flex items-center justify-between pb-3.5 border-b border-gray-150 dark:border-gray-800 shrink-0">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="w-10 h-10 rounded-2xl bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                                    <Eye size={20} />
+                                </div>
+                                <div className="min-w-0">
+                                    <h4 className="text-sm sm:text-base font-black text-gray-900 dark:text-gray-100 leading-tight">
+                                        Visto por estudiantes
+                                    </h4>
+                                    <p className="text-[11.5px] font-semibold text-gray-500 dark:text-gray-400 truncate">
+                                        {viewedStudents.length} {viewedStudents.length === 1 ? 'estudiante ha visto esta publicación' : 'estudiantes han visto esta publicación'}
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowViewsModal(false)}
+                                className="p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors cursor-pointer"
+                                title="Cerrar"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        {/* Lista de estudiantes */}
+                        <div className="flex-1 overflow-y-auto py-3 space-y-2 min-h-[140px] max-h-[50vh]">
+                            {viewedStudents.length === 0 ? (
+                                <div className="py-8 flex flex-col items-center justify-center text-center text-gray-400 dark:text-gray-500">
+                                    <EyeOff size={32} className="mb-2 opacity-50" />
+                                    <p className="text-xs font-bold">Ningún estudiante ha visto esta publicación todavía.</p>
+                                    <p className="text-[11px] opacity-75 mt-0.5">Aparecerán aquí automáticamente tan pronto como visualicen o abran la publicación en su muro.</p>
+                                </div>
+                            ) : (
+                                viewedStudents.map((st, idx) => (
+                                    <div
+                                        key={st.id || idx}
+                                        className="flex items-center justify-between gap-3 p-2.5 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-800/60 border border-gray-100 dark:border-gray-800/80 transition-all"
+                                    >
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            {st.avatar ? (
+                                                <img
+                                                    src={st.avatar}
+                                                    alt={st.name}
+                                                    className="w-9 h-9 rounded-full object-cover shrink-0 border border-gray-200 dark:border-gray-700"
+                                                    onError={(e) => { e.target.style.display = 'none'; }}
+                                                />
+                                            ) : (
+                                                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-black text-xs flex items-center justify-center shrink-0 shadow-xs">
+                                                    {(st.name || 'E').charAt(0).toUpperCase()}
+                                                </div>
+                                            )}
+                                            <div className="min-w-0">
+                                                <p className="text-xs font-bold text-gray-800 dark:text-gray-100 truncate">
+                                                    {st.name}
+                                                </p>
+                                                <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                                                    {st.viewedAt ? formatDateTime12H(st.viewedAt) : 'Visto recientemente'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <span className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/40 shrink-0">
+                                            <CheckCheck size={11} /> Visto
+                                        </span>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+
+                        {/* Pie del modal */}
+                        <div className="pt-3 border-t border-gray-150 dark:border-gray-800 flex justify-end shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => setShowViewsModal(false)}
+                                className="px-4 py-2 rounded-xl text-xs font-bold bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors cursor-pointer"
+                            >
+                                Cerrar
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
             )}
         </div>
     );

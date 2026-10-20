@@ -846,6 +846,29 @@ check('hydrateSlidesFromFirestore expande imágenes encogidas (44%x45%) a pantal
   healedShrunk[0].elements[0].y === 0
 );
 
+check('TaskCard simplifica botones de diapositivas a "Ver" y "Descargar", elimina "Estudio de Diapositivas" y remueve la barra superior con badges redundantes',
+  updatedTaskCardSrc.includes('<span>Ver</span>') &&
+  updatedTaskCardSrc.includes('<span>Descargar</span>') &&
+  !updatedTaskCardSrc.includes('<span>Estudio de Diapositivas</span>') &&
+  !updatedTaskCardSrc.includes('<span>Ver presentación</span>') &&
+  !updatedTaskCardSrc.includes('totalSlidesCount === 1 ? \'diapositiva\' : \'diapositivas\'')
+);
+
+check('TaskCard implementa seguimiento de visualizaciones de estudiantes (viewedBy) y botón de ojito exclusivo para docentes con modal de estudiantes',
+  updatedTaskCardSrc.includes('showViewsModal') &&
+  updatedTaskCardSrc.includes('setShowViewsModal(true)') &&
+  updatedTaskCardSrc.includes('viewedStudents') &&
+  updatedTaskCardSrc.includes('Visto por estudiantes') &&
+  updatedTaskCardSrc.includes('role === \'teacher\'')
+);
+
+check('ReviewsModule maximiza la presentación al 100% de la pantalla sin bordes en modo pantalla completa con controles flotantes',
+  reviewsSrc.includes('100vh * 16 / 9') &&
+  reviewsSrc.includes('100vw * 9 / 16') &&
+  reviewsSrc.includes('isFullscreen ? \'p-0 bg-black text-white\'') &&
+  reviewsSrc.includes('requestFullscreen')
+);
+
 console.log(`\nRESULTADO SLIDES STUDIO: ${okCount} OK, ${failCount} fallos\n`);
 if (failCount > 0) {
   process.exit(1);

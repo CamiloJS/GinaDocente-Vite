@@ -2737,6 +2737,19 @@ export const SlidePresenterViewer = ({ presentation, onClose, onEdit, role, them
     };
     document.addEventListener('fullscreenchange', handleFsChange);
     document.addEventListener('webkitfullscreenchange', handleFsChange);
+
+    // Intentar activar pantalla completa al abrir visor si el navegador lo permite
+    const el = viewerRef.current;
+    if (el) {
+      const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
+      if (!isFs) {
+        const req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+        try {
+          req?.call(el).then(() => setIsFullscreen(true)).catch(() => {});
+        } catch {}
+      }
+    }
+
     return () => {
       document.removeEventListener('fullscreenchange', handleFsChange);
       document.removeEventListener('webkitfullscreenchange', handleFsChange);
@@ -2931,10 +2944,14 @@ export const SlidePresenterViewer = ({ presentation, onClose, onEdit, role, them
   return createPortal(
     <div
       ref={viewerRef}
-      className={`fixed inset-0 z-[999999] flex flex-col justify-between p-2.5 sm:p-5 select-none animate-in fade-in duration-200 overflow-hidden ${viewerBg}`}
+      className={`fixed inset-0 z-[999999] flex flex-col justify-between ${
+        isFullscreen ? 'p-0 bg-black text-white' : 'p-2.5 sm:p-5 ' + viewerBg
+      } select-none animate-in fade-in duration-200 overflow-hidden`}
     >
       {/* Barra Superior de Presentación */}
-      <header className="flex items-center justify-between gap-2 w-full max-w-6xl mx-auto pb-1.5 shrink-0 flex-wrap">
+      <header className={`flex items-center justify-between gap-2 w-full ${
+        isFullscreen ? 'absolute top-0 left-0 right-0 z-50 px-4 py-2.5 bg-gradient-to-b from-black/85 via-black/40 to-transparent text-white' : 'max-w-7xl mx-auto pb-1.5'
+      } shrink-0 flex-wrap transition-all`}>
         <div className="flex items-center gap-2.5 min-w-0">
           <button
             type="button"
@@ -3103,12 +3120,25 @@ export const SlidePresenterViewer = ({ presentation, onClose, onEdit, role, them
 
       {/* Vista Principal: Google Slides Embebido O Mosaico de Diapositivas O Lienzo 16:9 */}
       {isGoogleDeck ? (
-        <main className="flex-1 flex flex-col items-center justify-center min-h-0 py-1 w-full gap-2">
-          <div className="w-full max-w-6xl h-full flex-1 min-h-[60vh] max-h-[82vh] aspect-video relative shadow-2xl rounded-2xl overflow-hidden border border-white/10 bg-black">
+        <main className={`flex-1 flex flex-col items-center justify-center min-h-0 w-full ${isFullscreen ? 'p-0 h-full' : 'py-1'}`}>
+          <div
+            style={isFullscreen ? {
+              width: '100%',
+              height: '100%',
+              maxWidth: 'calc(100vh * 16 / 9)',
+              maxHeight: 'calc(100vw * 9 / 16)',
+              aspectRatio: '16/9'
+            } : {}}
+            className={`w-full ${
+              isFullscreen
+                ? 'h-full rounded-none border-0 shadow-none'
+                : 'max-w-7xl h-full flex-1 min-h-[60vh] max-h-[85vh] rounded-2xl border border-white/10 shadow-2xl'
+            } aspect-video relative overflow-hidden bg-black flex items-center justify-center`}
+          >
             <iframe
               src={presentation.googleSlidesUrl}
               title={displayTitle}
-              className="w-full h-full border-0 rounded-2xl"
+              className={`w-full h-full border-0 ${isFullscreen ? 'rounded-none' : 'rounded-2xl'}`}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
               allowFullScreen
             />
@@ -3146,10 +3176,19 @@ export const SlidePresenterViewer = ({ presentation, onClose, onEdit, role, them
           </div>
         </main>
       ) : (
-        <main className="flex-1 flex flex-col items-center justify-center min-h-0 py-1 w-full gap-2">
+        <main className={`flex-1 flex flex-col items-center justify-center min-h-0 w-full ${isFullscreen ? 'p-0 h-full' : 'py-1'}`}>
           <div
             key={`${safeIdx}_${transitionType}`}
-            style={{ animationDuration: `${transitionDuration}ms` }}
+            style={{
+              animationDuration: `${transitionDuration}ms`,
+              ...(isFullscreen ? {
+                width: '100%',
+                height: '100%',
+                maxWidth: 'calc(100vh * 16 / 9)',
+                maxHeight: 'calc(100vw * 9 / 16)',
+                aspectRatio: '16/9'
+              } : {})
+            }}
             onPointerDown={handleStagePointerDown}
             onPointerMove={handleStagePointerMove}
             onPointerUp={handleStagePointerUp}
@@ -3157,7 +3196,11 @@ export const SlidePresenterViewer = ({ presentation, onClose, onEdit, role, them
               handleStagePointerUp();
               if (laserActive) setLaserPos(prev => ({ ...prev, visible: false }));
             }}
-            className={`w-full max-w-6xl max-h-[80vh] aspect-video relative shadow-2xl rounded-2xl overflow-hidden border border-white/10 ${transitionAnimClass} ${
+            className={`w-full ${
+              isFullscreen
+                ? 'h-full rounded-none border-0 shadow-none'
+                : 'max-w-7xl max-h-[86vh] rounded-2xl border border-white/10 shadow-2xl'
+            } aspect-video relative overflow-hidden flex items-center justify-center ${transitionAnimClass} ${
               laserActive ? 'cursor-none' : penActive ? 'cursor-crosshair touch-none' : ''
             }`}
           >
@@ -3210,7 +3253,7 @@ export const SlidePresenterViewer = ({ presentation, onClose, onEdit, role, them
 
           {/* Panel de Notas del Orador en Vivo (solo Docente) */}
           {role === 'teacher' && showSpeakerNotes && (
-            <div className="w-full max-w-4xl px-4 py-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs sm:text-sm">
+            <div className={`w-full max-w-4xl px-4 py-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs sm:text-sm ${isFullscreen ? 'absolute bottom-16 z-40 bg-black/80 backdrop-blur-md' : ''}`}>
               <span className="font-black uppercase tracking-wider text-amber-500 text-[10px] block mb-0.5">
                 Notas del Orador — Diapositiva {safeIdx + 1}
               </span>
@@ -3224,14 +3267,18 @@ export const SlidePresenterViewer = ({ presentation, onClose, onEdit, role, them
 
       {/* Barra Inferior de Navegación */}
       {isGoogleDeck ? (
-        <footer className="flex items-center justify-center w-full max-w-md mx-auto pt-1.5 shrink-0 text-xs font-semibold text-gray-400">
+        <footer className={`flex items-center justify-center w-full ${
+          isFullscreen ? 'absolute bottom-0 left-0 right-0 z-50 px-4 py-2 bg-gradient-to-t from-black/85 via-black/40 to-transparent' : 'max-w-md mx-auto pt-1.5'
+        } shrink-0 text-xs font-semibold text-gray-300`}>
           <span className="flex items-center gap-1.5">
             <Globe size={13} className="text-amber-500" />
             <span>Presentación interactiva de Google Slides • Proyección en pantalla completa</span>
           </span>
         </footer>
       ) : (
-      <footer className="flex items-center justify-between w-full max-w-md mx-auto pt-1.5 shrink-0">
+      <footer className={`flex items-center justify-between w-full ${
+        isFullscreen ? 'absolute bottom-0 left-0 right-0 z-50 px-4 py-2.5 bg-gradient-to-t from-black/85 via-black/40 to-transparent' : 'max-w-md mx-auto pt-1.5'
+      } shrink-0`}>
         <button
           type="button"
           onClick={() => setCurrentIdx(prev => Math.max(prev - 1, 0))}

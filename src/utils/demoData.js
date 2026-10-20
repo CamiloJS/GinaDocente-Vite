@@ -41,6 +41,12 @@ export const DEMO_TASKS = [
       laura_restrepo: { type: 'love', name: 'Laura Restrepo', timestamp: Date.now() - 2400000 },
       mateo_gomez: { type: 'happy', name: 'Mateo Gómez', timestamp: Date.now() - 1200000 },
     },
+    viewedBy: {
+      carlos_mendoza: { id: 'carlos_mendoza', name: 'Carlos Mendoza', viewedAt: Date.now() - 3600000 },
+      laura_restrepo: { id: 'laura_restrepo', name: 'Laura Restrepo', viewedAt: Date.now() - 2400000 },
+      mateo_gomez: { id: 'mateo_gomez', name: 'Mateo Gómez', viewedAt: Date.now() - 1200000 },
+      valeria_castro: { id: 'valeria_castro', name: 'Valeria Castro', viewedAt: Date.now() - 600000 }
+    },
     comments: [
       {
         id: 'demo-com-1',
@@ -89,6 +95,11 @@ export const DEMO_TASKS = [
       valeria_castro: { type: 'like', name: 'Valeria Castro' },
       carlos_mendoza: { type: 'wow', name: 'Carlos Mendoza' }
     },
+    viewedBy: {
+      valeria_castro: { id: 'valeria_castro', name: 'Valeria Castro', viewedAt: Date.now() - 5400000 },
+      carlos_mendoza: { id: 'carlos_mendoza', name: 'Carlos Mendoza', viewedAt: Date.now() - 4800000 },
+      laura_restrepo: { id: 'laura_restrepo', name: 'Laura Restrepo', viewedAt: Date.now() - 3600000 }
+    },
     comments: []
   },
   {
@@ -104,6 +115,12 @@ export const DEMO_TASKS = [
     reactions: {
       laura_restrepo: { type: 'love', name: 'Laura Restrepo' },
       mateo_gomez: { type: 'like', name: 'Mateo Gómez' }
+    },
+    viewedBy: {
+      laura_restrepo: { id: 'laura_restrepo', name: 'Laura Restrepo', viewedAt: Date.now() - 7200000 },
+      mateo_gomez: { id: 'mateo_gomez', name: 'Mateo Gómez', viewedAt: Date.now() - 6500000 },
+      carlos_mendoza: { id: 'carlos_mendoza', name: 'Carlos Mendoza', viewedAt: Date.now() - 5000000 },
+      valeria_castro: { id: 'valeria_castro', name: 'Valeria Castro', viewedAt: Date.now() - 4000000 }
     },
     comments: [
       {
