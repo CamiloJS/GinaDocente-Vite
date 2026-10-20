@@ -188,6 +188,32 @@ test('publishProfilePost guarda authorRole, author y authorPhoto', () => {
   assert(appJsx.includes('authorRole: postAuthorRole'), 'postPayload debe incluir authorRole');
 });
 
+test('myPosts.map prioriza el NOMBRE COMPLETO (3, 4 o 5 palabras) sobre nombres acortados de 2 palabras', () => {
+  assert(appJsx.includes('candidateNames'), 'Debe recolectar candidateNames');
+  assert(appJsx.includes('wordsB - wordsA'), 'Debe ordenar por cantidad de palabras para priorizar el nombre completo');
+
+  // Simulación del selector de nombre completo con el caso reportado por el usuario:
+  // Post guardó "Yulieth Gelvez" (2 palabras), pero el directorio tiene "Yulieth Alejandra Gelvez Orduz" (4 palabras)
+  const post = { authorName: 'Yulieth Gelvez', authorUsername: 'yulieth' };
+  const userData = { fullName: 'Yulieth Alejandra Gelvez Orduz' };
+  const userMappings = { yulieth: { fullName: 'Yulieth Alejandra Gelvez Orduz' } };
+
+  const candidateNames = [
+    userData.fullName,
+    userMappings.yulieth.fullName,
+    post.authorName
+  ].filter(Boolean);
+
+  const selectedFullName = [...candidateNames].sort((a, b) => {
+    const wordsA = a.trim().split(/\s+/).length;
+    const wordsB = b.trim().split(/\s+/).length;
+    if (wordsB !== wordsA) return wordsB - wordsA;
+    return b.trim().length - a.trim().length;
+  })[0].trim();
+
+  assertEqual(selectedFullName, 'Yulieth Alejandra Gelvez Orduz', 'Debe seleccionar el nombre completo de 4 palabras, NO el acortado de 2');
+});
+
 console.log(`\n========================================`);
 console.log(`Total pruebas Perfiles: ${totalTests} | OK: ${passedTests} | FAIL: ${failedTests}`);
 console.log(`========================================\n`);

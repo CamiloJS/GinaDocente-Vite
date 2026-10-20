@@ -6192,8 +6192,14 @@ useEffect(() => {
         setIsPublishingProfile(true);
         try {
             const postAuthorRole = role === 'teacher' ? 'teacher' : 'student';
-            const postAuthorPhoto = userMappings[myChatId]?.profilePicUrl || '';
-            const resolvedAuthorName = loggedInName || (role === 'teacher' ? (isCamiloTeacher(myChatId) ? SECOND_TEACHER_NAME : TEACHER_NAME) : 'Usuario');
+            const cleanMyId = String(myChatId || '').replace(/^@/, '');
+            const postAuthorPhoto = userMappings[cleanMyId]?.profilePicUrl || userMappings[myChatId]?.profilePicUrl || '';
+            const studentFullName = userMappings[cleanMyId]?.fullName || userMappings[myChatId]?.fullName;
+            const resolvedAuthorName = (
+                role === 'teacher'
+                    ? (isCamiloTeacher(myChatId) ? SECOND_TEACHER_NAME : TEACHER_NAME)
+                    : (studentFullName || loggedInName || 'Usuario')
+            );
             const postPayload = {
                 authorId: role === 'teacher' ? (myChatId || 'teacher') : (user?.uid || myChatId || 'user'), 
                 authorUsername: myChatId || '', 
@@ -6720,14 +6726,27 @@ useEffect(() => {
                             isTeacherId(post.authorName)
                         );
 
-                        const authorDisplayName = (
-                            (isPostAuthorTeacher ? (isCamiloTeacher(postAuthorKey) ? SECOND_TEACHER_NAME : TEACHER_NAME) : null) ||
-                            post.authorName || 
-                            authorUser?.fullName || 
-                            resolveUserDisplayName(post, userMappings, post.author || post.authorUsername || 'Usuario') ||
-                            (isMyProfile ? loggedInName : profileName) ||
-                            'Usuario'
-                        );
+                        // Obtener todos los candidatos de nombre posibles y elegir SIEMPRE el NOMBRE COMPLETO más exhaustivo (con todos sus nombres y apellidos)
+                        const candidateNames = [
+                            isPostAuthorTeacher ? (isCamiloTeacher(postAuthorKey) ? SECOND_TEACHER_NAME : TEACHER_NAME) : null,
+                            (!isTeacherProfile && userData?.fullName) ? userData.fullName : null,
+                            authorUser?.fullName,
+                            resolveUserDisplayName(post, userMappings, ''),
+                            (!isTeacherProfile && profileName && profileName !== targetUserKey) ? profileName : null,
+                            loggedInName,
+                            post.authorName,
+                            post.author
+                        ].filter(name => typeof name === 'string' && name.trim().length > 0 && !name.trim().startsWith('@'));
+
+                        // Ordenar para elegir con prioridad absoluta el nombre con más palabras (y más caracteres si empatan), garantizando el nombre completo de 3, 4 o más palabras
+                        const authorDisplayName = candidateNames.length > 0
+                            ? [...candidateNames].sort((a, b) => {
+                                const wordsA = a.trim().split(/\s+/).length;
+                                const wordsB = b.trim().split(/\s+/).length;
+                                if (wordsB !== wordsA) return wordsB - wordsA;
+                                return b.trim().length - a.trim().length;
+                            })[0].trim()
+                            : (post.authorName || post.author || 'Usuario');
 
                         const authorPhoto = (
                             post.authorPhoto || 
@@ -6738,7 +6757,8 @@ useEffect(() => {
                                     : (userMappings['teacher']?.profilePicUrl || userMappings['ginadocente']?.profilePicUrl || ''))
                                 : (cleanPostAuthorKey === String(myChatId || '').toLowerCase().replace(/^@/, '') ? (userMappings[myChatId]?.profilePicUrl || '') : '')
                             ) ||
-                            (targetProfilePic && cleanPostAuthorKey === cleanFilterIdLower ? targetProfilePic : '')
+                            (targetProfilePic && cleanPostAuthorKey === cleanFilterIdLower ? targetProfilePic : '') ||
+                            (!isTeacherProfile && userData?.profilePicUrl ? userData.profilePicUrl : '')
                         );
 
                         return (
