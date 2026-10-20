@@ -15,7 +15,7 @@ import AudioPlayer, { AudioRecordingVisualizer } from './AudioPlayer.jsx'
 import CustomVideoPlayer from './CustomVideoPlayer.jsx'
 import GeniallyEmbedPlayer, { extractGeniallyUrl } from './GeniallyEmbedPlayer.jsx'
 import { DEMO_TTL_MS, saveDemoSandboxItem } from '../utils/demoData.js'
-import { getCanonicalTeacherId, getItemTeacherId, getTeacherDisplayName, uploadImageToStorage, uploadRawFileToStorage, deleteFileFromStorage, generateId } from '../utils/helpers.js'
+import { getCanonicalTeacherId, getItemTeacherId, getTeacherDisplayName, uploadImageToStorage, uploadRawFileToStorage, deleteFileFromStorage, generateId, resolveUserPhoto } from '../utils/helpers.js'
 import { createDefaultKahootQuestion, validateKahootConfig, generateKahootPin } from '../utils/kahootEngine.js'
 import { BOOK_THEMES, renderPdfToBookPages, uploadBookPagesToStorage, sanitizeBookForFirestore, buildFallbackBookPages, buildBookPagesFromOutline, extractBookOutlinePageTexts, syncBookOutlineMetadata, stripBookHtml, generateAiBookPages, applyCustomCoverToPages, compressBookImageDataUrl, READING_AUDIO_PRESETS, getReadingAudioPreset, clampReadingVolume, readingAmbientPlayer } from '../utils/flipbookEngine.js'
 import Flipbook3DModal from './Flipbook3DModal.jsx'
@@ -879,7 +879,7 @@ const TasksTab = React.memo(({
         });
     }, [filteredTasks, visiblePinnedTasks]);
 
-    const teacherPic = userMappings?.[myChatId]?.profilePicUrl;
+    const teacherPic = resolveUserPhoto(myChatId, userMappings, userMappings?.[myChatId]?.profilePicUrl || '');
     const activeComposerGroupObj = (academicGroups || []).find(g => String(g?.id || '').replace(/^acad_/i, '').toLowerCase() === String((fixedTargetGroup || postTargetGroup || '')).replace(/^acad_/i, '').toLowerCase());
 
     return (

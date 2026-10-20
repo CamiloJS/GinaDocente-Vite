@@ -10,7 +10,8 @@ import {
   isCamiloTeacher,
   getCanonicalTeacherId,
   TEACHER_NAME,
-  SECOND_TEACHER_NAME
+  SECOND_TEACHER_NAME,
+  resolveUserPhoto
 } from '../src/utils/helpers.js';
 
 import { DEMO_USER_POSTS } from '../src/utils/demoData.js';
@@ -212,6 +213,51 @@ test('myPosts.map prioriza el NOMBRE COMPLETO (3, 4 o 5 palabras) sobre nombres 
   })[0].trim();
 
   assertEqual(selectedFullName, 'Yulieth Alejandra Gelvez Orduz', 'Debe seleccionar el nombre completo de 4 palabras, NO el acortado de 2');
+});
+
+test('resolveUserPhoto prioriza la foto de perfil actualizada en userMappings sobre la foto estática obsoleta de un post', () => {
+  const stalePost = {
+    id: 'post_123',
+    author: 'Yulieth Gelvez',
+    authorName: 'Yulieth Alejandra Gelvez Orduz',
+    authorUsername: 'yulieth',
+    authorPhoto: 'https://storage.googleapis.com/english-tech/old_avatar_january.jpg'
+  };
+
+  const userMappings = {
+    yulieth: {
+      fullName: 'Yulieth Alejandra Gelvez Orduz',
+      profilePicUrl: 'https://storage.googleapis.com/english-tech/new_avatar_october.jpg'
+    }
+  };
+
+  const resolved = resolveUserPhoto(stalePost, userMappings, stalePost.authorPhoto);
+  assertEqual(resolved, 'https://storage.googleapis.com/english-tech/new_avatar_october.jpg', 'Debe devolver la foto NUEVA de userMappings y no la vieja del post');
+});
+
+test('resolveUserPhoto devuelve la foto de respaldo si el usuario aún no tiene foto en userMappings', () => {
+  const postWithoutLivePhoto = {
+    id: 'post_456',
+    authorUsername: 'carlos',
+    authorPhoto: 'https://storage.googleapis.com/english-tech/fallback_carlos.jpg'
+  };
+
+  const userMappings = {
+    carlos: {
+      fullName: 'Carlos Mendoza',
+      profilePicUrl: ''
+    }
+  };
+
+  const resolved = resolveUserPhoto(postWithoutLivePhoto, userMappings, postWithoutLivePhoto.authorPhoto);
+  assertEqual(resolved, 'https://storage.googleapis.com/english-tech/fallback_carlos.jpg', 'Debe devolver la foto de respaldo');
+});
+
+test('App.jsx y TaskCard.jsx integran resolveUserPhoto para resolver fotos en vivo', () => {
+  const taskCardJsx = fs.readFileSync(path.join(rootDir, 'src', 'components', 'TaskCard.jsx'), 'utf-8');
+  assert(taskCardJsx.includes('resolveUserPhoto(task, userMappings'), 'TaskCard debe usar resolveUserPhoto');
+  assert(appJsx.includes('resolveUserPhoto'), 'App.jsx debe importar y usar resolveUserPhoto');
+  assert(appJsx.includes('updateProfile'), 'App.jsx debe sincronizar la foto en Firebase Auth con updateProfile');
 });
 
 console.log(`\n========================================`);

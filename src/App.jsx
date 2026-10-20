@@ -15,7 +15,7 @@ import {
   auth, db, appId, secondaryAuth, collection, onSnapshot, doc, setDoc, getDocs, getDocsFromServer,
   deleteDoc, addDoc, updateDoc, getDoc, query, where, orderBy, limit,
   signInWithEmailAndPassword, onAuthStateChanged, createUserWithEmailAndPassword, signInAnonymously,
-  signOut, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail,
+  signOut, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail, updateProfile,
 } from './firebase/config.js'
 import {
   CHAT_GRADIENTS, CHAT_PATTERNS, COMMENT_EMOJIS, FALLBACK_MAP, SLIDE_GRADIENTS,
@@ -25,7 +25,7 @@ import {
   uploadImageToStorage, uploadRawFileToStorage, deleteFileFromStorage, deleteFilesFromStorage,
   deleteAllStorageFilesInObject, deleteReplacedStorageFiles,
   speakText, splitNameFirstAndLast, format12HourTime, formatDateTime12H,
-  isImageLikeFile, isHeicFile, convertHeicToJpeg, resolveUserDisplayName
+  isImageLikeFile, isHeicFile, convertHeicToJpeg, resolveUserDisplayName, resolveUserPhoto
 } from './utils/helpers.js'
 import UniversalImage from './components/UniversalImage.jsx'
 import {
@@ -2800,6 +2800,13 @@ function App() {
                 const targetRole = isTeacherGoogle ? 'teacher' : (existingEntry[1]?.role || 'student');
                 const finalDisplayName = targetRole === 'teacher' ? getTeacherDisplayName(userKey || targetFullName) : targetFullName;
                 
+                const existingEntryData = existingEntry ? existingEntry[1] : (userMappings[userKey] || {});
+                const existingPhoto = existingEntryData?.profilePicUrl || '';
+                const isCustomStoragePhoto = typeof existingPhoto === 'string' && existingPhoto.includes('firebasestorage.googleapis.com');
+                // Sincronizar foto de Google si el estudiante no tiene foto previa o si su foto es de Google
+                const shouldSyncGooglePhoto = photo && (!existingPhoto || existingPhoto.includes('googleusercontent.com') || existingPhoto.includes('google.com') || !isCustomStoragePhoto);
+                const finalPhotoUrl = shouldSyncGooglePhoto ? photo : existingPhoto;
+
                 // Actualizar Firestore vinculando permanentemente uid y marcando onboardingCompleted: true
                 await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userMappings', userKey), {
                   fullName: targetFullName,
@@ -2808,7 +2815,8 @@ function App() {
                   uid: gUser.uid,
                   role: targetRole,
                   lastLogin: Date.now(),
-                  onboardingCompleted: true
+                  onboardingCompleted: true,
+                  ...(finalPhotoUrl ? { profilePicUrl: finalPhotoUrl } : {})
                 }, { merge: true }).catch(() => {});
 
                 // Actualizar inmediatamente en memoria para que no dependa de latencia de red
@@ -2822,18 +2830,19 @@ function App() {
                     uid: gUser.uid,
                     role: targetRole,
                     lastLogin: Date.now(),
-                    onboardingCompleted: true
+                    onboardingCompleted: true,
+                    ...(finalPhotoUrl ? { profilePicUrl: finalPhotoUrl } : {})
                   }
                 }));
 
-                const newAcc = { username: userKey, name: finalDisplayName, role: targetRole, email: email, isGoogle: true };
+                const newAcc = { username: userKey, name: finalDisplayName, role: targetRole, email: email, isGoogle: true, profilePicUrl: finalPhotoUrl, photoURL: finalPhotoUrl };
                 const accs = safeGetSavedAccounts();
                 const filtered = accs.filter(a => a.username !== userKey); 
                 const updatedAccs = [newAcc, ...filtered];
                 localStorage.setItem('englishTech_savedAccounts', JSON.stringify(updatedAccs));
                 setSavedAccounts(updatedAccs);
 
-                const sessionObj = { email: email, uid: gUser.uid, userKey: userKey, name: finalDisplayName, role: targetRole, isGoogle: true };
+                const sessionObj = { email: email, uid: gUser.uid, userKey: userKey, name: finalDisplayName, role: targetRole, isGoogle: true, profilePicUrl: finalPhotoUrl, photoURL: finalPhotoUrl };
                 localStorage.setItem('englishTech_activeSession', JSON.stringify(sessionObj));
 
                 setRole(targetRole);
@@ -3605,13 +3614,26 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
                         const fallbackData = FALLBACK_MAP[foundKey] || {};
                         const finalRole = dbData.role || fallbackData.role || 'student';
                         const finalName = finalRole === 'teacher' ? getTeacherDisplayName(foundKey) : (dbData.fullName || fallbackData.name || foundKey);
+
+                        // Sincronizar foto de perfil si proviene de Google Auth y el usuario no tiene foto personalizada de Storage
+                        const existingPhoto = dbData.profilePicUrl || '';
+                        const isCustomStoragePhoto = typeof existingPhoto === 'string' && existingPhoto.includes('firebasestorage.googleapis.com');
+                        if (u.photoURL && (!existingPhoto || existingPhoto.includes('googleusercontent.com') || existingPhoto.includes('google.com') || !isCustomStoragePhoto)) {
+                            if (u.photoURL !== existingPhoto) {
+                                dbData.profilePicUrl = u.photoURL;
+                                if (!isDemoMode) {
+                                    setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userMappings', foundKey), { profilePicUrl: u.photoURL }, { merge: true }).catch(() => {});
+                                }
+                                setUserMappings(prev => ({ ...prev, [foundKey]: { ...(prev[foundKey] || {}), profilePicUrl: u.photoURL } }));
+                            }
+                        }
                         
                         setRole(finalRole);
                         setLoggedInUser(finalRole === 'teacher' ? getTeacherUsername(foundKey) : `@${foundKey}`);
                         setLoggedInName(finalName);
                         setHasEntered(true);
                         setLoginType(null);
-                        localStorage.setItem('englishTech_activeSession', JSON.stringify({ email: u.email, uid: u.uid, userKey: foundKey, name: finalName, role: finalRole }));
+                        localStorage.setItem('englishTech_activeSession', JSON.stringify({ email: u.email, uid: u.uid, userKey: foundKey, name: finalName, role: finalRole, profilePicUrl: dbData.profilePicUrl || '' }));
                     }
                 }
             });
@@ -6135,6 +6157,49 @@ useEffect(() => {
             }
             await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userMappings', myChatId), { profilePicUrl: url }, { merge: true });
             
+            // Actualizar inmediatamente en memoria para que no dependa de latencia de red ni parpadee
+            const cleanKey = String(myChatId || '').toLowerCase().replace(/^@/, '');
+            setUserMappings(prev => ({
+                ...prev,
+                [myChatId]: { ...(prev[myChatId] || {}), profilePicUrl: url },
+                ...(cleanKey ? { [cleanKey]: { ...(prev[cleanKey] || {}), profilePicUrl: url } } : {})
+            }));
+            userMappingsRef.current = {
+                ...userMappingsRef.current,
+                [myChatId]: { ...(userMappingsRef.current[myChatId] || {}), profilePicUrl: url },
+                ...(cleanKey ? { [cleanKey]: { ...(userMappingsRef.current[cleanKey] || {}), profilePicUrl: url } } : {})
+            };
+
+            // Sincronizar en Firebase Auth
+            if (auth.currentUser && !auth.currentUser.isAnonymous) {
+                updateProfile(auth.currentUser, { photoURL: url }).catch(() => {});
+            }
+
+            // Sincronizar en cuentas guardadas y sesión activa local
+            try {
+                const accs = safeGetSavedAccounts();
+                const updatedAccs = accs.map(a => (a.username === myChatId || a.username === cleanKey) ? { ...a, profilePicUrl: url, photoURL: url } : a);
+                localStorage.setItem('englishTech_savedAccounts', JSON.stringify(updatedAccs));
+                setSavedAccounts(updatedAccs);
+
+                const rawSession = localStorage.getItem('englishTech_activeSession');
+                if (rawSession) {
+                    const sObj = JSON.parse(rawSession);
+                    sObj.profilePicUrl = url;
+                    sObj.photoURL = url;
+                    localStorage.setItem('englishTech_activeSession', JSON.stringify(sObj));
+                }
+            } catch (errLocal) {}
+
+            // Sincronizar en publicaciones locales de perfil en memoria
+            setUserPosts(prev => prev.map(p => {
+                const pAuthor = String(p.authorUsername || p.authorId || '').toLowerCase().replace(/^@/, '');
+                if (pAuthor === cleanKey || (user?.uid && p.authorId === user.uid)) {
+                    return { ...p, authorPhoto: url };
+                }
+                return p;
+            }));
+
             setAvatarPreviewUrl("");
             showMessage("Foto de perfil actualizada correctamente.");
             
@@ -6748,17 +6813,16 @@ useEffect(() => {
                             })[0].trim()
                             : (post.authorName || post.author || 'Usuario');
 
-                        const authorPhoto = (
-                            post.authorPhoto || 
-                            authorUser?.profilePicUrl || 
-                            (isPostAuthorTeacher 
-                                ? (isCamiloTeacher(postAuthorKey) 
-                                    ? (userMappings['camilodocente']?.profilePicUrl || '') 
-                                    : (userMappings['teacher']?.profilePicUrl || userMappings['ginadocente']?.profilePicUrl || ''))
-                                : (cleanPostAuthorKey === String(myChatId || '').toLowerCase().replace(/^@/, '') ? (userMappings[myChatId]?.profilePicUrl || '') : '')
-                            ) ||
-                            (targetProfilePic && cleanPostAuthorKey === cleanFilterIdLower ? targetProfilePic : '') ||
-                            (!isTeacherProfile && userData?.profilePicUrl ? userData.profilePicUrl : '')
+                        const authorPhoto = resolveUserPhoto(
+                            {
+                                authorId: post.authorId,
+                                authorUsername: post.authorUsername || postAuthorKey,
+                                authorName: authorDisplayName,
+                                author: post.author,
+                                uid: post.authorId || post.uid
+                            },
+                            userMappings,
+                            (!isTeacherProfile && userData?.profilePicUrl) || (targetProfilePic && cleanPostAuthorKey === cleanFilterIdLower ? targetProfilePic : '') || post.authorPhoto || ''
                         );
 
                         return (
@@ -13175,7 +13239,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                                                    <div className="flex items-center gap-3 min-w-0">
                                                         {(() => {
-                                                            const studentPhoto = s.studentPhoto || (s.studentId ? userMappings?.[s.studentId]?.profilePicUrl : null) || Object.values(userMappings || {}).find(u => u.fullName?.toLowerCase() === s.studentName?.toLowerCase())?.profilePicUrl;
+                                                            const studentPhoto = resolveUserPhoto({ authorId: s.studentId, authorName: s.studentName, name: s.studentName }, userMappings, s.studentPhoto || '');
                                                             return (
                                                                 <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs overflow-hidden border border-gray-200 dark:border-gray-700 ${
                                                                     !isRead
@@ -13287,7 +13351,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                                              <div className="flex items-center gap-3 min-w-0">
                                                  {(() => {
-                                                      const alertStudentPhoto = a.studentPhoto || (a.studentId ? userMappings?.[a.studentId]?.profilePicUrl : null) || Object.values(userMappings || {}).find(u => u.fullName?.toLowerCase() === a.studentName?.toLowerCase())?.profilePicUrl;
+                                                      const alertStudentPhoto = resolveUserPhoto({ authorId: a.studentId, authorName: a.studentName, name: a.studentName }, userMappings, a.studentPhoto || '');
                                                       return (
                                                           <div className="w-10 h-10 rounded-2xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-2xs overflow-hidden border border-red-400/40">
                                                               {alertStudentPhoto ? (
@@ -13929,8 +13993,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                   <div className="flex flex-wrap justify-center gap-4 max-h-64 overflow-y-auto p-2">
                                       {savedAccounts.map(acc => {
                                            const isCamiloAcc = acc.role === 'teacher' && isCamiloTeacher(acc.username || acc.name);
-                                           const teacherKey = isCamiloAcc ? 'camilodocente' : 'teacher';
-                                           const userPhoto = acc.profilePicUrl || acc.photoURL || userMappings?.[acc.username]?.profilePicUrl || (acc.role === 'teacher' ? userMappings?.[teacherKey]?.profilePicUrl : null);
+                                           const userPhoto = resolveUserPhoto({ username: acc.username, authorId: acc.username, authorName: acc.name, role: acc.role }, userMappings, acc.profilePicUrl || acc.photoURL || '');
                                            const initial = (acc.role === 'teacher' ? (isCamiloAcc ? 'C' : 'G') : (acc.name || 'U').charAt(0)).toUpperCase();
                                            return (
                                                <div key={acc.username} className="relative group">
@@ -14477,11 +14540,14 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                             title="Menú de perfil y cuenta"
                         >
                             <div className="w-7 h-7 rounded-full overflow-hidden flex items-center justify-center bg-gradient-to-br from-[#AD3333] to-[#8a2828] text-white text-xs font-bold shrink-0 shadow-xs">
-                                {userMappings[myChatId]?.profilePicUrl ? (
-                                    <img loading="lazy" decoding="async" src={userMappings[myChatId].profilePicUrl} alt="Avatar" className="w-full h-full object-cover" />
-                                ) : (
-                                    loggedInName?.charAt(0).toUpperCase() || 'U'
-                                )}
+                                {(() => {
+                                    const topPhoto = resolveUserPhoto({ username: myChatId, authorId: myChatId, authorName: loggedInName, role }, userMappings, userMappings[myChatId]?.profilePicUrl || auth.currentUser?.photoURL || '');
+                                    return topPhoto ? (
+                                        <img loading="lazy" decoding="async" src={topPhoto} alt="Avatar" className="w-full h-full object-cover" />
+                                    ) : (
+                                        loggedInName?.charAt(0).toUpperCase() || 'U'
+                                    );
+                                })()}
                             </div>
                             <span className="hidden sm:inline text-xs font-bold truncate max-w-[90px]">
                                 {loggedInName?.split(' ')[0]}
@@ -14562,7 +14628,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                           <div className={`p-3 rounded-2xl border shadow-xs flex items-center gap-3 transition-colors ${isDarkMode ? 'bg-gray-800/90 border-gray-700/80' : 'bg-white border-gray-200'}`}>
                               <div className="relative shrink-0">
                                   <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 overflow-hidden border border-gray-200 dark:border-gray-700 shadow-2xs">
-                                      {userMappings[myChatId]?.profilePicUrl ? <img loading="lazy" decoding="async" src={userMappings[myChatId].profilePicUrl} className="w-full h-full object-cover" /> : <UserIcon size={22} />}
+                                      {resolveUserPhoto({ username: myChatId, authorId: myChatId, authorName: loggedInName, role }, userMappings, userMappings[myChatId]?.profilePicUrl || auth.currentUser?.photoURL || '') ? <img loading="lazy" decoding="async" src={resolveUserPhoto({ username: myChatId, authorId: myChatId, authorName: loggedInName, role }, userMappings, userMappings[myChatId]?.profilePicUrl || auth.currentUser?.photoURL || '')} className="w-full h-full object-cover" /> : <UserIcon size={22} />}
                                   </div>
                                   <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 ${isDarkMode ? 'border-gray-800' : 'border-white'} ${
                                       (!userPresence[myChatId]?.isOnline || userPresence[myChatId]?.status === 'offline') ? 'bg-gray-400' :
@@ -14941,7 +15007,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                                       const isDisconnected = !isConnected;
                                                       
                                                       const statusDotColor = isOnline ? 'bg-green-500' : isAway ? 'bg-orange-400' : isBusy ? 'bg-red-500' : 'bg-gray-400';
-                                                      const photo = u.profilePicUrl || userMappings[u.id]?.profilePicUrl;
+                                                      const photo = resolveUserPhoto(u, userMappings, u.profilePicUrl || '');
 
                                                       return (
                                                           <div
@@ -15610,7 +15676,7 @@ Bot:`;
                                       const isConnected = isOnline || isAway || isBusy;
                                       const isDisconnected = !isConnected;
                                       const statusDotColor = isOnline ? 'bg-green-500' : isAway ? 'bg-orange-400' : isBusy ? 'bg-red-500' : 'bg-gray-400';
-                                      const photo = u.profilePicUrl || userMappings[u.id]?.profilePicUrl;
+                                      const photo = resolveUserPhoto(u, userMappings, u.profilePicUrl || '');
 
                                       return (
                                           <button 
@@ -15686,7 +15752,7 @@ Bot:`;
                                           <UsersGroupIcon size={14}/>
                                       ) : (() => {
                                           const tId = getDmTargetUserId(activeChat, myChatId);
-                                          const photo = userMappings[tId]?.profilePicUrl;
+                                          const photo = resolveUserPhoto(tId, userMappings);
                                           return photo ? (
                                               <img loading="lazy" decoding="async" src={photo} alt={activeChat.name} className="w-full h-full object-cover" />
                                           ) : (
@@ -15785,7 +15851,7 @@ Bot:`;
                                                        return <UsersGroupIcon size={18}/>;
                                                    })() : (() => {
                                                       const tId = getDmTargetUserId(activeChat, myChatId);
-                                                      const photo = getUserMappingData(tId, userMappings)?.profilePicUrl || userMappings[tId]?.profilePicUrl;
+                                                      const photo = resolveUserPhoto(tId, userMappings);
                                                       if (photo) return <img loading="lazy" decoding="async" src={photo} alt={activeChat.name} className="w-full h-full object-cover" />;
                                                       return activeChat.role === 'teacher' ? <TeacherIcon size={18}/> : <span className="font-bold text-sm">{activeChat.name?.charAt(0).toUpperCase() || 'U'}</span>;
                                                   })()}
@@ -17163,7 +17229,7 @@ Bot:`;
                           <div className="px-5 py-3.5 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between bg-white dark:bg-gray-900">
                               <div className="flex items-center gap-3 min-w-0">
                                   {(() => {
-                                      const userPhoto = userMappings[myChatId]?.profilePicUrl || (role === 'teacher' && !isCamiloTeacher(myChatId) ? userMappings['teacher']?.profilePicUrl : null) || (role === 'teacher' && isCamiloTeacher(myChatId) ? null : auth.currentUser?.photoURL);
+                                      const userPhoto = resolveUserPhoto({ username: myChatId, authorId: myChatId, authorName: loggedInName, role }, userMappings, userMappings[myChatId]?.profilePicUrl || auth.currentUser?.photoURL || '');
                                       return (
                                           <div className={`w-10 h-10 rounded-full overflow-hidden flex items-center justify-center text-white font-bold text-sm shadow-xs border-2 border-white dark:border-gray-700 shrink-0 ${
                                               role === 'teacher' ? 'bg-gradient-to-br from-[#AD3333] to-[#8a2828]' : 'bg-gradient-to-br from-blue-500 to-indigo-600'

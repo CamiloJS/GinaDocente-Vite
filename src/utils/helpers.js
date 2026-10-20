@@ -248,6 +248,131 @@ export const resolveUserDisplayName = (itemOrId, userMappings, fallbackName = ''
   return effectiveFallback;
 };
 
+/**
+ * Resuelve dinámicamente la foto de perfil más actualizada de un usuario o autor
+ * (para publicaciones, muros, comentarios, perfiles, evaluaciones, chats y entregas)
+ * consultando primero userMappings en tiempo real.
+ * Si el estudiante o docente actualizó su foto de perfil (en Google o en EnglishTech),
+ * siempre devuelve la foto nueva y vigente en lugar de fotos estáticas u obsoletas guardadas en registros históricos.
+ */
+export const resolveUserPhoto = (itemOrId, userMappings, fallbackPhoto = '') => {
+  if (!itemOrId && !fallbackPhoto) return '';
+
+  let rawAuthor = '';
+  let authorUsername = '';
+  let authorId = '';
+  let uid = '';
+  let email = '';
+  let explicitPhoto = '';
+
+  if (typeof itemOrId === 'object' && itemOrId !== null) {
+    rawAuthor = String(itemOrId.author || itemOrId.authorName || itemOrId.senderName || itemOrId.name || itemOrId.fullName || '').trim();
+    authorUsername = String(itemOrId.authorUsername || itemOrId.username || itemOrId.userKey || '').trim().replace(/^@/, '');
+    authorId = String(itemOrId.authorId || itemOrId.userId || itemOrId.senderId || itemOrId.id || '').trim().replace(/^@/, '');
+    uid = String(itemOrId.uid || '').trim();
+    email = String(itemOrId.email || '').trim().toLowerCase();
+    explicitPhoto = String(itemOrId.profilePicUrl || itemOrId.photoURL || itemOrId.authorPhoto || itemOrId.avatar || itemOrId.studentPhoto || '').trim();
+  } else {
+    const str = String(itemOrId).trim();
+    rawAuthor = str;
+    authorUsername = str.replace(/^@/, '');
+    authorId = str.replace(/^@/, '');
+  }
+
+  const cleanFallback = fallbackPhoto || explicitPhoto || '';
+
+  // 1. Docentes oficiales
+  if (isCamiloTeacher(authorUsername) || isCamiloTeacher(authorId) || isCamiloTeacher(rawAuthor)) {
+    return userMappings?.[SECOND_TEACHER_ID]?.profilePicUrl || userMappings?.['camilodocente']?.profilePicUrl || FALLBACK_MAP?.[SECOND_TEACHER_ID]?.profilePicUrl || '';
+  }
+
+  const rawAuthorLower = rawAuthor.toLowerCase();
+  const authorUserLower = authorUsername.toLowerCase();
+  const authorIdLower = authorId.toLowerCase();
+  if (
+    authorUserLower === 'teacher' || 
+    authorUserLower === 'ginadocente' || 
+    authorIdLower === 'teacher' || 
+    authorIdLower === 'ginadocente' ||
+    rawAuthorLower === 'profesora' || 
+    rawAuthorLower === 'profesor' || 
+    rawAuthorLower === 'la profe' || 
+    rawAuthorLower === 'docente' || 
+    rawAuthorLower === 'docente gina' ||
+    rawAuthorLower.includes('gina marcela')
+  ) {
+    return userMappings?.['teacher']?.profilePicUrl || userMappings?.['ginadocente']?.profilePicUrl || FALLBACK_MAP?.['teacher']?.profilePicUrl || '/icono.png';
+  }
+
+  if (!userMappings || typeof userMappings !== 'object') {
+    return cleanFallback;
+  }
+
+  // 2. Búsqueda por username / userKey
+  if (authorUserLower) {
+    if (userMappings[authorUserLower]?.profilePicUrl) {
+      return userMappings[authorUserLower].profilePicUrl;
+    }
+    const keyMatch = Object.keys(userMappings).find(k => k.toLowerCase().replace(/^@/, '') === authorUserLower);
+    if (keyMatch && userMappings[keyMatch]?.profilePicUrl) {
+      return userMappings[keyMatch].profilePicUrl;
+    }
+  }
+
+  // 3. Búsqueda por authorId / uid
+  if (authorIdLower) {
+    if (userMappings[authorIdLower]?.profilePicUrl) {
+      return userMappings[authorIdLower].profilePicUrl;
+    }
+    const idKeyMatch = Object.keys(userMappings).find(k => k.toLowerCase().replace(/^@/, '') === authorIdLower);
+    if (idKeyMatch && userMappings[idKeyMatch]?.profilePicUrl) {
+      return userMappings[idKeyMatch].profilePicUrl;
+    }
+    const uidMatch = Object.values(userMappings).find(u => (u?.uid && u.uid.toLowerCase() === authorIdLower) || (uid && u?.uid === uid));
+    if (uidMatch?.profilePicUrl) {
+      return uidMatch.profilePicUrl;
+    }
+  }
+
+  if (uid) {
+    const uidMatch = Object.values(userMappings).find(u => u?.uid && u.uid === uid);
+    if (uidMatch?.profilePicUrl) {
+      return uidMatch.profilePicUrl;
+    }
+  }
+
+  // 4. Búsqueda por email
+  if (email) {
+    const emailMatch = Object.values(userMappings).find(u => u?.email && u.email.toLowerCase() === email);
+    if (emailMatch?.profilePicUrl) {
+      return emailMatch.profilePicUrl;
+    }
+  }
+
+  // 5. Búsqueda por nombre completo
+  if (rawAuthor) {
+    const norm = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const rawNorm = norm(rawAuthor);
+    const exactNameMatch = Object.values(userMappings).find(u => norm(u?.fullName) === rawNorm);
+    if (exactNameMatch?.profilePicUrl) {
+      return exactNameMatch.profilePicUrl;
+    }
+    const authorWords = rawNorm.split(/\s+/).filter(w => w.length >= 3);
+    if (authorWords.length >= 2) {
+      const candidate = Object.values(userMappings).find(u => {
+        const uNorm = norm(u?.fullName);
+        if (!uNorm) return false;
+        return authorWords.every(w => uNorm.includes(w));
+      });
+      if (candidate?.profilePicUrl) {
+        return candidate.profilePicUrl;
+      }
+    }
+  }
+
+  return cleanFallback;
+};
+
 // --- Funciones de utilidad ---
 export const compressImage = async (file, maxWidth = 2048, maxHeight = 2048, quality = 0.85) => {
   if (!file) return null;

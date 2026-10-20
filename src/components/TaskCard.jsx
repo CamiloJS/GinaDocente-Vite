@@ -6,7 +6,7 @@ import {
 } from './Icons.jsx'
 import {
   compressImage, containsBadWords, checkBadWordsAsync, uploadImageToStorage, uploadRawFileToStorage, deleteFileFromStorage, deleteAllStorageFilesInObject, deleteReplacedStorageFiles, TEACHER_NAME, SECOND_TEACHER_NAME, SECOND_TEACHER_ID, isCamiloTeacher, isTeacherId, getCanonicalTeacherId, getTeacherDisplayName, getItemTeacherId, COMMENT_EMOJIS, REACTION_EMOJIS, splitNameFirstAndLast, FALLBACK_MAP, format12HourTime, formatDateTime12H,
-  isImageLikeFile, convertHeicToJpeg, resolveUserDisplayName
+  isImageLikeFile, convertHeicToJpeg, resolveUserDisplayName, resolveUserPhoto
 } from '../utils/helpers.js'
 import UniversalImage from './UniversalImage.jsx'
 import { glassCard, glassInput } from '../utils/styles.js'
@@ -181,7 +181,8 @@ const TaskCard = React.memo(({
                 if (!data) return null;
                 const rawName = typeof data === 'object' ? (data.name || data.author) : String(data);
                 const resolvedName = resolveUserDisplayName({ author: rawName, authorId: id }, userMappings, rawName) || rawName || 'Estudiante';
-                const avatar = typeof data === 'object' ? (data.avatar || data.photoURL || '') : '';
+                const rawAvatar = typeof data === 'object' ? (data.avatar || data.photoURL || '') : '';
+                const avatar = resolveUserPhoto({ id, authorId: id, author: rawName, name: rawName }, userMappings, rawAvatar);
                 const viewedAt = typeof data === 'object' ? data.viewedAt : null;
                 return {
                     id,
@@ -1315,28 +1316,9 @@ const TaskCard = React.memo(({
         }
     };
 
-    // Resolver foto de perfil del autor de la publicación o tarea
+    // Resolver foto de perfil del autor de la publicación o tarea (priorizando siempre userMappings actualizado)
     const resolveAuthorPhoto = () => {
-        if (task.authorPhoto) return task.authorPhoto;
-        if (task.authorId && userMappings?.[task.authorId]?.profilePicUrl) return userMappings[task.authorId].profilePicUrl;
-        
-        const authorNameLower = (task.authorName || '').trim().toLowerCase();
-        if (isCamiloTeacher(task.authorId) || isCamiloTeacher(authorNameLower)) {
-            return userMappings?.[SECOND_TEACHER_ID]?.profilePicUrl || FALLBACK_MAP?.[SECOND_TEACHER_ID]?.profilePicUrl || '';
-        }
-        const teacherNameLower = TEACHER_NAME.toLowerCase();
-        
-        if (!task.authorName || authorNameLower === teacherNameLower || authorNameLower.includes('gina') || authorNameLower.includes('profesora') || task.authorId === 'teacher' || (!task.authorId && role === 'teacher')) {
-            return userMappings?.['teacher']?.profilePicUrl || FALLBACK_MAP?.['teacher']?.profilePicUrl || '';
-        }
-        
-        const foundMapping = Object.values(userMappings || {}).find(u => (u.fullName || '').trim().toLowerCase() === authorNameLower);
-        if (foundMapping?.profilePicUrl) return foundMapping.profilePicUrl;
-        
-        const foundFallback = Object.values(FALLBACK_MAP || {}).find(u => (u.name || '').trim().toLowerCase() === authorNameLower);
-        if (foundFallback?.profilePicUrl) return foundFallback.profilePicUrl;
-        
-        return '';
+        return resolveUserPhoto(task, userMappings, task.authorPhoto || '');
     };
     const authorPhoto = resolveAuthorPhoto();
 

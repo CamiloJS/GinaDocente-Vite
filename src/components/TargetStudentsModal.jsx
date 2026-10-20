@@ -8,6 +8,7 @@ import { createPortal } from 'react-dom';
 import { X, Search, CheckCircle2, UserCheck, UsersIcon } from './Icons.jsx';
 import { glassCard, glassInput } from '../utils/styles.js';
 import { DEMO_USER_MAPPINGS } from '../utils/demoData.js';
+import { resolveUserPhoto } from '../utils/helpers.js';
 
 export default function TargetStudentsModal({
   isOpen,
@@ -65,7 +66,7 @@ export default function TargetStudentsModal({
         name: u.fullName || u.name || key,
         username: u.username || key,
         email: u.email || '',
-        profilePicUrl: u.profilePicUrl || '',
+        profilePicUrl: resolveUserPhoto(u, userMappings, u.profilePicUrl || ''),
         academicGroupId: u.academicGroupId || ''
       });
     });
@@ -80,14 +81,14 @@ export default function TargetStudentsModal({
         if (!m || isTeacherKey(m)) return;
         const cleanM = String(m).trim();
         if (!map.has(cleanM)) {
-          const uInfo = userMappings?.[cleanM] || {};
+          const uInfo = userMappings?.[cleanM] || userMappings?.[cleanM.toLowerCase().replace(/^@/, '')] || {};
           map.set(cleanM, {
             id: cleanM,
             key: cleanM,
             name: uInfo.fullName || uInfo.name || cleanM,
             username: uInfo.username || cleanM,
             email: uInfo.email || '',
-            profilePicUrl: uInfo.profilePicUrl || '',
+            profilePicUrl: resolveUserPhoto(cleanM, userMappings, uInfo.profilePicUrl || ''),
             academicGroupId: g.id
           });
         }

@@ -14,6 +14,7 @@ import {
   GoogleAuthProvider,
   signInWithPopup,
   sendPasswordResetEmail,
+  updateProfile,
 } from 'firebase/auth'
 import {
   initializeFirestore,
@@ -111,6 +112,7 @@ export {
   GoogleAuthProvider,
   signInWithPopup,
   sendPasswordResetEmail,
+  updateProfile,
   // Re-exportaciones de firestore
   collection,
   onSnapshot,
