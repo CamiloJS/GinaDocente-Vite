@@ -6191,10 +6191,16 @@ useEffect(() => {
         }
         setIsPublishingProfile(true);
         try {
+            const postAuthorRole = role === 'teacher' ? 'teacher' : 'student';
+            const postAuthorPhoto = userMappings[myChatId]?.profilePicUrl || '';
+            const resolvedAuthorName = loggedInName || (role === 'teacher' ? (isCamiloTeacher(myChatId) ? SECOND_TEACHER_NAME : TEACHER_NAME) : 'Usuario');
             const postPayload = {
-                authorId: role === 'teacher' ? myChatId : (user?.uid || myChatId || 'user'), 
+                authorId: role === 'teacher' ? (myChatId || 'teacher') : (user?.uid || myChatId || 'user'), 
                 authorUsername: myChatId || '', 
-                authorName: loggedInName || 'Usuario',
+                authorName: resolvedAuthorName,
+                author: resolvedAuthorName,
+                authorRole: postAuthorRole,
+                authorPhoto: postAuthorPhoto,
                 title: (profilePostTitle || '').trim(), 
                 text: (profilePostText || '').trim(), 
                 imageUrl: profilePostImage || '',
@@ -6433,15 +6439,55 @@ useEffect(() => {
         const isTeacherProfile = isTeacherId(targetFilterId);
         const cleanFilterIdLower = String(targetFilterId || '').toLowerCase().replace(/^@/, '');
         const myPosts = userPosts.filter(p => {
-            if (isTeacherProfile) {
-                return getCanonicalTeacherId(p.authorUsername || p.authorId || p.authorName) === getCanonicalTeacherId(targetFilterId);
-            }
-            const pUserLower = String(p.authorUsername || '').toLowerCase().replace(/^@/, '');
-            return (
-                pUserLower === cleanFilterIdLower ||
-                (userData?.uid && p.authorId === userData.uid) ||
-                (isMyProfile && ((p.authorId && p.authorId === user?.uid) || pUserLower === String(myChatId || '').toLowerCase().replace(/^@/, '')))
+            // Determinar con certeza absoluta si la publicación es de un docente o de un estudiante
+            const isPostFromTeacher = (
+                p.authorRole === 'teacher' ||
+                (p.authorRole !== 'student' && (
+                    isTeacherId(p.authorUsername) ||
+                    isTeacherId(p.authorId) ||
+                    isTeacherId(p.authorName) ||
+                    isTeacherId(p.author)
+                ))
             );
+
+            // 1. Si estamos viendo el perfil de una docente (Gina o Camilo):
+            // SOLO y EXCLUSIVAMENTE se muestran publicaciones creadas por ese docente en específico.
+            // Ninguna publicación de ningún estudiante puede colarse aquí.
+            if (isTeacherProfile) {
+                if (!isPostFromTeacher || p.authorRole === 'student') return false;
+                const postAuthorKey = p.authorUsername || p.authorId || p.authorName || p.author || '';
+                const postTeacherCanon = isCamiloTeacher(postAuthorKey) ? 'camilodocente' : 'teacher';
+                const targetTeacherCanon = isCamiloTeacher(targetFilterId) ? 'camilodocente' : 'teacher';
+                return postTeacherCanon === targetTeacherCanon;
+            }
+
+            // 2. Si estamos viendo el perfil de un estudiante:
+            // NUNCA mostrar publicaciones de docentes aquí.
+            if (isPostFromTeacher || p.authorRole === 'teacher') return false;
+
+            // 3. Filtrar de forma estrictamente independiente para ESTE estudiante en particular
+            const pUserLower = String(p.authorUsername || '').toLowerCase().replace(/^@/, '');
+            const pIdLower = String(p.authorId || '').toLowerCase().replace(/^@/, '');
+            const pUid = p.authorId || p.uid;
+            const targetUid = userData?.uid;
+            const pAuthorNameLower = String(p.authorName || p.author || '').trim().toLowerCase();
+            const profileFullNameLower = String(userData?.fullName || '').trim().toLowerCase();
+
+            if (cleanFilterIdLower) {
+                if (pUserLower && pUserLower === cleanFilterIdLower) return true;
+                if (pIdLower && pIdLower === cleanFilterIdLower) return true;
+                if (targetUid && pUid && pUid === targetUid) return true;
+            }
+            if (profileFullNameLower && pAuthorNameLower && profileFullNameLower === pAuthorNameLower) {
+                return true;
+            }
+            if (isMyProfile) {
+                const myClean = String(myChatId || '').toLowerCase().replace(/^@/, '');
+                if (myClean && (pUserLower === myClean || pIdLower === myClean)) return true;
+                if (user?.uid && pUid && pUid === user.uid) return true;
+                if (loggedInName && pAuthorNameLower && loggedInName.trim().toLowerCase() === pAuthorNameLower) return true;
+            }
+            return false;
         });
         
         return (
@@ -6660,24 +6706,118 @@ useEffect(() => {
                     ) : null}
                     {myPosts.map(post => {
                         const isEditingThis = editingProfilePostId === post.id;
+
+                        // Resolución limpia del autor de la publicación para mostrar arriba de cada tarjeta (inclusive en su propio perfil)
+                        const postAuthorKey = post.authorUsername || post.authorId || post.author || '';
+                        const cleanPostAuthorKey = String(postAuthorKey).toLowerCase().replace(/^@/, '');
+                        const authorUser = userMappings[cleanPostAuthorKey] || userMappings[post.authorUsername] || userMappings[post.authorId];
+
+                        const isPostAuthorTeacher = (
+                            post.authorRole === 'teacher' || 
+                            isTeacherId(post.authorUsername) || 
+                            isTeacherId(post.authorId) || 
+                            isTeacherId(post.author) ||
+                            isTeacherId(post.authorName)
+                        );
+
+                        const authorDisplayName = (
+                            (isPostAuthorTeacher ? (isCamiloTeacher(postAuthorKey) ? SECOND_TEACHER_NAME : TEACHER_NAME) : null) ||
+                            post.authorName || 
+                            authorUser?.fullName || 
+                            resolveUserDisplayName(post, userMappings, post.author || post.authorUsername || 'Usuario') ||
+                            (isMyProfile ? loggedInName : profileName) ||
+                            'Usuario'
+                        );
+
+                        const authorPhoto = (
+                            post.authorPhoto || 
+                            authorUser?.profilePicUrl || 
+                            (isPostAuthorTeacher 
+                                ? (isCamiloTeacher(postAuthorKey) 
+                                    ? (userMappings['camilodocente']?.profilePicUrl || '') 
+                                    : (userMappings['teacher']?.profilePicUrl || userMappings['ginadocente']?.profilePicUrl || ''))
+                                : (cleanPostAuthorKey === String(myChatId || '').toLowerCase().replace(/^@/, '') ? (userMappings[myChatId]?.profilePicUrl || '') : '')
+                            ) ||
+                            (targetProfilePic && cleanPostAuthorKey === cleanFilterIdLower ? targetProfilePic : '')
+                        );
+
+                        const authorRoleLabel = isPostAuthorTeacher ? 'Docente' : (authorUser?.customLabel || 'Estudiante');
+
                         return (
                         <div key={post.id} className={`${glassCard} !p-4 sm:!p-5 flex flex-col gap-3 rounded-2xl group relative w-full min-w-0 overflow-hidden break-words shadow-xs`}>
-                            {/* Menú de Opciones (Editar/Borrar) */}
-                            {isMyProfile && !isEditingThis && (
-                                <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                                    <button onClick={() => {setEditingProfilePostId(post.id); setEditProfilePostData({title: post.title || "", text: post.text || ""});}} className="bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-300 p-1.5 rounded-lg shadow-xs hover:bg-blue-100"><Edit3 size={14}/></button>
-                                    <button onClick={() => confirmAction("¿Eliminar publicación de tu perfil?", async () => {
-                                        if (isDemoMode) {
-                                            setUserPosts(prev => prev.filter(p => p.id !== post.id));
-                                            removeDemoSandboxItem('userPosts', post.id);
-                                            showMessage("Publicación eliminada (Modo Demo).");
-                                            return;
-                                        }
-                                        await deleteAllStorageFilesInObject(post);
-                                        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userPosts', post.id));
-                                    })} className="bg-red-50 dark:bg-red-950/50 text-red-600 dark:text-red-300 p-1.5 rounded-lg shadow-xs hover:bg-red-100"><Trash2 size={14}/></button>
+                            {/* Cabecera del Autor de la Publicación (Nombre del estudiante/docente siempre visible arriba) */}
+                            <div className="flex items-center justify-between gap-3 pb-2.5 border-b border-gray-100 dark:border-gray-800/80">
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                    <button 
+                                        type="button"
+                                        onClick={() => handleOpenProfileByName(authorDisplayName, post.authorUsername || post.authorId)}
+                                        className="w-10 h-10 rounded-full overflow-hidden shrink-0 flex items-center justify-center font-bold text-xs text-white shadow-2xs border-2 border-white dark:border-gray-700 bg-gradient-to-br from-blue-600 to-indigo-700 hover:scale-105 transition-transform"
+                                        title={`Ver perfil de ${authorDisplayName}`}
+                                    >
+                                        {authorPhoto ? (
+                                            <img loading="lazy" decoding="async" src={authorPhoto} alt={authorDisplayName} className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; }} />
+                                        ) : (
+                                            authorDisplayName ? authorDisplayName.charAt(0).toUpperCase() : 'U'
+                                        )}
+                                    </button>
+                                    <div className="min-w-0 flex flex-col text-left">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                            <button 
+                                                type="button"
+                                                onClick={() => handleOpenProfileByName(authorDisplayName, post.authorUsername || post.authorId)}
+                                                className={`font-bold text-sm truncate hover:underline text-left ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}
+                                            >
+                                                {authorDisplayName}
+                                            </button>
+                                            <span className={`text-[9.5px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider shrink-0 ${
+                                                isPostAuthorTeacher 
+                                                    ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-300/60 dark:border-amber-800/60' 
+                                                    : 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-300/60 dark:border-blue-800/60'
+                                            }`}>
+                                                {authorRoleLabel}
+                                            </span>
+                                        </div>
+                                        <span className="text-[10px] text-gray-400 font-medium">
+                                            {formatDateTime12H(post.createdAt)}
+                                            {post.isEdited && <span className="italic ml-1">(editado)</span>}
+                                        </span>
+                                    </div>
                                 </div>
-                            )}
+                                
+                                {/* Menú de Opciones (Editar/Borrar si es su propia publicación) */}
+                                {isMyProfile && !isEditingThis && (
+                                    <div className="flex items-center gap-1 shrink-0">
+                                        <button 
+                                            type="button"
+                                            onClick={() => {
+                                                setEditingProfilePostId(post.id); 
+                                                setEditProfilePostData({title: post.title || "", text: post.text || ""});
+                                            }} 
+                                            className="p-1.5 rounded-lg text-blue-600 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-colors" 
+                                            title="Editar publicación"
+                                        >
+                                            <Edit3 size={15}/>
+                                        </button>
+                                        <button 
+                                            type="button"
+                                            onClick={() => confirmAction("¿Eliminar publicación de tu perfil?", async () => {
+                                                if (isDemoMode) {
+                                                    setUserPosts(prev => prev.filter(p => p.id !== post.id));
+                                                    removeDemoSandboxItem('userPosts', post.id);
+                                                    showMessage("Publicación eliminada (Modo Demo).");
+                                                    return;
+                                                }
+                                                await deleteAllStorageFilesInObject(post);
+                                                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userPosts', post.id));
+                                            })} 
+                                            className="p-1.5 rounded-lg text-red-600 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/50 transition-colors" 
+                                            title="Eliminar publicación"
+                                        >
+                                            <Trash2 size={15}/>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                             
                             {/* Renderizado del Post o Modo Edición */}
                             {isEditingThis ? (
@@ -6697,7 +6837,7 @@ useEffect(() => {
                                 </div>
                             ) : (
                                 <div className="space-y-2 min-w-0 w-full">
-                                    {post.title && <h4 className={`font-black text-base sm:text-lg leading-tight pr-14 break-words ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}><LinkifyText text={post.title} isDarkMode={isDarkMode} embedVideos={false} /></h4>}
+                                    {post.title && <h4 className={`font-black text-base sm:text-lg leading-tight break-words ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}><LinkifyText text={post.title} isDarkMode={isDarkMode} embedVideos={false} /></h4>}
                                     {post.imageUrl && <img src={post.imageUrl} loading="lazy" onClick={() => setFullScreenImage(post.imageUrl)} alt="Post" className={`w-full max-h-96 object-cover rounded-xl cursor-pointer shadow-xs border ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`} />}
                                     {post.text && <div className={`text-xs sm:text-sm leading-relaxed break-words whitespace-pre-line ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}><LinkifyText text={post.text} colapsable /></div>}
                                 </div>

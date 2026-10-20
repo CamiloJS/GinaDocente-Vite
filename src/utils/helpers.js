@@ -79,6 +79,9 @@ export const isTeacherId = (val) => {
     clean === 'ginadocente' ||
     clean === 'teacher_gina' ||
     clean === 'demodocente' ||
+    clean === 'gina' ||
+    clean.includes('gina marcela') ||
+    clean.includes('gina quintana') ||
     isCamiloTeacher(clean)
   )
 }
