@@ -723,18 +723,54 @@ testSlide1.addText('Core Concepts and Incoterms', { x: 1, y: 2, fontSize: 14 });
 const testSlide2 = testPres.addSlide();
 testSlide2.addText('Key Takeaways', { x: 1, y: 0.8, fontSize: 20 });
 testSlide2.addText('Tariffs reduce imports; quotas restrict volume.', { x: 1, y: 1.8, fontSize: 13 });
+const testSlide3 = testPres.addSlide();
+testSlide3.addImage({
+  data: 'image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+  x: 0,
+  y: 0,
+  w: '100%',
+  h: '100%'
+});
+testSlide3.addText('Halloween Witch', { x: 2, y: 1, fontSize: 28, bold: true, color: 'FF0000' });
 const pptxNodeBuffer = await testPres.write({ outputType: 'nodebuffer' });
 
 const parsedPptxResult = await parsePptxFile(pptxNodeBuffer, 'Prueba Comercio');
 check('parsePptxFile extrae y normaliza diapositivas desde archivo .pptx con títulos, párrafos y layouts válidos',
   parsedPptxResult.success === true &&
-  parsedPptxResult.slideCount === 2 &&
+  parsedPptxResult.slideCount === 3 &&
   parsedPptxResult.slides[0].layout === 'title' &&
   parsedPptxResult.slides[0].title.includes('International Trade & Logistics') &&
   parsedPptxResult.slides[0].subtitle.includes('Core Concepts and Incoterms') &&
   parsedPptxResult.slides[1].title.includes('Key Takeaways') &&
   Array.isArray(parsedPptxResult.slides) &&
   !hasNestedArrayAnywhere(sanitizeSlidesForFirestore(parsedPptxResult.slides))
+);
+
+check('parsePptxFile importa diapositivas visuales a lienzo libre grande (100% 16:9), con elementos editables y SIN texto de relleno',
+  parsedPptxResult.slides[2].layout === 'blank' &&
+  parsedPptxResult.slides[2].hideHeader === true &&
+  Array.isArray(parsedPptxResult.slides[2].elements) &&
+  parsedPptxResult.slides[2].elements.some(el => el.type === 'image' && el.w >= 95 && el.h >= 95) &&
+  parsedPptxResult.slides[2].elements.some(el => el.text && el.text.includes('Halloween Witch')) &&
+  !JSON.stringify(parsedPptxResult.slides).includes('Contenido importado de PowerPoint')
+);
+
+const legacySlide = {
+  id: 'legacy_1',
+  layout: 'image_text',
+  title: 'Diapositiva 4',
+  imageUrl: 'https://example.com/witch.png',
+  body: 'Contenido importado de PowerPoint.'
+};
+const healed = hydrateSlidesFromFirestore([legacySlide]);
+check('hydrateSlidesFromFirestore recupera diapositivas legadas de PowerPoint a lienzo grande sin texto de relleno',
+  healed[0].layout === 'blank' &&
+  healed[0].hideHeader === true &&
+  healed[0].body === '' &&
+  healed[0].elements?.length === 1 &&
+  healed[0].elements[0].w === 100 &&
+  healed[0].elements[0].h === 100 &&
+  healed[0].elements[0].imageUrl === 'https://example.com/witch.png'
 );
 
 // Lectura de fuentes actualizadas

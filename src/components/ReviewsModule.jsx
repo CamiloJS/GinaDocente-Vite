@@ -73,83 +73,11 @@ import {
   hydrateSlidesFromFirestore,
   isGoogleSlidesUrl,
   extractGoogleSlidesEmbedUrl,
-  parsePptxFile
+  parsePptxFile,
+  compressSlideImageDataUrl
 } from '../utils/slidesEngine.js'
 
-export { resolveSlideLayout, isGoogleSlidesUrl, extractGoogleSlidesEmbedUrl, parsePptxFile }
-
-// Helper para comprimir cualquier archivo o DataURL de imagen (incluidos PNG pesados de portapapeles)
-// a un DataURL ligero apto para Firestore (< 90 KB) y modo Demo
-const compressSlideImageDataUrl = (fileOrDataUrl, maxDim = 960, quality = 0.74) =>
-  new Promise((resolve) => {
-    if (typeof document === 'undefined' || typeof Image === 'undefined') {
-      resolve(typeof fileOrDataUrl === 'string' ? fileOrDataUrl : '');
-      return;
-    }
-
-    const processSourceUrl = (srcUrl) => {
-      if (!srcUrl || typeof srcUrl !== 'string') {
-        resolve('');
-        return;
-      }
-      if (srcUrl.startsWith('data:image/svg')) {
-        resolve(srcUrl);
-        return;
-      }
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        try {
-          let w = img.naturalWidth || img.width || 640;
-          let h = img.naturalHeight || img.height || 420;
-          if (w > maxDim || h > maxDim) {
-            if (w >= h) {
-              h = Math.max(1, Math.round((h * maxDim) / w));
-              w = maxDim;
-            } else {
-              w = Math.max(1, Math.round((w * maxDim) / h));
-              h = maxDim;
-            }
-          }
-          const canvas = document.createElement('canvas');
-          canvas.width = w;
-          canvas.height = h;
-          const ctx = canvas.getContext('2d');
-          if (!ctx) {
-            resolve(srcUrl);
-            return;
-          }
-          ctx.fillStyle = '#FFFFFF';
-          ctx.fillRect(0, 0, w, h);
-          ctx.drawImage(img, 0, 0, w, h);
-          let out = canvas.toDataURL('image/jpeg', quality);
-          if (out.length > 180000) {
-            out = canvas.toDataURL('image/jpeg', 0.55);
-          }
-          resolve(out);
-        } catch {
-          resolve(srcUrl);
-        }
-      };
-      img.onerror = () => resolve(srcUrl);
-      img.src = srcUrl;
-    };
-
-    if (typeof fileOrDataUrl === 'string') {
-      processSourceUrl(fileOrDataUrl);
-      return;
-    }
-
-    if (fileOrDataUrl && typeof FileReader !== 'undefined') {
-      const reader = new FileReader();
-      reader.onload = (ev) => processSourceUrl(String(ev.target?.result || ''));
-      reader.onerror = () => resolve('');
-      reader.readAsDataURL(fileOrDataUrl);
-      return;
-    }
-
-    resolve('');
-  });
+export { resolveSlideLayout, isGoogleSlidesUrl, extractGoogleSlidesEmbedUrl, parsePptxFile, compressSlideImageDataUrl }
 
 const uploadOrInlineSlideImage = async (fileOrDataUrl, isDemoMode = false) => {
   let baseDataUrl = '';
@@ -1052,7 +980,11 @@ export const SlideCanvasSurface = ({
         ...patternStyle
       }}
       className={`w-full aspect-video relative overflow-hidden flex flex-col justify-between select-none transition-colors duration-200 ${
-        isCompact ? 'p-3 rounded-xl' : 'p-5 sm:p-9 md:p-11 rounded-2xl'
+        isCompact
+          ? 'p-3 rounded-xl'
+          : layout === 'blank' && safeSlide.hideHeader
+            ? 'p-0 rounded-2xl'
+            : 'p-5 sm:p-9 md:p-11 rounded-2xl'
       }`}
     >
       {/* Imagen de fondo opcional */}
@@ -1067,10 +999,12 @@ export const SlideCanvasSurface = ({
       )}
 
       {/* Barra decorativa superior de acento */}
-      <div
-        className="absolute top-0 left-0 right-0 h-1.5 pointer-events-none"
-        style={{ background: `linear-gradient(90deg, ${theme.primary}, ${theme.secondary})` }}
-      />
+      {!(layout === 'blank' && safeSlide.hideHeader) && (
+        <div
+          className="absolute top-0 left-0 right-0 h-1.5 pointer-events-none"
+          style={{ background: `linear-gradient(90deg, ${theme.primary}, ${theme.secondary})` }}
+        />
+      )}
 
       {/* Guías de cuadrícula y centrado en el Editor */}
       {isInteractiveEditor && showGridGuides && (
@@ -2568,7 +2502,7 @@ export const SlideCanvasSurface = ({
                   opacity: el.opacity ?? 1
                 }}
                 className={`group/el absolute pointer-events-auto transition-shadow ${
-                  isCircle ? 'rounded-full' : isPill ? 'rounded-full' : isRect ? 'rounded-md' : 'rounded-2xl'
+                  isCircle ? 'rounded-full' : isPill ? 'rounded-full' : isRect ? 'rounded-md' : (el.type === 'image' && el.w >= 95 && el.h >= 95) ? 'rounded-none' : 'rounded-2xl'
                 } ${el.type === 'note' ? 'shadow-md' : ''} ${
                   isInteractiveEditor ? 'cursor-move' : ''
                 } ${isSelected ? 'ring-2 ring-sky-500 shadow-lg' : isInteractiveEditor ? 'hover:ring-1 hover:ring-sky-400/60' : ''}`}
@@ -2591,12 +2525,12 @@ export const SlideCanvasSurface = ({
                 )}
 
                 {el.type === 'image' ? (
-                  <div className="w-full h-full overflow-hidden rounded-xl relative">
+                  <div className={`w-full h-full overflow-hidden relative ${(el.w >= 95 && el.h >= 95) ? 'rounded-none' : 'rounded-xl'}`}>
                     <img loading="lazy" decoding="async"
                       src={el.imageUrl}
                       alt={el.caption || 'Slide element'}
                       className="w-full h-full pointer-events-none"
-                      style={{ objectFit: el.fit || 'cover' }}
+                      style={{ objectFit: el.fit || 'contain' }}
                     />
                   </div>
                 ) : isDivider ? (

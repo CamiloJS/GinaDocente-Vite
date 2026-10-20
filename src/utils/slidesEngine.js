@@ -1854,6 +1854,31 @@ export const hydrateSlidesFromFirestore = (slides = []) => {
   if (!Array.isArray(slides)) return [];
   return slides.map((s, idx) => {
     if (!s || typeof s !== 'object') return createDefaultSlide('cards', idx);
+
+    // Auto-recuperación de diapositivas importadas de PowerPoint previamente que quedaron con layout 'image_text' y texto 'Contenido importado de PowerPoint.'
+    if (
+      s.imageUrl &&
+      (s.layout === 'image_text' || !Array.isArray(s.elements) || s.elements.length === 0) &&
+      (s.body === 'Contenido importado de PowerPoint.' || s.body === 'Contenido importado de PowerPoint' || !s.body)
+    ) {
+      return {
+        ...s,
+        layout: 'blank',
+        hideHeader: true,
+        body: '',
+        elements: [
+          createCanvasElement('image', {
+            x: 0,
+            y: 0,
+            w: 100,
+            h: 100,
+            imageUrl: s.imageUrl,
+            fit: 'contain'
+          })
+        ]
+      };
+    }
+
     if (s.table && Array.isArray(s.table.rows)) {
       return {
         ...s,
@@ -2440,8 +2465,83 @@ export const extractGoogleSlidesEmbedUrl = (rawUrl) => {
 };
 
 /**
- * Parsea un archivo PowerPoint (.pptx) extrayendo sus diapositivas, textos, viñetas,
- * imágenes embebidas y notas del orador a la estructura nativa de diapositivas.
+ * Comprime un DataURL o archivo de imagen en el navegador para que no sature la memoria
+ * ni exceda los límites de almacenamiento de documentos en Firestore (< 90-120 KB).
+ */
+export const compressSlideImageDataUrl = (fileOrDataUrl, maxDim = 960, quality = 0.74) =>
+  new Promise((resolve) => {
+    if (typeof document === 'undefined' || typeof Image === 'undefined') {
+      resolve(typeof fileOrDataUrl === 'string' ? fileOrDataUrl : '');
+      return;
+    }
+
+    const processSourceUrl = (srcUrl) => {
+      if (!srcUrl || typeof srcUrl !== 'string') {
+        resolve('');
+        return;
+      }
+      if (srcUrl.startsWith('data:image/svg')) {
+        resolve(srcUrl);
+        return;
+      }
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try {
+          let w = img.naturalWidth || img.width || 640;
+          let h = img.naturalHeight || img.height || 420;
+          if (w > maxDim || h > maxDim) {
+            if (w >= h) {
+              h = Math.max(1, Math.round((h * maxDim) / w));
+              w = maxDim;
+            } else {
+              w = Math.max(1, Math.round((w * maxDim) / h));
+              h = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(srcUrl);
+            return;
+          }
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, w, h);
+          ctx.drawImage(img, 0, 0, w, h);
+          let out = canvas.toDataURL('image/jpeg', quality);
+          if (out.length > 180000) {
+            out = canvas.toDataURL('image/jpeg', 0.55);
+          }
+          resolve(out);
+        } catch {
+          resolve(srcUrl);
+        }
+      };
+      img.onerror = () => resolve(srcUrl);
+      img.src = srcUrl;
+    };
+
+    if (typeof fileOrDataUrl === 'string') {
+      processSourceUrl(fileOrDataUrl);
+      return;
+    }
+    if (typeof FileReader !== 'undefined' && fileOrDataUrl instanceof Blob) {
+      const reader = new FileReader();
+      reader.onload = () => processSourceUrl(reader.result);
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(fileOrDataUrl);
+      return;
+    }
+    resolve('');
+  });
+
+/**
+ * Parsea un archivo PowerPoint (.pptx) extrayendo fielmente sus diapositivas, textos,
+ * formas geométricas, imágenes a pantalla completa y notas del orador a la estructura nativa.
+ * Respeta el diseño original de PowerPoint: las diapositivas visuales/imágenes se mantienen
+ * a pantalla completa (grandes y nítidas) y los textos/cuadros se convierten en elementos editables.
  */
 export const parsePptxFile = async (fileOrBuffer, defaultTopic = 'Presentación PowerPoint') => {
   try {
@@ -2457,7 +2557,26 @@ export const parsePptxFile = async (fileOrBuffer, defaultTopic = 'Presentación 
 
     const zip = await JSZip.loadAsync(buffer);
 
-    // Identificar archivos de diapositivas y ordenarlos numéricamente
+    // 1. Obtener dimensiones del lienzo de PowerPoint (EMU)
+    let slideWidth = 12192000; // Ancho por defecto 16:9
+    let slideHeight = 6858000; // Alto por defecto 16:9
+    if (zip.file('ppt/presentation.xml')) {
+      try {
+        const presXml = await zip.file('ppt/presentation.xml').async('text');
+        const sldSzMatch = presXml.match(/<p:sldSz\s+[^>]*?cx="(\d+)"[^>]*?cy="(\d+)"/i) ||
+                           presXml.match(/<p:sldSz\s+[^>]*?cy="(\d+)"[^>]*?cx="(\d+)"/i);
+        if (sldSzMatch) {
+          const parsedW = parseInt(sldSzMatch[1], 10);
+          const parsedH = parseInt(sldSzMatch[2], 10);
+          if (parsedW > 0 && parsedH > 0) {
+            slideWidth = parsedW;
+            slideHeight = parsedH;
+          }
+        }
+      } catch {}
+    }
+
+    // 2. Identificar archivos de diapositivas y ordenarlos numéricamente
     const slideFileNames = Object.keys(zip.files)
       .filter(name => /^ppt\/slides\/slide\d+\.xml$/.test(name))
       .sort((a, b) => {
@@ -2482,95 +2601,399 @@ export const parsePptxFile = async (fileOrBuffer, defaultTopic = 'Presentación 
       const slideNum = idx + 1;
       const slideXml = await zip.file(slidePath).async('text');
 
-      // Buscar relaciones de este slide (imágenes, notas)
+      // 3. Buscar todas las relaciones de este slide (imágenes, notas)
       const relsPath = `ppt/slides/_rels/slide${slideNum}.xml.rels`;
-      let embeddedImageUrl = '';
+      const relMap = {}; // rId -> clean zip path
       let speakerNotes = '';
 
       if (zip.file(relsPath)) {
         try {
           const relsXml = await zip.file(relsPath).async('text');
-          
-          // Buscar imagen
-          const imgMatch = relsXml.match(/Target=\"(\.\.\/media\/[^\"]+)\"/i) || relsXml.match(/Target=\"(media\/[^\"]+)\"/i);
-          if (imgMatch && imgMatch[1]) {
-            const cleanMediaName = imgMatch[1].replace(/^\.\.\//, 'ppt/');
-            const mediaFile = zip.file(cleanMediaName);
-            if (mediaFile) {
-              const ext = cleanMediaName.split('.').pop().toLowerCase();
-              const mime = ext === 'png' ? 'image/png' : ext === 'svg' ? 'image/svg+xml' : 'image/jpeg';
-              const b64 = await mediaFile.async('base64');
-              if (b64 && b64.length < 400000) {
-                embeddedImageUrl = `data:${mime};base64,${b64}`;
-              }
+          const relMatches = [...relsXml.matchAll(/<Relationship\s+[^>]*?Id="([^"]+)"[^>]*?Target="([^"]+)"/gi)];
+          for (const rm of relMatches) {
+            const rId = rm[1];
+            const target = rm[2];
+            if (/media\//i.test(target)) {
+              relMap[rId] = target.replace(/^(\.\.\/)+/, 'ppt/');
+            } else if (/notesSlide/i.test(target)) {
+              relMap[rId] = target.replace(/^(\.\.\/)+/, 'ppt/');
             }
           }
+        } catch {}
+      }
 
-          // Buscar notas del orador
-          const notesMatch = relsXml.match(/Target=\"(\.\.\/notesSlides\/[^\"]+)\"/i);
-          if (notesMatch && notesMatch[1]) {
-            const cleanNotesPath = notesMatch[1].replace(/^\.\.\//, 'ppt/');
-            const notesFile = zip.file(cleanNotesPath);
-            if (notesFile) {
+      // 4. Extraer notas del orador si existen
+      for (const notesPath of Object.values(relMap)) {
+        if (notesPath.includes('notesSlide')) {
+          const notesFile = zip.file(notesPath);
+          if (notesFile) {
+            try {
               const notesXml = await notesFile.async('text');
-              const noteRuns = [...notesXml.matchAll(/<a:t>([\s\S]*?)<\/a:t>/g)]
+              const noteRuns = [...notesXml.matchAll(/<a:t>([\s\S]*?)<\/a:t>/gi)]
                 .map(m => decodeXmlEntities(m[1]))
                 .join(' ')
                 .trim();
               if (noteRuns) speakerNotes = noteRuns;
-            }
+            } catch {}
           }
-        } catch {
-          // Relaciones opcionales
         }
       }
 
-      // Extraer párrafos de texto
-      const pMatches = slideXml.match(/<a:p[\s>][\s\S]*?<\/a:p>/g) || [];
-      const paragraphs = [];
-      for (const pXml of pMatches) {
-        const tMatches = [...pXml.matchAll(/<a:t>([\s\S]*?)<\/a:t>/g)]
-          .map(m => decodeXmlEntities(m[1]));
-        const fullText = tMatches.join('').trim();
-        if (fullText) paragraphs.push(fullText);
+      // 5. Cargar mapa de imágenes referenciadas en este slide
+      const slideMediaMap = {}; // rId -> dataUrl
+      for (const [rId, mediaPath] of Object.entries(relMap)) {
+        if (mediaPath.startsWith('ppt/media/')) {
+          const mediaFile = zip.file(mediaPath);
+          if (mediaFile) {
+            const ext = mediaPath.split('.').pop().toLowerCase();
+            let mime = 'image/jpeg';
+            if (ext === 'png') mime = 'image/png';
+            else if (ext === 'svg') mime = 'image/svg+xml';
+            else if (ext === 'gif') mime = 'image/gif';
+            else if (ext === 'webp') mime = 'image/webp';
+
+            const b64 = await mediaFile.async('base64');
+            if (b64) {
+              const rawDataUrl = `data:${mime};base64,${b64}`;
+              let finalDataUrl = rawDataUrl;
+              // Si estamos en navegador y la imagen es pesada, comprimirla ligeramente a 1080px
+              if (typeof document !== 'undefined' && typeof Image !== 'undefined' && rawDataUrl.length > 120000) {
+                try {
+                  finalDataUrl = await compressSlideImageDataUrl(rawDataUrl, 1080, 0.78);
+                } catch {
+                  finalDataUrl = rawDataUrl;
+                }
+              }
+              slideMediaMap[rId] = finalDataUrl;
+            }
+          }
+        }
       }
 
-      let title = paragraphs[0] || (idx === 0 ? defaultTopic : `Diapositiva ${slideNum}`);
-      if (idx === 0 && paragraphs[0]) {
-        detectedMainTopic = paragraphs[0];
+      // 6. Extraer imágenes (<p:pic>) con sus coordenadas en porcentaje
+      const picMatches = [...slideXml.matchAll(/<p:pic[\s>][\s\S]*?<\/p:pic>/gi)];
+      const parsedPics = [];
+      for (const picNode of picMatches) {
+        const picXml = picNode[0];
+        const blipMatch = picXml.match(/<a:blip\s+[^>]*?r:embed="([^"]+)"/i);
+        const rId = blipMatch ? blipMatch[1] : null;
+        const imgUrl = rId && slideMediaMap[rId];
+        if (!imgUrl) continue;
+
+        let x = 0, y = 0, w = 100, h = 100;
+        const xfrmMatch = picXml.match(/<a:xfrm[\s>][\s\S]*?<\/a:xfrm>/i);
+        if (xfrmMatch) {
+          const offMatch = xfrmMatch[0].match(/<a:off\s+[^>]*?x="(-?\d+)"[^>]*?y="(-?\d+)"/i);
+          const extMatch = xfrmMatch[0].match(/<a:ext\s+[^>]*?cx="(\d+)"[^>]*?cy="(\d+)"/i);
+          if (offMatch && extMatch) {
+            const offX = parseInt(offMatch[1], 10) || 0;
+            const offY = parseInt(offMatch[2], 10) || 0;
+            const extCx = parseInt(extMatch[1], 10) || slideWidth;
+            const extCy = parseInt(extMatch[2], 10) || slideHeight;
+
+            x = Math.max(0, Math.min(95, Math.round((offX / slideWidth) * 1000) / 10));
+            y = Math.max(0, Math.min(95, Math.round((offY / slideHeight) * 1000) / 10));
+            w = Math.max(5, Math.min(100, Math.round((extCx / slideWidth) * 1000) / 10));
+            h = Math.max(5, Math.min(100, Math.round((extCy / slideHeight) * 1000) / 10));
+          }
+        }
+
+        // Si la imagen cubre la gran mayoría de la diapositiva, se expande a pantalla completa (100% x 100%)
+        const isFullSlide = w >= 75 && h >= 75;
+        parsedPics.push({
+          rId,
+          imageUrl: imgUrl,
+          x: isFullSlide ? 0 : x,
+          y: isFullSlide ? 0 : y,
+          w: isFullSlide ? 100 : w,
+          h: isFullSlide ? 100 : h,
+          fit: 'contain',
+          isFullSlide
+        });
       }
 
-      let layout = 'bullets';
+      // Si no hubo <p:pic> explícito pero hay imagen en las relaciones o en <p:bg>, incluirla como fondo completo
+      let bgImageUrl = '';
+      const bgMatch = slideXml.match(/<p:bg[\s>][\s\S]*?<\/p:bg>/i);
+      if (bgMatch) {
+        const blipMatch = bgMatch[0].match(/<a:blip\s+[^>]*?r:embed="([^"]+)"/i);
+        if (blipMatch && blipMatch[1] && slideMediaMap[blipMatch[1]]) {
+          bgImageUrl = slideMediaMap[blipMatch[1]];
+        }
+      }
+      if (parsedPics.length === 0 && !bgImageUrl && Object.keys(slideMediaMap).length > 0) {
+        const firstMediaUrl = Object.values(slideMediaMap)[0];
+        if (firstMediaUrl) {
+          parsedPics.push({
+            imageUrl: firstMediaUrl,
+            x: 0,
+            y: 0,
+            w: 100,
+            h: 100,
+            fit: 'contain',
+            isFullSlide: true
+          });
+        }
+      }
+
+      // 7. Extraer formas y cuadros de texto (<p:sp>)
+      const spMatches = [...slideXml.matchAll(/<p:sp[\s>][\s\S]*?<\/p:sp>/gi)];
+      const parsedShapes = [];
+      const allExtractedParagraphs = [];
+
+      for (const spNode of spMatches) {
+        const raw = spNode[0];
+
+        // Ignorar encabezados de pie de página estáticos o números de diapositiva
+        if (/<p:ph\s+[^>]*?type="(sldNum|dt|ftr)"/i.test(raw)) {
+          continue;
+        }
+
+        const isTitlePlaceholder = /<p:ph\s+[^>]*?type="(title|ctrTitle)"/i.test(raw);
+        const isSubTitlePlaceholder = /<p:ph\s+[^>]*?type="subTitle"/i.test(raw);
+
+        // Coordenadas
+        let x = 10, y = 20, w = 80, h = 20;
+        let hasCustomXfrm = false;
+        const xfrmMatch = raw.match(/<a:xfrm[\s>][\s\S]*?<\/a:xfrm>/i);
+        if (xfrmMatch) {
+          const offMatch = xfrmMatch[0].match(/<a:off\s+[^>]*?x="(-?\d+)"[^>]*?y="(-?\d+)"/i);
+          const extMatch = xfrmMatch[0].match(/<a:ext\s+[^>]*?cx="(\d+)"[^>]*?cy="(\d+)"/i);
+          if (offMatch && extMatch) {
+            hasCustomXfrm = true;
+            const offX = parseInt(offMatch[1], 10) || 0;
+            const offY = parseInt(offMatch[2], 10) || 0;
+            const extCx = parseInt(extMatch[1], 10) || slideWidth;
+            const extCy = parseInt(extMatch[2], 10) || slideHeight;
+
+            x = Math.max(0, Math.min(95, Math.round((offX / slideWidth) * 1000) / 10));
+            y = Math.max(0, Math.min(95, Math.round((offY / slideHeight) * 1000) / 10));
+            w = Math.max(5, Math.min(100, Math.round((extCx / slideWidth) * 1000) / 10));
+            h = Math.max(4, Math.min(100, Math.round((extCy / slideHeight) * 1000) / 10));
+          }
+        }
+
+        // Colores y forma
+        let fill = 'transparent';
+        let stroke = 'transparent';
+        const solidFillMatch = raw.match(/<p:spPr>[\s\S]*?<a:solidFill>[\s\S]*?<a:srgbClr\s+val="([A-Fa-f0-9]{6})"/i);
+        if (solidFillMatch) {
+          fill = `#${solidFillMatch[1]}`;
+        }
+        const strokeMatch = raw.match(/<a:ln[\s>][\s\S]*?<a:solidFill>[\s\S]*?<a:srgbClr\s+val="([A-Fa-f0-9]{6})"/i);
+        if (strokeMatch) {
+          stroke = `#${strokeMatch[1]}`;
+        }
+
+        let shapeType = 'rect';
+        const geomMatch = raw.match(/<a:prstGeom\s+[^>]*?prst="([^"]+)"/i);
+        if (geomMatch) {
+          const gVal = geomMatch[1].toLowerCase();
+          if (gVal.includes('round')) shapeType = 'rounded';
+          else if (gVal.includes('ellipse') || gVal.includes('circle')) shapeType = 'circle';
+        }
+
+        // Párrafos de texto
+        const pNodes = [...raw.matchAll(/<a:p[\s>][\s\S]*?<\/a:p>/gi)];
+        const shapeParagraphs = [];
+        let shapeFontSize = 18;
+        let shapeBold = false;
+        let shapeItalic = false;
+        let shapeAlign = 'left';
+        let shapeTextColor = '';
+
+        for (const pNode of pNodes) {
+          const pContent = pNode[0];
+          const algnMatch = pContent.match(/<a:pPr\s+[^>]*?algn="([a-zA-Z]+)"/i);
+          if (algnMatch) {
+            const aVal = algnMatch[1].toLowerCase();
+            if (aVal === 'ctr') shapeAlign = 'center';
+            else if (aVal === 'r') shapeAlign = 'right';
+            else if (aVal === 'just') shapeAlign = 'justify';
+            else if (aVal === 'l') shapeAlign = 'left';
+          }
+
+          // Runs
+          const tMatches = [...pContent.matchAll(/<a:t>([\s\S]*?)<\/a:t>/gi)].map(m => decodeXmlEntities(m[1]));
+          const lineText = tMatches.join('').trim();
+          if (lineText) {
+            shapeParagraphs.push(lineText);
+            allExtractedParagraphs.push(lineText);
+          }
+
+          const szMatch = pContent.match(/<a:rPr\s+[^>]*?sz="(\d+)"/i);
+          if (szMatch) {
+            shapeFontSize = Math.max(10, Math.min(64, Math.round(parseInt(szMatch[1], 10) / 100)));
+          }
+          if (/<a:rPr\s+[^>]*?b="([1]|true)"/i.test(pContent)) {
+            shapeBold = true;
+          }
+          if (/<a:rPr\s+[^>]*?i="([1]|true)"/i.test(pContent)) {
+            shapeItalic = true;
+          }
+          const colorMatch = pContent.match(/<a:rPr[\s>][\s\S]*?<a:solidFill>[\s\S]*?<a:srgbClr\s+val="([A-Fa-f0-9]{6})"/i);
+          if (colorMatch) {
+            shapeTextColor = `#${colorMatch[1]}`;
+          }
+        }
+
+        const fullShapeText = shapeParagraphs.join('\n').trim();
+        if (fullShapeText || fill !== 'transparent' || stroke !== 'transparent') {
+          parsedShapes.push({
+            text: fullShapeText,
+            paragraphs: shapeParagraphs,
+            isTitle: isTitlePlaceholder,
+            isSubTitle: isSubTitlePlaceholder,
+            x, y, w, h,
+            hasCustomXfrm,
+            fill,
+            stroke,
+            shapeType,
+            fontSize: shapeFontSize,
+            bold: shapeBold,
+            italic: shapeItalic,
+            align: shapeAlign,
+            textColor: shapeTextColor
+          });
+        }
+      }
+
+      // 8. Determinar título representativo de la diapositiva
+      let detectedTitle = '';
+      const explicitTitleShape = parsedShapes.find(s => s.isTitle && s.text);
+      if (explicitTitleShape) {
+        detectedTitle = explicitTitleShape.text;
+      } else if (allExtractedParagraphs.length > 0) {
+        // Tomar el texto más destacado o primer texto corto
+        const candidate = allExtractedParagraphs.find(p => p.length <= 60) || allExtractedParagraphs[0];
+        detectedTitle = candidate;
+      }
+
+      if (!detectedTitle) {
+        detectedTitle = idx === 0 ? defaultTopic : `Diapositiva ${slideNum}`;
+      }
+      if (idx === 0 && detectedTitle && detectedTitle !== 'Diapositiva 1') {
+        detectedMainTopic = detectedTitle;
+      }
+
+      // 9. Construir diapositiva respetando exactamente el contenido de PowerPoint
+      let layout = 'blank';
+      let hideHeader = false;
+      const elements = [];
+
+      // A) Agregar imagen de fondo si existe
+      if (bgImageUrl) {
+        elements.push(
+          createCanvasElement('image', {
+            x: 0,
+            y: 0,
+            w: 100,
+            h: 100,
+            imageUrl: bgImageUrl,
+            fit: 'contain'
+          })
+        );
+      }
+
+      // B) Agregar todas las imágenes encontradas
+      for (const pic of parsedPics) {
+        elements.push(
+          createCanvasElement('image', {
+            x: pic.x,
+            y: pic.y,
+            w: pic.w,
+            h: pic.h,
+            imageUrl: pic.imageUrl,
+            fit: pic.fit || 'contain'
+          })
+        );
+      }
+
+      // C) Agregar cuadros de texto y formas geométricas con sus coordenadas originales
+      for (const shape of parsedShapes) {
+        const isShapeGraphic = shape.fill !== 'transparent' || shape.stroke !== 'transparent';
+        if (isShapeGraphic) {
+          elements.push(
+            createCanvasElement('shape', {
+              x: shape.x,
+              y: shape.y,
+              w: shape.w,
+              h: shape.h,
+              text: shape.text,
+              fill: shape.fill,
+              stroke: shape.stroke,
+              shapeType: shape.shapeType,
+              fontSize: shape.fontSize,
+              bold: shape.bold,
+              italic: shape.italic,
+              align: shape.align,
+              textColor: shape.textColor
+            })
+          );
+        } else {
+          elements.push(
+            createCanvasElement('textbox', {
+              x: shape.x,
+              y: shape.y,
+              w: shape.w,
+              h: shape.h,
+              text: shape.text,
+              fontSize: shape.fontSize,
+              bold: shape.bold,
+              italic: shape.italic,
+              align: shape.align,
+              textColor: shape.textColor
+            })
+          );
+        }
+      }
+
       let slideObj = {
         id: `slide_pptx_${slideNum}_${Date.now()}`,
         speakerNotes
       };
 
-      if (idx === 0) {
+      // Decisión de layout:
+      // Si la diapositiva tiene imágenes o formas posicionadas, se representa como Lienzo Libre (blank)
+      // a pantalla completa (hideHeader: true) para que las imágenes queden grandes (100% 16:9) y
+      // todos los textos/cuadros sean 100% editables sin márgenes apretados ni columnas recortadas.
+      if (elements.length > 0) {
+        layout = 'blank';
+        hideHeader = true;
+        slideObj.title = detectedTitle;
+        slideObj.hideHeader = true;
+        slideObj.elements = elements;
+      } else if (idx === 0) {
         layout = 'title';
-        slideObj.title = title;
-        slideObj.subtitle = paragraphs[1] || 'Presentación importada desde PowerPoint';
-        slideObj.description = paragraphs.slice(2).join(' • ');
-      } else if (embeddedImageUrl) {
-        layout = 'image_text';
-        slideObj.title = title;
-        slideObj.imageUrl = embeddedImageUrl;
-        slideObj.body = paragraphs.slice(1).join('\n') || 'Contenido importado de PowerPoint.';
-      } else if (paragraphs.length <= 2) {
+        slideObj.title = detectedTitle;
+        slideObj.subtitle = allExtractedParagraphs[1] || 'Presentación importada desde PowerPoint';
+        slideObj.description = allExtractedParagraphs.slice(2).join(' • ');
+      } else if (allExtractedParagraphs.length <= 2) {
         layout = 'title_body';
-        slideObj.title = title;
-        slideObj.body = paragraphs[1] || '';
+        slideObj.title = detectedTitle;
+        slideObj.body = allExtractedParagraphs[1] || allExtractedParagraphs[0] || '';
       } else {
         layout = 'bullets';
-        slideObj.title = title;
-        slideObj.bullets = paragraphs.slice(1).map(p => ({
+        slideObj.title = detectedTitle;
+        slideObj.bullets = allExtractedParagraphs.slice(1).map(p => ({
           title: p,
           text: '',
           example: ''
         }));
       }
 
-      const normalized = normalizeSingleSlide({ ...slideObj, layout }, idx, detectedMainTopic || defaultTopic);
+      // Si el primer slide es de texto puro (sin imágenes) con título y subtítulo, mantener layout 'title'
+      if (idx === 0 && parsedPics.length === 0 && !bgImageUrl && allExtractedParagraphs.length >= 2) {
+        layout = 'title';
+        hideHeader = false;
+        slideObj.layout = 'title';
+        slideObj.hideHeader = false;
+        slideObj.title = detectedTitle;
+        slideObj.subtitle = allExtractedParagraphs[1] || '';
+        slideObj.description = allExtractedParagraphs.slice(2).join(' • ');
+      }
+
+      const normalized = normalizeSingleSlide({ ...slideObj, layout, hideHeader }, idx, detectedMainTopic || defaultTopic);
       extractedSlides.push(normalized);
     }
 
