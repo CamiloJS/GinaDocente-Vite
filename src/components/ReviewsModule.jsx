@@ -7700,52 +7700,72 @@ export const ReviewsModule = ({
   const [groupFilter, setGroupFilter] = useState('all');
 
   const [isUploadingPptx, setIsUploadingPptx] = useState(false);
+  const [showPptxModal, setShowPptxModal] = useState(false);
+  const [pptxSelectedFile, setPptxSelectedFile] = useState(null);
+  const [pptxTitle, setPptxTitle] = useState('');
+  const [pptxTargetGroup, setPptxTargetGroup] = useState('all');
   const [showGoogleSlidesModal, setShowGoogleSlidesModal] = useState(false);
   const [googleSlidesInputUrl, setGoogleSlidesInputUrl] = useState('');
   const [googleSlidesTitle, setGoogleSlidesTitle] = useState('');
   const [googleSlidesTargetGroup, setGoogleSlidesTargetGroup] = useState('all');
   const pptxFileInputRef = useRef(null);
 
-  // Subir archivo PowerPoint (.pptx) y procesar diapositivas
-  const handlePptxFileUpload = async (e) => {
+  // Selección de archivo PowerPoint (.pptx) para abrir modal de configuración y grupo
+  const handlePptxFileSelected = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.name.toLowerCase().endsWith('.pptx')) {
       showMessage('⚠️ Por favor selecciona un archivo de PowerPoint válido (.pptx).');
       return;
     }
+    setPptxSelectedFile(file);
+    setPptxTitle(file.name.replace(/\.pptx$/i, '').trim());
+    setPptxTargetGroup(reviewTargetGroup || groupFilter || 'all');
+    setShowPptxModal(true);
+    if (pptxFileInputRef.current) pptxFileInputRef.current.value = '';
+  };
+  const handlePptxFileUpload = handlePptxFileSelected;
+
+  // Confirmar y subir archivo PowerPoint (.pptx) asignándolo al grupo elegido
+  const handleConfirmPptxUpload = async (e) => {
+    e?.preventDefault();
+    if (!pptxSelectedFile) {
+      showMessage('⚠️ Por favor selecciona un archivo de PowerPoint (.pptx).');
+      return;
+    }
     setIsUploadingPptx(true);
     try {
-      const defaultTopic = file.name.replace(/\.pptx$/i, '').trim();
-      const parseResult = await parsePptxFile(file, defaultTopic);
+      const defaultTopic = pptxSelectedFile.name.replace(/\.pptx$/i, '').trim();
+      const chosenTopic = pptxTitle.trim() || defaultTopic;
+      const parseResult = await parsePptxFile(pptxSelectedFile, chosenTopic);
 
       let rawPptxUrl = '';
       if (!isDemoMode) {
         try {
-          rawPptxUrl = await uploadRawFileToStorage(file, 'slides_pptx');
+          rawPptxUrl = await uploadRawFileToStorage(pptxSelectedFile, 'slides_pptx');
         } catch (uploadErr) {
           console.warn('No se pudo subir archivo .pptx a Storage, continuando con diapositivas procesadas:', uploadErr);
         }
       } else if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
         try {
-          rawPptxUrl = URL.createObjectURL(file);
+          rawPptxUrl = URL.createObjectURL(pptxSelectedFile);
         } catch {}
       }
 
-      const assignedGroupId = reviewTargetGroup || 'all';
+      const assignedGroupId = pptxTargetGroup || reviewTargetGroup || groupFilter || 'all';
       const assignedGroupName = (academicGroups || []).find(g => g.id === assignedGroupId)?.name || 'General';
       const effectiveSlides = Array.isArray(parseResult.slides) && parseResult.slides.length > 0
         ? parseResult.slides
-        : buildFallbackAiSlides({ topic: defaultTopic, language: 'Inglés', slideCount: 4 });
+        : buildFallbackAiSlides({ topic: chosenTopic, language: 'Inglés', slideCount: 4 });
 
       const newPres = {
-        topic: parseResult.topic || defaultTopic,
+        topic: chosenTopic,
         sourceType: 'pptx',
         pptxUrl: rawPptxUrl || '',
-        fileName: file.name,
-        fileSize: file.size,
+        fileName: pptxSelectedFile.name,
+        fileSize: pptxSelectedFile.size,
         language: 'Inglés',
-        theme: 'unipamplona',
+        theme: 'midnight', // Fondo elegante oscuro para que las diapositivas con imágenes resalten al 100%
         slides: effectiveSlides,
         slideCount: effectiveSlides.length,
         targetGroupId: assignedGroupId,
@@ -7754,7 +7774,10 @@ export const ReviewsModule = ({
       };
 
       const savedDoc = await persistNewPresentation(newPres);
-      showMessage(`🎉 PowerPoint "${file.name}" procesado con éxito (${effectiveSlides.length} diapositivas).`);
+      showMessage(`🎉 PowerPoint "${pptxSelectedFile.name}" publicado con éxito para ${assignedGroupName === 'General' ? 'todos los grupos' : assignedGroupName} (${effectiveSlides.length} diapositivas).`);
+      setShowPptxModal(false);
+      setPptxSelectedFile(null);
+      setPptxTitle('');
       if (savedDoc) {
         setActivePresentation(savedDoc);
       }
@@ -8309,10 +8332,13 @@ export const ReviewsModule = ({
 
             <button
               type="button"
-              onClick={() => pptxFileInputRef.current?.click()}
+              onClick={() => {
+                setPptxTargetGroup(reviewTargetGroup || groupFilter || 'all');
+                setShowPptxModal(true);
+              }}
               disabled={isUploadingPptx}
               className="h-10 sm:h-9 px-3 sm:px-3.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750 hover:border-gray-300 dark:hover:border-gray-600 text-gray-700 dark:text-gray-200 text-xs font-bold inline-flex items-center justify-center gap-2 transition-all shadow-2xs active:scale-95 cursor-pointer disabled:opacity-50"
-              title="Subir archivo PowerPoint (.pptx) para procesar y presentar en pantalla completa"
+              title="Subir presentación de PowerPoint (.pptx) y asignar a un grupo"
             >
               {isUploadingPptx ? <Loader2 size={15} className="animate-spin text-orange-500 shrink-0" /> : <UploadCloud size={15} className="text-orange-500 shrink-0" />}
               <span className="truncate">{isUploadingPptx ? 'Cargando .pptx...' : 'Subir PowerPoint'}</span>
@@ -8321,7 +8347,7 @@ export const ReviewsModule = ({
               ref={pptxFileInputRef}
               type="file"
               accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation"
-              onChange={handlePptxFileUpload}
+              onChange={handlePptxFileSelected}
               className="hidden"
             />
 
@@ -8686,6 +8712,156 @@ export const ReviewsModule = ({
           callGemini={callGemini}
           showMessage={showMessage}
         />
+      )}
+
+      {/* MODAL PARA SUBIR ARCHIVO POWERPOINT (.PPTX) CON SELECCIÓN DE GRUPO */}
+      {showPptxModal && createPortal(
+        <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+          <div className={`w-full max-w-lg rounded-3xl p-5 sm:p-6 shadow-2xl border space-y-4 animate-in zoom-in-95 duration-150 ${
+            isDarkMode ? 'bg-gray-900 border-gray-700 text-gray-100' : 'bg-white border-gray-200 text-gray-800'
+          }`}>
+            <div className="flex items-center justify-between pb-3 border-b border-gray-200 dark:border-gray-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-orange-500/15 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0">
+                  <UploadCloud size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold">Subir presentación de PowerPoint</h3>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400">Importa diapositivas con textos y visuales a pantalla completa</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setShowPptxModal(false); setPptxSelectedFile(null); setPptxTitle(''); }}
+                className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmPptxUpload} className="space-y-3.5">
+              {/* Dropzone o selector de archivo */}
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                  Archivo de PowerPoint (.pptx) *
+                </label>
+                {pptxSelectedFile ? (
+                  <div className="flex items-center justify-between p-3 rounded-2xl border border-orange-200 dark:border-orange-900/50 bg-orange-50/60 dark:bg-orange-950/20">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-lg bg-orange-500 text-white flex items-center justify-center shrink-0">
+                        <FileText size={16} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-gray-800 dark:text-gray-200 truncate">{pptxSelectedFile.name}</p>
+                        <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">
+                          {(pptxSelectedFile.size / (1024 * 1024)).toFixed(2)} MB
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => pptxFileInputRef.current?.click()}
+                      className="text-[11px] font-bold text-orange-600 dark:text-orange-400 hover:underline px-2 py-1 shrink-0 cursor-pointer"
+                    >
+                      Cambiar
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => pptxFileInputRef.current?.click()}
+                    onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const dropped = e.dataTransfer?.files?.[0];
+                      if (dropped) {
+                        if (!dropped.name.toLowerCase().endsWith('.pptx')) {
+                          showMessage('⚠️ Por favor selecciona un archivo de PowerPoint válido (.pptx).');
+                          return;
+                        }
+                        setPptxSelectedFile(dropped);
+                        setPptxTitle(dropped.name.replace(/\.pptx$/i, '').trim());
+                      }
+                    }}
+                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-2xl hover:border-orange-500/70 hover:bg-orange-50/20 dark:hover:bg-orange-950/10 cursor-pointer transition-all text-center gap-2"
+                  >
+                    <div className="w-10 h-10 rounded-2xl bg-orange-500/10 text-orange-500 flex items-center justify-center">
+                      <UploadCloud size={20} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-gray-700 dark:text-gray-300">Haz clic para seleccionar o arrastra aquí tu archivo .pptx</p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">Compatible con PowerPoint, Canva y Google Slides exportados</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Título de la presentación */}
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                  Título de la presentación *
+                </label>
+                <input
+                  type="text"
+                  value={pptxTitle}
+                  onChange={(e) => setPptxTitle(e.target.value)}
+                  placeholder="Ej: Halloween Vocabulary, Business Review..."
+                  className={`w-full ${glassInput} text-xs py-2 px-3.5`}
+                  required
+                />
+              </div>
+
+              {/* Dirigido a (Selección de grupo) */}
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                  Dirigido a *
+                </label>
+                <select
+                  value={pptxTargetGroup}
+                  onChange={(e) => setPptxTargetGroup(e.target.value)}
+                  className="w-full bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 dark:text-gray-200 outline-none"
+                >
+                  <option value="all">Todos los estudiantes (General)</option>
+                  {(academicGroups || []).map(g => (
+                    <option key={g.id} value={g.id}>{g.name || g.id}</option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-gray-400 mt-1">
+                  Solo los estudiantes asignados a este grupo verán esta presentación.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+                <button
+                  type="button"
+                  onClick={() => { setShowPptxModal(false); setPptxSelectedFile(null); setPptxTitle(''); }}
+                  disabled={isUploadingPptx}
+                  className="px-4 py-2 text-xs font-semibold rounded-xl text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={!pptxSelectedFile || !pptxTitle.trim() || isUploadingPptx}
+                  className="px-5 py-2 text-xs font-bold rounded-xl bg-orange-600 hover:bg-orange-700 text-white shadow-xs transition-all disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                >
+                  {isUploadingPptx ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      <span>Procesando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCheck size={14} />
+                      <span>Importar y Publicar</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
       )}
 
       {/* MODAL PARA ADJUNTAR ENLACE DE GOOGLE SLIDES */}

@@ -1879,6 +1879,35 @@ export const hydrateSlidesFromFirestore = (slides = []) => {
       };
     }
 
+    // Auto-recuperación de diapositivas en lienzo libre donde una imagen única quedó pequeña dejando gran parte en blanco
+    if (s.layout === 'blank' && Array.isArray(s.elements)) {
+      const imgElements = s.elements.filter(el => el && el.type === 'image');
+      if (imgElements.length === 1) {
+        const imgEl = imgElements[0];
+        const isShrunk = (imgEl.w < 90 || imgEl.h < 90 || imgEl.x > 5 || imgEl.y > 5);
+        if (isShrunk && (s.elements.length === 1 || s.hideHeader || String(s.id).includes('pptx') || String(s.title).includes('Halloween') || String(s.title).includes('Diapositiva'))) {
+          const updatedElements = s.elements.map(el => {
+            if (el.id === imgEl.id) {
+              return {
+                ...el,
+                x: 0,
+                y: 0,
+                w: 100,
+                h: 100,
+                fit: 'contain'
+              };
+            }
+            return el;
+          });
+          return {
+            ...s,
+            hideHeader: true,
+            elements: updatedElements
+          };
+        }
+      }
+    }
+
     if (s.table && Array.isArray(s.table.rows)) {
       return {
         ...s,
@@ -2563,11 +2592,11 @@ export const parsePptxFile = async (fileOrBuffer, defaultTopic = 'Presentación 
     if (zip.file('ppt/presentation.xml')) {
       try {
         const presXml = await zip.file('ppt/presentation.xml').async('text');
-        const sldSzMatch = presXml.match(/<p:sldSz\s+[^>]*?cx="(\d+)"[^>]*?cy="(\d+)"/i) ||
-                           presXml.match(/<p:sldSz\s+[^>]*?cy="(\d+)"[^>]*?cx="(\d+)"/i);
-        if (sldSzMatch) {
-          const parsedW = parseInt(sldSzMatch[1], 10);
-          const parsedH = parseInt(sldSzMatch[2], 10);
+        const cxMatch = presXml.match(/<p:sldSz\s+[^>]*?cx="(\d+)"/i);
+        const cyMatch = presXml.match(/<p:sldSz\s+[^>]*?cy="(\d+)"/i);
+        if (cxMatch && cyMatch) {
+          const parsedW = parseInt(cxMatch[1], 10);
+          const parsedH = parseInt(cyMatch[1], 10);
           if (parsedW > 0 && parsedH > 0) {
             slideWidth = parsedW;
             slideHeight = parsedH;
@@ -2683,13 +2712,16 @@ export const parsePptxFile = async (fileOrBuffer, defaultTopic = 'Presentación 
         let x = 0, y = 0, w = 100, h = 100;
         const xfrmMatch = picXml.match(/<a:xfrm[\s>][\s\S]*?<\/a:xfrm>/i);
         if (xfrmMatch) {
-          const offMatch = xfrmMatch[0].match(/<a:off\s+[^>]*?x="(-?\d+)"[^>]*?y="(-?\d+)"/i);
-          const extMatch = xfrmMatch[0].match(/<a:ext\s+[^>]*?cx="(\d+)"[^>]*?cy="(\d+)"/i);
-          if (offMatch && extMatch) {
-            const offX = parseInt(offMatch[1], 10) || 0;
-            const offY = parseInt(offMatch[2], 10) || 0;
-            const extCx = parseInt(extMatch[1], 10) || slideWidth;
-            const extCy = parseInt(extMatch[2], 10) || slideHeight;
+          const xfrmStr = xfrmMatch[0];
+          const offXMatch = xfrmStr.match(/<a:off\s+[^>]*?x="(-?\d+)"/i);
+          const offYMatch = xfrmStr.match(/<a:off\s+[^>]*?y="(-?\d+)"/i);
+          const extCxMatch = xfrmStr.match(/<a:ext\s+[^>]*?cx="(\d+)"/i);
+          const extCyMatch = xfrmStr.match(/<a:ext\s+[^>]*?cy="(\d+)"/i);
+          if (offXMatch && offYMatch && extCxMatch && extCyMatch) {
+            const offX = parseInt(offXMatch[1], 10) || 0;
+            const offY = parseInt(offYMatch[1], 10) || 0;
+            const extCx = parseInt(extCxMatch[1], 10) || slideWidth;
+            const extCy = parseInt(extCyMatch[1], 10) || slideHeight;
 
             x = Math.max(0, Math.min(95, Math.round((offX / slideWidth) * 1000) / 10));
             y = Math.max(0, Math.min(95, Math.round((offY / slideHeight) * 1000) / 10));
@@ -2698,27 +2730,30 @@ export const parsePptxFile = async (fileOrBuffer, defaultTopic = 'Presentación 
           }
         }
 
-        // Si la imagen cubre la gran mayoría de la diapositiva, se expande a pantalla completa (100% x 100%)
-        const isFullSlide = w >= 75 && h >= 75;
         parsedPics.push({
           rId,
           imageUrl: imgUrl,
-          x: isFullSlide ? 0 : x,
-          y: isFullSlide ? 0 : y,
-          w: isFullSlide ? 100 : w,
-          h: isFullSlide ? 100 : h,
+          x,
+          y,
+          w,
+          h,
           fit: 'contain',
-          isFullSlide
+          isFullSlide: false
         });
       }
 
       // Si no hubo <p:pic> explícito pero hay imagen en las relaciones o en <p:bg>, incluirla como fondo completo
       let bgImageUrl = '';
+      let slideBgColor = '';
       const bgMatch = slideXml.match(/<p:bg[\s>][\s\S]*?<\/p:bg>/i);
       if (bgMatch) {
         const blipMatch = bgMatch[0].match(/<a:blip\s+[^>]*?r:embed="([^"]+)"/i);
         if (blipMatch && blipMatch[1] && slideMediaMap[blipMatch[1]]) {
           bgImageUrl = slideMediaMap[blipMatch[1]];
+        }
+        const solidClrMatch = bgMatch[0].match(/<a:solidFill>[\s\S]*?<a:srgbClr\s+val="([A-Fa-f0-9]{6})"/i);
+        if (solidClrMatch) {
+          slideBgColor = `#${solidClrMatch[1]}`;
         }
       }
       if (parsedPics.length === 0 && !bgImageUrl && Object.keys(slideMediaMap).length > 0) {
@@ -2733,6 +2768,37 @@ export const parsePptxFile = async (fileOrBuffer, defaultTopic = 'Presentación 
             fit: 'contain',
             isFullSlide: true
           });
+        }
+      }
+
+      // Optimización de aprovechamiento total del lienzo:
+      // Si la diapositiva tiene 1 sola imagen, o una imagen central/fondo predominante:
+      // Se expande al 100% x 100% (pantalla completa 16:9 con fit: 'contain')
+      // para que ocupe todo el espacio y NUNCA quede un 60% de espacio vacío en blanco.
+      if (parsedPics.length === 1) {
+        parsedPics[0].x = 0;
+        parsedPics[0].y = 0;
+        parsedPics[0].w = 100;
+        parsedPics[0].h = 100;
+        parsedPics[0].fit = 'contain';
+        parsedPics[0].isFullSlide = true;
+      } else if (parsedPics.length > 1) {
+        let maxAreaIdx = 0;
+        let maxArea = 0;
+        parsedPics.forEach((p, pIdx) => {
+          const area = (p.w || 0) * (p.h || 0);
+          if (area > maxArea) {
+            maxArea = area;
+            maxAreaIdx = pIdx;
+          }
+        });
+        if (maxArea >= 1000 || parsedPics[maxAreaIdx].w >= 45 || parsedPics[maxAreaIdx].h >= 35) {
+          parsedPics[maxAreaIdx].x = 0;
+          parsedPics[maxAreaIdx].y = 0;
+          parsedPics[maxAreaIdx].w = 100;
+          parsedPics[maxAreaIdx].h = 100;
+          parsedPics[maxAreaIdx].fit = 'contain';
+          parsedPics[maxAreaIdx].isFullSlide = true;
         }
       }
 
@@ -2952,6 +3018,9 @@ export const parsePptxFile = async (fileOrBuffer, defaultTopic = 'Presentación 
         id: `slide_pptx_${slideNum}_${Date.now()}`,
         speakerNotes
       };
+      if (slideBgColor) {
+        slideObj.bgColor = slideBgColor;
+      }
 
       // Decisión de layout:
       // Si la diapositiva tiene imágenes o formas posicionadas, se representa como Lienzo Libre (blank)

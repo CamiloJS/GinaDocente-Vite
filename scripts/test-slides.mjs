@@ -806,6 +806,10 @@ check('ReviewsModule ofrece subida de archivos PowerPoint (.pptx), vinculación 
   reviewsSrc.includes('handlePptxFileUpload') &&
   reviewsSrc.includes('handleAttachGoogleSlides') &&
   reviewsSrc.includes('showGoogleSlidesModal') &&
+  reviewsSrc.includes('showPptxModal') &&
+  reviewsSrc.includes('pptxTargetGroup') &&
+  reviewsSrc.includes('handleConfirmPptxUpload') &&
+  reviewsSrc.includes('handlePptxFileSelected') &&
   reviewsSrc.includes('parsePptxFile') &&
   reviewsSrc.includes('extractGoogleSlidesEmbedUrl') &&
   reviewsSrc.includes('allowFullScreen') &&
@@ -813,6 +817,33 @@ check('ReviewsModule ofrece subida de archivos PowerPoint (.pptx), vinculación 
   reviewsSrc.includes('isPptxDeck') &&
   reviewsSrc.includes('Subir PowerPoint') &&
   reviewsSrc.includes('Adjuntar Google Slides')
+);
+
+const shrunkImageSlide = {
+  id: 'slide_pptx_shrunk_1',
+  layout: 'blank',
+  hideHeader: true,
+  title: 'Diapositiva 1',
+  elements: [
+    {
+      id: 'el_shrunk_img',
+      type: 'image',
+      x: 28,
+      y: 10,
+      w: 44,
+      h: 45,
+      imageUrl: 'https://example.com/halloween.png'
+    }
+  ]
+};
+const healedShrunk = hydrateSlidesFromFirestore([shrunkImageSlide]);
+check('hydrateSlidesFromFirestore expande imágenes encogidas (44%x45%) a pantalla completa 16:9 (100%x100%) eliminando el 60% en blanco',
+  healedShrunk[0].layout === 'blank' &&
+  healedShrunk[0].hideHeader === true &&
+  healedShrunk[0].elements[0].w === 100 &&
+  healedShrunk[0].elements[0].h === 100 &&
+  healedShrunk[0].elements[0].x === 0 &&
+  healedShrunk[0].elements[0].y === 0
 );
 
 console.log(`\nRESULTADO SLIDES STUDIO: ${okCount} OK, ${failCount} fallos\n`);
