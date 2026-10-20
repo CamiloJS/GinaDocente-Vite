@@ -143,23 +143,44 @@ const TaskCard = React.memo(({
 
     const [showViewsModal, setShowViewsModal] = useState(false);
 
-    // Registro automático de visualización para estudiantes (View tracker)
+    // Registro automático de visualización para estudiantes (View tracker con clave canónica y anti-duplicados)
     useEffect(() => {
         if (role === 'teacher') return;
-        const studentId = (currentUserId || currentUser?.uid || loggedInName || '').trim();
-        if (!studentId || isTeacherId(studentId) || studentId.toLowerCase().includes('teacher') || studentId.toLowerCase().includes('docente')) return;
+        const rawStudentKey = String(currentUserId || currentUser?.uid || loggedInName || '').trim();
+        if (!rawStudentKey || isTeacherId(rawStudentKey) || rawStudentKey.toLowerCase().includes('teacher') || rawStudentKey.toLowerCase().includes('docente')) return;
 
-        // Si ya está registrado en viewedBy, evitar escrituras innecesarias
-        if (task?.viewedBy && task.viewedBy[studentId]) return;
+        const cleanKey = rawStudentKey.toLowerCase().replace(/^@/, '');
+        // Determinar clave canónica del estudiante desde userMappings
+        const matchedEntry = Object.entries(userMappings || {}).find(([k, u]) => {
+            const kClean = String(k).toLowerCase().replace(/^@/, '');
+            return kClean === cleanKey || 
+                   (currentUser?.uid && u?.uid === currentUser.uid) || 
+                   (loggedInName && u?.fullName && u.fullName.trim().toLowerCase() === loggedInName.trim().toLowerCase());
+        });
+        const canonicalStudentId = matchedEntry ? matchedEntry[0].toLowerCase().replace(/^@/, '') : cleanKey;
+
+        // Si ya está registrado en viewedBy bajo cualquier alias o identificador de este estudiante, evitar escrituras duplicadas
+        const existingViews = task?.viewedBy && typeof task.viewedBy === 'object' ? task.viewedBy : null;
+        if (existingViews) {
+            if (existingViews[canonicalStudentId] || existingViews[rawStudentKey] || existingViews[cleanKey]) return;
+            const alreadyRecorded = Object.entries(existingViews).some(([id, data]) => {
+                const idClean = String(id).toLowerCase().replace(/^@/, '');
+                if (idClean === canonicalStudentId || idClean === cleanKey || (currentUser?.uid && id === currentUser.uid)) return true;
+                const dName = typeof data === 'object' ? (data.name || data.author) : String(data || '');
+                return loggedInName && dName && dName.trim().toLowerCase() === loggedInName.trim().toLowerCase();
+            });
+            if (alreadyRecorded) return;
+        }
 
         const timer = setTimeout(() => {
             try {
                 const currentViews = task.viewedBy && typeof task.viewedBy === 'object' ? { ...task.viewedBy } : {};
-                if (currentViews[studentId]) return;
-                const studentName = resolveUserDisplayName({ author: loggedInName, authorId: studentId }, userMappings, loggedInName) || loggedInName || 'Estudiante';
-                const studentAvatar = currentUser?.photoURL || '';
-                currentViews[studentId] = {
-                    id: studentId,
+                if (currentViews[canonicalStudentId] || currentViews[rawStudentKey] || currentViews[cleanKey]) return;
+
+                const studentName = resolveUserDisplayName({ author: loggedInName, authorId: canonicalStudentId }, userMappings, loggedInName) || loggedInName || 'Estudiante';
+                const studentAvatar = resolveUserPhoto({ id: canonicalStudentId, authorId: canonicalStudentId, authorName: studentName }, userMappings, currentUser?.photoURL || '');
+                currentViews[canonicalStudentId] = {
+                    id: canonicalStudentId,
                     name: studentName,
                     avatar: studentAvatar,
                     viewedAt: Date.now()
@@ -173,26 +194,46 @@ const TaskCard = React.memo(({
         return () => clearTimeout(timer);
     }, [task?.id, task?.viewedBy, role, currentUserId, currentUser, loggedInName, userMappings]);
 
-    // Lista de estudiantes que han visto esta publicación (solo visible para docentes)
+    // Lista de estudiantes únicos que han visto esta publicación (sin duplicados, con avatar y marca de tiempo más reciente)
     const viewedStudents = React.useMemo(() => {
         if (!task?.viewedBy || typeof task.viewedBy !== 'object') return [];
-        return Object.entries(task.viewedBy)
-            .map(([id, data]) => {
-                if (!data) return null;
-                const rawName = typeof data === 'object' ? (data.name || data.author) : String(data);
-                const resolvedName = resolveUserDisplayName({ author: rawName, authorId: id }, userMappings, rawName) || rawName || 'Estudiante';
-                const rawAvatar = typeof data === 'object' ? (data.avatar || data.photoURL || '') : '';
-                const avatar = resolveUserPhoto({ id, authorId: id, author: rawName, name: rawName }, userMappings, rawAvatar);
-                const viewedAt = typeof data === 'object' ? data.viewedAt : null;
-                return {
-                    id,
+        const studentMap = new Map();
+
+        Object.entries(task.viewedBy).forEach(([id, data]) => {
+            if (!data) return;
+            const rawName = typeof data === 'object' ? (data.name || data.author) : String(data);
+            const resolvedName = resolveUserDisplayName({ author: rawName, authorId: id }, userMappings, rawName) || rawName || 'Estudiante';
+            const rawAvatar = typeof data === 'object' ? (data.avatar || data.photoURL || '') : '';
+            const avatar = resolveUserPhoto({ id, authorId: id, author: rawName, name: rawName }, userMappings, rawAvatar);
+            const viewedAt = typeof data === 'object' ? Number(data.viewedAt || 0) : 0;
+
+            // Clave única canónica para deduplicar completamente
+            const matchedUser = Object.entries(userMappings || {}).find(([k, u]) => {
+                const kClean = String(k).toLowerCase().replace(/^@/, '');
+                const idClean = String(id).toLowerCase().replace(/^@/, '');
+                return kClean === idClean || (u?.fullName && u.fullName.trim().toLowerCase() === resolvedName.trim().toLowerCase());
+            });
+            const dedupeKey = matchedUser ? matchedUser[0].toLowerCase().replace(/^@/, '') : resolvedName.trim().toLowerCase();
+
+            if (!studentMap.has(dedupeKey)) {
+                studentMap.set(dedupeKey, {
+                    id: matchedUser ? matchedUser[0] : id,
                     name: resolvedName,
                     avatar,
                     viewedAt
-                };
-            })
-            .filter(Boolean)
-            .sort((a, b) => (b.viewedAt || 0) - (a.viewedAt || 0));
+                });
+            } else {
+                const existing = studentMap.get(dedupeKey);
+                studentMap.set(dedupeKey, {
+                    id: existing.id || id,
+                    name: existing.name || resolvedName,
+                    avatar: (avatar && !avatar.includes('default')) ? avatar : (existing.avatar || avatar),
+                    viewedAt: Math.max(existing.viewedAt || 0, viewedAt || 0)
+                });
+            }
+        });
+
+        return Array.from(studentMap.values()).sort((a, b) => (b.viewedAt || 0) - (a.viewedAt || 0));
     }, [task?.viewedBy, userMappings]);
 
     const [commentText, setCommentText] = useState("");
@@ -1736,35 +1777,37 @@ const TaskCard = React.memo(({
         }
 
         return (
-          <div className="flex flex-wrap items-center gap-1.5 pt-2">
-            {Object.entries(REACTION_EMOJIS).map(([key, emoji]) => {
-              const isSelected = mySelectedReactionType === key;
-              const hoverText = namesByType[key].length > 0 ? `${namesByType[key].join(', ')} reaccionó así` : "";
-              return (
-                <button 
-                  key={key} 
-                  type="button"
-                  onClick={() => toggleReaction(key)} 
-                  disabled={isLocked} 
-                  title={hoverText} 
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition-all border ${
-                    isSelected 
-                      ? 'bg-red-50 dark:bg-red-900/30 border-red-400 text-red-600 dark:text-red-300 ring-2 ring-red-500/20 shadow-xs scale-105' 
-                      : 'bg-gray-50 dark:bg-gray-800/80 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
-                  } ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  <span>{emoji}</span>
-                  {counts[key] > 0 && <span className="font-semibold text-[11px]">{counts[key]}</span>}
-                </button>
-              );
-            })}
+          <div className="flex items-center justify-between gap-1.5 pt-2 w-full">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {Object.entries(REACTION_EMOJIS).map(([key, emoji]) => {
+                const isSelected = mySelectedReactionType === key;
+                const hoverText = namesByType[key].length > 0 ? `${namesByType[key].join(', ')} reaccionó así` : "";
+                return (
+                  <button 
+                    key={key} 
+                    type="button"
+                    onClick={() => toggleReaction(key)} 
+                    disabled={isLocked} 
+                    title={hoverText} 
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition-all border ${
+                      isSelected 
+                        ? 'bg-red-50 dark:bg-red-900/30 border-red-400 text-red-600 dark:text-red-300 ring-2 ring-red-500/20 shadow-xs scale-105' 
+                        : 'bg-gray-50 dark:bg-gray-800/80 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                    } ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <span>{emoji}</span>
+                    {counts[key] > 0 && <span className="font-semibold text-[11px]">{counts[key]}</span>}
+                  </button>
+                );
+              })}
+            </div>
 
             {/* Contador de Vistas por Estudiantes exclusivo para Docentes */}
             {role === 'teacher' && (
               <button
                 type="button"
                 onClick={() => setShowViewsModal(true)}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold transition-all border bg-slate-50 dark:bg-gray-800/80 border-slate-200 dark:border-gray-700 hover:bg-slate-100 dark:hover:bg-gray-750 text-slate-700 dark:text-gray-300 ml-auto sm:ml-1 shadow-2xs hover:scale-105 cursor-pointer"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold transition-all border bg-slate-50 dark:bg-gray-800/80 border-slate-200 dark:border-gray-700 hover:bg-slate-100 dark:hover:bg-gray-750 text-slate-700 dark:text-gray-300 ml-auto shrink-0 shadow-2xs hover:scale-105 cursor-pointer"
                 title={`Visto por ${viewedStudents.length} estudiante${viewedStudents.length === 1 ? '' : 's'}`}
               >
                 <Eye size={13} className="text-blue-500" />
@@ -3646,7 +3689,7 @@ const TaskCard = React.memo(({
                                     <CheckCircle2 size={15} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
                                 )}
                                 <span className="font-bold">
-                                    {myDeliveryIsLate ? "Tarea entregada -tarde-" : "Tarea entregada -a tiempo-"}
+                                    {myDeliveryIsLate ? "Entregado tarde" : "Entregado a tiempo"}
                                 </span>
                             </div>
                         </div>
@@ -3968,7 +4011,7 @@ const TaskCard = React.memo(({
                                         !isNaN(new Date(`${task.dueDate}T${task.dueTime || '23:59'}`).getTime()) &&
                                         new Date(c.createdAt) > new Date(`${task.dueDate}T${task.dueTime || '23:59'}`)
                                     );
-                                    const subText = isLateC ? "Tarea entregada -tarde-" : "Tarea entregada -a tiempo-";
+                                    const subText = isLateC ? "Entregado tarde" : "Entregado a tiempo";
 
                                     return (
                                         <div key={cid} className={`p-3 rounded-2xl text-xs border shadow-xs transition-all ${
@@ -4018,7 +4061,7 @@ const TaskCard = React.memo(({
                                                         !isNaN(new Date(`${task.dueDate}T${task.dueTime || '23:59'}`).getTime()) &&
                                                         new Date(c.createdAt) > new Date(`${task.dueDate}T${task.dueTime || '23:59'}`)
                                                     );
-                                                    const subText = isLateC ? "Tarea entregada -tarde-" : "Tarea entregada -a tiempo-";
+                                                    const subText = isLateC ? "Entregado tarde" : "Entregado a tiempo";
                                                     return (
                                                         <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
                                                             isLateC
