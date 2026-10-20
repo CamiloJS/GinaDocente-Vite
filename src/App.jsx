@@ -6741,11 +6741,9 @@ useEffect(() => {
                             (targetProfilePic && cleanPostAuthorKey === cleanFilterIdLower ? targetProfilePic : '')
                         );
 
-                        const authorRoleLabel = isPostAuthorTeacher ? 'Docente' : (authorUser?.customLabel || 'Estudiante');
-
                         return (
                         <div key={post.id} className={`${glassCard} !p-4 sm:!p-5 flex flex-col gap-3 rounded-2xl group relative w-full min-w-0 overflow-hidden break-words shadow-xs`}>
-                            {/* Cabecera del Autor de la Publicación (Nombre del estudiante/docente siempre visible arriba) */}
+                            {/* Cabecera del Autor de la Publicación (Nombre del estudiante/docente y fecha al lado del nombre) */}
                             <div className="flex items-center justify-between gap-3 pb-2.5 border-b border-gray-100 dark:border-gray-800/80">
                                 <div className="flex items-center gap-2.5 min-w-0">
                                     <button 
@@ -6760,25 +6758,16 @@ useEffect(() => {
                                             authorDisplayName ? authorDisplayName.charAt(0).toUpperCase() : 'U'
                                         )}
                                     </button>
-                                    <div className="min-w-0 flex flex-col text-left">
-                                        <div className="flex items-center gap-1.5 flex-wrap">
-                                            <button 
-                                                type="button"
-                                                onClick={() => handleOpenProfileByName(authorDisplayName, post.authorUsername || post.authorId)}
-                                                className={`font-bold text-sm truncate hover:underline text-left ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}
-                                            >
-                                                {authorDisplayName}
-                                            </button>
-                                            <span className={`text-[9.5px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider shrink-0 ${
-                                                isPostAuthorTeacher 
-                                                    ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-300/60 dark:border-amber-800/60' 
-                                                    : 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-300/60 dark:border-blue-800/60'
-                                            }`}>
-                                                {authorRoleLabel}
-                                            </span>
-                                        </div>
-                                        <span className="text-[10px] text-gray-400 font-medium">
-                                            {formatDateTime12H(post.createdAt)}
+                                    <div className="min-w-0 flex items-center gap-2 flex-wrap text-left">
+                                        <button 
+                                            type="button"
+                                            onClick={() => handleOpenProfileByName(authorDisplayName, post.authorUsername || post.authorId)}
+                                            className={`font-bold text-sm truncate hover:underline text-left ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}
+                                        >
+                                            {authorDisplayName}
+                                        </button>
+                                        <span className="text-[11px] text-gray-400 dark:text-gray-400 font-normal shrink-0">
+                                            • {formatDateTime12H(post.createdAt)}
                                             {post.isEdited && <span className="italic ml-1">(editado)</span>}
                                         </span>
                                     </div>
@@ -6900,14 +6889,10 @@ useEffect(() => {
                                 </div>
                             )}
 
-                                                        <div className="flex justify-between items-center mt-auto pt-2 border-t border-gray-200 dark:border-gray-800">
-                                <span className="text-[10px] text-gray-400 font-medium">
-                                    {formatDateTime12H(post.createdAt)}
-                                    {post.isEdited && <span className="italic ml-1">(editado)</span>}
-                                </span>
-                                
+                            {/* Barra Inferior: Reacciones y Acciones Docente */}
+                            <div className="flex items-center justify-between gap-2 mt-auto pt-2 border-t border-gray-200 dark:border-gray-800">
                                 {/* Reacciones del Perfil */}
-                                <div className="flex items-center gap-1">
+                                <div className="flex items-center gap-1.5 flex-wrap">
                                     {Object.entries(post.reactions || {}).reduce((acc, [uid, emoji]) => {
                                         const existing = acc.find(item => item.emoji === emoji);
                                         if (existing) existing.count++; else acc.push({ emoji, count: 1 });
@@ -6918,6 +6903,18 @@ useEffect(() => {
                                             <span>{r.count}</span>
                                         </span>
                                     ))}
+
+                                    <div className="relative group/react">
+                                        <button className="p-1 rounded-full text-gray-400 hover:text-blue-500 transition-colors" title="Reaccionar"><SmileIcon size={15}/></button>
+                                        <div className={`absolute bottom-full left-0 mb-1 hidden group-hover/react:flex gap-1.5 p-1.5 rounded-full shadow-lg border z-30 ${isDarkMode ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-200'}`}>
+                                            {['❤️','👍','👏'].map(emj => (
+                                                <button key={emj} onClick={() => toggleProfilePostReaction(post.id, emj)} className="hover:scale-125 transition-transform p-0.5 flex items-center justify-center">
+                                                    <AppleEmoji emoji={emj} size="18px" />
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
                                     {/* Botón para Calificar Publicación (Exclusivo Docente si aún no está calificada y es de estudiante) */}
                                     {role === 'teacher' && !isTeacherProfile && !isTeacherId(post.authorUsername || post.authorId) && post.grade == null && (
                                         <button
@@ -6941,18 +6938,6 @@ useEffect(() => {
                                             <span>Calificar</span>
                                         </button>
                                     )}
-
-                                    <div className="relative group/react">
-                                        <button className={`p-1 rounded-full text-gray-400 hover:text-blue-500 transition-colors`}><SmileIcon size={14}/></button>
-                                        <div className={`absolute bottom-full right-0 mb-1 hidden group-hover/react:flex gap-1.5 p-1.5 rounded-full shadow-lg border z-30 ${isDarkMode ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-200'}`}>
-                                            {['❤️','👍','👏'].map(emj => (
-                                                <button key={emj} onClick={() => toggleProfilePostReaction(post.id, emj)} className="hover:scale-125 transition-transform p-0.5 flex items-center justify-center">
-                                                    <AppleEmoji emoji={emj} size="18px" />
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
                             </div>
                             
                             {/* Sección de Comentarios Perfectamente Contenida */}

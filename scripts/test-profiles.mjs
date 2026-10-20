@@ -170,14 +170,14 @@ console.log('\n== 3. Integridad Estática en App.jsx (Cabecera de Autor y Filtro
 
 const appJsx = fs.readFileSync(path.join(rootDir, 'src', 'App.jsx'), 'utf8');
 
-test('App.jsx incluye cabecera del autor arriba de cada publicación en el perfil', () => {
+test('App.jsx incluye cabecera del autor arriba de cada publicación en el perfil con fecha al lado del nombre', () => {
   assert(appJsx.includes('authorDisplayName'), 'Debe calcular authorDisplayName en myPosts.map');
-  assert(appJsx.includes('authorRoleLabel'), 'Debe calcular authorRoleLabel en myPosts.map');
   assert(appJsx.includes('authorPhoto'), 'Debe calcular authorPhoto en myPosts.map');
   assert(appJsx.includes('Cabecera del Autor de la Publicación'), 'Debe contener la cabecera del autor de la publicación');
+  assert(!appJsx.includes('authorRoleLabel'), 'NO debe contener etiquetas de rol (Docente/Estudiante) en las publicaciones');
 });
 
-test('App.jsx muestra el nombre del autor inclusive si es en su propio perfil', () => {
+test('App.jsx muestra el nombre del autor inclusive si es en su propio perfil con fecha al lado', () => {
   assert(appJsx.includes('{authorDisplayName}'), 'Debe renderizar {authorDisplayName}');
   assert(appJsx.includes('isTeacherProfile'), 'Debe verificar isTeacherProfile en el filtro');
   assert(appJsx.includes('isPostFromTeacher'), 'Debe verificar isPostFromTeacher en el filtro');
