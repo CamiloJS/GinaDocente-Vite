@@ -293,8 +293,8 @@ export const SLIDE_ACADEMIC_ILLUSTRATIONS = [
     id: 'chart_growth',
     name: 'Gráfico y Tendencias',
     label: 'Gráfico y Tendencias',
-    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420"><rect width="640" height="420" rx="24" fill="%230f172a"/><rect x="80" y="240" width="65" height="110" rx="10" fill="%23334155"/><rect x="180" y="190" width="65" height="160" rx="10" fill="%230284c7"/><rect x="280" y="140" width="65" height="210" rx="10" fill="%2310b981"/><rect x="380" y="90" width="65" height="260" rx="10" fill="%23f59e0b"/><rect x="480" y="55" width="65" height="295" rx="10" fill="%23ad3333"/><polyline fill="none" stroke="%23f8fafc" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" points="112,220 212,170 312,120 412,72 512,38"/><circle cx="512" cy="38" r="10" fill="%23facc15"/><text x="80" y="390" font-family="Arial,sans-serif" font-size="18" font-weight="bold" fill="%23e2e8f0">Analytics &amp; Key Indicators</text></svg>',
-    dataUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420"><rect width="640" height="420" rx="24" fill="%230f172a"/><rect x="80" y="240" width="65" height="110" rx="10" fill="%23334155"/><rect x="180" y="190" width="65" height="160" rx="10" fill="%230284c7"/><rect x="280" y="140" width="65" height="210" rx="10" fill="%2310b981"/><rect x="380" y="90" width="65" height="260" rx="10" fill="%23f59e0b"/><rect x="480" y="55" width="65" height="295" rx="10" fill="%23ad3333"/><polyline fill="none" stroke="%23f8fafc" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" points="112,220 212,170 312,120 412,72 512,38"/><circle cx="512" cy="38" r="10" fill="%23facc15"/><text x="80" y="390" font-family="Arial,sans-serif" font-size="18" font-weight="bold" fill="%23e2e8f0">Analytics &amp; Key Indicators</text></svg>'
+    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420"><rect width="640" height="420" rx="24" fill="%230f172a"/><rect x="80" y="240" width="65" height="110" rx="10" fill="%23334155"/><rect x="180" y="190" width="65" height="160" rx="10" fill="%230284c7"/><rect x="280" y="140" width="65" height="210" rx="10" fill="%2310b981"/><rect x="380" y="90" width="65" height="260" rx="10" fill="%23f59e0b"/><rect x="480" y="55" width="65" height="295" rx="10" fill="%23ad3333"/><polyline fill="none" stroke="%23f8fafc" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" points="112,220 212,170 312,120 412,72 512,38"/><circle cx="512" cy="38" r="10" fill="%23facc15"/><text x="80" y="390" font-family="Arial,sans-serif" font-size="18" font-weight="bold" fill="%23e2e8f0">Progreso y Resultados</text></svg>',
+    dataUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420"><rect width="640" height="420" rx="24" fill="%230f172a"/><rect x="80" y="240" width="65" height="110" rx="10" fill="%23334155"/><rect x="180" y="190" width="65" height="160" rx="10" fill="%230284c7"/><rect x="280" y="140" width="65" height="210" rx="10" fill="%2310b981"/><rect x="380" y="90" width="65" height="260" rx="10" fill="%23f59e0b"/><rect x="480" y="55" width="65" height="295" rx="10" fill="%23ad3333"/><polyline fill="none" stroke="%23f8fafc" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" points="112,220 212,170 312,120 412,72 512,38"/><circle cx="512" cy="38" r="10" fill="%23facc15"/><text x="80" y="390" font-family="Arial,sans-serif" font-size="18" font-weight="bold" fill="%23e2e8f0">Progreso y Resultados</text></svg>'
   },
   {
     id: 'global_comm',
@@ -1743,7 +1743,89 @@ export const getTableRows = (table) => {
   return table.rows.map(r => extractTableRowCells(r, headers));
 };
 
-const COMPACT_FALLBACK_IMAGE_URL = SLIDE_ACADEMIC_ILLUSTRATIONS[0].url;
+export const NEUTRAL_SLIDE_PLACEHOLDER_SVG = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360"><rect width="640" height="360" rx="16" fill="%230f172a"/><rect x="40" y="40" width="560" height="280" rx="12" fill="%231e293b" stroke="%23334155" stroke-width="2"/><circle cx="320" cy="150" r="32" fill="%23475569"/><path d="M180 270 L280 180 L350 235 L420 175 L500 270 Z" fill="%23334155"/></svg>';
+
+export const isCorruptedAnalyticsSlideImage = (url) => {
+  if (!url || typeof url !== 'string') return false;
+  return (
+    url.includes('Analytics &amp; Key Indicators') ||
+    url.includes('Analytics & Key Indicators') ||
+    url.includes('chart_growth')
+  );
+};
+
+export const isCorruptedAnalyticsSlide = (slide) => {
+  if (!slide || typeof slide !== 'object') return false;
+  if (isCorruptedAnalyticsSlideImage(slide.imageUrl)) return true;
+  if (isCorruptedAnalyticsSlideImage(slide.bgImage)) return true;
+  if (Array.isArray(slide.elements)) {
+    return slide.elements.some(el => el && isCorruptedAnalyticsSlideImage(el.imageUrl));
+  }
+  return false;
+};
+
+export const presentationHasCorruptedSlides = (pres) => {
+  if (!pres || !Array.isArray(pres.slides)) return false;
+  return pres.slides.some(isCorruptedAnalyticsSlide);
+};
+
+export const healCorruptedPresentationFromPptx = async (presentation) => {
+  if (!presentation || !Array.isArray(presentation.slides) || presentation.slides.length === 0) {
+    return null;
+  }
+  const pptxUrl = presentation.pptxUrl;
+  if (!pptxUrl || typeof pptxUrl !== 'string') {
+    return null;
+  }
+
+  const hasCorrupted = presentation.slides.some(isCorruptedAnalyticsSlide) ||
+    presentation.slides.some(s => s._wasCorrupted);
+  if (!hasCorrupted) {
+    return null;
+  }
+
+  try {
+    const res = await fetch(pptxUrl);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    const parseResult = await parsePptxFile(blob, presentation.topic || 'Presentación');
+    if (!parseResult || !Array.isArray(parseResult.slides) || parseResult.slides.length === 0) {
+      return null;
+    }
+
+    const freshSlides = parseResult.slides;
+    const healedSlides = presentation.slides.map((currentSlide, idx) => {
+      const isCorrupted = isCorruptedAnalyticsSlide(currentSlide) || currentSlide._wasCorrupted;
+      if (!isCorrupted) return currentSlide;
+
+      const fresh = freshSlides[idx];
+      if (!fresh) return currentSlide;
+
+      const restoredElements = Array.isArray(fresh.elements) ? fresh.elements : [];
+      return {
+        ...currentSlide,
+        layout: fresh.layout || currentSlide.layout || 'blank',
+        hideHeader: fresh.hideHeader !== undefined ? fresh.hideHeader : currentSlide.hideHeader,
+        imageUrl: fresh.imageUrl || '',
+        bgImage: fresh.bgImage || '',
+        elements: restoredElements.length > 0 ? restoredElements : currentSlide.elements,
+        _wasCorrupted: false,
+        _healedAt: Date.now()
+      };
+    });
+
+    return {
+      ...presentation,
+      slides: healedSlides,
+      _isHealed: true
+    };
+  } catch (err) {
+    console.warn('Error al auto-sanar presentación desde PPTX:', err);
+    return null;
+  }
+};
+
+const COMPACT_FALLBACK_IMAGE_URL = NEUTRAL_SLIDE_PLACEHOLDER_SVG;
 const MAX_SINGLE_DATA_IMAGE_CHARS = 380000;
 const MAX_TOTAL_FIRESTORE_SLIDES_CHARS = 750000;
 
@@ -1854,6 +1936,39 @@ export const hydrateSlidesFromFirestore = (slides = []) => {
   if (!Array.isArray(slides)) return [];
   return slides.map((s, idx) => {
     if (!s || typeof s !== 'object') return createDefaultSlide('cards', idx);
+
+    // Sanitización preventiva contra el gráfico corrupto 'Analytics & Key Indicators'
+    if (isCorruptedAnalyticsSlide(s)) {
+      if (Array.isArray(s.elements)) {
+        s = {
+          ...s,
+          elements: s.elements.map(el => {
+            if (el && isCorruptedAnalyticsSlideImage(el.imageUrl)) {
+              return {
+                ...el,
+                imageUrl: NEUTRAL_SLIDE_PLACEHOLDER_SVG,
+                _wasCorrupted: true
+              };
+            }
+            return el;
+          })
+        };
+      }
+      if (isCorruptedAnalyticsSlideImage(s.imageUrl)) {
+        s = {
+          ...s,
+          imageUrl: NEUTRAL_SLIDE_PLACEHOLDER_SVG,
+          _wasCorrupted: true
+        };
+      }
+      if (isCorruptedAnalyticsSlideImage(s.bgImage)) {
+        s = {
+          ...s,
+          bgImage: '',
+          _wasCorrupted: true
+        };
+      }
+    }
 
     // Auto-recuperación de diapositivas importadas de PowerPoint previamente que quedaron con layout 'image_text' y texto 'Contenido importado de PowerPoint.'
     if (

@@ -74,10 +74,26 @@ import {
   isGoogleSlidesUrl,
   extractGoogleSlidesEmbedUrl,
   parsePptxFile,
-  compressSlideImageDataUrl
+  compressSlideImageDataUrl,
+  NEUTRAL_SLIDE_PLACEHOLDER_SVG,
+  isCorruptedAnalyticsSlideImage,
+  isCorruptedAnalyticsSlide,
+  presentationHasCorruptedSlides,
+  healCorruptedPresentationFromPptx
 } from '../utils/slidesEngine.js'
 
-export { resolveSlideLayout, isGoogleSlidesUrl, extractGoogleSlidesEmbedUrl, parsePptxFile, compressSlideImageDataUrl }
+export {
+  resolveSlideLayout,
+  isGoogleSlidesUrl,
+  extractGoogleSlidesEmbedUrl,
+  parsePptxFile,
+  compressSlideImageDataUrl,
+  NEUTRAL_SLIDE_PLACEHOLDER_SVG,
+  isCorruptedAnalyticsSlideImage,
+  isCorruptedAnalyticsSlide,
+  presentationHasCorruptedSlides,
+  healCorruptedPresentationFromPptx
+}
 
 const uploadOrInlineSlideImage = async (fileOrDataUrl, isDemoMode = false) => {
   let baseDataUrl = '';
@@ -114,36 +130,48 @@ const uploadOrInlineSlideImage = async (fileOrDataUrl, isDemoMode = false) => {
 
 const compactDeckSlidesImages = async (slides = [], isDemoMode = false) => {
   if (!Array.isArray(slides)) return [];
-  const nextSlides = [];
-  for (let i = 0; i < slides.length; i++) {
-    const s = slides[i];
-    if (!s || typeof s !== 'object') {
-      nextSlides.push(s);
-      continue;
-    }
-    let updatedSlide = { ...s };
-    if (typeof updatedSlide.imageUrl === 'string' && updatedSlide.imageUrl.startsWith('data:image/') && !updatedSlide.imageUrl.startsWith('data:image/svg') && updatedSlide.imageUrl.length > 90000) {
-      updatedSlide.imageUrl = await uploadOrInlineSlideImage(updatedSlide.imageUrl, isDemoMode);
-    }
-    if (typeof updatedSlide.bgImage === 'string' && updatedSlide.bgImage.startsWith('data:image/') && !updatedSlide.bgImage.startsWith('data:image/svg') && updatedSlide.bgImage.length > 90000) {
-      updatedSlide.bgImage = await uploadOrInlineSlideImage(updatedSlide.bgImage, isDemoMode);
-    }
-    if (Array.isArray(updatedSlide.elements) && updatedSlide.elements.length > 0) {
-      const nextEls = [];
-      for (let j = 0; j < updatedSlide.elements.length; j++) {
-        const el = updatedSlide.elements[j];
-        if (el && el.type === 'image' && typeof el.imageUrl === 'string' && el.imageUrl.startsWith('data:image/') && !el.imageUrl.startsWith('data:image/svg') && el.imageUrl.length > 90000) {
-          const compactElUrl = await uploadOrInlineSlideImage(el.imageUrl, isDemoMode);
-          nextEls.push({ ...el, imageUrl: compactElUrl });
-        } else {
-          nextEls.push(el);
-        }
+  return Promise.all(
+    slides.map(async (s) => {
+      if (!s || typeof s !== 'object') return s;
+      let updatedSlide = { ...s };
+      if (
+        typeof updatedSlide.imageUrl === 'string' &&
+        updatedSlide.imageUrl.startsWith('data:image/') &&
+        !updatedSlide.imageUrl.startsWith('data:image/svg') &&
+        updatedSlide.imageUrl.length > 1000
+      ) {
+        updatedSlide.imageUrl = await uploadOrInlineSlideImage(updatedSlide.imageUrl, isDemoMode);
       }
-      updatedSlide.elements = nextEls;
-    }
-    nextSlides.push(updatedSlide);
-  }
-  return nextSlides;
+      if (
+        typeof updatedSlide.bgImage === 'string' &&
+        updatedSlide.bgImage.startsWith('data:image/') &&
+        !updatedSlide.bgImage.startsWith('data:image/svg') &&
+        updatedSlide.bgImage.length > 1000
+      ) {
+        updatedSlide.bgImage = await uploadOrInlineSlideImage(updatedSlide.bgImage, isDemoMode);
+      }
+      if (Array.isArray(updatedSlide.elements) && updatedSlide.elements.length > 0) {
+        const nextEls = await Promise.all(
+          updatedSlide.elements.map(async (el) => {
+            if (
+              el &&
+              el.type === 'image' &&
+              typeof el.imageUrl === 'string' &&
+              el.imageUrl.startsWith('data:image/') &&
+              !el.imageUrl.startsWith('data:image/svg') &&
+              el.imageUrl.length > 1000
+            ) {
+              const compactElUrl = await uploadOrInlineSlideImage(el.imageUrl, isDemoMode);
+              return { ...el, imageUrl: compactElUrl };
+            }
+            return el;
+          })
+        );
+        updatedSlide.elements = nextEls;
+      }
+      return updatedSlide;
+    })
+  );
 };
 
 const resolvePptxImageSource = (rawUrl) =>
@@ -988,7 +1016,7 @@ export const SlideCanvasSurface = ({
       }`}
     >
       {/* Imagen de fondo opcional */}
-      {safeSlide.bgImage && (
+      {safeSlide.bgImage && !isCorruptedAnalyticsSlideImage(safeSlide.bgImage) && (
         <div
           className="absolute inset-0 bg-cover bg-center pointer-events-none"
           style={{
@@ -1687,7 +1715,7 @@ export const SlideCanvasSurface = ({
                   {safeSlide.imageUrl ? (
                     <>
                       <img loading="lazy" decoding="async"
-                        src={safeSlide.imageUrl}
+                        src={isCorruptedAnalyticsSlideImage(safeSlide.imageUrl) ? NEUTRAL_SLIDE_PLACEHOLDER_SVG : safeSlide.imageUrl}
                         alt={safeSlide.imageCaption || safeSlide.title || 'Slide visual'}
                         className="w-full h-full object-cover"
                       />
@@ -2527,7 +2555,7 @@ export const SlideCanvasSurface = ({
                 {el.type === 'image' ? (
                   <div className={`w-full h-full overflow-hidden relative ${(el.w >= 95 && el.h >= 95) ? 'rounded-none' : 'rounded-xl'}`}>
                     <img loading="lazy" decoding="async"
-                      src={el.imageUrl}
+                      src={isCorruptedAnalyticsSlideImage(el.imageUrl) ? NEUTRAL_SLIDE_PLACEHOLDER_SVG : el.imageUrl}
                       alt={el.caption || 'Slide element'}
                       className="w-full h-full pointer-events-none"
                       style={{ objectFit: el.fit || 'contain' }}
@@ -2667,18 +2695,37 @@ export const SlidePresenterViewer = ({ presentation, onClose, onEdit, role, them
   const [penColor, setPenColor] = useState('#EF4444');
   const [strokesBySlide, setStrokesBySlide] = useState({});
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [livePresentation, setLivePresentation] = useState(presentation);
+
+  // Auto-recuperación en caliente si la presentación abierta contiene diapositivas corruptas y tiene pptxUrl
+  useEffect(() => {
+    setLivePresentation(presentation);
+    if (!presentation?.pptxUrl) return;
+    const hasCorrupted = presentation?.slides?.some(s => isCorruptedAnalyticsSlide(s) || s?._wasCorrupted);
+    if (!hasCorrupted) return;
+    let isCancelled = false;
+    (async () => {
+      try {
+        const healed = await healCorruptedPresentationFromPptx(presentation);
+        if (!healed || isCancelled) return;
+        setLivePresentation(healed);
+      } catch {}
+    })();
+    return () => { isCancelled = true; };
+  }, [presentation]);
 
   const viewerRef = useRef(null);
   const drawingRef = useRef({ active: false, points: [] });
 
-  const slides = presentation?.slides || [];
+  const activePres = livePresentation || presentation;
+  const slides = activePres?.slides || [];
   const total = slides.length;
   const safeIdx = total > 0 ? Math.min(currentIdx, total - 1) : 0;
   const currentSlide = slides[safeIdx] || {};
-  const displayTitle = presentation?.slides?.[0]?.title || presentation?.topic || 'Presentación';
-  const transitionType = currentSlide.transition || presentation?.transition || 'fade';
-  const transitionDuration = Number(currentSlide.transitionDuration || presentation?.transitionDuration || 400);
-  const autoAdvanceSec = Number(currentSlide.autoAdvanceSeconds ?? presentation?.autoAdvanceSeconds ?? 0);
+  const displayTitle = activePres?.slides?.[0]?.title || activePres?.topic || 'Presentación';
+  const transitionType = currentSlide.transition || activePres?.transition || 'fade';
+  const transitionDuration = Number(currentSlide.transitionDuration || activePres?.transitionDuration || 400);
+  const autoAdvanceSec = Number(currentSlide.autoAdvanceSeconds ?? activePres?.autoAdvanceSeconds ?? 0);
 
   const isLight = themeMode === 'light';
   const isDim = themeMode === 'dim';
@@ -3160,7 +3207,7 @@ export const SlidePresenterViewer = ({ presentation, onClose, onEdit, role, them
               >
                 <div className="rounded-xl overflow-hidden shadow-xs pointer-events-none">
                   <SlideCanvasSurface
-                    presentation={presentation}
+                    presentation={activePres}
                     slide={s}
                     slideIdx={idx}
                     totalSlides={total}
@@ -3205,7 +3252,7 @@ export const SlidePresenterViewer = ({ presentation, onClose, onEdit, role, them
             }`}
           >
             <SlideCanvasSurface
-              presentation={presentation}
+              presentation={activePres}
               slide={currentSlide}
               slideIdx={safeIdx}
               totalSlides={total}
@@ -7756,6 +7803,56 @@ export const ReviewsModule = ({
   const [googleSlidesTitle, setGoogleSlidesTitle] = useState('');
   const [googleSlidesTargetGroup, setGoogleSlidesTargetGroup] = useState('all');
   const pptxFileInputRef = useRef(null);
+
+  // Auto-recuperación transparente de presentaciones de PowerPoint que tengan diapositivas afectadas por 'Analytics & Key Indicators'
+  useEffect(() => {
+    if (!reviews || !Array.isArray(reviews) || isDemoMode || !db || !appId) return;
+    const corruptedPres = reviews.find(r =>
+      r &&
+      r.pptxUrl &&
+      Array.isArray(r.slides) &&
+      (r.slides.some(isCorruptedAnalyticsSlide) || r.slides.some(s => s?._wasCorrupted))
+    );
+    if (!corruptedPres) return;
+
+    let isCancelled = false;
+    (async () => {
+      try {
+        const healed = await healCorruptedPresentationFromPptx(corruptedPres);
+        if (!healed || isCancelled) return;
+
+        // Subir las imágenes reales de las diapositivas a Storage para garantizar que pesen < 5 KB en Firestore
+        const compactedSlides = await compactDeckSlidesImages(healed.slides, false);
+        const firestoreSlides = sanitizeSlidesForFirestore(compactedSlides);
+
+        if (auth && !auth.currentUser) {
+          await signInAnonymously(auth).catch(() => {});
+        }
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reviews', String(corruptedPres.id)), {
+          slides: firestoreSlides
+        });
+
+        // Actualizar también la publicación correspondiente en el muro (rev_wall_<id>) si existe
+        try {
+          const wallTaskId = `rev_wall_${corruptedPres.id}`;
+          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', wallTaskId), {
+            slides: firestoreSlides
+          });
+        } catch {}
+
+        const finalHealed = { ...corruptedPres, slides: compactedSlides };
+        if (typeof setReviews === 'function') {
+          setReviews(prev => (prev || []).map(r => String(r.id) === String(corruptedPres.id) ? finalHealed : r));
+        }
+        setActivePresentation(prev => (prev && String(prev.id) === String(corruptedPres.id) ? finalHealed : prev));
+        console.log(`✅ Presentación "${corruptedPres.topic || corruptedPres.fileName}" auto-recuperada con éxito desde su PPTX original.`);
+      } catch (healErr) {
+        console.warn('Aviso al auto-recuperar presentación desde PPTX:', healErr);
+      }
+    })();
+
+    return () => { isCancelled = true; };
+  }, [reviews, isDemoMode, db, appId]);
 
   // Selección de archivo PowerPoint (.pptx) para abrir modal de configuración y grupo
   const handlePptxFileSelected = (e) => {

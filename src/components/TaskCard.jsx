@@ -22,7 +22,7 @@ import GeniallyEmbedPlayer, { extractGeniallyUrl } from './GeniallyEmbedPlayer.j
 import KahootLiveModal from './KahootLiveModal.jsx'
 import KahootBuilder from './KahootBuilder.jsx'
 import { validateKahootConfig, buildKahootLeaderboard, reconcileKahootParticipantsAfterEdit, canAccessKahootReview, buildPublicKahootUrl } from '../utils/kahootEngine.js'
-import { SlideCanvasSurface, SlidePresenterViewer, exportReviewToPresentation } from './ReviewsModule.jsx'
+import { SlideCanvasSurface, SlidePresenterViewer, exportReviewToPresentation, isCorruptedAnalyticsSlide, healCorruptedPresentationFromPptx } from './ReviewsModule.jsx'
 import Flipbook3DModal from './Flipbook3DModal.jsx'
 import {
     getBookTheme,
@@ -545,6 +545,37 @@ const TaskCard = React.memo(({
         }
         return null;
     }, [isSlides, reviews, task]);
+
+    const [healedSlidesOverride, setHealedSlidesOverride] = useState(null);
+
+    // Auto-sanación en caliente de diapositivas en el Muro si contienen imágenes corruptas por 'Analytics & Key Indicators'
+    useEffect(() => {
+        if (!isSlides || !linkedReview?.pptxUrl) return;
+        const hasCorrupted = (linkedReview.slides || []).some(s => isCorruptedAnalyticsSlide(s) || s?._wasCorrupted);
+        if (!hasCorrupted) return;
+
+        let isCancelled = false;
+        (async () => {
+            try {
+                const healed = await healCorruptedPresentationFromPptx(linkedReview);
+                if (!healed || isCancelled) return;
+                setHealedSlidesOverride(healed.slides);
+            } catch {}
+        })();
+        return () => { isCancelled = true; };
+    }, [isSlides, linkedReview]);
+
+    const effectiveLinkedReview = React.useMemo(() => {
+        if (!linkedReview) return null;
+        if (healedSlidesOverride && Array.isArray(healedSlidesOverride)) {
+            return {
+                ...linkedReview,
+                slides: healedSlidesOverride,
+                slideCount: healedSlidesOverride.length
+            };
+        }
+        return linkedReview;
+    }, [linkedReview, healedSlidesOverride]);
 
     const [filterOnlyUngraded, setFilterOnlyUngraded] = useState(false);
 
@@ -2686,8 +2717,8 @@ const TaskCard = React.memo(({
             })()}
 
             {/* Módulo Interactivo de Diapositivas (Publicación de Presentación en el Muro) */}
-            {isSlides && (linkedReview || task.slideCount) && (() => {
-                const rev = linkedReview;
+            {isSlides && (effectiveLinkedReview || task.slideCount) && (() => {
+                const rev = effectiveLinkedReview;
                 const slidesArr = Array.isArray(rev?.slides) ? rev.slides : [];
                 const totalSlidesCount = slidesArr.length || Number(task.slideCount) || 0;
                 const safeSlideIdx = slidesArr.length > 0 ? Math.min(slidePreviewIdx, slidesArr.length - 1) : 0;
@@ -4690,13 +4721,13 @@ const TaskCard = React.memo(({
             )}
 
             {/* VISOR INTERACTIVO DE DIAPOSITIVAS EN PANTALLA COMPLETA DESDE EL MURO */}
-            {showSlidePresenter && linkedReview && (
+            {showSlidePresenter && effectiveLinkedReview && (
                 <SlidePresenterViewer
-                    presentation={linkedReview}
+                    presentation={effectiveLinkedReview}
                     onClose={() => setShowSlidePresenter(false)}
                     onEdit={role === 'teacher' && typeof onOpenReviewsTab === 'function' ? () => {
                         setShowSlidePresenter(false);
-                        onOpenReviewsTab(linkedReview);
+                        onOpenReviewsTab(effectiveLinkedReview);
                     } : undefined}
                     role={role}
                     themeMode={themeMode || (isDarkMode ? 'dark' : 'light')}

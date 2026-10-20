@@ -45,7 +45,12 @@ import {
   decodeXmlEntities,
   isGoogleSlidesUrl,
   extractGoogleSlidesEmbedUrl,
-  parsePptxFile
+  parsePptxFile,
+  NEUTRAL_SLIDE_PLACEHOLDER_SVG,
+  isCorruptedAnalyticsSlideImage,
+  isCorruptedAnalyticsSlide,
+  presentationHasCorruptedSlides,
+  healCorruptedPresentationFromPptx
 } from '../src/utils/slidesEngine.js';
 
 import { DEMO_REVIEWS } from '../src/utils/demoData.js';
@@ -867,6 +872,66 @@ check('ReviewsModule maximiza la presentación al 100% de la pantalla sin bordes
   reviewsSrc.includes('100vw * 9 / 16') &&
   reviewsSrc.includes('isFullscreen ? \'p-0 bg-black text-white\'') &&
   reviewsSrc.includes('requestFullscreen')
+);
+
+// == 11. Erradicación del Fallback "Analytics & Key Indicators" y Auto-recuperación de Diapositivas ==
+console.log('\n== 11. Erradicación del Fallback "Analytics & Key Indicators" y Auto-recuperación de Diapositivas ==');
+
+const corruptedSvgSnippet = 'data:image/svg+xml;utf8,<svg><text>Analytics &amp; Key Indicators</text></svg>';
+check('isCorruptedAnalyticsSlideImage detecta imágenes afectadas por "Analytics & Key Indicators" o "chart_growth"',
+  isCorruptedAnalyticsSlideImage(corruptedSvgSnippet) === true &&
+  isCorruptedAnalyticsSlideImage('data:image/svg+xml;utf8,<svg id="chart_growth"></svg>') === true &&
+  isCorruptedAnalyticsSlideImage('https://firebasestorage.googleapis.com/v0/b/app/o/slides%2Fphoto.jpg') === false &&
+  isCorruptedAnalyticsSlideImage(NEUTRAL_SLIDE_PLACEHOLDER_SVG) === false
+);
+
+const fakeCorruptedSlide = {
+  id: 'slide_corrupted',
+  layout: 'blank',
+  title: 'Diapositiva afectada',
+  imageUrl: corruptedSvgSnippet,
+  elements: [{ id: 'el_corrupt', type: 'image', imageUrl: corruptedSvgSnippet }]
+};
+check('isCorruptedAnalyticsSlide y presentationHasCorruptedSlides detectan diapositivas y presentaciones corruptas',
+  isCorruptedAnalyticsSlide(fakeCorruptedSlide) === true &&
+  presentationHasCorruptedSlides({ slides: [fakeCorruptedSlide] }) === true &&
+  presentationHasCorruptedSlides({ slides: [{ id: 'clean', layout: 'title', title: 'Limpia' }] }) === false
+);
+
+const sanitizedCorrupted = sanitizeSlidesForFirestore([
+  {
+    layout: 'image_text',
+    title: 'Slide pesada para compactar',
+    imageUrl: 'data:image/jpeg;base64,' + 'Z'.repeat(500000)
+  }
+]);
+check('sanitizeSlidesForFirestore NUNCA usa "Analytics & Key Indicators" como fallback (usa NEUTRAL_SLIDE_PLACEHOLDER_SVG)',
+  !JSON.stringify(sanitizedCorrupted).includes('Analytics &amp; Key Indicators') &&
+  !JSON.stringify(sanitizedCorrupted).includes('Analytics & Key Indicators') &&
+  sanitizedCorrupted[0].imageUrl === NEUTRAL_SLIDE_PLACEHOLDER_SVG
+);
+
+const hydratedCorrupted = hydrateSlidesFromFirestore([fakeCorruptedSlide]);
+check('hydrateSlidesFromFirestore limpia automáticamente imágenes con "Analytics & Key Indicators" al hidratar',
+  !hydratedCorrupted[0].imageUrl.includes('Analytics &amp; Key Indicators') &&
+  hydratedCorrupted[0].imageUrl === NEUTRAL_SLIDE_PLACEHOLDER_SVG &&
+  hydratedCorrupted[0]._wasCorrupted === true
+);
+
+const freshReviewsSrc = fs.readFileSync(path.join(rootDir, 'src/components/ReviewsModule.jsx'), 'utf8');
+const freshTaskCardSrc = fs.readFileSync(path.join(rootDir, 'src/components/TaskCard.jsx'), 'utf8');
+
+check('ReviewsModule implementa compactDeckSlidesImages en paralelo con umbral bajo (> 1000) y subida transparente a Storage',
+  freshReviewsSrc.includes('compactDeckSlidesImages') &&
+  freshReviewsSrc.includes('healCorruptedPresentationFromPptx') &&
+  freshReviewsSrc.includes('isCorruptedAnalyticsSlideImage') &&
+  freshReviewsSrc.includes('NEUTRAL_SLIDE_PLACEHOLDER_SVG')
+);
+
+check('TaskCard integra effectiveLinkedReview con auto-sanación desde PPTX y evita mostrar "Analytics & Key Indicators"',
+  freshTaskCardSrc.includes('effectiveLinkedReview') &&
+  freshTaskCardSrc.includes('healCorruptedPresentationFromPptx') &&
+  freshTaskCardSrc.includes('isCorruptedAnalyticsSlide')
 );
 
 console.log(`\nRESULTADO SLIDES STUDIO: ${okCount} OK, ${failCount} fallos\n`);
