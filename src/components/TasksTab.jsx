@@ -1,5 +1,5 @@
 // src/components/TasksTab.jsx
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import {
   Book, BookOpen, CheckCheck, CheckCircle2, ChevronRight, Globe, ImageIcon, Mic, NavNotebook, PaperclipIcon, Plus, SearchIcon, Sparkles, Square, Target, Loader2, Undo2, UploadCloud, X, Play, Pause, MessageCircle, BarChart2, Vote, Gamepad2, ClipboardList, NavSlides, Music, Volume2, VolumeX
 } from './Icons.jsx'
@@ -81,6 +81,23 @@ const TasksTab = React.memo(({
     const book3dFileInputRef = useRef(null);
     const book3dCoverInputRef = useRef(null);
     const book3dAmbientFileInputRef = useRef(null);
+    const loadMoreSentinelRef = useRef(null);
+
+    // Infinite scroll: auto-load older posts when sentinel becomes visible
+    useEffect(() => {
+        const sentinel = loadMoreSentinelRef.current;
+        if (!sentinel) return;
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting && !tasksLoading) {
+                    loadMoreTasks?.();
+                }
+            },
+            { threshold: 0.1 }
+        );
+        observer.observe(sentinel);
+        return () => observer.disconnect();
+    }, [tasksLoading, loadMoreTasks, tasks?.length, taskLimit]);
 
     // Configuración de música de fondo / audio de lectura para libros
     const [book3dAmbientEnabled, setBook3dAmbientEnabled] = useState(true);
@@ -2657,10 +2674,16 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                     </div>
                 ))}
             </div>
+{/* Sentinel for infinite scroll — visible only when there are more posts to load */}
 {!tasksLoading && (tasks?.length || 0) >= taskLimit && (
-    <button type="button" onClick={loadMoreTasks} className="w-full py-3 mt-6 rounded-xl border-2 border-dashed font-bold transition-all text-sm flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
-        <Plus size={18} /> Cargar publicaciones anteriores
-    </button>
+    <div ref={loadMoreSentinelRef} className="w-full flex justify-center py-4" aria-hidden="true" />
+)}
+
+{/* Spinner shown while loading more posts */}
+{tasksLoading && (tasks?.length || 0) > 0 && (
+    <div className="w-full flex justify-center py-6">
+        <Loader2 size={28} className="animate-spin text-gray-400 dark:text-gray-500" />
+    </div>
 )}
 
             {book3dPreviewModal?.book && (
