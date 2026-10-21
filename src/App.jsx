@@ -729,8 +729,14 @@ function App() {
     });
   }, []);
   const [tasksLoading, setTasksLoading] = useState(() => !initialIsDemo);
-  const [taskLimit, setTaskLimit] = useState(20);
-  const loadMoreTasks = () => setTaskLimit(prev => prev + 20);
+  const [taskLimit, setTaskLimit] = useState(25);
+  const [isLoadingMoreTasks, setIsLoadingMoreTasks] = useState(false);
+  const [hasMoreTasks, setHasMoreTasks] = useState(true);
+  const loadMoreTasks = useCallback(() => {
+    if (isLoadingMoreTasks || !hasMoreTasks) return;
+    setIsLoadingMoreTasks(true);
+    setTaskLimit(prev => prev + 25);
+  }, [isLoadingMoreTasks, hasMoreTasks]);
   const [rawSyllabus, setSyllabus] = useState(() => initialIsDemo ? DEMO_SYLLABUS : []);
   const [showAddSyllabus, setShowAddSyllabus] = useState(false);
   const [showPdfSyllabusModal, setShowPdfSyllabusModal] = useState(false);
@@ -3936,12 +3942,18 @@ useEffect(() => {
             deferredTasks = null;
             setTasks(nextList); 
         }
+        setHasMoreTasks(s.docs.length >= taskLimit);
         setTasksLoading(false); 
+        setIsLoadingMoreTasks(false);
     }, err => {
         console.error('Error cargando tareas:', err);
         setTasksLoading(false);
+        setIsLoadingMoreTasks(false);
     });
-    const fallbackTimer = setTimeout(() => setTasksLoading(false), 3500);
+    const fallbackTimer = setTimeout(() => {
+        setTasksLoading(false);
+        setIsLoadingMoreTasks(false);
+    }, 3500);
     return () => {
         window.removeEventListener('kahoot-live-modal-closed', flushDeferredTasks);
         uTasks();
@@ -10156,7 +10168,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                             callGemini={callGemini} showMessage={showMessage} handleAiTranslate={handleAiTranslate} taskDate={taskDate}
                             setTaskDate={setTaskDate} taskTime={taskTime} setTaskTime={setTaskTime} allowLate={allowLate} setAllowLate={setAllowLate}
                             db={db} appId={appId} loggedInName={loggedInName} getToday={getToday} tasks={tasks} setTasks={setTasks} isDemoMode={isDemoMode} user={user} isDarkMode={isDarkMode} themeMode={themeMode}
-                            confirmAction={confirmAction} setFullScreenImage={setFullScreenImage} tasksLoading={tasksLoading} taskLimit={taskLimit} loadMoreTasks={loadMoreTasks} pinnedTasks={pinnedTasks}
+                            confirmAction={confirmAction} setFullScreenImage={setFullScreenImage} tasksLoading={tasksLoading} taskLimit={taskLimit} loadMoreTasks={loadMoreTasks} hasMoreTasks={hasMoreTasks} isLoadingMoreTasks={isLoadingMoreTasks} pinnedTasks={pinnedTasks}
                             wallSearchTerm={wallSearchTerm} setWallSearchTerm={setWallSearchTerm}
                             fixedTargetGroup={selectedGroupForFeed.id}
                             postTargetGroup={postTargetGroup} setPostTargetGroup={setPostTargetGroup}
@@ -14762,7 +14774,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                               callGemini={callGemini} showMessage={showMessage} handleAiTranslate={handleAiTranslate} taskDate={taskDate}
                               setTaskDate={setTaskDate} taskTime={taskTime} setTaskTime={setTaskTime} allowLate={allowLate} setAllowLate={setAllowLate}
                               db={db} appId={appId} loggedInName={loggedInName} getToday={getToday} tasks={tasks} setTasks={setTasks} user={user} isDarkMode={isDarkMode} themeMode={themeMode}
-                              confirmAction={confirmAction} setFullScreenImage={setFullScreenImage} tasksLoading={tasksLoading} taskLimit={taskLimit} loadMoreTasks={loadMoreTasks} pinnedTasks={pinnedTasks}
+                              confirmAction={confirmAction} setFullScreenImage={setFullScreenImage} tasksLoading={tasksLoading} taskLimit={taskLimit} loadMoreTasks={loadMoreTasks} hasMoreTasks={hasMoreTasks} isLoadingMoreTasks={isLoadingMoreTasks} pinnedTasks={pinnedTasks}
                               wallSearchTerm={wallSearchTerm} setWallSearchTerm={setWallSearchTerm}
                               postTargetGroup={postTargetGroup} setPostTargetGroup={setPostTargetGroup}
                               isFormExpanded={isFormExpanded} setIsFormExpanded={setIsFormExpanded}

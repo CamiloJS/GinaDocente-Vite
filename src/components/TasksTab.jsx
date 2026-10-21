@@ -31,7 +31,7 @@ const TasksTab = React.memo(({
     setHasAiModified, callGemini, showMessage, handleAiTranslate, taskDate, setTaskDate,
     taskTime, setTaskTime, allowLate, setAllowLate, db, appId, loggedInName, getToday,
     tasks, setTasks, isDemoMode = false, user, isDarkMode, themeMode = 'light', confirmAction, setFullScreenImage, handleOpenProfileByName,
-    academicGroups, myChatId, userMappings, tasksLoading, taskLimit, loadMoreTasks, pinnedTasks,
+    academicGroups, myChatId, userMappings, tasksLoading, taskLimit, loadMoreTasks, hasMoreTasks = true, isLoadingMoreTasks = false, pinnedTasks,
     filterType, setFilterType, selectedGroupFilter, setSelectedGroupFilter, onTogglePin,
     taskSortOrder, setTaskSortOrder, wallSearchTerm: propWallSearchTerm, setWallSearchTerm: propSetWallSearchTerm,
     isFormExpanded: propIsFormExpanded, setIsFormExpanded: propSetIsFormExpanded,
@@ -83,21 +83,62 @@ const TasksTab = React.memo(({
     const book3dAmbientFileInputRef = useRef(null);
     const loadMoreSentinelRef = useRef(null);
 
-    // Infinite scroll: auto-load older posts when sentinel becomes visible
+    // Infinite scroll automático: auto-cargar publicaciones más antiguas al desplazarse hacia abajo
     useEffect(() => {
         const sentinel = loadMoreSentinelRef.current;
-        if (!sentinel) return;
+        if (!sentinel || !hasMoreTasks) return;
+
         const observer = new IntersectionObserver(
             (entries) => {
-                if (entries[0].isIntersecting && !tasksLoading) {
+                if (entries[0]?.isIntersecting && !tasksLoading && !isLoadingMoreTasks && hasMoreTasks) {
                     loadMoreTasks?.();
                 }
             },
-            { threshold: 0.1 }
+            {
+                root: null,
+                rootMargin: '400px',
+                threshold: 0
+            }
         );
+
         observer.observe(sentinel);
         return () => observer.disconnect();
-    }, [tasksLoading, loadMoreTasks, tasks?.length, taskLimit]);
+    }, [hasMoreTasks, tasksLoading, isLoadingMoreTasks, loadMoreTasks]);
+
+    // Respaldo de scroll por contenedor (para contenedores con overflow-y-auto en escritorio y móvil)
+    useEffect(() => {
+        if (!hasMoreTasks) return;
+        let ticking = false;
+
+        const handleScroll = (e) => {
+            if (ticking) return;
+            ticking = true;
+            requestAnimationFrame(() => {
+                ticking = false;
+                if (tasksLoading || isLoadingMoreTasks || !hasMoreTasks) return;
+                const target = e.target && e.target.scrollHeight ? e.target : document.documentElement;
+                const scrollTop = target.scrollTop || window.scrollY || 0;
+                const clientHeight = target.clientHeight || window.innerHeight || 0;
+                const scrollHeight = target.scrollHeight || document.documentElement.scrollHeight || 0;
+                if (scrollHeight - (scrollTop + clientHeight) < 450) {
+                    loadMoreTasks?.();
+                }
+            });
+        };
+
+        const scrollContainer = loadMoreSentinelRef.current?.closest('.overflow-y-auto') || document.querySelector('.overflow-y-auto');
+        if (scrollContainer) {
+            scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+        }
+        window.addEventListener('scroll', handleScroll, { passive: true });
+
+        return () => {
+            if (scrollContainer) {
+                scrollContainer.removeEventListener('scroll', handleScroll);
+            }
+            window.removeEventListener('scroll', handleScroll);
+        };
+    }, [hasMoreTasks, tasksLoading, isLoadingMoreTasks, loadMoreTasks]);
 
     // Configuración de música de fondo / audio de lectura para libros
     const [book3dAmbientEnabled, setBook3dAmbientEnabled] = useState(true);
@@ -2674,17 +2715,37 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                     </div>
                 ))}
             </div>
-{/* Sentinel for infinite scroll — visible only when there are more posts to load */}
-{!tasksLoading && (tasks?.length || 0) >= taskLimit && (
-    <div ref={loadMoreSentinelRef} className="w-full flex justify-center py-4" aria-hidden="true" />
-)}
+            {/* Sentinel y controles de carga de publicaciones anteriores (Scroll infinito + botón de respaldo) */}
+            {hasMoreTasks && (
+                <div className="w-full flex flex-col items-center justify-center py-4">
+                    <div ref={loadMoreSentinelRef} className="h-4 w-full pointer-events-none" aria-hidden="true" />
+                    
+                    {isLoadingMoreTasks ? (
+                        <div className="flex items-center gap-2.5 py-4 text-xs font-bold text-gray-500 dark:text-gray-400 animate-in fade-in">
+                            <Loader2 size={18} className="animate-spin text-[#AD3333]" />
+                            <span>Cargando publicaciones anteriores...</span>
+                        </div>
+                    ) : (
+                        <button 
+                            type="button" 
+                            onClick={loadMoreTasks} 
+                            className="px-5 py-2.5 rounded-2xl border font-bold text-xs flex items-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98] bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 shadow-2xs hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer"
+                        >
+                            <Plus size={15} className="text-[#AD3333]" />
+                            <span>Cargar más publicaciones</span>
+                        </button>
+                    )}
+                </div>
+            )}
 
-{/* Spinner shown while loading more posts */}
-{tasksLoading && (tasks?.length || 0) > 0 && (
-    <div className="w-full flex justify-center py-6">
-        <Loader2 size={28} className="animate-spin text-gray-400 dark:text-gray-500" />
-    </div>
-)}
+            {!hasMoreTasks && regularTasksToRender.length > 0 && !tasksLoading && (
+                <div className="w-full flex items-center justify-center py-6 text-center text-xs text-gray-400 dark:text-gray-500 select-none">
+                    <span className="flex items-center gap-1.5 opacity-80 font-medium">
+                        <CheckCircle2 size={14} className="text-emerald-500" />
+                        <span>Has llegado al final de las publicaciones</span>
+                    </span>
+                </div>
+            )}
 
             {book3dPreviewModal?.book && (
                 <Flipbook3DModal
