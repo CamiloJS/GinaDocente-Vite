@@ -201,6 +201,29 @@ export default function NotesModule({
     return { shared, private: priv };
   }, [notes, normalizedUserId]);
 
+  const formatCounts = useMemo(() => {
+    let all = 0;
+    let sticky = 0;
+    let sheet = 0;
+    (Array.isArray(notes) ? notes : []).forEach((note) => {
+      if (!note || note.isSoftDeleted) return;
+      const noteScope = note.scope === 'private' ? 'private' : 'shared';
+      if (noteScope !== activeScope) return;
+      if (noteScope === 'private') {
+        const owner = String(note.ownerId || note.authorId || '').trim().toLowerCase();
+        if (owner !== normalizedUserId) return;
+      }
+      if (selectedGroupFilter !== 'ALL' && noteScope === 'shared') {
+        if (String(note.targetGroupId || '') !== String(selectedGroupFilter)) return;
+      }
+      const fmt = normalizeNoteFormat(note.noteFormat);
+      all += 1;
+      if (fmt === 'sheet') sheet += 1;
+      else sticky += 1;
+    });
+    return { all, sticky, sheet };
+  }, [notes, activeScope, normalizedUserId, selectedGroupFilter]);
+
   useEffect(() => {
     if (hasAutoSelectedScopeRef.current) return;
     if (scopeCounts.shared === 0 && scopeCounts.private > 0 && activeScope === 'shared') {
@@ -629,9 +652,7 @@ export default function NotesModule({
     if (e) e.preventDefault();
     const activeEditorHtml = editorRef.current ? sanitizeNoteHtml(editorRef.current.innerHTML) : '';
 
-    const effectiveFormat = editingNote
-      ? normalizeNoteFormat(editingNote.noteFormat)
-      : normalizeNoteFormat(noteFormat);
+    const effectiveFormat = normalizeNoteFormat(noteFormat);
 
     let finalPages = [];
     let primaryContent = '';
@@ -1399,18 +1420,27 @@ export default function NotesModule({
             <button
               type="button"
               onClick={() => setViewMode('all')}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 viewMode === 'all'
                   ? (isDarkMode ? 'bg-slate-800 text-white shadow-2xs' : 'bg-white text-slate-900 shadow-2xs')
                   : (isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900')
               }`}
             >
-              Todo
+              <span>Todo</span>
+              {formatCounts.all > 0 && (
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                  viewMode === 'all'
+                    ? (isDarkMode ? 'bg-slate-700 text-slate-200' : 'bg-slate-100 text-slate-700')
+                    : (isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-200/70 text-slate-600')
+                }`}>
+                  {formatCounts.all}
+                </span>
+              )}
             </button>
             <button
               type="button"
               onClick={() => setViewMode('sticky')}
-              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 viewMode === 'sticky'
                   ? (isDarkMode ? 'bg-slate-800 text-white shadow-2xs' : 'bg-white text-slate-900 shadow-2xs')
                   : (isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900')
@@ -1418,11 +1448,20 @@ export default function NotesModule({
             >
               <Grid size={12} />
               <span>Notas rápidas</span>
+              {formatCounts.sticky > 0 && (
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                  viewMode === 'sticky'
+                    ? (isDarkMode ? 'bg-slate-700 text-slate-200' : 'bg-slate-100 text-slate-700')
+                    : (isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-200/70 text-slate-600')
+                }`}>
+                  {formatCounts.sticky}
+                </span>
+              )}
             </button>
             <button
               type="button"
               onClick={() => setViewMode('sheet')}
-              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 viewMode === 'sheet'
                   ? (isDarkMode ? 'bg-slate-800 text-white shadow-2xs' : 'bg-white text-slate-900 shadow-2xs')
                   : (isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900')
@@ -1430,6 +1469,15 @@ export default function NotesModule({
             >
               <FileText size={12} />
               <span>Hojas</span>
+              {formatCounts.sheet > 0 && (
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                  viewMode === 'sheet'
+                    ? (isDarkMode ? 'bg-slate-700 text-slate-200' : 'bg-slate-100 text-slate-700')
+                    : (isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-200/70 text-slate-600')
+                }`}>
+                  {formatCounts.sheet}
+                </span>
+              )}
             </button>
           </div>
         </div>
@@ -1489,7 +1537,11 @@ export default function NotesModule({
             <NavNotebook size={22} />
           </div>
           <p className={`text-sm font-semibold ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-            {activeScope === 'shared' ? 'No hay notas compartidas aún' : 'No hay notas privadas aún'}
+            {viewMode === 'sheet'
+              ? (activeScope === 'shared' ? 'No hay hojas compartidas aún' : 'No hay hojas privadas aún')
+              : viewMode === 'sticky'
+                ? (activeScope === 'shared' ? 'No hay notas rápidas compartidas aún' : 'No hay notas rápidas privadas aún')
+                : (activeScope === 'shared' ? 'No hay notas compartidas aún' : 'No hay notas privadas aún')}
           </p>
         </div>
       ) : (
@@ -2119,35 +2171,26 @@ export default function NotesModule({
                     </button>
                   </div>
 
-                  {/* Selector de Formato: Nota rápida vs Hoja completa (bloqueado en edición para evitar transformar) */}
-                  {editingNote ? (
-                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold ${
-                      isDarkMode ? 'bg-slate-950 border-slate-800 text-slate-200' : 'bg-slate-100 border-slate-200 text-slate-800'
-                    }`}>
-                      {noteFormat === 'sheet' ? <FileText size={13} className="text-blue-500" /> : <Grid size={13} className="text-amber-500" />}
-                      <span>{noteFormat === 'sheet' ? 'Hoja completa' : 'Nota rápida'}</span>
-                    </span>
-                  ) : (
-                    <div className={`inline-flex p-1 rounded-xl border ${
-                      isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200'
-                    }`}>
-                      {NOTE_FORMATS.map((fmt) => (
-                        <button
-                          key={fmt.id}
-                          type="button"
-                          onClick={() => setNoteFormat(fmt.id)}
-                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                            noteFormat === fmt.id
-                              ? (isDarkMode ? 'bg-slate-800 text-white' : 'bg-white text-slate-900 shadow-2xs')
-                              : 'text-slate-500'
-                          }`}
-                        >
-                          {fmt.id === 'sheet' ? <FileText size={13} /> : <Grid size={13} />}
-                          <span>{fmt.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                  {/* Selector de Formato: Nota rápida vs Hoja completa */}
+                  <div className={`inline-flex p-1 rounded-xl border ${
+                    isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200'
+                  }`}>
+                    {NOTE_FORMATS.map((fmt) => (
+                      <button
+                        key={fmt.id}
+                        type="button"
+                        onClick={() => setNoteFormat(fmt.id)}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                          noteFormat === fmt.id
+                            ? (isDarkMode ? 'bg-slate-800 text-white' : 'bg-white text-slate-900 shadow-2xs')
+                            : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                        }`}
+                      >
+                        {fmt.id === 'sheet' ? <FileText size={13} /> : <Grid size={13} />}
+                        <span>{fmt.label}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {scope === 'shared' && academicGroups.length > 0 && (

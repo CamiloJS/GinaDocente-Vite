@@ -1149,6 +1149,8 @@ export const DEMO_NOTES = [
     fontFamily: 'handwriting',
     fontSize: 'md',
     paperTheme: 'violet',
+    noteFormat: 'sticky',
+    stickyColor: 'purple',
     isPinned: true,
     isLocked: false,
     ownerId: 'invitado',
@@ -1171,6 +1173,17 @@ export const DEMO_NOTES = [
     fontFamily: 'sans',
     fontSize: 'base',
     paperTheme: 'default',
+    noteFormat: 'sheet',
+    sheetStyle: 'lined',
+    pages: [
+      {
+        id: 'p_teach_1',
+        pageNumber: 1,
+        title: 'Retroalimentación del Workshop 1',
+        content: '<p>Puntos a reforzar en la próxima sesión:</p><ul><li>Revisar el uso de <em>unless</em> vs. <em>if not</em> en proyecciones de inflación.</li><li>Felicitar a Laura y Carlos por sus intervenciones en el foro.</li></ul>'
+      }
+    ],
+    pageCount: 1,
     isPinned: true,
     isLocked: false,
     ownerId: 'teacher',
