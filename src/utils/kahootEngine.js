@@ -144,6 +144,7 @@ export function createDefaultKahootQuestion(type = 'quiz', index = 0) {
       text: '',
       imageUrl: '',
       imageReveal: 'none',
+      videoUrl: '',
       timeLimit: 20,
       pointsMultiplier: 1,
       allowMultiple: false,
@@ -165,6 +166,7 @@ export function createDefaultKahootQuestion(type = 'quiz', index = 0) {
       text: '',
       imageUrl: '',
       imageReveal: 'none',
+      videoUrl: '',
       timeLimit: 30,
       pointsMultiplier: 1,
       allowMultiple: false,
@@ -183,6 +185,7 @@ export function createDefaultKahootQuestion(type = 'quiz', index = 0) {
       text: '',
       imageUrl: '',
       imageReveal: 'none',
+      videoUrl: '',
       timeLimit: 30,
       pointsMultiplier: 2,
       allowMultiple: false,
@@ -201,6 +204,7 @@ export function createDefaultKahootQuestion(type = 'quiz', index = 0) {
       text: '',
       imageUrl: '',
       imageReveal: 'none',
+      videoUrl: '',
       timeLimit: 30,
       pointsMultiplier: 2,
       allowMultiple: false,
@@ -218,6 +222,7 @@ export function createDefaultKahootQuestion(type = 'quiz', index = 0) {
     text: '',
     imageUrl: '',
     imageReveal: 'none',
+    videoUrl: '',
     timeLimit: 20,
     pointsMultiplier: 1,
     allowMultiple: false,
@@ -263,6 +268,7 @@ export function normalizeKahootQuestion(raw, index = 0, normOptions = {}) {
   const text = cleanFn(rawTextSource, 500);
   const imageUrl = typeof raw.imageUrl === 'string' ? raw.imageUrl.trim() : '';
   const imageReveal = raw.imageReveal === 'blur' || raw.imageRevealMode === 'blur' ? 'blur' : 'none';
+  const videoUrl = typeof raw.videoUrl === 'string' ? raw.videoUrl.trim() : (typeof raw.video === 'string' ? raw.video.trim() : '');
 
   const rawTime = Number(raw.timeLimit);
   const timeLimit = KAHOOT_TIME_OPTIONS.includes(rawTime)
@@ -298,6 +304,7 @@ export function normalizeKahootQuestion(raw, index = 0, normOptions = {}) {
       question: text,
       imageUrl,
       imageReveal,
+      videoUrl,
       timeLimit,
       pointsMultiplier,
       allowMultiple: false,
@@ -348,6 +355,7 @@ export function normalizeKahootQuestion(raw, index = 0, normOptions = {}) {
       question: text,
       imageUrl,
       imageReveal,
+      videoUrl,
       timeLimit,
       pointsMultiplier,
       allowMultiple: false,
@@ -400,6 +408,7 @@ export function normalizeKahootQuestion(raw, index = 0, normOptions = {}) {
       question: text,
       imageUrl,
       imageReveal,
+      videoUrl,
       timeLimit,
       pointsMultiplier,
       allowMultiple: false,
@@ -450,6 +459,7 @@ export function normalizeKahootQuestion(raw, index = 0, normOptions = {}) {
       question: text,
       imageUrl,
       imageReveal,
+      videoUrl,
       timeLimit,
       pointsMultiplier: rawMult === 0 ? 0 : (rawMult === 1 || rawMult === 1000 ? 1 : 2),
       allowMultiple: false,
@@ -501,6 +511,7 @@ export function normalizeKahootQuestion(raw, index = 0, normOptions = {}) {
     question: text,
     imageUrl,
     imageReveal,
+    videoUrl,
     timeLimit,
     pointsMultiplier,
     allowMultiple,

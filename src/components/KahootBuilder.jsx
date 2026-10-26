@@ -17,7 +17,9 @@ import {
   X,
   Gamepad2,
   HelpCircle,
+  Video,
 } from './Icons.jsx';
+import CustomVideoPlayer from './CustomVideoPlayer.jsx';
 import {
   KAHOOT_COLORS,
   KAHOOT_TIME_OPTIONS,
@@ -29,7 +31,7 @@ import {
   generarKahootConIA,
   detectarIntencionAcertijoIA,
 } from '../utils/kahootEngine.js';
-import { compressImage, uploadImageToStorage, deleteFileFromStorage } from '../utils/helpers.js';
+import { compressImage, uploadImageToStorage, uploadRawFileToStorage, deleteFileFromStorage } from '../utils/helpers.js';
 
 const IDIOMAS_IA = [
   { value: 'en', label: 'Inglés' },
@@ -62,6 +64,8 @@ const KahootBuilder = ({
   const [isGeneratingSingleAi, setIsGeneratingSingleAi] = useState(false);
   const [isUploadingImg, setIsUploadingImg] = useState(false);
   const [showImageUrlInput, setShowImageUrlInput] = useState(false);
+  const [isUploadingVideo, setIsUploadingVideo] = useState(false);
+  const [showVideoUrlInput, setShowVideoUrlInput] = useState(false);
 
   const safeQuestions = Array.isArray(questions) && questions.length > 0
     ? questions
@@ -124,6 +128,9 @@ const KahootBuilder = ({
     if (!isDemoMode && removedQ?.imageUrl && !nextList.some((q) => q?.imageUrl === removedQ.imageUrl)) {
       deleteFileFromStorage(removedQ.imageUrl).catch(() => {});
     }
+    if (!isDemoMode && removedQ?.videoUrl && !nextList.some((q) => q?.videoUrl === removedQ.videoUrl)) {
+      deleteFileFromStorage(removedQ.videoUrl).catch(() => {});
+    }
     setQuestions(nextList);
     setActiveIndex(Math.max(0, Math.min(idx, nextList.length - 1)));
   };
@@ -162,6 +169,7 @@ const KahootBuilder = ({
         text: prev.text,
         imageUrl: prev.imageUrl,
         imageReveal: prev.imageReveal,
+        videoUrl: prev.videoUrl || '',
         timeLimit: newType === 'riddle' && prev.timeLimit < 30 ? 30 : prev.timeLimit,
         pointsMultiplier: prev.pointsMultiplier,
         correctAnswer: carriedCorrectAnswer,
@@ -215,6 +223,41 @@ const KahootBuilder = ({
       showMessage?.('No se pudo subir la imagen.');
     } finally {
       setIsUploadingImg(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  const handleUploadQuestionVideo = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('video/')) {
+      showMessage?.('Por favor selecciona un archivo de video válido (MP4, WebM, MOV, etc.).');
+      return;
+    }
+    setIsUploadingVideo(true);
+    try {
+      const prevVideoUrl = currentQ.videoUrl;
+      if (isDemoMode) {
+        const dummyUrl = URL.createObjectURL(file);
+        updateQuestionAt(safeIdx, { videoUrl: dummyUrl });
+        showMessage?.('Video añadido a la pregunta (Modo Demo).');
+      } else {
+        const url = await uploadRawFileToStorage(file, 'kahoot_videos');
+        if (
+          prevVideoUrl &&
+          prevVideoUrl !== url &&
+          !safeQuestions.some((q, qi) => qi !== safeIdx && q?.videoUrl === prevVideoUrl)
+        ) {
+          deleteFileFromStorage(prevVideoUrl).catch(() => {});
+        }
+        updateQuestionAt(safeIdx, { videoUrl: url });
+        showMessage?.('Video subido exitosamente.');
+      }
+    } catch (err) {
+      console.error('Error subiendo video de Kahoot:', err);
+      showMessage?.('No se pudo subir el video.');
+    } finally {
+      setIsUploadingVideo(false);
       if (e.target) e.target.value = '';
     }
   };
@@ -607,6 +650,7 @@ const KahootBuilder = ({
                     </span>
                   )}
                   {norm.imageUrl && <ImageIcon size={11} className="opacity-80" />}
+                  {norm.videoUrl && <Video size={11} className="text-blue-400 opacity-90" title="Contiene video" />}
                 </div>
                 <span
                   className={`block text-[10px] truncate max-w-[90px] mt-0.5 font-normal ${
@@ -888,7 +932,101 @@ const KahootBuilder = ({
                   <button
                     type="button"
                     onClick={() => setShowImageUrlInput(false)}
-                    className="text-xs font-bold text-gray-500 hover:text-gray-800 px-2"
+                    className="text-xs font-bold text-gray-500 hover:text-gray-800 px-2 cursor-pointer"
+                  >
+                    Listo
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Video de la pregunta (con inicio automático del contador al terminar) */}
+        <div className="p-3 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-800/40">
+          {currentQ.videoUrl ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                  <Video size={15} className="text-blue-500" />
+                  <span>Video adjunto</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const prevUrl = currentQ.videoUrl;
+                    if (
+                      !isDemoMode &&
+                      prevUrl &&
+                      !safeQuestions.some((q, qi) => qi !== safeIdx && q?.videoUrl === prevUrl)
+                    ) {
+                      deleteFileFromStorage(prevUrl).catch(() => {});
+                    }
+                    updateQuestionAt(safeIdx, { videoUrl: '' });
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-red-100 hover:bg-red-200 dark:bg-red-950/40 text-red-600 dark:text-red-400 font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors"
+                  title="Quitar video"
+                >
+                  <X size={12} />
+                  <span>Quitar video</span>
+                </button>
+              </div>
+
+              {/* Vista previa del video */}
+              <div className="max-w-md mx-auto overflow-hidden rounded-2xl shadow-md border border-gray-200 dark:border-gray-700">
+                <CustomVideoPlayer
+                  url={currentQ.videoUrl}
+                  title="Vista previa del video"
+                  isDarkMode={isDarkMode}
+                  className="w-full"
+                />
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 text-[11px] font-semibold text-blue-800 dark:text-blue-200 flex items-start gap-2">
+                <span className="text-base leading-none">⏱️</span>
+                <span>
+                  <strong>Tiempo sincronizado:</strong> En el juego, el contador de tiempo ({currentQ.timeLimit}s) esperará y comenzará a contar <em>automáticamente después de que se termine de reproducir este video</em>.
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                <Video size={15} className="text-blue-500" />
+                <span>Video (opcional)</span>
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="px-3 py-1.5 rounded-xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-xs font-bold text-gray-700 dark:text-gray-200 hover:border-blue-500 cursor-pointer flex items-center gap-1.5 shadow-2xs">
+                  {isUploadingVideo ? <Loader2 size={13} className="animate-spin text-blue-500" /> : <Video size={13} className="text-blue-500" />}
+                  <span>{isUploadingVideo ? 'Subiendo video...' : 'Subir video'}</span>
+                  <input
+                    type="file"
+                    accept="video/*"
+                    className="hidden"
+                    onChange={handleUploadQuestionVideo}
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowVideoUrlInput(!showVideoUrlInput)}
+                  className="px-3 py-1.5 rounded-xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-xs font-bold text-gray-700 dark:text-gray-200 hover:border-blue-500 cursor-pointer flex items-center gap-1"
+                >
+                  <span>Enlace YouTube / URL</span>
+                </button>
+              </div>
+              {showVideoUrlInput && (
+                <div className="w-full flex items-center gap-2 mt-2">
+                  <input
+                    type="url"
+                    value={currentQ.videoUrl || ''}
+                    onChange={(e) => updateQuestionAt(safeIdx, { videoUrl: e.target.value })}
+                    placeholder="https://www.youtube.com/watch?v=... o https://ejemplo.com/video.mp4"
+                    className="flex-1 py-1.5 px-3 text-xs rounded-xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowVideoUrlInput(false)}
+                    className="text-xs font-bold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 px-2 cursor-pointer"
                   >
                     Listo
                   </button>

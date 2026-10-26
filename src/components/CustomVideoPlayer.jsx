@@ -21,10 +21,31 @@ export const isDirectVideoUrl = (url) => {
     || (cleanUrl.includes('firebasestorage.googleapis.com') && (cleanUrl.includes('video') || cleanUrl.includes('.mp4') || cleanUrl.includes('.webm') || cleanUrl.includes('.mov')));
 };
 
-const CustomVideoPlayer = ({ src, url, videoId: propVideoId, title = "Video de la clase", isDarkMode = false, className = "" }) => {
+const CustomVideoPlayer = ({ src, url, videoId: propVideoId, title = "Video de la clase", isDarkMode = false, className = "", onEnded = null, autoPlay = false }) => {
   const videoSource = src || url;
   const ytId = propVideoId || extractYouTubeId(videoSource);
   const isDirectVideo = !ytId && isDirectVideoUrl(videoSource);
+
+  // Listener para eventos de finalización de YouTube (enablejsapi=1)
+  useEffect(() => {
+    if (!ytId || typeof window === 'undefined' || typeof onEnded !== 'function') return undefined;
+    const handleMessage = (e) => {
+      try {
+        let data = e.data;
+        if (typeof data === 'string') {
+          try { data = JSON.parse(data); } catch (err) {}
+        }
+        // YouTube PlayerState.ENDED === 0
+        if (data && (data.event === 'onStateChange' || data.info !== undefined)) {
+          if (data.info === 0) {
+            onEnded();
+          }
+        }
+      } catch (err) {}
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [ytId, onEnded]);
 
   // Estados para reproductor HTML5 nativo
   const videoRef = useRef(null);
@@ -157,7 +178,7 @@ const CustomVideoPlayer = ({ src, url, videoId: propVideoId, title = "Video de l
         {/* Video Frame limpio sin encabezados ni marcos redundantes */}
         <div className="relative aspect-video w-full bg-black">
           <iframe
-            src={`https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&iv_load_policy=3&playsinline=1&controls=1`}
+            src={`https://www.youtube-nocookie.com/embed/${ytId}?enablejsapi=1&rel=0&modestbranding=1&iv_load_policy=3&playsinline=1&controls=1${autoPlay ? '&autoplay=1' : ''}`}
             title={title || "Video"}
             className="w-full h-full border-0"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -189,9 +210,13 @@ const CustomVideoPlayer = ({ src, url, videoId: propVideoId, title = "Video de l
           onWaiting={() => setIsLoading(true)}
           onPlaying={() => { setIsLoading(false); setIsPlaying(true); }}
           onPause={() => setIsPlaying(false)}
-          onEnded={() => setIsPlaying(false)}
+          onEnded={() => {
+            setIsPlaying(false);
+            if (typeof onEnded === 'function') onEnded();
+          }}
           className="w-full aspect-video object-contain cursor-pointer"
           playsInline
+          autoPlay={autoPlay}
         />
 
         {/* Spinner de carga */}

@@ -86,6 +86,26 @@ check('normalizeKahootQuestion corrige timeLimit invalido a 20s', normInvalid.ti
 check('normalizeKahootQuestion corrige pointsMultiplier invalido a 1 (estandar)', normInvalid.pointsMultiplier === 1);
 check('normalizeKahootQuestion garantiza al menos 1 opcion correcta en quiz', normInvalid.options.some(o => o.isCorrect));
 
+check('createDefaultKahootQuestion inicializa videoUrl vacio en todos los tipos', 
+  qQuiz.videoUrl === '' && qTF.videoUrl === '' && qType.videoUrl === '' && qPuzzle.videoUrl === ''
+);
+
+const normVideoQ = normalizeKahootQuestion({
+  type: 'quiz',
+  question: 'Watch this clip and answer',
+  videoUrl: '  https://www.youtube.com/watch?v=dQw4w9WgXcQ  ',
+  options: [{ text: 'Yes', isCorrect: true }, { text: 'No', isCorrect: false }]
+}, 0);
+check('normalizeKahootQuestion preserva y limpia videoUrl', normVideoQ.videoUrl === 'https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+
+const normVideoPuzzle = normalizeKahootQuestion({
+  type: 'puzzle',
+  question: 'Order the steps shown in the video',
+  videoUrl: 'https://example.com/clip.mp4',
+  puzzleItems: ['Step A', 'Step B']
+}, 1);
+check('normalizeKahootQuestion preserva videoUrl en preguntas tipo puzzle', normVideoPuzzle.videoUrl === 'https://example.com/clip.mp4');
+
 console.log('\n== 3. Validacion de Configuracion del Kahoot ==');
 check('rechaza lista vacia de preguntas', validateKahootConfig([]).valid === false);
 check('rechaza pregunta con enunciado vacio', validateKahootConfig([createDefaultKahootQuestion('quiz', 0)]).valid === false);

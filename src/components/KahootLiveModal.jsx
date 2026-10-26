@@ -34,7 +34,9 @@ import {
   Unlock,
   Share2,
   HelpCircle,
+  Video,
 } from './Icons.jsx';
+import CustomVideoPlayer from './CustomVideoPlayer.jsx';
 import {
   KAHOOT_COLORS,
   KAHOOT_AVATARS,
@@ -338,6 +340,16 @@ const KahootLiveModal = ({
   const activeDuration = Number(currentQuestion?.timeLimit || kahoot.questionDuration || 20);
   const currentRoundKey = `${viewMode}_${activeQIndex}_${activeStartedAt}`;
 
+  // Determina si la pregunta actual tiene un video que aún se está reproduciendo
+  // (en este estado el contador de tiempo espera y no comienza a contar hasta que el video termine)
+  const isVideoPlaying = Boolean(
+    currentQuestion?.videoUrl &&
+    rawPhase === 'question' &&
+    (viewMode === 'solo'
+      ? (soloState.videoPlaying || soloState.startedAt <= 0)
+      : (kahoot.videoPlaying === true || (activeStartedAt <= 0 && kahoot.videoEndedRoundKey !== currentRoundKey)))
+  );
+
   // Marca de tiempo de la primera respuesta correcta en preguntas de tipo Acertijo (riddle)
   const activeFirstCorrectAt = useMemo(() => {
     if (viewMode === 'solo') {
@@ -373,7 +385,7 @@ const KahootLiveModal = ({
   const roundLocalStartMapRef = useRef({});
   if (rawPhase === 'question' && !roundLocalStartMapRef.current[currentRoundKey]) {
     const nowLocal = Date.now();
-    if (sawNonQuestionPhaseRef.current || viewMode === 'solo' || activeStartedAt <= 0) {
+    if (sawNonQuestionPhaseRef.current || viewMode === 'solo' || activeStartedAt <= 0 || isVideoPlaying) {
       roundLocalStartMapRef.current[currentRoundKey] = nowLocal;
     } else {
       // El estudiante abrió el modal cuando la pregunta ya estaba en curso:
@@ -475,6 +487,40 @@ const KahootLiveModal = ({
     },
     [isDemoTask, db, appId, syncTaskToParent]
   );
+
+  // Inicia el contador de tiempo de la pregunta una vez que el video termina (o si el anfitrión/jugador decide omitirlo)
+  const handleStartTimerAfterVideo = useCallback(async () => {
+    const now = Date.now();
+    const dur = Number(currentQuestion?.timeLimit) || 20;
+    const newRoundKey = `${viewMode}_${activeQIndex}_${now}`;
+    roundLocalStartMapRef.current[newRoundKey] = now;
+    remainingSecondsRef.current = dur;
+    setTimerState({ roundKey: newRoundKey, seconds: dur });
+
+    if (viewMode === 'solo') {
+      setSoloState((prev) => ({
+        ...prev,
+        startedAt: now,
+        videoPlaying: false,
+      }));
+      return;
+    }
+
+    if (canControlGame) {
+      await updateKahootState(
+        {
+          videoPlaying: false,
+          questionStartedAt: now,
+          videoEndedRoundKey: newRoundKey,
+        },
+        {
+          'kahoot.videoPlaying': false,
+          'kahoot.questionStartedAt': now,
+          'kahoot.videoEndedRoundKey': newRoundKey,
+        }
+      );
+    }
+  }, [currentQuestion, viewMode, activeQIndex, canControlGame, updateKahootState]);
 
   // Auto-registrar participante al entrar a la sala en vivo (si es estudiante o bots en Modo Demo)
   const hasAutoJoinedRef = useRef(false);
@@ -851,6 +897,14 @@ const KahootLiveModal = ({
     if (!isOpen || activePhase !== 'question') return undefined;
 
     const roundKey = `${viewMode}_${activeQIndex}_${activeStartedAt}`;
+
+    // Si la pregunta tiene video y aún se está reproduciendo, el contador espera
+    if (isVideoPlaying) {
+      remainingSecondsRef.current = activeDuration;
+      setTimerState({ roundKey, seconds: activeDuration });
+      return undefined;
+    }
+
     if (!roundLocalStartMapRef.current[roundKey]) {
       roundLocalStartMapRef.current[roundKey] = Date.now();
     }
@@ -876,7 +930,7 @@ const KahootLiveModal = ({
     tickTimer();
     const interval = setInterval(tickTimer, 100);
     return () => clearInterval(interval);
-  }, [isOpen, viewMode, activePhase, activeQIndex, activeStartedAt, activeDuration, triggerRoundEndWithGong]);
+  }, [isOpen, viewMode, activePhase, activeQIndex, activeStartedAt, activeDuration, isVideoPlaying, triggerRoundEndWithGong]);
 
   // Si todos los participantes conectados ya respondieron en vivo, revelar de inmediato sin demora
   useEffect(() => {
@@ -1108,7 +1162,11 @@ const KahootLiveModal = ({
     if (activePhase === 'lobby') {
       startLobbyMusic();
     } else if (activePhase === 'question') {
-      startTensionMusic(() => remainingSecondsRef.current);
+      if (isVideoPlaying) {
+        stopKahootMusic();
+      } else {
+        startTensionMusic(() => remainingSecondsRef.current);
+      }
     } else if (activePhase === 'revealed') {
       stopKahootMusic();
       if (myLiveAnswer && lastPlayedRevealRoundRef.current !== currentRoundKey) {
@@ -1141,7 +1199,7 @@ const KahootLiveModal = ({
       if (revealSoundTimer) clearTimeout(revealSoundTimer);
       stopKahootMusic();
     };
-  }, [isOpen, viewMode, activePhase, activeQIndex, currentRoundKey, soundMuted, myLiveAnswer, kahoot.finishedAt, soloState.startedAt]);
+  }, [isOpen, viewMode, activePhase, activeQIndex, currentRoundKey, soundMuted, myLiveAnswer, kahoot.finishedAt, soloState.startedAt, isVideoPlaying]);
 
   // Limpiar audio y temporizadores al desmontar
   useEffect(() => () => {
@@ -1155,7 +1213,7 @@ const KahootLiveModal = ({
   // Enviar respuesta del participante
   const handleSubmitAnswer = async (submissionPayload) => {
     const roundKey = `${viewMode}_${activeQIndex}_${activeStartedAt}`;
-    if (!currentQuestion || myLiveAnswer || activePhase !== 'question' || submittingRoundRef.current === roundKey) return;
+    if (!currentQuestion || myLiveAnswer || activePhase !== 'question' || submittingRoundRef.current === roundKey || isVideoPlaying) return;
     submittingRoundRef.current = roundKey;
 
     if (!soundMutedRef.current) {
@@ -1358,12 +1416,15 @@ const KahootLiveModal = ({
     if (!targetQ) return;
     const now = Date.now();
     const dur = Number(targetQ.timeLimit) || 20;
-    const nextRoundKey = `live_${indexToStart}_${now}`;
+    const hasVideo = Boolean(targetQ.videoUrl);
+    const nextRoundKey = `live_${indexToStart}_${hasVideo ? 0 : now}`;
     gongTriggeredForRoundRef.current = '';
     submittingRoundRef.current = '';
     setGongBannerVisible(false);
     setLocalRevealedRoundKey('');
-    roundLocalStartMapRef.current[nextRoundKey] = now;
+    if (!hasVideo) {
+      roundLocalStartMapRef.current[nextRoundKey] = now;
+    }
     setTimerState({ roundKey: nextRoundKey, seconds: dur });
     remainingSecondsRef.current = dur;
 
@@ -1371,7 +1432,9 @@ const KahootLiveModal = ({
       status: 'live',
       phase: 'question',
       currentQuestionIndex: indexToStart,
-      questionStartedAt: now,
+      questionStartedAt: hasVideo ? 0 : now,
+      videoPlaying: hasVideo,
+      videoEndedRoundKey: '',
       questionDuration: dur,
       firstCorrectAt: null,
       firstCorrectRoundKey: nextRoundKey,
@@ -1380,7 +1443,9 @@ const KahootLiveModal = ({
       'kahoot.status': 'live',
       'kahoot.phase': 'question',
       'kahoot.currentQuestionIndex': indexToStart,
-      'kahoot.questionStartedAt': now,
+      'kahoot.questionStartedAt': hasVideo ? 0 : now,
+      'kahoot.videoPlaying': hasVideo,
+      'kahoot.videoEndedRoundKey': '',
       'kahoot.questionDuration': dur,
       'kahoot.firstCorrectAt': null,
       'kahoot.firstCorrectRoundKey': nextRoundKey,
@@ -1417,17 +1482,19 @@ const KahootLiveModal = ({
         const nextIdx = soloState.qIndex + 1;
         const dur = Number(questions[nextIdx]?.timeLimit) || 20;
         const now = Date.now();
+        const hasNextVideo = Boolean(questions[nextIdx]?.videoUrl);
         gongTriggeredForRoundRef.current = '';
         submittingRoundRef.current = '';
         setGongBannerVisible(false);
         setLocalRevealedRoundKey('');
-        setTimerState({ roundKey: `solo_${nextIdx}_${now}`, seconds: dur });
+        setTimerState({ roundKey: `solo_${nextIdx}_${hasNextVideo ? 0 : now}`, seconds: dur });
         remainingSecondsRef.current = dur;
         setSoloState((prev) => ({
           ...prev,
           qIndex: nextIdx,
           phase: 'question',
-          startedAt: now,
+          startedAt: hasNextVideo ? 0 : now,
+          videoPlaying: hasNextVideo,
           firstCorrectAt: null,
         }));
       } else {
@@ -1466,6 +1533,8 @@ const KahootLiveModal = ({
       'kahoot.phase': 'lobby',
       'kahoot.currentQuestionIndex': 0,
       'kahoot.questionStartedAt': 0,
+      'kahoot.videoPlaying': false,
+      'kahoot.videoEndedRoundKey': '',
       'kahoot.firstCorrectAt': null,
       'kahoot.firstCorrectRoundKey': null,
     };
@@ -1554,17 +1623,19 @@ const KahootLiveModal = ({
     }
     const firstDur = Number(questions[0]?.timeLimit) || 20;
     const now = Date.now();
+    const hasFirstVideo = Boolean(questions[0]?.videoUrl);
     gongTriggeredForRoundRef.current = '';
     submittingRoundRef.current = '';
     setGongBannerVisible(false);
     setLocalRevealedRoundKey('');
-    setTimerState({ roundKey: `solo_0_${now}`, seconds: firstDur });
+    setTimerState({ roundKey: `solo_0_${hasFirstVideo ? 0 : now}`, seconds: firstDur });
     remainingSecondsRef.current = firstDur;
     setSoloState({
       active: true,
       qIndex: 0,
       phase: 'question',
-      startedAt: now,
+      startedAt: hasFirstVideo ? 0 : now,
+      videoPlaying: hasFirstVideo,
       score: 0,
       streak: 0,
       correctCount: 0,
@@ -1936,6 +2007,16 @@ const KahootLiveModal = ({
                       )}
                     </div>
 
+                    {q.videoUrl && (
+                      <div className="flex justify-center max-w-xl mx-auto w-full rounded-2xl overflow-hidden aspect-video bg-black/40 border border-white/20">
+                        <CustomVideoPlayer
+                          url={q.videoUrl}
+                          title={q.text}
+                          autoPlay={false}
+                        />
+                      </div>
+                    )}
+
                     {q.imageUrl && (
                       <div className="flex justify-center">
                         <img loading="lazy" decoding="async"
@@ -2274,16 +2355,23 @@ const KahootLiveModal = ({
 
                 {/* Reloj circular central y contador de respuestas */}
                 <div className="flex items-center gap-3">
-                  <div
-                    className={`px-3.5 py-1.5 rounded-2xl font-black text-base sm:text-lg flex items-center gap-1.5 border shadow-lg ${
-                      remainingSeconds <= 5
-                        ? 'bg-red-600 border-red-300 text-white scale-105'
-                        : 'bg-white text-[#46178F] border-white'
-                    }`}
-                  >
-                    <Clock size={16} />
-                    <span>{Math.ceil(remainingSeconds)}s</span>
-                  </div>
+                  {isVideoPlaying ? (
+                    <div className="px-3.5 py-1.5 rounded-2xl font-black text-xs sm:text-sm flex items-center gap-1.5 border shadow-lg bg-blue-600 border-blue-400 text-white animate-pulse">
+                      <Video size={16} />
+                      <span>Video ({activeDuration}s al terminar)</span>
+                    </div>
+                  ) : (
+                    <div
+                      className={`px-3.5 py-1.5 rounded-2xl font-black text-base sm:text-lg flex items-center gap-1.5 border shadow-lg ${
+                        remainingSeconds <= 5
+                          ? 'bg-red-600 border-red-300 text-white scale-105'
+                          : 'bg-white text-[#46178F] border-white'
+                      }`}
+                    >
+                      <Clock size={16} />
+                      <span>{Math.ceil(remainingSeconds)}s</span>
+                    </div>
+                  )}
 
                   {viewMode === 'live' && (
                     <div className="px-3 py-1.5 rounded-xl bg-white/15 border border-white/20 text-xs font-extrabold">
@@ -2314,7 +2402,7 @@ const KahootLiveModal = ({
               )}
             </div>
 
-            {/* Tarjeta del Enunciado e Imagen de la Pregunta (blindada contra Modo Oscuro) */}
+            {/* Tarjeta del Enunciado e Imagen/Video de la Pregunta (blindada contra Modo Oscuro) */}
             <div
               className="kahoot-question-card p-6 sm:p-8 rounded-3xl bg-white text-[#0f172a] shadow-2xl text-center space-y-4 border-4 border-purple-300/40"
               style={{ backgroundColor: '#ffffff', color: '#0f172a' }}
@@ -2325,6 +2413,36 @@ const KahootLiveModal = ({
               >
                 {currentQuestion.text}
               </h3>
+
+              {currentQuestion.videoUrl && (
+                <div className="flex flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl bg-black border border-gray-200 p-1 sm:p-2">
+                  <div className="w-full max-w-2xl aspect-video rounded-xl overflow-hidden shadow-lg">
+                    <CustomVideoPlayer
+                      url={currentQuestion.videoUrl}
+                      title={currentQuestion.text}
+                      autoPlay={true}
+                      onEnded={handleStartTimerAfterVideo}
+                    />
+                  </div>
+                  {isVideoPlaying && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 w-full max-w-2xl px-2 py-1 bg-black/60 rounded-xl text-xs text-white">
+                      <div className="flex items-center gap-1.5 text-blue-300 font-bold">
+                        <Video size={14} className="animate-pulse" />
+                        <span>Reproduciendo video... El contador de {activeDuration}s iniciará al finalizar.</span>
+                      </div>
+                      {(canControlGame || viewMode === 'solo') && (
+                        <button
+                          type="button"
+                          onClick={handleStartTimerAfterVideo}
+                          className="px-3 py-1 rounded-lg bg-blue-500 hover:bg-blue-400 text-white font-extrabold text-xs cursor-pointer shadow transition-all hover:scale-105"
+                        >
+                          Iniciar tiempo ahora
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {currentQuestion.imageUrl && (
                 <div className="flex justify-center overflow-hidden rounded-2xl bg-gray-100 border border-gray-200 max-h-64">
@@ -2440,6 +2558,16 @@ const KahootLiveModal = ({
                  interactivas en lista vertical.
                  ================================================================= */
               <>
+                {/* Banner de video en reproducción */}
+                {isVideoPlaying && (
+                  <div className="p-3.5 rounded-2xl bg-blue-600/30 border-2 border-blue-400 text-white flex items-center justify-center gap-2 shadow-lg animate-pulse">
+                    <Video size={18} className="text-blue-300 shrink-0" />
+                    <span className="font-black text-xs sm:text-sm">
+                      Mira el video con atención. El contador iniciará tan pronto termine el video.
+                    </span>
+                  </div>
+                )}
+
                 {/* Estado de espera si el estudiante ya respondió */}
                 {myLiveAnswer && (
                   <div className="p-3.5 rounded-2xl bg-emerald-500/25 border-2 border-emerald-400 text-center animate-in zoom-in-95">
@@ -2492,7 +2620,7 @@ const KahootLiveModal = ({
                         <button
                           key={opt.id || oIdx}
                           type="button"
-                          disabled={Boolean(myLiveAnswer)}
+                          disabled={Boolean(myLiveAnswer) || isVideoPlaying}
                           onClick={() => {
                             if (currentQuestion.allowMultiple) {
                               setSelectedMultiIndices((prev) =>
@@ -2511,9 +2639,11 @@ const KahootLiveModal = ({
                               ? isLockedSelection
                                 ? 'ring-4 ring-white scale-[1.01]'
                                 : 'opacity-45 cursor-not-allowed'
-                              : isMultiSelected
-                                ? 'ring-4 ring-white scale-[1.01]'
-                                : 'hover:scale-[1.01] active:scale-[0.99] cursor-pointer'
+                              : isVideoPlaying
+                                ? 'opacity-65 cursor-not-allowed'
+                                : isMultiSelected
+                                  ? 'ring-4 ring-white scale-[1.01]'
+                                  : 'hover:scale-[1.01] active:scale-[0.99] cursor-pointer'
                           }`}
                         >
                           <div className="flex items-center gap-3.5 min-w-0 flex-1">
@@ -2537,7 +2667,7 @@ const KahootLiveModal = ({
                     {currentQuestion.allowMultiple && !myLiveAnswer && (
                       <button
                         type="button"
-                        disabled={selectedMultiIndices.length === 0}
+                        disabled={selectedMultiIndices.length === 0 || isVideoPlaying}
                         onClick={() =>
                           handleSubmitAnswer({
                             optionIndex: selectedMultiIndices[0],
@@ -2567,7 +2697,7 @@ const KahootLiveModal = ({
                     <form
                       onSubmit={(e) => {
                         e.preventDefault();
-                        if (!typedAnswerText.trim()) return;
+                        if (!typedAnswerText.trim() || isVideoPlaying) return;
                         handleSubmitAnswer({ textAnswer: typedAnswerText.trim() });
                       }}
                       className="flex flex-col sm:flex-row gap-3 w-full"
@@ -2575,15 +2705,16 @@ const KahootLiveModal = ({
                       <input
                         type="text"
                         value={typedAnswerText}
+                        disabled={isVideoPlaying}
                         onChange={(e) => setTypedAnswerText(e.target.value)}
-                        placeholder="Escribe tu respuesta aquí..."
+                        placeholder={isVideoPlaying ? "Espera a que termine el video..." : "Escribe tu respuesta aquí..."}
                         style={{ backgroundColor: '#ffffff', color: '#0f172a' }}
-                        className="kahoot-light-input flex-1 py-4 px-5 rounded-2xl bg-white text-[#0f172a] font-black text-base outline-none ring-4 ring-purple-400/40 focus:ring-amber-400"
+                        className="kahoot-light-input flex-1 py-4 px-5 rounded-2xl bg-white text-[#0f172a] font-black text-base outline-none ring-4 ring-purple-400/40 focus:ring-amber-400 disabled:opacity-60"
                         autoFocus
                       />
                       <button
                         type="submit"
-                        disabled={!typedAnswerText.trim()}
+                        disabled={!typedAnswerText.trim() || isVideoPlaying}
                         className="px-8 py-4 rounded-2xl bg-emerald-400 hover:bg-emerald-300 disabled:opacity-40 text-gray-950 font-black text-base shadow-xl cursor-pointer"
                       >
                         Enviar
@@ -2621,7 +2752,7 @@ const KahootLiveModal = ({
                             <div className="flex items-center gap-1 shrink-0">
                               <button
                                 type="button"
-                                disabled={idx === 0}
+                                disabled={idx === 0 || isVideoPlaying}
                                 onClick={() => {
                                   const copy = [...puzzleOrderDraft];
                                   const [moved] = copy.splice(idx, 1);
@@ -2634,7 +2765,7 @@ const KahootLiveModal = ({
                               </button>
                               <button
                                 type="button"
-                                disabled={idx === puzzleOrderDraft.length - 1}
+                                disabled={idx === puzzleOrderDraft.length - 1 || isVideoPlaying}
                                 onClick={() => {
                                   const copy = [...puzzleOrderDraft];
                                   const [moved] = copy.splice(idx, 1);
@@ -2653,8 +2784,9 @@ const KahootLiveModal = ({
                     {!myLiveAnswer && (
                       <button
                         type="button"
+                        disabled={isVideoPlaying}
                         onClick={() => handleSubmitAnswer({ puzzleOrder: puzzleOrderDraft })}
-                        className="w-full py-3.5 rounded-2xl bg-emerald-400 hover:bg-emerald-300 text-gray-950 font-black text-sm shadow-xl cursor-pointer"
+                        className="w-full py-3.5 rounded-2xl bg-emerald-400 hover:bg-emerald-300 disabled:opacity-40 text-gray-950 font-black text-sm shadow-xl cursor-pointer"
                       >
                         Confirmar orden
                       </button>
@@ -2677,24 +2809,24 @@ const KahootLiveModal = ({
                     <form
                       onSubmit={(e) => {
                         e.preventDefault();
-                        if (!typedAnswerText.trim() || isRiddleLockedForMe) return;
+                        if (!typedAnswerText.trim() || isRiddleLockedForMe || isVideoPlaying) return;
                         handleSubmitAnswer({ textAnswer: typedAnswerText.trim() });
                       }}
                       className="flex flex-col sm:flex-row gap-3 w-full"
                     >
                       <input
                         type="text"
-                        disabled={isRiddleLockedForMe}
+                        disabled={isRiddleLockedForMe || isVideoPlaying}
                         value={typedAnswerText}
                         onChange={(e) => setTypedAnswerText(e.target.value)}
-                        placeholder="Escribe la respuesta del acertijo..."
+                        placeholder={isVideoPlaying ? "Espera a que termine el video..." : "Escribe la respuesta del acertijo..."}
                         style={{ backgroundColor: '#ffffff', color: '#0f172a' }}
                         className="kahoot-light-input flex-1 py-4 px-5 rounded-2xl bg-white text-[#0f172a] font-black text-base outline-none ring-4 ring-purple-400/40 focus:ring-amber-400 disabled:opacity-50"
                         autoFocus
                       />
                       <button
                         type="submit"
-                        disabled={!typedAnswerText.trim() || isRiddleLockedForMe}
+                        disabled={!typedAnswerText.trim() || isRiddleLockedForMe || isVideoPlaying}
                         className="px-8 py-4 rounded-2xl bg-emerald-400 hover:bg-emerald-300 disabled:opacity-40 text-gray-950 font-black text-base shadow-xl cursor-pointer"
                       >
                         Enviar
