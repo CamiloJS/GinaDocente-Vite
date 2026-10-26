@@ -1349,7 +1349,7 @@ export default function NotesModule({
             }`}
           >
             <FileText size={14} className="text-blue-500" />
-            <span>+ Hoja completa</span>
+            <span>Hoja completa</span>
           </button>
 
           <button
@@ -1357,8 +1357,8 @@ export default function NotesModule({
             onClick={() => handleOpenNewNote(activeScope, 'sticky')}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-sm transition-all active:scale-95 cursor-pointer"
           >
-            <Plus size={15} />
-            <span>+ Nota rápida</span>
+            <Grid size={14} />
+            <span>Nota rápida</span>
           </button>
         </div>
       </div>
