@@ -43,8 +43,9 @@ import {
   ChevronDown, ChevronUp, Minus, HelpCircle, Lightbulb, GraduationCap, Laptop, PenTool,
   Compass, Atom, Award, Star, Bookmark, Terminal, Folder, Globe, Target, Layers, RotateCcw,
   Archive, ShieldAlert, Unlock, Menu, UserPlus, Camera, Upload, Phone, PhoneOff,
-  Lock, Key, ClipboardList, BarChart3, Music, Video, Film
+  Lock, Key, ClipboardList, BarChart3, Music, Video, Film, Timer, Coins, Calculator
 } from './components/Icons.jsx'
+import FloatingToolsOverlay from './components/FloatingToolsOverlay.jsx'
 import AudioPlayer, { AudioRecordingVisualizer } from './components/AudioPlayer.jsx'
 import AudioCall from './components/AudioCall.jsx'
 import { playRingtone, stopRingtone, playSuccessChime } from './utils/callSounds.js'
@@ -471,6 +472,32 @@ function App() {
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, message: "", onConfirm: null });
   const [globalGifCallback, setGlobalGifCallback] = useState(null);
   window.openGifPicker = (cb) => setGlobalGifCallback(() => cb);
+
+  // Herramientas Flotantes (Moneda, Temporizador, Calculadora)
+  const [floatingTools, setFloatingTools] = useState({
+    timer: false,
+    coin: false,
+    calculator: false
+  });
+  const [minimizedFloatingTools, setMinimizedFloatingTools] = useState({
+    timer: false,
+    coin: false,
+    calculator: false
+  });
+
+  const openFloatingTool = useCallback((toolId) => {
+    setFloatingTools(prev => ({ ...prev, [toolId]: true }));
+    setMinimizedFloatingTools(prev => ({ ...prev, [toolId]: false }));
+  }, []);
+
+  const closeFloatingTool = useCallback((toolId) => {
+    setFloatingTools(prev => ({ ...prev, [toolId]: false }));
+    setMinimizedFloatingTools(prev => ({ ...prev, [toolId]: false }));
+  }, []);
+
+  const toggleMinimizeFloatingTool = useCallback((toolId) => {
+    setMinimizedFloatingTools(prev => ({ ...prev, [toolId]: !prev[toolId] }));
+  }, []);
 
   const [mobileProfileMenuOpen, setMobileProfileMenuOpen] = useState(false);
   const mobileProfileMenuRef = useRef(null);
@@ -14728,9 +14755,100 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                                   )}
                               </button>
                               {role === 'teacher' && (
-                                  <button onClick={() => changeTab('tools')} className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-bold rounded-xl transition-colors ${activeTab === 'tools' ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' : isDarkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-100 text-gray-700'}`}>
-                                      <Wrench size={18} className="text-amber-500" /> Herramientas
-                                  </button>
+                                  <div className="space-y-1">
+                                      <button onClick={() => changeTab('tools')} className={`w-full flex items-center justify-between px-2.5 py-1.5 text-xs font-bold rounded-xl transition-colors ${activeTab === 'tools' ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' : isDarkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-100 text-gray-700'}`}>
+                                          <span className="flex items-center gap-2.5">
+                                              <Wrench size={18} className="text-amber-500" /> Herramientas
+                                          </span>
+                                      </button>
+                                      {/* Acciones flotantes rápidas */}
+                                      <div className="grid grid-cols-3 gap-1 px-1 py-0.5">
+                                          <button
+                                              type="button"
+                                              onClick={() => openFloatingTool('timer')}
+                                              className={`py-1 px-1.5 rounded-lg text-[10px] font-bold border flex items-center justify-center gap-1 transition-all active:scale-95 ${
+                                                  floatingTools.timer
+                                                      ? 'bg-amber-500 text-white border-amber-500 shadow-2xs'
+                                                      : isDarkMode ? 'bg-gray-800/80 text-gray-300 border-gray-700 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'
+                                              }`}
+                                              title="Abrir Temporizador flotante"
+                                          >
+                                              <Timer size={11} className={floatingTools.timer ? 'text-white' : 'text-amber-500'} />
+                                              <span>Timer</span>
+                                          </button>
+                                          <button
+                                              type="button"
+                                              onClick={() => openFloatingTool('coin')}
+                                              className={`py-1 px-1.5 rounded-lg text-[10px] font-bold border flex items-center justify-center gap-1 transition-all active:scale-95 ${
+                                                  floatingTools.coin
+                                                      ? 'bg-orange-500 text-white border-orange-500 shadow-2xs'
+                                                      : isDarkMode ? 'bg-gray-800/80 text-gray-300 border-gray-700 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'
+                                              }`}
+                                              title="Abrir Moneda 3D flotante"
+                                          >
+                                              <Coins size={11} className={floatingTools.coin ? 'text-white' : 'text-orange-500'} />
+                                              <span>Moneda</span>
+                                          </button>
+                                          <button
+                                              type="button"
+                                              onClick={() => openFloatingTool('calculator')}
+                                              className={`py-1 px-1.5 rounded-lg text-[10px] font-bold border flex items-center justify-center gap-1 transition-all active:scale-95 ${
+                                                  floatingTools.calculator
+                                                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
+                                                      : isDarkMode ? 'bg-gray-800/80 text-gray-300 border-gray-700 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'
+                                              }`}
+                                              title="Abrir Calculadora flotante"
+                                          >
+                                              <Calculator size={11} className={floatingTools.calculator ? 'text-white' : 'text-indigo-500'} />
+                                              <span>Calc</span>
+                                          </button>
+                                      </div>
+                                  </div>
+                              )}
+                              {role !== 'teacher' && (
+                                  <div className="pt-1">
+                                      <div className="grid grid-cols-3 gap-1 px-1 py-0.5">
+                                          <button
+                                              type="button"
+                                              onClick={() => openFloatingTool('timer')}
+                                              className={`py-1 px-1.5 rounded-lg text-[10px] font-bold border flex items-center justify-center gap-1 transition-all active:scale-95 ${
+                                                  floatingTools.timer
+                                                      ? 'bg-amber-500 text-white border-amber-500 shadow-2xs'
+                                                      : isDarkMode ? 'bg-gray-800/80 text-gray-300 border-gray-700 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'
+                                              }`}
+                                              title="Temporizador flotante"
+                                          >
+                                              <Timer size={11} className={floatingTools.timer ? 'text-white' : 'text-amber-500'} />
+                                              <span>Timer</span>
+                                          </button>
+                                          <button
+                                              type="button"
+                                              onClick={() => openFloatingTool('coin')}
+                                              className={`py-1 px-1.5 rounded-lg text-[10px] font-bold border flex items-center justify-center gap-1 transition-all active:scale-95 ${
+                                                  floatingTools.coin
+                                                      ? 'bg-orange-500 text-white border-orange-500 shadow-2xs'
+                                                      : isDarkMode ? 'bg-gray-800/80 text-gray-300 border-gray-700 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'
+                                              }`}
+                                              title="Moneda 3D flotante"
+                                          >
+                                              <Coins size={11} className={floatingTools.coin ? 'text-white' : 'text-orange-500'} />
+                                              <span>Moneda</span>
+                                          </button>
+                                          <button
+                                              type="button"
+                                              onClick={() => openFloatingTool('calculator')}
+                                              className={`py-1 px-1.5 rounded-lg text-[10px] font-bold border flex items-center justify-center gap-1 transition-all active:scale-95 ${
+                                                  floatingTools.calculator
+                                                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
+                                                      : isDarkMode ? 'bg-gray-800/80 text-gray-300 border-gray-700 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'
+                                              }`}
+                                              title="Calculadora flotante"
+                                          >
+                                              <Calculator size={11} className={floatingTools.calculator ? 'text-white' : 'text-indigo-500'} />
+                                              <span>Calc</span>
+                                          </button>
+                                      </div>
+                                  </div>
                               )}
                           </div>
 
@@ -14873,6 +14991,8 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                               isDemoMode={isDemoMode}
                               myChatId={myChatId}
                               loggedInName={loggedInName}
+                              onOpenFloatingTool={openFloatingTool}
+                              activeFloatingTools={floatingTools}
                           />
                       )}
                   </main>
@@ -18375,6 +18495,16 @@ Bot:`;
                   , document.body)}
 
                   {/* 👆 HASTA AQUÍ 👆 */}
+
+                  {/* HERRAMIENTAS FLOTANTES (Moneda, Temporizador, Calculadora) */}
+                  <FloatingToolsOverlay
+                      isDarkMode={isDarkMode}
+                      activeTools={floatingTools}
+                      minimizedTools={minimizedFloatingTools}
+                      onCloseTool={closeFloatingTool}
+                      onToggleMinimize={toggleMinimizeFloatingTool}
+                      onOpenTool={openFloatingTool}
+                  />
 
             </div>
           );

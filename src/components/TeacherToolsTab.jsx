@@ -6,260 +6,19 @@ import {
   Timer, Dices, Coins, Shuffle, Play, Pause, RotateCcw, Plus, Minus,
   UsersGroupIcon, Users, CheckCheck, Copy, Volume2, VolumeX, Sparkles,
   ArrowRightIcon, CheckCircle2, ChevronRight, ChevronLeft, BookOpen, X, Wrench, Clock,
-  Target, Bell
+  Target, Bell, ExternalLink, Calculator
 } from './Icons.jsx';
 import OvaStudioTool from './OvaStudioTool.jsx';
-
-// Shared AudioContext Singleton to avoid hitting browser hardware limits
-let sharedAudioCtx = null;
-const getAudioContext = () => {
-  try {
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContextClass) return null;
-    if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') {
-      sharedAudioCtx = new AudioContextClass();
-    }
-    if (sharedAudioCtx.state === 'suspended') {
-      sharedAudioCtx.resume().catch(() => {});
-    }
-    return sharedAudioCtx;
-  } catch (e) {
-    return null;
-  }
-};
-
-// Web Audio API Sound Synthesizer for 100% reliable, zero-latency sounds
-const playTone = (frequency, type = 'sine', duration = 0.15, gainVal = 0.3) => {
-  try {
-    const ctx = getAudioContext();
-    if (!ctx) return;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = type;
-    osc.frequency.value = frequency;
-    gain.gain.setValueAtTime(gainVal, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + duration);
-  } catch (e) {}
-};
-
-// Loud beep alarm for timer completion (3 loud series)
-const playAlarmSound = () => {
-  try {
-    const ctx = getAudioContext();
-    if (!ctx) return;
-    
-    [0, 0.25, 0.5, 0.9, 1.15, 1.4, 1.8, 2.05, 2.3].forEach((delay, idx) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'square';
-      osc.frequency.value = (idx % 2 === 0) ? 980 : 1318.5;
-      gain.gain.setValueAtTime(0.45, ctx.currentTime + delay);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.18);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(ctx.currentTime + delay);
-      osc.stop(ctx.currentTime + delay + 0.18);
-    });
-  } catch (e) {}
-};
-
-// Coin flip whoosh sound
-const playCoinSound = () => {
-  try {
-    const ctx = getAudioContext();
-    if (!ctx) return;
-    
-    for (let i = 0; i < 8; i++) {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.value = 400 + i * 80;
-      gain.gain.setValueAtTime(0.08, ctx.currentTime + i * 0.08);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.08 + 0.07);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(ctx.currentTime + i * 0.08);
-      osc.stop(ctx.currentTime + i * 0.08 + 0.07);
-    }
-  } catch (e) {}
-};
-
-// Roulette tick sound
-const playRouletteTick = () => {
-  playTone(800 + Math.random() * 200, 'triangle', 0.04, 0.12);
-};
-
-// =========================================================================
-// CUSTOM VECTOR COIN DESIGNS (PROFESSIONAL RELIEF MINTED COINS)
-// =========================================================================
-
-// CARA / HEADS - Golden Minted Coin Vector (Fully opaque base to prevent 3D bleed)
-const CoinFaceHeads = () => (
-  <svg viewBox="0 0 200 200" className="w-full h-full select-none" style={{ pointerEvents: 'none' }}>
-    <defs>
-      <radialGradient id="goldGrad" cx="35%" cy="30%" r="70%">
-        <stop offset="0%" stopColor="#FFF2B2" />
-        <stop offset="25%" stopColor="#F59E0B" />
-        <stop offset="60%" stopColor="#D97706" />
-        <stop offset="85%" stopColor="#B45309" />
-        <stop offset="100%" stopColor="#78350F" />
-      </radialGradient>
-      <linearGradient id="goldRim" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#FEF3C7" />
-        <stop offset="50%" stopColor="#D97706" />
-        <stop offset="100%" stopColor="#78350F" />
-      </linearGradient>
-      <linearGradient id="innerGold" x1="0%" y1="0%" x2="0%" y2="100%">
-        <stop offset="0%" stopColor="#FDE68A" />
-        <stop offset="100%" stopColor="#B45309" />
-      </linearGradient>
-    </defs>
-
-    {/* Fondo 100% opaco para evitar que el reverso se transparente */}
-    <circle cx="100" cy="100" r="99" fill="#78350F" />
-
-    {/* Borde exterior acanalado */}
-    <circle cx="100" cy="100" r="96" fill="url(#goldGrad)" stroke="url(#goldRim)" strokeWidth="4" />
-    <circle cx="100" cy="100" r="90" fill="none" stroke="#78350F" strokeWidth="2.5" strokeDasharray="3 3.5" opacity="0.7" />
-    
-    {/* Anillo biselado interior */}
-    <circle cx="100" cy="100" r="83" fill="none" stroke="url(#innerGold)" strokeWidth="3" opacity="0.9" />
-    <circle cx="100" cy="100" r="79" fill="#92400E" fillOpacity="0.25" />
-
-    {/* Estrellas decorativas superiores */}
-    <g fill="#FEF3C7">
-      <path d="M 100 24 L 102 29 L 107 29 L 103 32 L 105 37 L 100 34 L 95 37 L 97 32 L 93 29 L 98 29 Z" transform="scale(0.8) translate(25, 6)" />
-      <path d="M 70 30 L 71.5 34 L 75.5 34 L 72.5 36.5 L 73.5 40.5 L 70 38 L 66.5 40.5 L 67.5 36.5 L 64.5 34 L 68.5 34 Z" transform="scale(0.65) translate(38, 14)" />
-      <path d="M 130 30 L 131.5 34 L 135.5 34 L 132.5 36.5 L 133.5 40.5 L 130 38 L 126.5 40.5 L 127.5 36.5 L 124.5 34 L 128.5 34 Z" transform="scale(0.65) translate(70, 14)" />
-    </g>
-
-    {/* Corona Real Emblema Central */}
-    <g>
-      {/* Corona base */}
-      <path d="M 52 110 L 60 72 L 80 92 L 100 62 L 120 92 L 140 72 L 148 110 Z" fill="url(#innerGold)" stroke="#78350F" strokeWidth="1.5" strokeLinejoin="round" />
-      {/* Joyas en las puntas */}
-      <circle cx="60" cy="71" r="4.5" fill="#FEF08A" stroke="#78350F" strokeWidth="1" />
-      <circle cx="80" cy="91" r="3.5" fill="#FEF08A" stroke="#78350F" strokeWidth="1" />
-      <circle cx="100" cy="61" r="6" fill="#FDE047" stroke="#78350F" strokeWidth="1.2" />
-      <circle cx="120" cy="91" r="3.5" fill="#FEF08A" stroke="#78350F" strokeWidth="1" />
-      <circle cx="140" cy="71" r="4.5" fill="#FEF08A" stroke="#78350F" strokeWidth="1" />
-      
-      {/* Banda de la corona con gemas */}
-      <rect x="52" y="105" width="96" height="12" rx="3" fill="#78350F" stroke="#FDE68A" strokeWidth="1" />
-      <circle cx="64" cy="111" r="2.5" fill="#EF4444" />
-      <circle cx="78" cy="111" r="2.5" fill="#3B82F6" />
-      <circle cx="100" cy="111" r="3.5" fill="#10B981" />
-      <circle cx="122" cy="111" r="2.5" fill="#3B82F6" />
-      <circle cx="136" cy="111" r="2.5" fill="#EF4444" />
-    </g>
-
-    {/* Ramas de Laurel debajo */}
-    <g stroke="#FDE68A" strokeWidth="1.8" fill="#F59E0B" opacity="0.85">
-      <path d="M 50 128 C 70 145 130 145 150 128" fill="none" />
-      <path d="M 58 131 Q 62 126 68 130 Q 64 135 58 131 Z" />
-      <path d="M 78 138 Q 82 133 88 137 Q 84 142 78 138 Z" />
-      <path d="M 122 138 Q 118 133 112 137 Q 116 142 122 138 Z" />
-      <path d="M 142 131 Q 138 126 132 130 Q 136 135 142 131 Z" />
-    </g>
-
-    {/* Tipografía Acuñada: CARA & HEADS */}
-    <text x="100" y="162" textAnchor="middle" fill="#FEF3C7" fontSize="19" fontWeight="900" fontFamily="serif" letterSpacing="3.5">
-      CARA
-    </text>
-    <text x="100" y="177" textAnchor="middle" fill="#FDE68A" fontSize="9" fontWeight="800" fontFamily="sans-serif" letterSpacing="2" opacity="0.9">
-      ★ HEADS ★
-    </text>
-  </svg>
-);
-
-// SELLO / TAILS - Silver & Platinum Minted Emblem Vector (Fully opaque base)
-const CoinFaceTails = () => (
-  <svg viewBox="0 0 200 200" className="w-full h-full select-none" style={{ pointerEvents: 'none' }}>
-    <defs>
-      <radialGradient id="silverGrad" cx="35%" cy="30%" r="70%">
-        <stop offset="0%" stopColor="#FFFFFF" />
-        <stop offset="25%" stopColor="#E2E8F0" />
-        <stop offset="60%" stopColor="#94A3B8" />
-        <stop offset="85%" stopColor="#64748B" />
-        <stop offset="100%" stopColor="#1E293B" />
-      </radialGradient>
-      <linearGradient id="silverRim" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#FFFFFF" />
-        <stop offset="50%" stopColor="#94A3B8" />
-        <stop offset="100%" stopColor="#0F172A" />
-      </linearGradient>
-      <linearGradient id="innerSilver" x1="0%" y1="0%" x2="0%" y2="100%">
-        <stop offset="0%" stopColor="#F8FAFC" />
-        <stop offset="100%" stopColor="#475569" />
-      </linearGradient>
-    </defs>
-
-    {/* Fondo 100% opaco para evitar que el reverso se transparente */}
-    <circle cx="100" cy="100" r="99" fill="#0F172A" />
-
-    {/* Borde exterior acanalado de plata */}
-    <circle cx="100" cy="100" r="96" fill="url(#silverGrad)" stroke="url(#silverRim)" strokeWidth="4" />
-    <circle cx="100" cy="100" r="90" fill="none" stroke="#0F172A" strokeWidth="2.5" strokeDasharray="3 3.5" opacity="0.7" />
-    
-    {/* Anillo biselado interior */}
-    <circle cx="100" cy="100" r="83" fill="none" stroke="url(#innerSilver)" strokeWidth="3" opacity="0.9" />
-    <circle cx="100" cy="100" r="79" fill="#0F172A" fillOpacity="0.3" />
-
-    {/* Texto Superior Circular: ENGLISH TECH */}
-    <path id="curveTailsFixed" d="M 35 100 A 65 65 0 0 1 165 100" fill="none" />
-    <text fill="#F8FAFC" fontSize="9" fontWeight="900" letterSpacing="2.5">
-      <textPath href="#curveTailsFixed" startOffset="50%" textAnchor="middle">
-        ★ ENGLISH TECH ★
-      </textPath>
-    </text>
-
-    {/* Águila Imperial Emblema Central */}
-    <g>
-      {/* Cuerpo y alas extendidas del águila */}
-      <path d="M 100 55 L 108 68 L 123 58 L 118 76 L 140 68 L 130 88 L 152 86 L 132 104 L 142 118 L 118 116 L 120 128 L 100 134 L 80 128 L 82 116 L 58 118 L 68 104 L 48 86 L 70 88 L 60 68 L 82 76 L 77 58 L 92 68 Z" fill="url(#innerSilver)" stroke="#0F172A" strokeWidth="1.3" strokeLinejoin="round" />
-      
-      {/* Cabeza del Águila */}
-      <path d="M 98 52 C 94 48 90 52 86 54 C 82 55 78 54 75 58 C 80 62 86 60 90 62 C 94 64 96 66 100 66 C 104 66 106 64 110 62 C 114 60 120 62 125 58 C 122 54 118 55 114 54 C 110 52 106 48 102 52 Z" fill="#FFFFFF" stroke="#0F172A" strokeWidth="1" />
-      
-      {/* Escudo en el pecho */}
-      <path d="M 87 80 L 113 80 L 113 99 Q 113 115 100 121 Q 87 115 87 99 Z" fill="#1E293B" stroke="#F8FAFC" strokeWidth="1.5" />
-      {/* Estrella en el escudo */}
-      <path d="M 100 87 L 102 92 L 107 92 L 103 95 L 105 100 L 100 97 L 95 100 L 97 95 L 93 92 L 98 92 Z" fill="#F8FAFC" />
-    </g>
-
-    {/* Tipografía Acuñada: SELLO & TAILS */}
-    <text x="100" y="162" textAnchor="middle" fill="#FFFFFF" fontSize="19" fontWeight="900" fontFamily="serif" letterSpacing="3.5">
-      SELLO
-    </text>
-    <text x="100" y="177" textAnchor="middle" fill="#CBD5E1" fontSize="9" fontWeight="800" fontFamily="sans-serif" letterSpacing="2" opacity="0.9">
-      ★ TAILS ★
-    </text>
-  </svg>
-);
-
-// Mini Coin Badge Icon for Stats & Chips
-const MiniCoinBadge = ({ side = 'heads', size = 18 }) => {
-  if (side === 'heads') {
-    return (
-      <svg width={size} height={size} viewBox="0 0 24 24" className="shrink-0">
-        <circle cx="12" cy="12" r="11" fill="#F59E0B" stroke="#B45309" strokeWidth="1.5" />
-        <circle cx="12" cy="12" r="8" fill="none" stroke="#FDE68A" strokeWidth="1" strokeDasharray="1.5 1.5" />
-        <path d="M7 14 L8 9 L10.5 11 L12 8 L13.5 11 L16 9 L17 14 Z" fill="#FEF3C7" stroke="#78350F" strokeWidth="0.8" />
-      </svg>
-    );
-  }
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" className="shrink-0">
-      <circle cx="12" cy="12" r="11" fill="#94A3B8" stroke="#475569" strokeWidth="1.5" />
-      <circle cx="12" cy="12" r="8" fill="none" stroke="#F1F5F9" strokeWidth="1" strokeDasharray="1.5 1.5" />
-      <path d="M7 10 L12 7 L17 10 L15 15 L12 17 L9 15 Z" fill="#F8FAFC" stroke="#1E293B" strokeWidth="0.8" />
-    </svg>
-  );
-};
+import {
+  SimpleCalculator,
+  playTone,
+  playAlarmSound,
+  playCoinSound,
+  playRouletteTick,
+  CoinFaceHeads,
+  CoinFaceTails,
+  MiniCoinBadge
+} from './FloatingToolsOverlay.jsx';
 
 const TEAM_COOL_NAMES = [
   'Team Phoenix', 'Team Titan', 'Team Vortex', 'Team Cyber', 
@@ -284,7 +43,9 @@ export default function TeacherToolsTab({
   role = 'teacher',
   isDemoMode = false,
   myChatId = 'teacher',
-  loggedInName = ''
+  loggedInName = '',
+  onOpenFloatingTool = () => {},
+  activeFloatingTools = {}
 }) {
   const [activeSubTab, setActiveSubTab] = useState('timer'); // 'timer' | 'picker' | 'groups' | 'coin' | 'ova'
   const tabsScrollRef = useRef(null);
@@ -793,6 +554,7 @@ export default function TeacherToolsTab({
     { id: 'picker', label: 'Aleatorio', icon: Dices, color: 'text-purple-500', activeBg: 'bg-purple-600 text-white', badge: 'Ruleta' },
     { id: 'groups', label: 'Grupos', icon: UsersGroupIcon, color: 'text-teal-500', activeBg: 'bg-teal-600 text-white', badge: 'Equipos' },
     { id: 'coin', label: 'Moneda', icon: Coins, color: 'text-orange-500', activeBg: 'bg-orange-500 text-white', badge: 'Cara/Sello' },
+    { id: 'calculator', label: 'Calculadora', icon: Calculator, color: 'text-indigo-500', activeBg: 'bg-indigo-600 text-white', badge: 'Básica' },
     { id: 'ova', label: 'OVA Studio', icon: BookOpen, color: 'text-rose-500', activeBg: 'bg-rose-600 text-white', badge: 'Estudio OVA' }
   ];
 
@@ -927,30 +689,46 @@ export default function TeacherToolsTab({
           <div className={`p-5 sm:p-7 rounded-3xl border shadow-sm flex flex-col items-center justify-center text-center relative overflow-hidden ${
             isDarkMode ? 'bg-gray-800/90 border-gray-700/80' : 'bg-white border-gray-200/90'
           }`}>
-            {/* Toggle de Modo Compacto */}
-            <div className="flex items-center gap-1 p-1 rounded-2xl bg-gray-100 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 mb-4">
-              <button
-                type="button"
-                onClick={() => { setTimerMode('countdown'); playTone(500, 'sine', 0.05); }}
-                className={`px-4 py-1.5 rounded-xl text-xs font-black transition-all ${
-                  timerMode === 'countdown'
-                    ? 'bg-amber-500 text-white shadow-xs'
-                    : 'text-gray-500 hover:text-gray-800 dark:hover:text-gray-200'
-                }`}
-              >
-                Temporizador
-              </button>
-              <button
-                type="button"
-                onClick={() => { setTimerMode('stopwatch'); playTone(500, 'sine', 0.05); }}
-                className={`px-4 py-1.5 rounded-xl text-xs font-black transition-all ${
-                  timerMode === 'stopwatch'
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'text-gray-500 hover:text-gray-800 dark:hover:text-gray-200'
-                }`}
-              >
-                Cronómetro
-              </button>
+            {/* Cabecera con selector de modo y botón flotante */}
+            <div className="w-full flex flex-wrap items-center justify-between gap-2.5 mb-4 px-1">
+              <span className="text-xs font-bold uppercase tracking-wider text-amber-500 flex items-center gap-1.5">
+                <Timer size={16} /> Temporizador & Cronómetro
+              </span>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 p-1 rounded-2xl bg-gray-100 dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
+                  <button
+                    type="button"
+                    onClick={() => { setTimerMode('countdown'); playTone(500, 'sine', 0.05); }}
+                    className={`px-3 py-1 rounded-xl text-xs font-black transition-all ${
+                      timerMode === 'countdown'
+                        ? 'bg-amber-500 text-white shadow-xs'
+                        : 'text-gray-500 hover:text-gray-800 dark:hover:text-gray-200'
+                    }`}
+                  >
+                    Temporizador
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setTimerMode('stopwatch'); playTone(500, 'sine', 0.05); }}
+                    className={`px-3 py-1 rounded-xl text-xs font-black transition-all ${
+                      timerMode === 'stopwatch'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-gray-500 hover:text-gray-800 dark:hover:text-gray-200'
+                    }`}
+                  >
+                    Cronómetro
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onOpenFloatingTool('timer')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/20 transition-all active:scale-95"
+                  title="Abrir temporizador en ventana flotante"
+                >
+                  <ExternalLink size={13} />
+                  <span>Ventana flotante</span>
+                </button>
+              </div>
             </div>
 
             {/* MODO TEMPORIZADOR */}
@@ -1616,6 +1394,16 @@ export default function TeacherToolsTab({
                 >
                   Ver Sello
                 </button>
+                <span className="text-gray-300 dark:text-gray-700">|</span>
+                <button
+                  type="button"
+                  onClick={() => onOpenFloatingTool('coin')}
+                  className="px-2 py-0.5 rounded-md text-[10px] font-bold text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/40 flex items-center gap-1 transition-all"
+                  title="Abrir moneda en ventana flotante"
+                >
+                  <ExternalLink size={11} />
+                  <span>Flotante</span>
+                </button>
               </div>
             </div>
 
@@ -1734,7 +1522,20 @@ export default function TeacherToolsTab({
       )}
 
       {/* ========================================================================= */}
-      {/* 5. SECCIÓN: ENGLISHTECH OVA STUDIO */}
+      {/* 5. SECCIÓN: CALCULADORA SENCILLA */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'calculator' && (
+        <div className="py-3 animate-in fade-in flex justify-center">
+          <SimpleCalculator
+            isDarkMode={isDarkMode}
+            isFloating={false}
+            onOpenFloating={() => onOpenFloatingTool('calculator')}
+          />
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 6. SECCIÓN: ENGLISHTECH OVA STUDIO */}
       {/* ========================================================================= */}
       {activeSubTab === 'ova' && (
         <div className="space-y-4 animate-in fade-in duration-200">
