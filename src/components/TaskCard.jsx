@@ -3706,41 +3706,21 @@ const TaskCard = React.memo(({
                 </div>
             )}
 
-            {/* Contador de Entregas y Pendientes por Calificar para la Docente */}
-            {role === 'teacher' && isTask && (
-                <div className="mt-3 px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/70 flex items-center justify-between text-xs text-slate-700 dark:text-slate-300">
-                    <div className="flex items-center gap-2 font-medium">
-                        <FileText size={14} className="text-slate-500 shrink-0" />
-                        <span>
-                            {teacherDeliveryStats.totalReceived === 0
-                                ? "0 entregas recibidas"
-                                : `${teacherDeliveryStats.totalReceived} ${teacherDeliveryStats.totalReceived === 1 ? 'entrega recibida' : 'entregas recibidas'} • ${teacherDeliveryStats.pendingToGrade} ${teacherDeliveryStats.pendingToGrade === 1 ? 'pendiente' : 'pendientes'} de calificar`
-                            }
-                        </span>
-                    </div>
-                    {teacherDeliveryStats.pendingToGrade > 0 && (
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60">
-                            Por calificar
-                        </span>
-                    )}
-                </div>
-            )}
-
             {/* Botón de Comentarios / Respuestas / Foros y Botón de Excel */}
             <div className="mt-3 pt-2.5 border-t border-gray-100 dark:border-gray-700/60 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                 <button 
                     onClick={() => setShowCommentModal(true)} 
                     className={`flex-1 py-2 px-3 bg-gray-50 dark:bg-gray-900/60 hover:bg-gray-100 dark:hover:bg-gray-750 border border-gray-200 dark:border-gray-700/70 shadow-xs rounded-xl text-xs font-bold transition-all flex justify-between items-center gap-2 text-gray-700 dark:text-gray-300`}
                 >
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap min-w-0">
                         {isForum ? (
-                            <MessageCircle size={15} className="text-emerald-600 dark:text-emerald-400" />
+                            <MessageCircle size={15} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
                         ) : isPoll ? (
-                            <BarChart2 size={15} className="text-indigo-600 dark:text-indigo-400" />
+                            <BarChart2 size={15} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
                         ) : isTask ? (
-                            <MessageSquareText size={15} className="text-[#AD3333]" />
+                            <MessageSquareText size={15} className="text-[#AD3333] shrink-0" />
                         ) : (
-                            <MessageSquareText size={15} className="text-blue-600 dark:text-blue-400" />
+                            <MessageSquareText size={15} className="text-blue-600 dark:text-blue-400 shrink-0" />
                         )}
                         <span>
                             {task.comments?.length > 0 
@@ -3760,8 +3740,20 @@ const TaskCard = React.memo(({
                                   )
                             }
                         </span>
+
+                        {role === 'teacher' && isTask && teacherDeliveryStats.pendingToGrade > 0 && (
+                            <>
+                                <span className="h-3.5 w-px bg-gray-300 dark:bg-gray-600 self-center shrink-0" aria-hidden="true" />
+                                <span 
+                                    className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100/90 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/60 leading-none shrink-0"
+                                    title={`${teacherDeliveryStats.pendingToGrade} ${teacherDeliveryStats.pendingToGrade === 1 ? 'entrega pendiente' : 'entregas pendientes'} por calificar`}
+                                >
+                                    {teacherDeliveryStats.pendingToGrade === 1 ? 'pendiente por calificar' : 'pendientes por calificar'}
+                                </span>
+                            </>
+                        )}
                     </div>
-                    <span className="text-[11px] text-blue-500 font-semibold hover:underline">Ver conversación ▾</span>
+                    <span className="text-[11px] text-blue-500 font-semibold hover:underline shrink-0">Ver conversación ▾</span>
                 </button>
 
                 {role === 'teacher' && isTask && (
