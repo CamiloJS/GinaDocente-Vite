@@ -6574,7 +6574,7 @@ useEffect(() => {
         });
         
         return (
-            <div className="space-y-5 pb-20 md:pb-6 max-w-3xl mx-auto">
+            <div className="space-y-5 pb-20 md:pb-6 max-w-5xl xl:max-w-6xl mx-auto w-full">
                 
                 {/* Cabecera del Perfil Compacta con Indicador de Presencia */}
                 <div className={`flex flex-col sm:flex-row items-center gap-4 sm:gap-6 p-5 sm:p-6 relative rounded-2xl shadow-xs border ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} ${!isMyProfile ? 'pt-14 sm:pt-6 sm:pl-14' : ''}`}>
@@ -7392,7 +7392,7 @@ Devuelve ÚNICAMENTE un array JSON plano (sin bloques markdown \`\`\`json ni tex
             });
 
             return (
-              <div className="space-y-6 pb-20 md:pb-6 max-w-5xl mx-auto">
+              <div className="space-y-6 pb-20 md:pb-6 max-w-5xl xl:max-w-6xl mx-auto w-full">
                 {/* Cabecera Principal */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
@@ -8909,7 +8909,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
     }
 
     return (
-        <div className="space-y-6 max-w-4xl mx-auto pb-20 md:pb-8 animate-in fade-in duration-300">
+        <div className="space-y-6 max-w-5xl xl:max-w-6xl mx-auto w-full pb-20 md:pb-8 animate-in fade-in duration-300">
             {/* Header con estadísticas */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
@@ -9718,7 +9718,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                     : academicGroups.filter(isStudentInGroup);
 
                 return (
-                    <div className="space-y-6 max-w-4xl mx-auto pb-20 md:pb-8 animate-in fade-in duration-300">
+                    <div className="space-y-6 max-w-5xl xl:max-w-6xl mx-auto w-full pb-20 md:pb-8 animate-in fade-in duration-300">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div>
                                 <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-gray-100 flex items-center gap-2.5">
@@ -9845,7 +9845,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
             const currentPattern = GROUP_COVER_PATTERNS.find(p => p.id === (currentGroupData.coverPattern || 'doodle-1')) || GROUP_COVER_PATTERNS[0];
 
             return (
-                <div className="space-y-6 max-w-4xl mx-auto pb-20 md:pb-8 animate-in fade-in duration-300">
+                <div className="space-y-6 max-w-5xl xl:max-w-6xl mx-auto w-full pb-20 md:pb-8 animate-in fade-in duration-300">
                     {/* PORTADA / ENCABEZADO INTEGRADO DEL GRUPO */}
                     <div className="relative rounded-3xl overflow-hidden shadow-lg border border-gray-200/80 dark:border-gray-800 transition-all min-h-[190px] sm:min-h-[220px] flex flex-col justify-between p-4 sm:p-6 text-white">
                         {/* Fondo de Portada (Imagen personalizada o Patrón Doodle) */}
@@ -10251,7 +10251,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
               // Vista de Rendición de Evaluación (Estudiante respondiendo)
               if (activeTakingEval) {
                   return (
-                      <div className="max-w-3xl mx-auto space-y-4 pb-24 md:pb-12 animate-in fade-in relative">
+                      <div className="max-w-4xl xl:max-w-5xl mx-auto w-full space-y-4 pb-24 md:pb-12 animate-in fade-in relative">
                           {/* Encabezado fijo arriba (NO sticky para que el título nunca baje ni tape las preguntas) */}
                           <div className={`${glassCard} !p-4 border border-red-500/20 shadow-sm flex items-start justify-between gap-3 rounded-2xl`}>
                               <div className="min-w-0 flex-1">
@@ -10521,7 +10521,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                   const fbGrade = grades.find((g) => g.id === activeImmediateFeedback.grade?.id) || activeImmediateFeedback.grade || {};
                   const notaNum = Number(fbGrade.score) || 0;
                   return (
-                      <div className="max-w-3xl mx-auto space-y-4 pb-20 md:pb-8 animate-in fade-in">
+                      <div className="max-w-5xl xl:max-w-6xl mx-auto w-full space-y-4 pb-20 md:pb-8 animate-in fade-in">
                           <div className={`${glassCard} !p-4 sm:!p-5 rounded-3xl border border-blue-500/25 shadow-sm space-y-3`}>
                               <div className="flex flex-wrap items-center justify-between gap-2">
                                   <button
@@ -10880,7 +10880,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                       : -1;
 
                   return (
-                      <div className="space-y-5 max-w-4xl mx-auto pb-20 md:pb-8 animate-in fade-in">
+                      <div className="space-y-5 max-w-5xl xl:max-w-6xl mx-auto w-full pb-20 md:pb-8 animate-in fade-in">
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                               <div className="flex items-center gap-3">
                                   <button 
@@ -11808,7 +11808,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
               // Vista de Creación de Evaluaciones (Docente)
               if (isCreatingEval) {
                   return (
-                      <div className="space-y-4 max-w-3xl mx-auto pb-20 md:pb-8 animate-in fade-in">
+                      <div className="space-y-4 max-w-5xl xl:max-w-6xl mx-auto w-full pb-20 md:pb-8 animate-in fade-in">
                           <div className="flex items-center gap-3">
                               <button onClick={() => setIsCreatingEval(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors text-gray-600 dark:text-gray-300">
                                   <ArrowLeftIcon size={18}/>
@@ -12678,7 +12678,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
 
               // Vista de Lista (Por defecto)
               return (
-                <div className="space-y-4 max-w-4xl mx-auto pb-20 md:pb-8 animate-in fade-in">
+                <div className="space-y-4 max-w-5xl xl:max-w-6xl mx-auto w-full pb-20 md:pb-8 animate-in fade-in">
                   <div className="flex items-center justify-between gap-3">
                       <div>
                           <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-gray-100 flex items-center gap-2.5">
@@ -13063,7 +13063,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
               };
 
               return (
-                  <div className="space-y-6 max-w-4xl mx-auto pb-20 md:pb-8 animate-in fade-in duration-300">
+                  <div className="space-y-6 max-w-5xl xl:max-w-6xl mx-auto w-full pb-20 md:pb-8 animate-in fade-in duration-300">
                       {/* Header con estadísticas rápidas */}
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                           <div>
@@ -13441,7 +13441,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
           };
 
           const renderSettings = () => (
-            <div className="space-y-4 animate-in fade-in duration-200 max-w-2xl mx-auto">
+            <div className="space-y-4 animate-in fade-in duration-200 max-w-4xl xl:max-w-5xl mx-auto w-full">
               <div className="flex items-center gap-2 mb-1">
                   <Settings className="text-purple-600 dark:text-purple-400" size={24} />
                   <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 drop-shadow-sm">Ajustes y preferencias</h2>
@@ -14755,7 +14755,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                   </aside>
 
                   {/* CENTER CONTENT */}
-                  <main className={`flex-1 ${activeTab === 'tools' || activeTab === 'books' || activeTab === 'notes' || activeTab === 'tasks' || activeTab === 'reviews' ? 'max-w-5xl xl:max-w-6xl' : 'max-w-[680px]'} min-w-0 w-full p-2 md:p-6 pb-28 md:pb-8 relative mx-auto transition-all duration-300`}>
+                  <main className="flex-1 max-w-5xl xl:max-w-6xl min-w-0 w-full p-2 md:p-6 pb-28 md:pb-8 relative mx-auto transition-all duration-300">
                       {activeTab === 'tasks' && (
                           <React.Suspense fallback={<div className="space-y-4 p-4">{[1,2,3].map(i => <div key={i} className="p-4 rounded-2xl border animate-pulse bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800"><div className="flex items-center gap-3 mb-4"><div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700" /><div className="flex-1 space-y-2"><div className="h-3 w-1/3 rounded bg-gray-200 dark:bg-gray-700" /></div></div><div className="h-4 w-full rounded mb-2 bg-gray-200 dark:bg-gray-700" /><div className="h-4 w-5/6 rounded bg-gray-200 dark:bg-gray-700" /></div>)}</div>}>
                           <TasksTab 
