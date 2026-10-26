@@ -465,6 +465,7 @@ check(
     notesModuleSrc.includes("if (viewMode === 'sheet' && savedFmt !== 'sheet') return false;") &&
     !notesModuleSrc.includes("const effectiveFormat = viewMode === 'all' ? savedFormat : viewMode;") &&
     !notesModuleSrc.includes("handleToggleNoteFormat") &&
+    !notesModuleSrc.includes("return owner === normalizedUserId;") &&
     DEMO_NOTES.some(n => n.noteFormat === 'sheet' && Array.isArray(n.pages) && n.pages.length > 1) &&
     DEMO_NOTES.some(n => n.noteFormat === 'sticky' && n.stickyColor)
 );

@@ -248,7 +248,7 @@ export default function NotesModule({
 
         if (noteScope === 'private') {
           const owner = String(note.ownerId || note.authorId || '').trim().toLowerCase();
-          return owner === normalizedUserId;
+          if (owner !== normalizedUserId) return false;
         }
 
         // Filtro por grupo en notas compartidas
