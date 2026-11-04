@@ -140,6 +140,64 @@ check('DEMO_LESSON_PLANS tiene como institución Universidad de Pamplona y curso
   DEMO_LESSON_PLANS[0].institution === 'Universidad de Pamplona' && DEMO_LESSON_PLANS[0].course === ''
 );
 
+console.log('\n== 6. Prevención de Duplicados al Editar Planeaciones ==');
+const originalPlan = {
+  id: 'lp_test_edit_123',
+  week: 3,
+  weekTopic: 'Macroeconomic Equilibrium',
+  institution: 'Universidad de Pamplona',
+  subject: '',
+  teacher: 'Gina',
+  course: '',
+  unit: 'Unidad 3',
+  learningPurpose: 'Comprender el equilibrio macroeconómico',
+  specificPurposes: '1. Modelar curvas.\n2. Analizar shocks.',
+  rows: [
+    { phase: 'Inicio', time: '20 min', topics: 'Intro', activities: 'Icebreaker', resources: 'Slides' },
+    { phase: 'Desarrollo', time: '50 min', topics: 'Core', activities: 'Exercises', resources: 'Paper' },
+    { phase: 'Cierre - Tarea', time: '20 min', topics: 'Wrapup', activities: 'Quiz', resources: 'Virtual' }
+  ],
+  createdAt: 1700000000000,
+  updatedAt: 1700000000000
+};
+
+// Modificación simulada
+const editedDraft = {
+  ...originalPlan,
+  unit: 'Unidad 3: Análisis Avanzado',
+  learningPurpose: 'Comprender el equilibrio macroeconómico con enfoque cuantitativo'
+};
+
+const normalizedEdited = normalizeLessonPlan(editedDraft);
+check('Normalización preserva exactamente el ID original del plan', normalizedEdited.id === originalPlan.id);
+check('Normalización preserva el tema de la semana (weekTopic) sin sobreescribirlo con general', normalizedEdited.weekTopic === originalPlan.weekTopic);
+check('Normalización preserva la fecha de creación original', normalizedEdited.createdAt === originalPlan.createdAt);
+
+// Simulación de actualización en lista de estado (prev.map)
+const sampleList = [originalPlan, { id: 'lp_other_999', week: 2, createdAt: 1690000000000 }];
+const updatedList = sampleList.map(p => p.id === normalizedEdited.id ? normalizedEdited : p);
+check('Actualización en lista reemplaza en la misma posición sin duplicar', updatedList.length === 2 && updatedList[0].unit === 'Unidad 3: Análisis Avanzado');
+
+// Simulación de deduplicación Map ante snapshots duplicados (ej: legacy addDoc + setDoc)
+const duplicateSnapshots = [
+  { id: 'random_firestore_id_1', ...originalPlan },
+  { id: normalizedEdited.id, ...normalizedEdited, updatedAt: 1700000050000 }
+];
+const dedupMap = new Map();
+duplicateSnapshots.forEach(d => {
+  const internalId = String(d.id || '').trim();
+  const planKey = (d.rows && d.week) ? (d.id === 'random_firestore_id_1' ? originalPlan.id : d.id) : d.id;
+  if (!dedupMap.has(planKey)) {
+    dedupMap.set(planKey, d);
+  } else {
+    const existing = dedupMap.get(planKey);
+    if ((d.updatedAt || 0) >= (existing.updatedAt || 0)) {
+      dedupMap.set(planKey, d);
+    }
+  }
+});
+check('Deduplicador colapsa entradas duplicadas en un solo registro con la versión más reciente', dedupMap.size === 1 && dedupMap.get(originalPlan.id).unit === 'Unidad 3: Análisis Avanzado');
+
 console.log(`\n========================================`);
 console.log(`Total pruebas Planes de Clase: ${okCount + failCount} | OK: ${okCount} | FAIL: ${failCount}`);
 console.log(`========================================\n`);

@@ -32,13 +32,28 @@ export function LessonPlansModal({
   const [editingPlanId, setEditingPlanId] = useState(null);
   const [editForm, setEditForm] = useState(null);
 
+  // Asegurar lista única sin duplicados por id
+  const uniquePlans = React.useMemo(() => {
+    const map = new Map();
+    (lessonPlans || []).forEach((p) => {
+      if (!p || !p.id) return;
+      const key = String(p.id).trim();
+      const existing = map.get(key);
+      if (!existing || (Number(p.updatedAt || p.createdAt || 0) >= Number(existing.updatedAt || existing.createdAt || 0))) {
+        map.set(key, p);
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  }, [lessonPlans]);
+
   if (!isOpen) return null;
 
   // Plan actualmente seleccionado
-  const activePlan = lessonPlans.find((p) => p.id === (selectedPlanId || lessonPlans[0]?.id)) || lessonPlans[0] || null;
+  const activePlan = uniquePlans.find((p) => p.id === (selectedPlanId || uniquePlans[0]?.id)) || uniquePlans[0] || null;
 
   const startEditing = (plan) => {
     setEditingPlanId(plan.id);
+    setSelectedPlanId(plan.id);
     setEditForm(JSON.parse(JSON.stringify(plan)));
   };
 
@@ -49,7 +64,9 @@ export function LessonPlansModal({
 
   const saveEditing = async () => {
     if (!editForm) return;
-    await onUpdatePlan(editForm);
+    const planToSave = { ...editForm, updatedAt: Date.now() };
+    setSelectedPlanId(planToSave.id);
+    await onUpdatePlan(planToSave);
     setEditingPlanId(null);
     setEditForm(null);
     showMessage?.('Planeación actualizada correctamente.');
@@ -84,7 +101,7 @@ export function LessonPlansModal({
                   Respaldos IA
                 </span>
                 <span className="text-xs font-bold text-gray-500 dark:text-gray-400">
-                  {lessonPlans.length} {lessonPlans.length === 1 ? 'planeación guardada' : 'planeaciones guardadas'}
+                  {uniquePlans.length} {uniquePlans.length === 1 ? 'planeación guardada' : 'planeaciones guardadas'}
                 </span>
               </div>
               <h3 className="text-base sm:text-lg font-extrabold">Planeaciones de clase (Semanal)</h3>
@@ -112,7 +129,7 @@ export function LessonPlansModal({
               <span>HISTORIAL DE PLANEACIONES</span>
             </div>
 
-            {lessonPlans.length === 0 ? (
+            {uniquePlans.length === 0 ? (
               <div className="p-8 text-center space-y-2 text-gray-400">
                 <FileText size={32} className="mx-auto opacity-40" />
                 <p className="text-xs font-medium">Aún no hay planeaciones generadas con IA.</p>
@@ -122,7 +139,7 @@ export function LessonPlansModal({
               </div>
             ) : (
               <div className="p-2 space-y-1.5 overflow-y-auto flex-1">
-                {lessonPlans.map((plan) => {
+                {uniquePlans.map((plan) => {
                   const isSelected = activePlan?.id === plan.id;
                   const isEditingThis = editingPlanId === plan.id;
                   const dateStr = plan.createdAt ? new Date(plan.createdAt).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }) : '';
@@ -372,7 +389,11 @@ export function LessonPlansModal({
                       type="button"
                       onClick={() => {
                         if (window.confirm('¿Seguro que deseas eliminar esta planeación de clase?')) {
-                          onDeletePlan(activePlan.id);
+                          const deletedId = activePlan.id;
+                          onDeletePlan(deletedId, activePlan);
+                          if (selectedPlanId === deletedId) {
+                            setSelectedPlanId(null);
+                          }
                           showMessage?.('Planeación eliminada.');
                         }
                       }}

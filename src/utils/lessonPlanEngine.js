@@ -143,7 +143,7 @@ export function normalizeLessonPlan(plan = {}, fallbackData = {}) {
   const course = typeof plan.course === 'string' ? plan.course : '';
   const unit = (plan.unit || fallbackUnit).trim();
 
-  const learningPurpose = (plan.learningPurpose || fallbackData.learningPurpose || `Desarrollar competencias en: ${fallbackTopic}`).trim();
+  const learningPurpose = (plan.learningPurpose || fallbackData.learningPurpose || `Desarrollar competencias en: ${plan.weekTopic || fallbackTopic}`).trim();
   const specificPurposes = (plan.specificPurposes || fallbackData.specificPurposes || '1. Comprender los conceptos clave.\n2. Aplicar los aprendizajes en actividades guiadas.\n3. Evaluar el desempeño formativo.').trim();
 
   const rawRows = Array.isArray(plan.rows) && plan.rows.length > 0 ? plan.rows : [];
@@ -152,19 +152,21 @@ export function normalizeLessonPlan(plan = {}, fallbackData = {}) {
   const rows = defaultPhases.map((phaseName, idx) => {
     const found = rawRows.find(r => (r.phase || '').toLowerCase().includes(phaseName.split(' ')[0].toLowerCase())) || rawRows[idx] || {};
     return {
-      date: (found.date || `Semana ${fallbackWeek}`).trim(),
+      date: (found.date || `Semana ${plan.week || fallbackWeek}`).trim(),
       phase: phaseName,
-      topics: (found.topics || fallbackTopic).trim(),
+      topics: (found.topics || plan.weekTopic || fallbackTopic).trim(),
       activities: (found.activities || (idx === 0 ? 'Activación de saberes previos y presentación.' : idx === 1 ? 'Explicación del docente y práctica de los estudiantes.' : 'Conclusiones y asignación de trabajo autónomo.')).trim(),
       resources: (found.resources || 'Material didáctico, proyector, campus virtual').trim(),
       time: (found.time || (idx === 0 ? '20 min' : idx === 1 ? '50 min' : '20 min')).trim()
     };
   });
 
+  const planId = String(plan.id || '').trim();
+
   return {
-    id: plan.id || `lp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    id: planId || `lp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
     week: Number(plan.week || fallbackWeek) || 1,
-    weekTopic: fallbackTopic,
+    weekTopic: (plan.weekTopic || fallbackTopic).trim(),
     institution,
     subject,
     teacher,

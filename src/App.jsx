@@ -779,7 +779,7 @@ function App() {
     setTaskLimit(prev => prev + 25);
   }, [isLoadingMoreTasks, hasMoreTasks]);
   const [rawSyllabus, setSyllabus] = useState(() => initialIsDemo ? DEMO_SYLLABUS : []);
-  const [rawLessonPlans, setRawLessonPlans] = useState(() => initialIsDemo ? DEMO_LESSON_PLANS : []);
+  const [rawLessonPlans, setRawLessonPlans] = useState(() => initialIsDemo ? mergeDemoItemsWithBase(DEMO_LESSON_PLANS, [], 'lessonPlans') : []);
   const [showLessonPlansModal, setShowLessonPlansModal] = useState(false);
   const [showAddSyllabus, setShowAddSyllabus] = useState(false);
   const [showPdfSyllabusModal, setShowPdfSyllabusModal] = useState(false);
@@ -3452,7 +3452,6 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
                 setPinnedTasks(mergedTasks.filter(t => t.isPinned));
                 setEvaluations(mergeDemoItemsWithBase(DEMO_EVALUATIONS, [], 'evaluations'));
                 setSyllabus(mergeDemoItemsWithBase(DEMO_SYLLABUS, [], 'syllabus').slice().sort((a, b) => (Number(a.week) || 0) - (Number(b.week) || 0)));
-    setRawLessonPlans(mergeDemoItemsWithBase(DEMO_LESSON_PLANS, [], 'lessonPlans'));
                 setRawLessonPlans(mergeDemoItemsWithBase(DEMO_LESSON_PLANS, [], 'lessonPlans'));
                 setReviews(mergeDemoItemsWithBase(DEMO_REVIEWS, [], 'reviews'));
                 setRawBooks(mergeDemoItemsWithBase(DEMO_BOOKS, [], 'books'));
@@ -4100,7 +4099,37 @@ useEffect(() => {
 useEffect(() => {
     if (!hasEntered || !myChatId || isDemoMode || activeTab !== 'syllabus') return;
     const uSyllabus = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'syllabus'), limit(100)), s => setSyllabus(s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.week - b.week)), err => console.error(err));
-    const uLessonPlans = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'lessonPlans'), limit(100)), s => setRawLessonPlans(s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))), err => console.error(err));
+    const uLessonPlans = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'lessonPlans'), limit(100)), s => {
+      const planMap = new Map();
+      s.docs.forEach(d => {
+        const data = d.data() || {};
+        const internalId = String(data.id || d.id).trim();
+        const plan = {
+          ...data,
+          id: internalId,
+          _docId: d.id
+        };
+        if (!planMap.has(internalId)) {
+          planMap.set(internalId, plan);
+        } else {
+          const existing = planMap.get(internalId);
+          const existingTime = Number(existing.updatedAt || existing.createdAt || 0);
+          const thisTime = Number(plan.updatedAt || plan.createdAt || 0);
+          if (thisTime >= existingTime) {
+            if (existing._docId && existing._docId !== d.id && existing._docId !== internalId) {
+              deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'lessonPlans', existing._docId)).catch(() => {});
+            }
+            planMap.set(internalId, plan);
+          } else {
+            if (d.id !== internalId) {
+              deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'lessonPlans', d.id)).catch(() => {});
+            }
+          }
+        }
+      });
+      const uniqueSorted = Array.from(planMap.values()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      setRawLessonPlans(uniqueSorted);
+    }, err => console.error(err));
     return () => {
       uSyllabus();
       uLessonPlans();
@@ -8173,7 +8202,7 @@ Escribe en español con tono pedagógico moderno.`;
                                       setRawLessonPlans(prev => [normalizedPlan, ...prev.filter(p => p.id !== normalizedPlan.id)]);
                                     } else {
                                       try {
-                                        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'lessonPlans'), normalizedPlan);
+                                        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'lessonPlans', normalizedPlan.id), normalizedPlan, { merge: true });
                                       } catch (dbErr) {
                                         console.error('Error guardando planeación en Firestore:', dbErr);
                                       }
@@ -8596,27 +8625,39 @@ Escribe en español con tono pedagógico moderno.`;
                     const norm = normalizeLessonPlan(updatedPlan);
                     if (isDemoMode) {
                       saveDemoSandboxItem('lessonPlans', norm);
-                      setRawLessonPlans(prev => prev.map(p => p.id === norm.id ? norm : p));
+                      setRawLessonPlans(prev => {
+                        const exists = prev.some(p => p.id === norm.id);
+                        return exists ? prev.map(p => p.id === norm.id ? norm : p) : [norm, ...prev];
+                      });
                     } else {
                       try {
                         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'lessonPlans', norm.id), norm, { merge: true });
+                        if (updatedPlan._docId && updatedPlan._docId !== norm.id) {
+                          await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'lessonPlans', updatedPlan._docId)).catch(() => {});
+                        }
                       } catch (err) {
-                        console.error('Error actualizando planeación en Firestore:', err);
+                        console.error('Error actualizando planeacion en Firestore:', err);
                       }
-                      setRawLessonPlans(prev => prev.map(p => p.id === norm.id ? norm : p));
+                      setRawLessonPlans(prev => {
+                        const exists = prev.some(p => p.id === norm.id);
+                        return exists ? prev.map(p => p.id === norm.id ? norm : p) : [norm, ...prev];
+                      });
                     }
                   }}
-                  onDeletePlan={async (planId) => {
+                  onDeletePlan={async (planId, planObj) => {
                     if (isDemoMode) {
                       removeDemoSandboxItem('lessonPlans', planId);
                       setRawLessonPlans(prev => prev.filter(p => p.id !== planId));
                     } else {
                       try {
                         await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'lessonPlans', planId));
+                        if (planObj?._docId && planObj._docId !== planId) {
+                          await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'lessonPlans', planObj._docId)).catch(() => {});
+                        }
                       } catch (err) {
-                        console.error('Error eliminando planeación de Firestore:', err);
+                        console.error('Error eliminando planeacion de Firestore:', err);
                       }
-                      setRawLessonPlans(prev => prev.filter(p => p.id !== planId));
+                      setRawLessonPlans(prev => prev.filter(p => p.id !== planId && p._docId !== planId));
                     }
                   }}
                   isDarkMode={isDarkMode}
