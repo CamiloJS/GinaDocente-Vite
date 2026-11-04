@@ -1200,6 +1200,49 @@ export const DEMO_NOTES = [
   }
 ];
 
+export const DEMO_LESSON_PLANS = [
+  {
+    id: 'demo-lp-1',
+    week: 1,
+    weekTopic: 'Introduction to Economic Terminology: Scarcity, Supply & Demand',
+    institution: 'Universidad de Pamplona',
+    subject: '',
+    teacher: 'Gina',
+    course: '',
+    unit: 'Unidad 1: Fundamentos de Economía y Mercados',
+    learningPurpose: 'Comprender y emplear el vocabulario fundamental de la economía en inglés para describir dinámicas de mercado y escasez.',
+    specificPurposes: '1. Identificar términos clave como Scarcity, Opportunity Cost y Market Equilibrium.\n2. Emplear Present Simple y Present Continuous al describir situaciones de oferta y demanda.\n3. Participar en un debate colaborativo sobre fijación de precios de bienes esenciales.',
+    rows: [
+      {
+        date: 'Semana 1',
+        phase: 'Inicio',
+        topics: 'Escasez y conceptos introductorios',
+        activities: 'Dinámica de rompehielos (Warm-up): Pregunta detonante sobre bienes escasos en la vida cotidiana y lluvia de ideas.',
+        resources: 'Diapositivas interactivas, pizarra digital',
+        time: '20 min'
+      },
+      {
+        date: 'Semana 1',
+        phase: 'Desarrollo',
+        topics: 'Leyes de oferta y demanda, punto de equilibrio',
+        activities: 'Presentación guiada con ejemplos de mercado internacional y taller en parejas de lectura de reportes económicos.',
+        resources: 'Guía de lectura técnica, gráficas de oferta y demanda',
+        time: '50 min'
+      },
+      {
+        date: 'Semana 1',
+        phase: 'Cierre - Tarea',
+        topics: 'Síntesis y glosario técnico',
+        activities: 'Wrap-up: Conclusiones grupales, verificación de conceptos clave y asignación de glosario bilingüe de 10 términos.',
+        resources: 'Campus virtual, rúbrica de vocabulario',
+        time: '20 min'
+      }
+    ],
+    createdAt: Date.now() - 1000 * 60 * 60 * 24 * 3,
+    updatedAt: Date.now() - 1000 * 60 * 60 * 24 * 3
+  }
+];
+
 export const DEMO_GUIDE_TOUR = [
   {
     title: 'Muro de Clase',
@@ -2019,6 +2062,7 @@ export const DEMO_SANDBOX_CATEGORIES = [
   'tasks',
   'evaluations',
   'syllabus',
+  'lessonPlans',
   'reviews',
   'books',
   'notes',
@@ -2041,6 +2085,7 @@ export function loadDemoSandbox(now = Date.now()) {
     tasks: [],
     evaluations: [],
     syllabus: [],
+    lessonPlans: [],
     reviews: [],
     books: [],
     notes: [],

@@ -96,6 +96,7 @@ import {
   DEMO_TASKS,
   DEMO_EVALUATIONS,
   DEMO_SYLLABUS,
+  DEMO_LESSON_PLANS,
   DEMO_REVIEWS,
   DEMO_BOOKS,
   DEMO_NOTES,
@@ -126,6 +127,14 @@ const ReviewsModule = React.lazy(() => import('./components/ReviewsModule.jsx'))
 const BooksLibraryModule = React.lazy(() => import('./components/BooksLibraryModule.jsx'))
 const NotesModule = React.lazy(() => import('./components/NotesModule.jsx'))
 const GifPickerModal = React.lazy(() => import('./components/GifPickerModal.jsx'))
+import { LessonPlansModal } from './components/LessonPlansModal.jsx'
+import {
+  buildLessonPlanPrompt,
+  parseLessonPlanResponse,
+  normalizeLessonPlan,
+  createDefaultLessonPlan,
+  formatLessonPlanAsMarkdown
+} from './utils/lessonPlanEngine.js'
 
 // --- CONSTANTES DE DISEÑO Y PERSONALIZACIÓN DE GRUPOS ---
 export const GROUP_VECTOR_ICONS = [
@@ -770,6 +779,8 @@ function App() {
     setTaskLimit(prev => prev + 25);
   }, [isLoadingMoreTasks, hasMoreTasks]);
   const [rawSyllabus, setSyllabus] = useState(() => initialIsDemo ? DEMO_SYLLABUS : []);
+  const [rawLessonPlans, setRawLessonPlans] = useState(() => initialIsDemo ? DEMO_LESSON_PLANS : []);
+  const [showLessonPlansModal, setShowLessonPlansModal] = useState(false);
   const [showAddSyllabus, setShowAddSyllabus] = useState(false);
   const [showPdfSyllabusModal, setShowPdfSyllabusModal] = useState(false);
   const [isProcessingSyllabusPdf, setIsProcessingSyllabusPdf] = useState(false);
@@ -3380,6 +3391,7 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
             setPinnedTasks(DEMO_TASKS.filter(t => t.isPinned));
             setEvaluations(DEMO_EVALUATIONS);
             setSyllabus(DEMO_SYLLABUS.slice().sort((a, b) => (Number(a.week) || 0) - (Number(b.week) || 0)));
+            setRawLessonPlans(DEMO_LESSON_PLANS);
             setReviews(DEMO_REVIEWS);
             setRawBooks(DEMO_BOOKS);
             setRawNotes(DEMO_NOTES);
@@ -3430,6 +3442,8 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
                 setPinnedTasks(mergedTasks.filter(t => t.isPinned));
                 setEvaluations(mergeDemoItemsWithBase(DEMO_EVALUATIONS, [], 'evaluations'));
                 setSyllabus(mergeDemoItemsWithBase(DEMO_SYLLABUS, [], 'syllabus').slice().sort((a, b) => (Number(a.week) || 0) - (Number(b.week) || 0)));
+    setRawLessonPlans(mergeDemoItemsWithBase(DEMO_LESSON_PLANS, [], 'lessonPlans'));
+                setRawLessonPlans(mergeDemoItemsWithBase(DEMO_LESSON_PLANS, [], 'lessonPlans'));
                 setReviews(mergeDemoItemsWithBase(DEMO_REVIEWS, [], 'reviews'));
                 setRawBooks(mergeDemoItemsWithBase(DEMO_BOOKS, [], 'books'));
                 setRawNotes(mergeDemoItemsWithBase(DEMO_NOTES, [], 'notes'));
@@ -3929,6 +3943,7 @@ useEffect(() => {
     setPinnedTasks(initialTasks.filter(t => t.isPinned));
     setEvaluations(mergeDemoItemsWithBase(DEMO_EVALUATIONS, [], 'evaluations'));
     setSyllabus(mergeDemoItemsWithBase(DEMO_SYLLABUS, [], 'syllabus').slice().sort((a, b) => (Number(a.week) || 0) - (Number(b.week) || 0)));
+    setRawLessonPlans(mergeDemoItemsWithBase(DEMO_LESSON_PLANS, [], 'lessonPlans'));
     setReviews(mergeDemoItemsWithBase(DEMO_REVIEWS, [], 'reviews'));
     setRawBooks(mergeDemoItemsWithBase(DEMO_BOOKS, [], 'books'));
     setRawNotes(mergeDemoItemsWithBase(DEMO_NOTES, [], 'notes'));
@@ -4071,11 +4086,15 @@ useEffect(() => {
     return () => uNotes();
 }, [hasEntered, myChatId, needsNotesSubscription, isDemoMode]);
 
-// 5. PESTAÑA: SYLLABUS
+// 5. PESTAÑA: SYLLABUS Y PLANES DE CLASE
 useEffect(() => {
     if (!hasEntered || !myChatId || isDemoMode || activeTab !== 'syllabus') return;
     const uSyllabus = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'syllabus'), limit(100)), s => setSyllabus(s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.week - b.week)), err => console.error(err));
-    return () => uSyllabus();
+    const uLessonPlans = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'lessonPlans'), limit(100)), s => setRawLessonPlans(s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))), err => console.error(err));
+    return () => {
+      uSyllabus();
+      uLessonPlans();
+    };
 }, [hasEntered, myChatId, activeTab, isDemoMode]);
 
 // 6. PESTAÑA: EVALUACIONES, NOTAS Y MURO
@@ -7441,6 +7460,16 @@ Devuelve ÚNICAMENTE un array JSON plano (sin bloques markdown \`\`\`json ni tex
                     <div className="flex items-center gap-2 shrink-0">
                       <button
                         type="button"
+                        onClick={() => setShowLessonPlansModal(true)}
+                        className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-all hover:scale-[1.02]"
+                        title="Ver respaldos de planeaciones de clase semanales"
+                      >
+                        <FileText size={14} />
+                        <span>Planeaciones ({rawLessonPlans.length})</span>
+                      </button>
+
+                      <button
+                        type="button"
                         onClick={() => {
                           setShowPdfSyllabusModal(true);
                           setExtractedSyllabusPreview(null);
@@ -7952,7 +7981,53 @@ Escribe en español con tono pedagógico moderno.`;
                               </div>
 
                               <div
-                                onClick={() => setSyllabusAssistantModal(prev => ({ ...prev, type: 'lesson_plan_duration' }))}
+                                onClick={async () => {
+                                  const item = syllabusAssistantModal.weekItem;
+                                  setSyllabusAssistantModal(prev => ({ ...prev, type: 'lesson_plan', isLoading: true, content: '', planObject: null }));
+                                  try {
+                                    const teacherName = myDisplayName || 'Gina';
+                                    const prompt = buildLessonPlanPrompt({
+                                      weekItem: item,
+                                      teacherName,
+                                      institution: 'Universidad de Pamplona'
+                                    });
+                                    const res = await callGemini(prompt);
+                                    const normalizedPlan = parseLessonPlanResponse(res, {
+                                      weekItem: item,
+                                      teacherName
+                                    });
+
+                                    // Guardar en Firestore o Modo Demo
+                                    if (isDemoMode) {
+                                      saveDemoSandboxItem('lessonPlans', normalizedPlan);
+                                      setRawLessonPlans(prev => [normalizedPlan, ...prev.filter(p => p.id !== normalizedPlan.id)]);
+                                    } else {
+                                      try {
+                                        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'lessonPlans'), normalizedPlan);
+                                      } catch (dbErr) {
+                                        console.error('Error guardando planeación en Firestore:', dbErr);
+                                      }
+                                      setRawLessonPlans(prev => [normalizedPlan, ...prev.filter(p => p.id !== normalizedPlan.id)]);
+                                    }
+
+                                    setSyllabusAssistantModal(prev => ({
+                                      ...prev,
+                                      type: 'lesson_plan',
+                                      content: formatLessonPlanAsMarkdown(normalizedPlan),
+                                      planObject: normalizedPlan,
+                                      isLoading: false
+                                    }));
+                                    showMessage('Planeación de clase generada y respaldada con éxito.');
+                                  } catch (e) {
+                                    console.error('Error al generar plan de clase con IA:', e);
+                                    setSyllabusAssistantModal(prev => ({
+                                      ...prev,
+                                      type: 'lesson_plan',
+                                      content: 'Error al generar el plan de clase. Intenta de nuevo.',
+                                      isLoading: false
+                                    }));
+                                  }
+                                }}
                                 className={`p-5 rounded-2xl border transition-all cursor-pointer hover:scale-[1.02] flex flex-col justify-between gap-3 ${
                                   isDarkMode ? 'bg-gray-800/80 border-gray-700 hover:border-purple-500/50' : 'bg-purple-50/50 border-purple-200/80 hover:border-purple-400 shadow-xs'
                                 }`}
@@ -7963,7 +8038,7 @@ Escribe en español con tono pedagógico moderno.`;
                                   </div>
                                   <div>
                                     <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100">Crear un plan de clase</h4>
-                                    <p className="text-[11px] text-gray-500 mt-1">Estructura una sesión universitaria completa (Warm-up, Presentation, Practice y Wrap-up).</p>
+                                    <p className="text-[11px] text-gray-500 mt-1">Genera la planeación semanal oficial de la Universidad de Pamplona (Inicio, Desarrollo y Cierre - Tarea).</p>
                                   </div>
                                 </div>
                                 <span className="text-xs font-bold text-purple-600 dark:text-purple-400 flex items-center gap-1">
@@ -7972,77 +8047,177 @@ Escribe en español con tono pedagógico moderno.`;
                               </div>
                             </div>
                           </div>
-                        ) : syllabusAssistantModal.type === 'lesson_plan_duration' ? (
-                          <div className="flex flex-col items-center justify-center h-full py-8 space-y-6">
-                            <div className="w-14 h-14 rounded-2xl bg-purple-500/10 text-purple-600 flex items-center justify-center shrink-0 mb-2">
-                              <Clock size={28} />
-                            </div>
-                            <div className="text-center">
-                              <h4 className="font-bold text-lg text-gray-900 dark:text-gray-100">Duración de la clase</h4>
-                              <p className="text-sm text-gray-500 mt-1">Selecciona cuánto durará esta sesión para que la IA distribuya el tiempo correctamente.</p>
-                            </div>
-                            <div className="flex flex-wrap items-center justify-center gap-3 w-full max-w-sm">
-                              {[60, 90, 120].map(mins => (
-                                <button
-                                  key={mins}
-                                  onClick={async () => {
-                                    const item = syllabusAssistantModal.weekItem;
-                                    setSyllabusAssistantModal(prev => ({ ...prev, type: 'lesson_plan', duration: mins, isLoading: true, content: '' }));
-                                    try {
-                                      const prompt = `Eres un diseñador instruccional y pedagogo universitario de alto nivel.
-Diseña un Plan de Clase (Lesson Plan) completo de ${mins} minutos para la docente Gina, basado en la siguiente semana del programa:
-- Semana ${item.week}: ${item.topic}
-- Unidad: ${item.unit || 'General'}
-- Descripción / Objetivos: ${item.description || ''}
-- Conceptos clave: ${(item.keyConcepts || []).join(', ')}
-
-Estructura el plan en 4 momentos pedagógicos clave ajustando los tiempos para que sumen exactamente ${mins} minutos:
-1. 🚀 Warm-up / Rompehielos y activación previa
-2. 📚 Presentation / Explicación del tema y ejemplos clave
-3. ✍️ Practice / Práctica guiada e interactiva
-4. 🏁 Wrap-up / Evaluación formativa y cierre de sesión
-
-Incluye recursos recomendados y tips docentes para la profesora Gina.`;
-                                      const res = await callGemini(prompt);
-                                      setSyllabusAssistantModal(prev => ({ ...prev, content: res || '', isLoading: false }));
-                                    } catch (e) {
-                                      setSyllabusAssistantModal(prev => ({ ...prev, content: 'Error al generar el plan de clase. Intenta de nuevo.', isLoading: false }));
-                                    }
-                                  }}
-                                  className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm transition-colors border shadow-sm flex flex-col items-center gap-1 hover:scale-105 ${
-                                    isDarkMode ? 'bg-gray-800 border-gray-700 text-purple-300 hover:bg-gray-700' : 'bg-white border-purple-200 text-purple-700 hover:bg-purple-50'
-                                  }`}
-                                >
-                                  <span className="text-xl leading-none">{mins}</span>
-                                  <span className="text-[10px] uppercase tracking-wider text-purple-500/70 dark:text-purple-400/70">minutos</span>
-                                </button>
-                              ))}
-                            </div>
-                            <button
-                                onClick={() => setSyllabusAssistantModal(prev => ({ ...prev, type: null }))}
-                                className="mt-4 text-xs font-semibold text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
-                            >
-                                Cancelar
-                            </button>
-                          </div>
                         ) : syllabusAssistantModal.isLoading ? (
                           <div className="p-8 text-center space-y-3">
-                            <Loader2 size={32} className="animate-spin text-amber-500 mx-auto" />
+                            <Loader2 size={32} className="animate-spin text-purple-600 mx-auto" />
                             <h4 className="text-sm font-bold text-gray-800 dark:text-gray-200">
-                              {syllabusAssistantModal.type === 'activity' ? 'Diseñando actividad pedagógica...' : `Estructurando plan de clase de ${syllabusAssistantModal.duration || 90} min...`}
+                              {syllabusAssistantModal.type === 'activity' ? 'Diseñando actividad pedagógica...' : 'Estructurando planeación semanal en formato oficial...'}
                             </h4>
-                            <p className="text-xs text-gray-500">Analizando objetivos y conceptos clave de la semana...</p>
+                            <p className="text-xs text-gray-500">Diseñando propósitos de aprendizaje, fases, tiempos y recursos para la Universidad de Pamplona...</p>
+                          </div>
+                        ) : syllabusAssistantModal.type === 'lesson_plan' && syllabusAssistantModal.planObject ? (
+                          /* RENDERIZADO VISUAL OFICIAL DEL PLAN DE CLASE (IDÉNTICO A LA IMAGEN) */
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between pb-2 border-b border-gray-200 dark:border-gray-800">
+                              <span className="text-xs font-bold text-purple-600 dark:text-purple-400 flex items-center gap-1.5">
+                                <CheckCheck size={16} />
+                                <span>Planeación semanal generada y guardada como respaldo</span>
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setShowLessonPlansModal(true)}
+                                  className="text-xs font-bold text-purple-600 hover:underline flex items-center gap-1"
+                                >
+                                  <FileText size={13} /> Ver todos los respaldos
+                                </button>
+                                <span className="text-gray-300 dark:text-gray-700">|</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setSyllabusAssistantModal(prev => ({ ...prev, type: null, content: '', planObject: null }))}
+                                  className="text-xs text-gray-500 hover:underline"
+                                >
+                                  Elegir otra opción
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* HOJA OFICIAL CON EL FORMATO EXACTO DE LA IMAGEN */}
+                            <div className="p-5 sm:p-7 rounded-2xl bg-white text-black border border-gray-300 shadow-md font-sans text-xs leading-relaxed space-y-4 overflow-x-auto">
+                              <div className="text-center">
+                                <h2 className="text-sm sm:text-base font-black tracking-wide uppercase text-black">
+                                  FORMATO PLANEACIÓN DE CLASE (SEMANAL)
+                                </h2>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3 gap-x-6 pt-2">
+                                <div className="flex items-baseline">
+                                  <span className="font-extrabold text-black shrink-0 whitespace-nowrap">
+                                    Institución educativa:&nbsp;
+                                  </span>
+                                  <span className="flex-1 border-b border-black font-semibold text-black px-1.5">
+                                    {syllabusAssistantModal.planObject.institution || 'Universidad de Pamplona'}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-baseline">
+                                  <span className="font-extrabold text-black shrink-0 whitespace-nowrap">
+                                    Asignatura:&nbsp;
+                                  </span>
+                                  <span className="flex-1 border-b border-black font-semibold text-black px-1.5 min-h-[1.25rem]">
+                                    {syllabusAssistantModal.planObject.subject || ''}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-baseline">
+                                  <span className="font-extrabold text-black shrink-0 whitespace-nowrap">
+                                    Profesor:&nbsp;
+                                  </span>
+                                  <span className="flex-1 border-b border-black font-semibold text-black px-1.5">
+                                    {syllabusAssistantModal.planObject.teacher || ''}
+                                  </span>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div className="flex items-baseline">
+                                    <span className="font-extrabold text-black shrink-0 whitespace-nowrap">
+                                      Curso:&nbsp;
+                                    </span>
+                                    <span className="flex-1 border-b border-black font-semibold text-black px-1.5 min-h-[1.25rem]">
+                                      {syllabusAssistantModal.planObject.course || ''}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-baseline">
+                                    <span className="font-extrabold text-black shrink-0 whitespace-nowrap">
+                                      Unidad:&nbsp;
+                                    </span>
+                                    <span className="flex-1 border-b border-black font-semibold text-black px-1.5">
+                                      {syllabusAssistantModal.planObject.unit || ''}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="pt-2">
+                                <div className="flex items-baseline flex-wrap">
+                                  <span className="font-extrabold text-black shrink-0">
+                                    Propósito de aprendizaje:&nbsp;
+                                  </span>
+                                  <span className="flex-1 min-w-[200px] border-b border-black font-semibold text-black px-1.5">
+                                    {syllabusAssistantModal.planObject.learningPurpose || ''}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div>
+                                <div className="flex items-baseline">
+                                  <span className="font-extrabold text-black shrink-0">
+                                    Propósitos específicos:&nbsp;
+                                  </span>
+                                  <div className="flex-1 border-b border-black min-h-[1.25rem]" />
+                                </div>
+                                <div className="pt-1.5 pb-2 border-b border-black whitespace-pre-line text-black font-medium pl-4">
+                                  {syllabusAssistantModal.planObject.specificPurposes || ''}
+                                </div>
+                                <div className="border-b border-black h-1" />
+                              </div>
+
+                              <div className="overflow-x-auto pt-2">
+                                <table className="w-full border-collapse border border-black text-left text-[11px] sm:text-xs">
+                                  <thead>
+                                    <tr className="border-b border-black bg-gray-50/70">
+                                      <th className="border border-black p-2 font-black text-black w-24">Fecha</th>
+                                      <th className="border border-black p-2 font-black text-black w-28">Fases</th>
+                                      <th className="border border-black p-2 font-black text-black w-40">Temas</th>
+                                      <th className="border border-black p-2 font-black text-black">Actividades</th>
+                                      <th className="border border-black p-2 font-black text-black w-36">Recursos</th>
+                                      <th className="border border-black p-2 font-black text-black w-20 text-center">Tiempo</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {(syllabusAssistantModal.planObject.rows || []).map((row, rIdx) => (
+                                      <tr key={rIdx} className="border-b border-black align-top">
+                                        {rIdx === 0 ? (
+                                          <td
+                                            rowSpan={syllabusAssistantModal.planObject.rows.length}
+                                            className="border border-black p-2 font-bold text-black text-center align-middle bg-white"
+                                          >
+                                            {row.date || `Semana ${syllabusAssistantModal.planObject.week}`}
+                                          </td>
+                                        ) : null}
+                                        <td className="border border-black p-2 font-black text-black bg-white">
+                                          {row.phase}
+                                        </td>
+                                        <td className="border border-black p-2 text-black font-semibold whitespace-pre-line">
+                                          {row.topics}
+                                        </td>
+                                        <td className="border border-black p-2 text-black font-normal whitespace-pre-line leading-relaxed">
+                                          {row.activities}
+                                        </td>
+                                        <td className="border border-black p-2 text-black font-medium whitespace-pre-line">
+                                          {row.resources}
+                                        </td>
+                                        <td className="border border-black p-2 font-bold text-black text-center whitespace-nowrap">
+                                          {row.time}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
                           </div>
                         ) : (
                           <div className="space-y-4">
                             <div className="flex items-center justify-between pb-2 border-b border-gray-200 dark:border-gray-800">
                               <span className="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
                                 <CheckCheck size={16} />
-                                <span>{syllabusAssistantModal.type === 'activity' ? 'Propuesta de Actividad' : 'Plan de Clase Generado'}</span>
+                                <span>Propuesta de Actividad</span>
                               </span>
                               <button
                                 type="button"
-                                onClick={() => setSyllabusAssistantModal(prev => ({ ...prev, type: null, content: '' }))}
+                                onClick={() => setSyllabusAssistantModal(prev => ({ ...prev, type: null, content: '', planObject: null }))}
                                 className="text-xs text-gray-500 hover:underline"
                               >
                                 Elegir otra opción
@@ -8062,7 +8237,7 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                       <div className="flex items-center justify-between gap-2.5 px-5 pt-3.5 pb-safe border-t border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50">
                         <button
                           type="button"
-                          onClick={() => setSyllabusAssistantModal({ isOpen: false, weekItem: null, type: null, content: '', isLoading: false })}
+                          onClick={() => setSyllabusAssistantModal({ isOpen: false, weekItem: null, type: null, content: '', planObject: null, isLoading: false })}
                           className="px-4 py-2 text-xs font-semibold rounded-xl text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
                         >
                           Cerrar
@@ -8070,6 +8245,19 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
 
                         {syllabusAssistantModal.content && !syllabusAssistantModal.isLoading && (
                           <div className="flex items-center gap-2">
+                            {syllabusAssistantModal.type === 'lesson_plan' && syllabusAssistantModal.planObject && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowLessonPlansModal(true);
+                                  setSyllabusAssistantModal(prev => ({ ...prev, isOpen: false }));
+                                }}
+                                className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-1.5 transition-colors shadow-2xs"
+                              >
+                                <FileText size={14} /> Abrir en respaldos
+                              </button>
+                            )}
+
                             <button
                               type="button"
                               onClick={() => {
@@ -8080,19 +8268,22 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                             >
                               <Copy size={14} /> Copiar texto
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setTaskTitle(`Semana ${syllabusAssistantModal.weekItem.week}: ${syllabusAssistantModal.weekItem.topic}`);
-                                setTaskDesc(syllabusAssistantModal.content);
-                                setSyllabusAssistantModal({ isOpen: false, weekItem: null, type: null, content: '', isLoading: false });
-                                changeTab('tasks');
-                                showMessage("Tarea cargada en el compositor del muro.");
-                              }}
-                              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition-all"
-                            >
-                              <Plus size={14} /> Publicar como tarea
-                            </button>
+
+                            {syllabusAssistantModal.type !== 'lesson_plan' && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setTaskTitle(`Semana ${syllabusAssistantModal.weekItem.week}: ${syllabusAssistantModal.weekItem.topic}`);
+                                  setTaskDesc(syllabusAssistantModal.content);
+                                  setSyllabusAssistantModal({ isOpen: false, weekItem: null, type: null, content: '', planObject: null, isLoading: false });
+                                  changeTab('tasks');
+                                  showMessage("Tarea cargada en el compositor del muro.");
+                                }}
+                                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition-all"
+                              >
+                                <Plus size={14} /> Publicar como tarea
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
@@ -8237,6 +8428,42 @@ Incluye recursos recomendados y tips docentes para la profesora Gina.`;
                     ))
                   )}
                 </div>
+
+                {/* MODAL GESTOR DE PLANES DE CLASE (RESPALDOS) */}
+                <LessonPlansModal
+                  isOpen={showLessonPlansModal}
+                  onClose={() => setShowLessonPlansModal(false)}
+                  lessonPlans={rawLessonPlans}
+                  onUpdatePlan={async (updatedPlan) => {
+                    const norm = normalizeLessonPlan(updatedPlan);
+                    if (isDemoMode) {
+                      saveDemoSandboxItem('lessonPlans', norm);
+                      setRawLessonPlans(prev => prev.map(p => p.id === norm.id ? norm : p));
+                    } else {
+                      try {
+                        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'lessonPlans', norm.id), norm, { merge: true });
+                      } catch (err) {
+                        console.error('Error actualizando planeación en Firestore:', err);
+                      }
+                      setRawLessonPlans(prev => prev.map(p => p.id === norm.id ? norm : p));
+                    }
+                  }}
+                  onDeletePlan={async (planId) => {
+                    if (isDemoMode) {
+                      removeDemoSandboxItem('lessonPlans', planId);
+                      setRawLessonPlans(prev => prev.filter(p => p.id !== planId));
+                    } else {
+                      try {
+                        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'lessonPlans', planId));
+                      } catch (err) {
+                        console.error('Error eliminando planeación de Firestore:', err);
+                      }
+                      setRawLessonPlans(prev => prev.filter(p => p.id !== planId));
+                    }
+                  }}
+                  isDarkMode={isDarkMode}
+                  showMessage={showMessage}
+                />
               </div>
             );
           };
