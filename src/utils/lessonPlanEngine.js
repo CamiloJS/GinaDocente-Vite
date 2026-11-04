@@ -21,18 +21,34 @@ export function buildLessonPlanPrompt({
   const activities = weekItem?.activities || '';
   const totalMinutes = Math.max(30, Math.round(Number(hours) * 60) || 120);
 
-  // Distribución de tiempo según duración y si hay rompehielos
-  const inicioMins = includeIcebreaker ? Math.round(totalMinutes * 0.25) : Math.round(totalMinutes * 0.15);
-  const cierreMins = Math.round(totalMinutes * 0.20);
-  const desarrolloMins = totalMinutes - inicioMins - cierreMins;
+  // Distribución de tiempo según duración y si hay rompehielos:
+  // Las actividades rompehielos deben ser CORTAS: de 10 a 15 minutos como mucho (nunca de media hora)
+  let inicioMins;
+  if (includeIcebreaker) {
+    inicioMins = totalMinutes <= 60 ? 10 : 15; // 10 a 15 min máximo
+  } else {
+    inicioMins = totalMinutes <= 60 ? 5 : 10;  // activación breve de saberes previos
+  }
+
+  // Cierre formativo breve (10 a 20 min)
+  let cierreMins;
+  if (totalMinutes <= 60) {
+    cierreMins = 10;
+  } else if (totalMinutes <= 120) {
+    cierreMins = 15;
+  } else {
+    cierreMins = 20;
+  }
+
+  const desarrolloMins = Math.max(15, totalMinutes - inicioMins - cierreMins);
 
   const icebreakerGuideline = includeIcebreaker
-    ? `SÍ incluir una actividad rompehielos (Icebreaker / Warm-up dinámico) en la fase de "Inicio".${
+    ? `SÍ incluir una actividad rompehielos (Icebreaker / Warm-up) en la fase de "Inicio". REGLA CRÍTICA DE TIEMPO: La actividad rompehielos DEBE ser CORTA y ágil, de entre 10 y 15 minutos como máximo (NUNCA de 20, 25 ni 30 minutos; estrictamente entre 10 y 15 minutos). Debe ser una dinámica breve de integración o calentamiento sin consumir el tiempo principal de la clase.${
         icebreakerResources && icebreakerResources.trim()
-          ? ` RECURSOS A DISPOSICIÓN PARA EL ROMPEHIELOS: ${icebreakerResources.trim()}. Debes diseñar el rompehielos adaptado a estos recursos disponibles.`
-          : ' Diseña un rompehielos activo y motivador adaptado a estudiantes universitarios.'
+          ? ` RECURSOS A DISPOSICIÓN PARA EL ROMPEHIELOS: ${icebreakerResources.trim()}. Diseña el rompehielos corto adaptado exclusivamente a estos recursos disponibles.`
+          : ' Diseña un rompehielos activo, breve y motivador adaptado a estudiantes universitarios.'
       }`
-    : `NO incluir actividad rompehielos; en la fase de "Inicio", enfócate directamente en activación de saberes previos, motivación y preguntas detonantes técnicas sobre el tema.`;
+    : `NO incluir actividad rompehielos; en la fase de "Inicio", realiza una activación breve y directa de saberes previos y preguntas detonantes (5 a 10 min).`;
 
   return `Eres un diseñador instruccional y pedagogo universitario de alto nivel.
 Genera una planeación de clase semanal universitaria en ESPAÑOL basada en los siguientes datos del contenido programático:
@@ -63,7 +79,7 @@ El formato del JSON debe ser exactamente:
       "date": "Semana ${week}",
       "phase": "Inicio",
       "topics": "Temas o conceptos a abordar en la fase de Inicio",
-      "activities": "Actividades detalladas para el Inicio (${includeIcebreaker ? 'Actividad rompehielos dinámica' : 'Activación de saberes previos'}, motivación y contextualización)",
+      "activities": "Actividades detalladas para el Inicio (${includeIcebreaker ? 'Dinámica rompehielos CORTA de 10 a 15 minutos como máximo' : 'Activación breve de saberes previos'}, motivación y contextualización)",
       "resources": "Recursos para Inicio${icebreakerResources ? ` (incluyendo: ${icebreakerResources.trim()})` : ''}",
       "time": "${inicioMins} min"
     },
@@ -94,7 +110,8 @@ Reglas estrictas:
 5. "specificPurposes" debe contener 2 o 3 propósitos específicos numerados.
 6. "rows" debe contener exactamente 3 filas correspondientes a las fases: "Inicio", "Desarrollo" y "Cierre - Tarea".
 7. Cada fila debe tener "date", "phase", "topics", "activities", "resources" y "time".
-8. La suma de tiempos de las 3 filas debe ser aproximadamente ${totalMinutes} minutos (${hours} ${hours === 1 ? 'hora' : 'horas'}).`;
+8. La suma de tiempos de las 3 filas debe ser aproximadamente ${totalMinutes} minutos (${hours} ${hours === 1 ? 'hora' : 'horas'}).
+9. DURACIÓN DEL ROMPEHIELOS: Si se incluye rompehielos, la actividad de "Inicio" DEBE ser CORTA, de 10 a 15 minutos como máximo (tiempo asignado: "${inicioMins} min"). NUNCA programes un rompehielos de media hora ni mayor a 15 minutos.`;
 }
 
 /**

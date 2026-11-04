@@ -56,9 +56,19 @@ check('Prompt exige las 3 fases del cuadro (Inicio, Desarrollo, Cierre - Tarea)'
   prompt.includes('Inicio') && prompt.includes('Desarrollo') && prompt.includes('Cierre - Tarea')
 );
 check('Prompt incluye la duración solicitada (3 horas / 180 minutos)', prompt.includes('3 horas') && prompt.includes('180 minutos'));
+check('Prompt limita el rompehielos a 10-15 min máximo incluso en clases largas de 3 horas', 
+  prompt.includes('15 min') && prompt.includes('10 y 15 minutos como máximo') && prompt.includes('NUNCA de 20, 25 ni 30 minutos')
+);
 check('Prompt incluye la directriz de rompehielos con los recursos a disposición', 
   prompt.includes('Marcadores de colores, balones y música') && prompt.includes('rompehielos')
 );
+
+// Prueba de duración de rompehielos para 1h y 2h
+const prompt2h = buildLessonPlanPrompt({ weekItem: mockWeek, hours: 2, includeIcebreaker: true });
+check('Prompt de 2 horas asigna exactamente 15 min al rompehielos en lugar de 30 min', prompt2h.includes('"time": "15 min"'));
+
+const prompt1h = buildLessonPlanPrompt({ weekItem: mockWeek, hours: 1, includeIcebreaker: true });
+check('Prompt de 1 hora asigna exactamente 10 min al rompehielos', prompt1h.includes('"time": "10 min"'));
 
 const promptNoIcebreaker = buildLessonPlanPrompt({
   weekItem: mockWeek,

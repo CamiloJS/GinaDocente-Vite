@@ -8113,7 +8113,7 @@ Escribe en español con tono pedagógico moderno.`;
                                         : 'bg-white border-gray-300 text-gray-600'
                                   }`}
                                 >
-                                  <span>Sí, incluir rompehielos</span>
+                                  <span>Sí, incluir rompehielos (10-15 min)</span>
                                 </button>
                                 <button
                                   type="button"
@@ -8148,7 +8148,7 @@ Escribe en español con tono pedagógico moderno.`;
                                     }`}
                                   />
                                   <p className="text-[10px] text-gray-400">
-                                    La IA adaptará la dinámica del rompehielos a los materiales que indiques.
+                                    La IA adaptará una dinámica corta (10 a 15 min máximo) a los materiales que indiques.
                                   </p>
                                 </div>
                               )}
