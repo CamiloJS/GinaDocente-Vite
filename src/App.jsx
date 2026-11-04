@@ -8271,56 +8271,63 @@ Escribe en español con tono pedagógico moderno.`;
                             </div>
 
                             {/* HOJA OFICIAL CON EL FORMATO EXACTO DE LA IMAGEN */}
-                            <div className="p-5 sm:p-7 rounded-2xl bg-white text-black border border-gray-300 shadow-md font-sans text-xs leading-relaxed space-y-4 overflow-x-auto">
+                            <div 
+                              className="p-5 sm:p-7 rounded-2xl bg-white text-black border-2 border-gray-300 shadow-md font-sans text-xs leading-relaxed space-y-4 overflow-x-auto printable-lesson-plan"
+                              style={{ color: '#000000', backgroundColor: '#ffffff', colorScheme: 'light' }}
+                            >
                               <div className="text-center">
-                                <h2 className="text-sm sm:text-base font-black tracking-wide uppercase text-black">
+                                <h2 className="text-sm sm:text-base font-black tracking-wide uppercase text-black" style={{ color: '#000000' }}>
                                   FORMATO PLANEACIÓN DE CLASE (SEMANAL)
                                 </h2>
                               </div>
 
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3 gap-x-6 pt-2">
-                                <div className="flex items-baseline">
-                                  <span className="font-extrabold text-black shrink-0 whitespace-nowrap">
-                                    Institución educativa:&nbsp;
-                                  </span>
-                                  <span className="flex-1 border-b border-black font-semibold text-black px-1.5">
-                                    {syllabusAssistantModal.planObject.institution || 'Universidad de Pamplona'}
-                                  </span>
+                              <div className="space-y-3 pt-2">
+                                {/* Fila 1: Institución educativa y Asignatura */}
+                                <div className="flex flex-col sm:flex-row gap-3 sm:gap-6">
+                                  <div className="flex-1 flex items-baseline min-w-0">
+                                    <span className="font-black text-black shrink-0 whitespace-nowrap" style={{ color: '#000000' }}>
+                                      Institución educativa:&nbsp;
+                                    </span>
+                                    <span className="flex-1 border-b-2 border-black font-bold text-black px-1.5 truncate" style={{ color: '#000000', borderColor: '#000000' }}>
+                                      {syllabusAssistantModal.planObject.institution || 'Universidad de Pamplona'}
+                                    </span>
+                                  </div>
+
+                                  <div className="w-full sm:w-2/5 flex items-baseline min-w-0">
+                                    <span className="font-black text-black shrink-0 whitespace-nowrap" style={{ color: '#000000' }}>
+                                      Asignatura:&nbsp;
+                                    </span>
+                                    <span className="flex-1 border-b-2 border-black font-bold text-black px-1.5 min-h-[1.25rem] truncate" style={{ color: '#000000', borderColor: '#000000' }}>
+                                      {syllabusAssistantModal.planObject.subject || ''}
+                                    </span>
+                                  </div>
                                 </div>
 
-                                <div className="flex items-baseline">
-                                  <span className="font-extrabold text-black shrink-0 whitespace-nowrap">
-                                    Asignatura:&nbsp;
-                                  </span>
-                                  <span className="flex-1 border-b border-black font-semibold text-black px-1.5 min-h-[1.25rem]">
-                                    {syllabusAssistantModal.planObject.subject || ''}
-                                  </span>
-                                </div>
+                                {/* Fila 2: Profesor, Curso y Unidad */}
+                                <div className="flex flex-col sm:flex-row gap-3 sm:gap-6">
+                                  <div className="flex-1 flex items-baseline min-w-0">
+                                    <span className="font-black text-black shrink-0 whitespace-nowrap" style={{ color: '#000000' }}>
+                                      Profesor:&nbsp;
+                                    </span>
+                                    <span className="flex-1 border-b-2 border-black font-bold text-black px-1.5 truncate" style={{ color: '#000000', borderColor: '#000000' }}>
+                                      {syllabusAssistantModal.planObject.teacher || ''}
+                                    </span>
+                                  </div>
 
-                                <div className="flex items-baseline">
-                                  <span className="font-extrabold text-black shrink-0 whitespace-nowrap">
-                                    Profesor:&nbsp;
-                                  </span>
-                                  <span className="flex-1 border-b border-black font-semibold text-black px-1.5">
-                                    {syllabusAssistantModal.planObject.teacher || ''}
-                                  </span>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-3">
-                                  <div className="flex items-baseline">
-                                    <span className="font-extrabold text-black shrink-0 whitespace-nowrap">
+                                  <div className="w-full sm:w-36 flex items-baseline min-w-0">
+                                    <span className="font-black text-black shrink-0 whitespace-nowrap" style={{ color: '#000000' }}>
                                       Curso:&nbsp;
                                     </span>
-                                    <span className="flex-1 border-b border-black font-semibold text-black px-1.5 min-h-[1.25rem]">
+                                    <span className="flex-1 border-b-2 border-black font-bold text-black px-1.5 min-h-[1.25rem] truncate" style={{ color: '#000000', borderColor: '#000000' }}>
                                       {syllabusAssistantModal.planObject.course || ''}
                                     </span>
                                   </div>
 
-                                  <div className="flex items-baseline">
-                                    <span className="font-extrabold text-black shrink-0 whitespace-nowrap">
+                                  <div className="w-full sm:w-56 flex items-baseline min-w-0">
+                                    <span className="font-black text-black shrink-0 whitespace-nowrap" style={{ color: '#000000' }}>
                                       Unidad:&nbsp;
                                     </span>
-                                    <span className="flex-1 border-b border-black font-semibold text-black px-1.5">
+                                    <span className="flex-1 border-b-2 border-black font-bold text-black px-1.5 truncate" style={{ color: '#000000', borderColor: '#000000' }} title={syllabusAssistantModal.planObject.unit || ''}>
                                       {syllabusAssistantModal.planObject.unit || ''}
                                     </span>
                                   </div>
@@ -8329,64 +8336,65 @@ Escribe en español con tono pedagógico moderno.`;
 
                               <div className="pt-2">
                                 <div className="flex items-baseline flex-wrap">
-                                  <span className="font-extrabold text-black shrink-0">
+                                  <span className="font-black text-black shrink-0" style={{ color: '#000000' }}>
                                     Propósito de aprendizaje:&nbsp;
                                   </span>
-                                  <span className="flex-1 min-w-[200px] border-b border-black font-semibold text-black px-1.5">
+                                  <span className="flex-1 min-w-[200px] border-b-2 border-black font-semibold text-black px-1.5" style={{ color: '#000000', borderColor: '#000000' }}>
                                     {syllabusAssistantModal.planObject.learningPurpose || ''}
                                   </span>
                                 </div>
                               </div>
 
-                              <div>
+                              <div className="pt-1">
                                 <div className="flex items-baseline">
-                                  <span className="font-extrabold text-black shrink-0">
+                                  <span className="font-black text-black shrink-0" style={{ color: '#000000' }}>
                                     Propósitos específicos:&nbsp;
                                   </span>
-                                  <div className="flex-1 border-b border-black min-h-[1.25rem]" />
+                                  <div className="flex-1 border-b-2 border-black min-h-[1.25rem]" style={{ borderColor: '#000000' }} />
                                 </div>
-                                <div className="pt-1.5 pb-2 border-b border-black whitespace-pre-line text-black font-medium pl-4">
+                                <div className="pt-1.5 pb-2 border-b-2 border-black whitespace-pre-line text-black font-medium pl-4" style={{ color: '#000000', borderColor: '#000000' }}>
                                   {syllabusAssistantModal.planObject.specificPurposes || ''}
                                 </div>
-                                <div className="border-b border-black h-1" />
+                                <div className="border-b-2 border-black h-1" style={{ borderColor: '#000000' }} />
                               </div>
 
-                              <div className="overflow-x-auto pt-2">
-                                <table className="w-full border-collapse border border-black text-left text-[11px] sm:text-xs">
+                              <div className="overflow-x-auto pt-3">
+                                <table className="w-full border-collapse border-2 border-black text-left text-[11px] sm:text-xs" style={{ borderColor: '#000000' }}>
                                   <thead>
-                                    <tr className="border-b border-black bg-gray-50/70">
-                                      <th className="border border-black p-2 font-black text-black w-24">Fecha</th>
-                                      <th className="border border-black p-2 font-black text-black w-28">Fases</th>
-                                      <th className="border border-black p-2 font-black text-black w-40">Temas</th>
-                                      <th className="border border-black p-2 font-black text-black">Actividades</th>
-                                      <th className="border border-black p-2 font-black text-black w-36">Recursos</th>
-                                      <th className="border border-black p-2 font-black text-black w-20 text-center">Tiempo</th>
+                                    <tr className="border-b-2 border-black bg-gray-100" style={{ borderColor: '#000000', backgroundColor: '#f3f4f6' }}>
+                                      <th className="border border-black p-2 font-black text-black w-24 text-center" style={{ color: '#000000', borderColor: '#000000', backgroundColor: '#f3f4f6' }}>Fecha</th>
+                                      <th className="border border-black p-2 font-black text-black w-28 text-center" style={{ color: '#000000', borderColor: '#000000', backgroundColor: '#f3f4f6' }}>Fases</th>
+                                      <th className="border border-black p-2 font-black text-black w-40" style={{ color: '#000000', borderColor: '#000000', backgroundColor: '#f3f4f6' }}>Temas</th>
+                                      <th className="border border-black p-2 font-black text-black" style={{ color: '#000000', borderColor: '#000000', backgroundColor: '#f3f4f6' }}>Actividades</th>
+                                      <th className="border border-black p-2 font-black text-black w-36" style={{ color: '#000000', borderColor: '#000000', backgroundColor: '#f3f4f6' }}>Recursos</th>
+                                      <th className="border border-black p-2 font-black text-black w-20 text-center" style={{ color: '#000000', borderColor: '#000000', backgroundColor: '#f3f4f6' }}>Tiempo</th>
                                     </tr>
                                   </thead>
                                   <tbody>
                                     {(syllabusAssistantModal.planObject.rows || []).map((row, rIdx) => (
-                                      <tr key={rIdx} className="border-b border-black align-top">
+                                      <tr key={rIdx} className="border-b border-black align-top" style={{ borderColor: '#000000' }}>
                                         {rIdx === 0 ? (
                                           <td
                                             rowSpan={syllabusAssistantModal.planObject.rows.length}
-                                            className="border border-black p-2 font-bold text-black text-center align-middle bg-white"
+                                            className="border border-black p-2.5 font-black text-black text-center align-middle bg-white"
+                                            style={{ color: '#000000', borderColor: '#000000', backgroundColor: '#ffffff' }}
                                           >
-                                            {row.date || `Semana ${syllabusAssistantModal.planObject.week}`}
+                                            {row.date || `Semana ${syllabusAssistantModal.planObject.week || 1}`}
                                           </td>
                                         ) : null}
-                                        <td className="border border-black p-2 font-black text-black bg-white">
+                                        <td className="border border-black p-2.5 font-black text-black text-center bg-gray-50/70" style={{ color: '#000000', borderColor: '#000000' }}>
                                           {row.phase}
                                         </td>
-                                        <td className="border border-black p-2 text-black font-semibold whitespace-pre-line">
+                                        <td className="border border-black p-2.5 text-black font-semibold whitespace-pre-line" style={{ color: '#000000', borderColor: '#000000' }}>
                                           {row.topics}
                                         </td>
-                                        <td className="border border-black p-2 text-black font-normal whitespace-pre-line leading-relaxed">
+                                        <td className="border border-black p-2.5 text-black font-normal whitespace-pre-line leading-relaxed" style={{ color: '#000000', borderColor: '#000000' }}>
                                           {stripTimeFromActivityText(row.activities)}
                                         </td>
-                                        <td className="border border-black p-2 text-black font-medium whitespace-pre-line">
+                                        <td className="border border-black p-2.5 text-black font-medium whitespace-pre-line" style={{ color: '#000000', borderColor: '#000000' }}>
                                           {row.resources}
                                         </td>
-                                        <td className="border border-black p-2 font-bold text-black text-center whitespace-nowrap">
+                                        <td className="border border-black p-2.5 font-black text-black text-center whitespace-nowrap" style={{ color: '#000000', borderColor: '#000000' }}>
                                           {row.time}
                                         </td>
                                       </tr>

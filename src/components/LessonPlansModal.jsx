@@ -625,6 +625,16 @@ export function LessonPlansModal({
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
+                      onClick={() => {
+                        document.getElementById('didactic-materials-section')?.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                      className="px-2.5 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 text-xs font-bold flex items-center gap-1.5 text-purple-600 dark:text-purple-400 transition-colors cursor-pointer"
+                      title="Ver materiales didácticos de la clase"
+                    >
+                      <BookOpen size={13} /> Materiales ({activeMaterials.length})
+                    </button>
+                    <button
+                      type="button"
                       onClick={handlePrint}
                       className="px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
                       title="Imprimir o guardar como PDF"
@@ -667,60 +677,65 @@ export function LessonPlansModal({
                 </div>
 
                 {/* HOJA OFICIAL CON EL FORMATO IDÉNTICO A LA IMAGEN */}
-                <div className="p-6 sm:p-8 rounded-2xl bg-white text-black border border-gray-300 shadow-md font-sans text-xs leading-relaxed space-y-4 printable-lesson-plan">
+                <div 
+                  className="p-6 sm:p-8 rounded-2xl bg-white text-black border-2 border-gray-300 shadow-md font-sans text-xs leading-relaxed space-y-4 printable-lesson-plan"
+                  style={{ color: '#000000', backgroundColor: '#ffffff', colorScheme: 'light' }}
+                >
                   {/* Título Principal */}
                   <div className="text-center">
-                    <h2 className="text-base sm:text-lg font-black tracking-wide uppercase text-black">
+                    <h2 className="text-base sm:text-lg font-black tracking-wide uppercase text-black" style={{ color: '#000000' }}>
                       FORMATO PLANEACIÓN DE CLASE (SEMANAL)
                     </h2>
                   </div>
 
                   {/* Encabezado con líneas subrayadas */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3 gap-x-6 pt-2">
+                  <div className="space-y-3 pt-2">
                     {/* Fila 1: Institución educativa y Asignatura */}
-                    <div className="flex items-baseline">
-                      <span className="font-extrabold text-black shrink-0 whitespace-nowrap">
-                        Institución educativa:&nbsp;
-                      </span>
-                      <span className="flex-1 border-b border-black font-semibold text-black px-1.5">
-                        {activePlan.institution || 'Universidad de Pamplona'}
-                      </span>
-                    </div>
+                    <div className="flex flex-col sm:flex-row gap-3 sm:gap-6">
+                      <div className="flex-1 flex items-baseline min-w-0">
+                        <span className="font-black text-black shrink-0 whitespace-nowrap" style={{ color: '#000000' }}>
+                          Institución educativa:&nbsp;
+                        </span>
+                        <span className="flex-1 border-b-2 border-black font-bold text-black px-1.5 truncate" style={{ color: '#000000', borderColor: '#000000' }}>
+                          {activePlan.institution || 'Universidad de Pamplona'}
+                        </span>
+                      </div>
 
-                    <div className="flex items-baseline">
-                      <span className="font-extrabold text-black shrink-0 whitespace-nowrap">
-                        Asignatura:&nbsp;
-                      </span>
-                      <span className="flex-1 border-b border-black font-semibold text-black px-1.5 min-h-[1.25rem]">
-                        {activePlan.subject || ''}
-                      </span>
+                      <div className="w-full sm:w-2/5 flex items-baseline min-w-0">
+                        <span className="font-black text-black shrink-0 whitespace-nowrap" style={{ color: '#000000' }}>
+                          Asignatura:&nbsp;
+                        </span>
+                        <span className="flex-1 border-b-2 border-black font-bold text-black px-1.5 min-h-[1.25rem] truncate" style={{ color: '#000000', borderColor: '#000000' }}>
+                          {activePlan.subject || ''}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Fila 2: Profesor, Curso y Unidad */}
-                    <div className="flex items-baseline">
-                      <span className="font-extrabold text-black shrink-0 whitespace-nowrap">
-                        Profesor:&nbsp;
-                      </span>
-                      <span className="flex-1 border-b border-black font-semibold text-black px-1.5">
-                        {activePlan.teacher || ''}
-                      </span>
-                    </div>
+                    <div className="flex flex-col sm:flex-row gap-3 sm:gap-6">
+                      <div className="flex-1 flex items-baseline min-w-0">
+                        <span className="font-black text-black shrink-0 whitespace-nowrap" style={{ color: '#000000' }}>
+                          Profesor:&nbsp;
+                        </span>
+                        <span className="flex-1 border-b-2 border-black font-bold text-black px-1.5 truncate" style={{ color: '#000000', borderColor: '#000000' }}>
+                          {activePlan.teacher || ''}
+                        </span>
+                      </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="flex items-baseline">
-                        <span className="font-extrabold text-black shrink-0 whitespace-nowrap">
+                      <div className="w-full sm:w-36 flex items-baseline min-w-0">
+                        <span className="font-black text-black shrink-0 whitespace-nowrap" style={{ color: '#000000' }}>
                           Curso:&nbsp;
                         </span>
-                        <span className="flex-1 border-b border-black font-semibold text-black px-1.5 min-h-[1.25rem]">
+                        <span className="flex-1 border-b-2 border-black font-bold text-black px-1.5 min-h-[1.25rem] truncate" style={{ color: '#000000', borderColor: '#000000' }}>
                           {activePlan.course || ''}
                         </span>
                       </div>
 
-                      <div className="flex items-baseline">
-                        <span className="font-extrabold text-black shrink-0 whitespace-nowrap">
+                      <div className="w-full sm:w-56 flex items-baseline min-w-0">
+                        <span className="font-black text-black shrink-0 whitespace-nowrap" style={{ color: '#000000' }}>
                           Unidad:&nbsp;
                         </span>
-                        <span className="flex-1 border-b border-black font-semibold text-black px-1.5">
+                        <span className="flex-1 border-b-2 border-black font-bold text-black px-1.5 truncate" style={{ color: '#000000', borderColor: '#000000' }} title={activePlan.unit || ''}>
                           {activePlan.unit || ''}
                         </span>
                       </div>
@@ -730,78 +745,79 @@ export function LessonPlansModal({
                   {/* Propósito de aprendizaje */}
                   <div className="pt-2">
                     <div className="flex items-baseline flex-wrap">
-                      <span className="font-extrabold text-black shrink-0">
+                      <span className="font-black text-black shrink-0" style={{ color: '#000000' }}>
                         Propósito de aprendizaje:&nbsp;
                       </span>
-                      <span className="flex-1 min-w-[200px] border-b border-black font-semibold text-black px-1.5">
+                      <span className="flex-1 min-w-[200px] border-b-2 border-black font-semibold text-black px-1.5" style={{ color: '#000000', borderColor: '#000000' }}>
                         {activePlan.learningPurpose || ''}
                       </span>
                     </div>
                   </div>
 
                   {/* Propósitos específicos */}
-                  <div>
+                  <div className="pt-1">
                     <div className="flex items-baseline">
-                      <span className="font-extrabold text-black shrink-0">
+                      <span className="font-black text-black shrink-0" style={{ color: '#000000' }}>
                         Propósitos específicos:&nbsp;
                       </span>
-                      <div className="flex-1 border-b border-black min-h-[1.25rem]" />
+                      <div className="flex-1 border-b-2 border-black min-h-[1.25rem]" style={{ borderColor: '#000000' }} />
                     </div>
-                    <div className="pt-1.5 pb-2 border-b border-black whitespace-pre-line text-black font-medium pl-4">
+                    <div className="pt-1.5 pb-2 border-b-2 border-black whitespace-pre-line text-black font-medium pl-4" style={{ color: '#000000', borderColor: '#000000' }}>
                       {activePlan.specificPurposes || ''}
                     </div>
                     {/* Segunda línea de cierre para respetar la imagen */}
-                    <div className="border-b border-black h-1" />
+                    <div className="border-b-2 border-black h-1" style={{ borderColor: '#000000' }} />
                   </div>
 
                   {/* CUADRO / TABLA PRINCIPAL EXACTO AL FORMATO */}
-                  <div className="overflow-x-auto pt-2">
-                    <table className="w-full border-collapse border border-black text-left text-[11px] sm:text-xs">
+                  <div className="overflow-x-auto pt-3">
+                    <table className="w-full border-collapse border-2 border-black text-left text-[11px] sm:text-xs" style={{ borderColor: '#000000' }}>
                       <thead>
-                        <tr className="border-b border-black bg-gray-50/70">
-                          <th className="border border-black p-2 font-black text-black w-24">Fecha</th>
-                          <th className="border border-black p-2 font-black text-black w-28">Fases</th>
-                          <th className="border border-black p-2 font-black text-black w-44">Temas</th>
-                          <th className="border border-black p-2 font-black text-black">Actividades</th>
-                          <th className="border border-black p-2 font-black text-black w-36">Recursos</th>
-                          <th className="border border-black p-2 font-black text-black w-20 text-center">Tiempo</th>
+                        <tr className="border-b-2 border-black bg-gray-100" style={{ borderColor: '#000000', backgroundColor: '#f3f4f6' }}>
+                          <th className="border border-black p-2 font-black text-black w-24 text-center" style={{ color: '#000000', borderColor: '#000000', backgroundColor: '#f3f4f6' }}>Fecha</th>
+                          <th className="border border-black p-2 font-black text-black w-28 text-center" style={{ color: '#000000', borderColor: '#000000', backgroundColor: '#f3f4f6' }}>Fases</th>
+                          <th className="border border-black p-2 font-black text-black w-44" style={{ color: '#000000', borderColor: '#000000', backgroundColor: '#f3f4f6' }}>Temas</th>
+                          <th className="border border-black p-2 font-black text-black" style={{ color: '#000000', borderColor: '#000000', backgroundColor: '#f3f4f6' }}>Actividades</th>
+                          <th className="border border-black p-2 font-black text-black w-36" style={{ color: '#000000', borderColor: '#000000', backgroundColor: '#f3f4f6' }}>Recursos</th>
+                          <th className="border border-black p-2 font-black text-black w-20 text-center" style={{ color: '#000000', borderColor: '#000000', backgroundColor: '#f3f4f6' }}>Tiempo</th>
                         </tr>
                       </thead>
                       <tbody>
                         {(activePlan.rows || []).map((row, rIdx) => (
-                          <tr key={rIdx} className="border-b border-black align-top">
+                          <tr key={rIdx} className="border-b border-black align-top" style={{ borderColor: '#000000' }}>
                             {/* Fecha (compartida o individual) */}
                             {rIdx === 0 ? (
                               <td
                                 rowSpan={activePlan.rows.length}
-                                className="border border-black p-2.5 font-bold text-black text-center align-middle bg-white"
+                                className="border border-black p-2.5 font-black text-black text-center align-middle bg-white"
+                                style={{ color: '#000000', borderColor: '#000000', backgroundColor: '#ffffff' }}
                               >
-                                {row.date || `Semana ${activePlan.week}`}
+                                {row.date || `Semana ${activePlan.week || 1}`}
                               </td>
                             ) : null}
 
                             {/* Fase */}
-                            <td className="border border-black p-2.5 font-black text-black bg-white">
+                            <td className="border border-black p-2.5 font-black text-black text-center bg-gray-50/70" style={{ color: '#000000', borderColor: '#000000' }}>
                               {row.phase}
                             </td>
 
                             {/* Temas */}
-                            <td className="border border-black p-2.5 text-black font-semibold whitespace-pre-line">
+                            <td className="border border-black p-2.5 text-black font-semibold whitespace-pre-line" style={{ color: '#000000', borderColor: '#000000' }}>
                               {row.topics}
                             </td>
 
                             {/* Actividades */}
-                            <td className="border border-black p-2.5 text-black font-normal whitespace-pre-line leading-relaxed">
+                            <td className="border border-black p-2.5 text-black font-normal whitespace-pre-line leading-relaxed" style={{ color: '#000000', borderColor: '#000000' }}>
                               {stripTimeFromActivityText(sanitizeRealisticActivityText(row.activities, row.phase))}
                             </td>
 
                             {/* Recursos */}
-                            <td className="border border-black p-2.5 text-black font-medium whitespace-pre-line">
+                            <td className="border border-black p-2.5 text-black font-medium whitespace-pre-line" style={{ color: '#000000', borderColor: '#000000' }}>
                               {sanitizeRealisticResourceText(row.resources)}
                             </td>
 
                             {/* Tiempo */}
-                            <td className="border border-black p-2.5 font-bold text-black text-center whitespace-nowrap">
+                            <td className="border border-black p-2.5 font-black text-black text-center whitespace-nowrap" style={{ color: '#000000', borderColor: '#000000' }}>
                               {row.time}
                             </td>
                           </tr>
@@ -812,7 +828,7 @@ export function LessonPlansModal({
                 </div>
 
                 {/* ================= SECCIÓN DE MATERIALES DIDÁCTICOS (LISTOS PARA IMPRIMIR O USAR) ================= */}
-                <div className="pt-4 border-t border-gray-200 dark:border-gray-800 space-y-3">
+                <div id="didactic-materials-section" className="pt-4 border-t border-gray-200 dark:border-gray-800 space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2.5">
                       <div className="w-8 h-8 rounded-xl bg-purple-600/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 flex items-center justify-center">
@@ -1050,8 +1066,21 @@ export function LessonPlansModal({
           </button>
         </div>
 
-        {/* Estilos CSS para impresión limpia en blanco y negro sin el fondo oscuro del modal */}
+        {/* Estilos CSS para contraste absoluto en pantalla y en impresión */}
         <style>{`
+          .printable-lesson-plan,
+          .printable-lesson-plan * {
+            color: #000000 !important;
+            border-color: #000000 !important;
+          }
+          .printable-lesson-plan th {
+            background-color: #f3f4f6 !important;
+            color: #000000 !important;
+            font-weight: 900 !important;
+          }
+          .printable-lesson-plan td {
+            color: #000000 !important;
+          }
           @media print {
             body * {
               visibility: hidden !important;
