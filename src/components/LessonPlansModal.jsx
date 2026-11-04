@@ -69,8 +69,6 @@ export function LessonPlansModal({
     return Array.from(map.values()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   }, [lessonPlans]);
 
-  if (!isOpen) return null;
-
   // Plan actualmente seleccionado
   const activePlan = uniquePlans.find((p) => p.id === (selectedPlanId || uniquePlans[0]?.id)) || uniquePlans[0] || null;
 
@@ -82,6 +80,8 @@ export function LessonPlansModal({
     }
     return generateDefaultDidacticMaterials(activePlan);
   }, [activePlan]);
+
+  if (!isOpen) return null;
 
   const startEditing = (plan) => {
     setEditingPlanId(plan.id);
