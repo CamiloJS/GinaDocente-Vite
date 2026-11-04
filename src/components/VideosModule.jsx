@@ -20,6 +20,7 @@ import {
   Filter,
   CheckCircle2,
   Smartphone,
+  SmartphoneHorizontal,
   Loader2,
   User
 } from './Icons.jsx';
@@ -486,7 +487,7 @@ export default function VideosModule({
                   : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
               }`}
             >
-              <Video size={14} />
+              <SmartphoneHorizontal size={14} />
               <span>Largos</span>
             </button>
 
@@ -704,7 +705,7 @@ export default function VideosModule({
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-base sm:text-lg font-black text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                  <Video size={18} className="text-[#AD3333]" />
+                  <SmartphoneHorizontal size={18} className="text-[#AD3333]" />
                   <span>Largos</span>
                 </h3>
                 <span className="text-xs text-gray-400 font-bold">
@@ -1132,7 +1133,7 @@ export default function VideosModule({
                         : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400'
                     }`}
                   >
-                    <Video size={14} />
+                    <SmartphoneHorizontal size={14} />
                     <span>Largos</span>
                   </button>
 
