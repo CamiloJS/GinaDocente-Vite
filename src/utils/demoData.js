@@ -1218,7 +1218,7 @@ export const DEMO_LESSON_PLANS = [
         phase: 'Inicio',
         topics: 'Escasez y conceptos introductorios',
         activities: 'Dinámica de rompehielos (Warm-up): Pregunta detonante sobre bienes escasos en la vida cotidiana y lluvia de ideas.',
-        resources: 'Diapositivas interactivas, pizarra digital',
+        resources: 'Tablero, marcadores borrables, preguntas guía impresas',
         time: '15 min'
       },
       {

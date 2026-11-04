@@ -8141,7 +8141,7 @@ Escribe en español con tono pedagógico moderno.`;
                                     rows={2}
                                     value={syllabusAssistantModal.icebreakerResources || ''}
                                     onChange={(e) => setSyllabusAssistantModal(prev => ({ ...prev, icebreakerResources: e.target.value }))}
-                                    placeholder="Ej: Marcadores, hojas recicladas, proyector, balones antiestrés, teléfonos de los estudiantes, música suave..."
+                                    placeholder="Ej: Marcadores, hojas recicladas, preguntas guía impresas, balones antiestrés, tarjetas didácticas..."
                                     className={`w-full p-2.5 rounded-xl border text-xs outline-none transition-colors ${
                                       isDarkMode
                                         ? 'bg-gray-800 border-gray-700 text-white focus:border-purple-500'
@@ -8149,7 +8149,7 @@ Escribe en español con tono pedagógico moderno.`;
                                     }`}
                                   />
                                   <p className="text-[10px] text-gray-400">
-                                    La IA adaptará una dinámica corta (10 a 15 min máximo) a los materiales que indiques.
+                                    La IA adaptará una dinámica corta (10 a 15 min máximo) a los materiales accesibles que indiques.
                                   </p>
                                 </div>
                               )}
@@ -8161,7 +8161,7 @@ Escribe en español con tono pedagógico moderno.`;
                               <div className="space-y-0.5">
                                 <span className="font-bold block">Planeación 100% realista y realizable:</span>
                                 <span className="text-[11px] opacity-90 block">
-                                  Diseñada para el aula física estándar (docente enseñando activamente y estudiantes practicando con tablero, marcadores y guías). Sin videos extensos ni recursos inaccesibles.
+                                  Diseñada para el aula física presencial estándar (docente enseñando activamente y estudiantes practicando con tablero, marcadores y guías). Cero videos ni recursos inaccesibles.
                                 </span>
                               </div>
                             </div>

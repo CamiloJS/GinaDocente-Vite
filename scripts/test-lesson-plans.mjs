@@ -242,11 +242,17 @@ check('Prompt instruye estrictamente no escribir tiempos en activities',
   prompt.includes('SIN TIEMPOS EN "activities"') && prompt.includes('columna "time"')
 );
 
-console.log('\n== 8. Clases Realizables: Prohibición de Videos Largos y Recursos Inaccesibles ==');
-check('Prompt prohíbe terminantemente videos largos y actividades pasivas de cine',
-  prompt.includes('PROHIBICIÓN TERMINANTE DE VIDEOS LARGOS') &&
-  prompt.includes('PROHIBICIÓN TOTAL DE VIDEOS LARGOS') &&
-  prompt.includes('NUNCA uses un video como sustituto de la clase')
+console.log('\n== 8. Clases Realizables: Prohibición de Videos (Cero Videos) y Recursos Inaccesibles ==');
+check('Prompt prohíbe terminantemente cualquier video (CERO VIDEOS)',
+  prompt.includes('PROHIBICIÓN TOTAL Y ABSOLUTA DE VIDEOS (CERO VIDEOS)') &&
+  prompt.includes('PROHIBICIÓN TOTAL DE VIDEOS (CERO VIDEOS)') &&
+  prompt.includes('NUNCA uses un video como recurso')
+);
+
+check('Prompt prohíbe explícitamente videos de cualquier duración (ni cortos ni largos)',
+  prompt.includes('ni de 2 min') &&
+  prompt.includes('ni de 90 minutos') &&
+  prompt.includes('CERO VIDEOS')
 );
 
 check('Prompt exige recursos 100% accesibles en aula física (tablero, marcadores, guías impresas)',
@@ -271,6 +277,42 @@ check('Sanea y sustituye video de 90 min por explicación dialogada del docente 
   sanitizedActivity.includes('tablero')
 );
 
+// Prueba con video corto (2-3 minutos)
+const shortVideoActivity = "Ver un video corto de 3 minutos sobre conectores discursivos y discutir.";
+const sanitizedShortVideo = sanitizeRealisticActivityText(shortVideoActivity, 'Desarrollo');
+check('Sanea video corto prohibiéndolo y reemplazándolo por docencia en tablero',
+  !sanitizedShortVideo.toLowerCase().includes('video') &&
+  !sanitizedShortVideo.toLowerCase().includes('3 min') &&
+  sanitizedShortVideo.includes('tablero')
+);
+
+// Prueba con oración iniciada por sustantivo (Video sobre...)
+const nounVideoActivity = "Video sobre la historia del dinero y posterior debate grupal.";
+const sanitizedNounVideo = sanitizeRealisticActivityText(nounVideoActivity, 'Desarrollo');
+check('Sanea frase que inicia con sustantivo "Video sobre..." reemplazándola por lectura y explicación',
+  !sanitizedNounVideo.toLowerCase().includes('video') &&
+  sanitizedNounVideo.toLowerCase().includes('lectura') &&
+  sanitizedNounVideo.includes('historia del dinero')
+);
+
+// Prueba con sujeto docente y verbo presenta: "El docente presenta un video..."
+const teacherPresentsVideo = "El docente presenta un video corto sobre las finanzas corporativas.";
+const sanitizedTeacherVideo = sanitizeRealisticActivityText(teacherPresentsVideo, 'Desarrollo');
+check('Sanea frase con sujeto docente que presenta video sin duplicaciones gramaticales',
+  !sanitizedTeacherVideo.toLowerCase().includes('video') &&
+  sanitizedTeacherVideo.includes('docente') &&
+  sanitizedTeacherVideo.includes('tablero') &&
+  !sanitizedTeacherVideo.includes('El docente Explicación')
+);
+
+// Prueba con discusión a partir de video
+const discussionVideo = "Discusión a partir de un video sobre fonética y práctica guiada.";
+const sanitizedDiscussion = sanitizeRealisticActivityText(discussionVideo, 'Desarrollo');
+check('Sanea "a partir de un video" por explicación y modelado en tablero',
+  !sanitizedDiscussion.toLowerCase().includes('video') &&
+  sanitizedDiscussion.includes('tablero')
+);
+
 // Prueba con documental pasivo en YouTube
 const docuActivity = "Los estudiantes observan un documental de 1 hora sobre macroeconomía en YouTube.";
 const sanitizedDocu = sanitizeRealisticActivityText(docuActivity, 'Desarrollo');
@@ -283,11 +325,36 @@ check('Sanea visualización pasiva de documental reemplazándola por explicació
 // Prueba de saneamiento de recursos con videos extensos o software de pago
 const badResources = "Video de 90 minutos en YouTube, software de pago Bloomberg Terminal, pantalla gigante";
 const cleanedResources = sanitizeRealisticResourceText(badResources);
-check('Sanea recursos reemplazando video de 90 min y software de pago por recursos accesibles',
+check('Sanea recursos reemplazando video de 90 min, software de pago y pantalla por recursos accesibles',
+  !cleanedResources.toLowerCase().includes('video') &&
   !cleanedResources.toLowerCase().includes('90 min') &&
   !cleanedResources.toLowerCase().includes('software de pago') &&
   !cleanedResources.toLowerCase().includes('youtube') &&
-  cleanedResources.includes('Guía de ejercicios')
+  !cleanedResources.toLowerCase().includes('pantalla') &&
+  cleanedResources.includes('Guía de ejercicios') &&
+  cleanedResources.includes('tablero')
+);
+
+// Prueba de recursos con proyectores, videobeam, parlantes y televisores
+const techResources = "Video de YouTube, proyector, televisor, videobeam y parlantes";
+const cleanedTechResources = sanitizeRealisticResourceText(techResources);
+check('Sanea equipos audiovisuales inaccesibles (proyector, televisor, parlantes, videobeam)',
+  !cleanedTechResources.toLowerCase().includes('video') &&
+  !cleanedTechResources.toLowerCase().includes('youtube') &&
+  !cleanedTechResources.toLowerCase().includes('proyector') &&
+  !cleanedTechResources.toLowerCase().includes('televisor') &&
+  !cleanedTechResources.toLowerCase().includes('videobeam') &&
+  !cleanedTechResources.toLowerCase().includes('parlantes') &&
+  cleanedTechResources.includes('tablero')
+);
+
+// Prueba de recursos con laptops obligatorias para estudiantes
+const studentLaptopRes = "Laptops de los estudiantes, videobeam, conexión a internet obligatoria";
+const cleanedStudentLaptops = sanitizeRealisticResourceText(studentLaptopRes);
+check('Sanea exigencia de laptops por estudiante sustituyéndolas por cuadernos y apuntes',
+  !cleanedStudentLaptops.toLowerCase().includes('laptops') &&
+  !cleanedStudentLaptops.toLowerCase().includes('videobeam') &&
+  cleanedStudentLaptops.toLowerCase().includes('cuadernos de apuntes')
 );
 
 // Prueba de normalización de plan completo con videos largos (caso real del usuario)
@@ -306,6 +373,21 @@ check('validateLessonPlanFeasibility detecta video extenso y recursos no factibl
   !validationBefore.isRealistic && validationBefore.issues.length >= 2
 );
 
+// Prueba de que validateLessonPlanFeasibility también detecta videos cortos y equipos inaccesibles
+const shortVideoPlan = {
+  id: 'lp_short_video_test',
+  week: 3,
+  rows: [
+    { phase: 'Inicio', activities: 'Saludo', resources: 'Tablero', time: '15 min' },
+    { phase: 'Desarrollo', activities: 'Ver video corto de 3 min sobre gramática', resources: 'Proyector y televisor', time: '50 min' },
+    { phase: 'Cierre - Tarea', activities: 'Cierre', resources: 'Campus virtual', time: '15 min' }
+  ]
+};
+const shortVideoValidation = validateLessonPlanFeasibility(shortVideoPlan);
+check('validateLessonPlanFeasibility detecta video corto y equipos de proyeccion/tv en plan',
+  !shortVideoValidation.isRealistic && shortVideoValidation.issues.length >= 2
+);
+
 const normalizedBadPlan = normalizeLessonPlan(badPlan);
 check('Normalizador reemplaza la actividad de video de 90 minutos por docencia activa y práctica',
   !normalizedBadPlan.rows[1].activities.toLowerCase().includes('90 min') &&
@@ -314,13 +396,20 @@ check('Normalizador reemplaza la actividad de video de 90 minutos por docencia a
 );
 
 check('Normalizador reemplaza recursos inaccesibles por materiales de aula reales',
-  !normalizedBadPlan.rows[1].resources.toLowerCase().includes('90 minutos') &&
-  !normalizedBadPlan.rows[1].resources.toLowerCase().includes('youtube')
+  !normalizedBadPlan.rows[1].resources.toLowerCase().includes('video') &&
+  !normalizedBadPlan.rows[1].resources.toLowerCase().includes('youtube') &&
+  !normalizedBadPlan.rows[1].resources.toLowerCase().includes('pantalla')
 );
 
 const validationAfter = validateLessonPlanFeasibility(normalizedBadPlan);
 check('validateLessonPlanFeasibility aprueba el plan normalizado como 100% realizable',
   validationAfter.isRealistic && validationAfter.issues.length === 0
+);
+
+// Prueba de plan precargado en DEMO_LESSON_PLANS
+const demoValidation = validateLessonPlanFeasibility(DEMO_LESSON_PLANS[0]);
+check('DEMO_LESSON_PLANS precargado cumple 100% con factibilidad presencial en aula física',
+  demoValidation.isRealistic && demoValidation.issues.length === 0 && !DEMO_LESSON_PLANS[0].rows[0].resources.toLowerCase().includes('pizarra digital')
 );
 
 // Prueba de plan por defecto

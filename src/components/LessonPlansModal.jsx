@@ -17,7 +17,13 @@ import {
   ChevronRight,
   BookOpen
 } from './Icons.jsx';
-import { formatLessonPlanAsMarkdown, stripTimeFromActivityText } from '../utils/lessonPlanEngine.js';
+import {
+  formatLessonPlanAsMarkdown,
+  stripTimeFromActivityText,
+  sanitizeRealisticActivityText,
+  sanitizeRealisticResourceText,
+  normalizeLessonPlan
+} from '../utils/lessonPlanEngine.js';
 
 export function LessonPlansModal({
   isOpen,
@@ -64,7 +70,7 @@ export function LessonPlansModal({
 
   const saveEditing = async () => {
     if (!editForm) return;
-    const planToSave = { ...editForm, updatedAt: Date.now() };
+    const planToSave = normalizeLessonPlan({ ...editForm, updatedAt: Date.now() });
     setSelectedPlanId(planToSave.id);
     await onUpdatePlan(planToSave);
     setEditingPlanId(null);
@@ -553,12 +559,12 @@ export function LessonPlansModal({
 
                             {/* Actividades */}
                             <td className="border border-black p-2.5 text-black font-normal whitespace-pre-line leading-relaxed">
-                              {stripTimeFromActivityText(row.activities)}
+                              {stripTimeFromActivityText(sanitizeRealisticActivityText(row.activities, row.phase))}
                             </td>
 
                             {/* Recursos */}
                             <td className="border border-black p-2.5 text-black font-medium whitespace-pre-line">
-                              {row.resources}
+                              {sanitizeRealisticResourceText(row.resources)}
                             </td>
 
                             {/* Tiempo */}

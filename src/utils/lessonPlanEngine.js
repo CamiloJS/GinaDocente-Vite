@@ -66,17 +66,17 @@ Genera una planeación de clase semanal universitaria en ESPAÑOL, 100% REALISTA
 IMPORTANTE: Responde ÚNICAMENTE con un objeto JSON válido (sin comentarios, sin texto introductorio ni explicaciones fuera del bloque JSON).
 
 PRINCIPIOS PEDAGÓGICOS CRÍTICOS Y OBLIGATORIOS (CLASE 100% REALISTA Y REALIZABLE):
-1. PROHIBICIÓN TERMINANTE DE VIDEOS LARGOS O SESIONES PASIVAS DE PANTALLA:
-   - Queda terminantemente PROHIBIDO programar la visualización de videos largos, documentales, películas o tutoriales extensos (NADA de videos de 15, 30, 45, 60 ni 90 minutos; NUNCA uses un video como sustituto de la clase).
-   - Los estudiantes universitarios NO van al salón a sentarse a mirar una pantalla. La clase universitaria NO es una sesión de cine.
-   - Si se requiere un estímulo audiovisual, debe ser exclusivamente un micro-audio o clip introductorio de 2 a 3 minutos como máximo; de lo contrario, no incluyas videos.
-2. RECURSOS 100% ACCESIBLES Y REALES PARA EL AULA PRESENCIAL:
-   - Prohibido exigir software de pago, licencias privativas costosas, plataformas especializadas inaccesibles o equipos de laboratorio inexistentes en un aula estándar.
-   - Emplea exclusivamente recursos cotidianos, accesibles y reales: tablero (pizarra), marcadores borrables, guías de ejercicios impresas, fotocopias, lecturas breves, diapositivas/proyector básico, cuadernos de apuntes y campus virtual institucional.
+1. PROHIBICIÓN TOTAL Y ABSOLUTA DE VIDEOS (CERO VIDEOS):
+   - Queda TERMINANTEMENTE PROHIBIDO incluir cualquier video, documental, película, clip, videotutorial o reproducción audiovisual (NADA de videos de ninguna duración, ni de 2 min, ni de 15, ni de 60, ni de 90 minutos; CERO VIDEOS).
+   - Los estudiantes universitarios NO van al salón a sentarse a mirar una pantalla. La clase universitaria NO es una sesión de cine ni de televisión.
+   - NUNCA uses un video como recurso, contenido ni sustituto de la clase. CERO menciones a videos, YouTube o proyecciones audiovisuales.
+2. RECURSOS 100% ACCESIBLES Y REALES PARA EL AULA FÍSICA ESTÁNDAR:
+   - Prohibido exigir proyectores indispensables, pantallas de video, televisores, equipos de sonido, computadores o tablets obligatorias por estudiante en el aula, software de pago, licencias privativas costosas, plataformas especializadas inaccesibles o equipos de laboratorio inexistentes en un aula estándar.
+   - Emplea exclusivamente recursos cotidianos, accesibles y reales del aula física: tablero (pizarra), marcadores borrables, guías de ejercicios impresas, fotocopias, lecturas breves en papel, hojas de trabajo, cuadernos de apuntes y campus virtual institucional (exclusivamente para tareas asincrónicas).
 3. PEDAGOGÍA ACTIVA: EL DOCENTE ENSEÑA Y LOS ESTUDIANTES PRACTICAN EN EL AULA:
-   - En Inicio: El docente lidera la bienvenida, motivación y activación de saberes previos o rompehielos corto (10 a 15 min máximo) con preguntas orientadoras en el tablero o lluvia de ideas.
-   - En Desarrollo: El docente realiza la explicación magistral y modela los conceptos clave; luego los estudiantes realizan ejercicios prácticos, análisis de casos en parejas, talleres colaborativos o dinámicas activas de aplicación directa en el aula. El docente circula, asesora y retroalimenta activamente.
-   - En Cierre - Tarea: Síntesis formativa en el tablero, verificación oral de aprendizajes (preguntas de comprobación), retroalimentación del docente y asignación puntual de trabajo autónomo.
+   - En Inicio: El docente lidera la bienvenida, contextualización y activación de saberes previos o rompehielos corto (10 a 15 min máximo) con preguntas orientadoras en el tablero o lluvia de ideas participativa.
+   - En Desarrollo: El docente realiza la explicación magistral dialogada y modela los conceptos clave en el tablero; luego los estudiantes realizan ejercicios prácticos, análisis de casos en parejas, talleres colaborativos con guías impresas o dinámicas activas de aplicación directa en el aula. El docente circula, asesora y retroalimenta activamente.
+   - En Cierre - Tarea: Síntesis formativa en el tablero, verificación oral de aprendizajes (preguntas de comprobación), retroalimentación del docente y asignación puntual de trabajo autónomo en el campus virtual.
 
 El formato del JSON debe ser exactamente:
 {
@@ -93,15 +93,15 @@ El formato del JSON debe ser exactamente:
       "phase": "Inicio",
       "topics": "Temas o conceptos a abordar en la fase de Inicio",
       "activities": "Descripción detallada de las actividades de Inicio (${includeIcebreaker ? 'dinámica rompehielos corta de 10-15 min y contextualización' : 'activación de saberes previos'} con preguntas en tablero - SIN minutos ni duración aquí)",
-      "resources": "Recursos accesibles para Inicio (tablero, marcadores, tarjetas impresas)${icebreakerResources ? ` (incluyendo: ${icebreakerResources.trim()})` : ''}",
+      "resources": "Recursos accesibles para Inicio (tablero, marcadores, preguntas guía impresas)${icebreakerResources ? ` (incluyendo: ${icebreakerResources.trim()})` : ''}",
       "time": "${inicioMins} min"
     },
     {
       "date": "Semana ${week}",
       "phase": "Desarrollo",
       "topics": "Temas centrales, vocabulario y estructuras clave",
-      "activities": "Actividades detalladas de Desarrollo (Presentation & Practice: explicación dialogada del docente, modelado en tablero, taller práctico colaborativo en parejas - PROHIBIDO videos largos o sesiones pasivas de pantalla - SIN incluir minutos ni duración aquí)",
-      "resources": "Recursos de desarrollo accesibles y cotidianos (guías de trabajo impresas, lecturas breves, tablero, marcadores)",
+      "activities": "Actividades detalladas de Desarrollo (Presentation & Practice: explicación dialogada del docente, modelado en tablero, taller práctico colaborativo en parejas con guía impresa - PROHIBIDO videos de cualquier tipo o sesiones de pantalla - SIN incluir minutos ni duración aquí)",
+      "resources": "Recursos de desarrollo accesibles y cotidianos (guías de trabajo impresas, lecturas breves, tablero, marcadores borrables - CERO videos)",
       "time": "${desarrolloMins} min"
     },
     {
@@ -126,9 +126,9 @@ Reglas estrictas:
 8. La suma de tiempos de las 3 filas debe ser aproximadamente ${totalMinutes} minutos (${hours} ${hours === 1 ? 'hora' : 'horas'}).
 9. DURACIÓN DEL ROMPEHIELOS: Si se incluye rompehielos, la actividad de "Inicio" DEBE ser CORTA, de 10 a 15 minutos como máximo (tiempo asignado: "${inicioMins} min"). NUNCA programes un rompehielos de media hora ni mayor a 15 minutos.
 10. SIN TIEMPOS EN "activities": En el campo "activities" (descripción de la actividad) NUNCA escribas el tiempo ni la duración (NO pongas "(10 min)", "(15 min)", "10 minutos", etc.). La duración va ÚNICAMENTE en la columna "time" para evitar contradicciones.
-11. CLASE 100% REALIZABLE Y ACTIVIDADES EN EL AULA: Cada actividad propuesta debe ser algo que el docente y los estudiantes universitarios puedan ejecutar físicamente en un aula presencial estándar. El docente enseña directamente y los estudiantes resuelven, debaten y practican.
-12. PROHIBICIÓN TOTAL DE VIDEOS LARGOS: Está terminantemente prohibido incluir videos largos (por ejemplo videos de 15, 30, 45, 60 o 90 minutos) o actividades pasivas donde los estudiantes solo vean pantallas o videos. NUNCA sustituyas la clase presencial por la visualización de un video.
-13. RECURSOS 100% ACCESIBLES: En "resources" usa únicamente materiales de fácil acceso y uso universal en la Universidad de Pamplona (tablero, marcadores, fotocopias, guías impresas, lecturas de texto, apuntes, proyector básico, campus virtual). No menciones software de pago, plataformas complejas ni recursos inaccesibles.`;
+11. CLASE 100% REALIZABLE Y ACTIVIDADES EN EL AULA: Cada actividad propuesta debe ser algo que el docente y los estudiantes universitarios puedan ejecutar físicamente en un aula presencial estándar. El docente enseña directamente en el tablero y los estudiantes resuelven, debaten y practican activamente.
+12. PROHIBICIÓN TOTAL DE VIDEOS (CERO VIDEOS): Queda terminantemente prohibido incluir videos de cualquier tipo o duración (ni cortos ni largos), documentales, películas, tutoriales audiovisuales, YouTube o transmisiones. La sesión es 100% presencial, pedagógica y activa en el aula.
+13. RECURSOS 100% ACCESIBLES: En "resources" usa únicamente materiales de fácil acceso y uso universal en la Universidad de Pamplona (tablero, marcadores borrables, fotocopias, guías impresas, lecturas de texto, apuntes de clase, campus virtual). Queda prohibido mencionar videos, pantallas, proyectores indispensables, televisores, parlantes, dispositivos por estudiante, software de pago ni plataformas inaccesibles.`;
 }
 
 /**
@@ -183,33 +183,57 @@ export function stripTimeFromActivityText(text = '') {
 }
 
 /**
- * Detecta y sanea actividades que propongan videos largos o sesiones pasivas de pantalla,
- * transformándolas en dinámicas pedagógicas activas, realistas y realizables en el aula
- * presencial, guiadas por la explicación del docente y práctica de los estudiantes.
+ * Detecta y sanea actividades que propongan cualquier tipo de video o sesión pasiva de pantalla,
+ * transformándolas en dinámicas pedagógicas 100% activas, realistas y realizables en el aula
+ * presencial, guiadas por la explicación del docente y práctica de los estudiantes con guías y tablero.
  */
 export function sanitizeRealisticActivityText(text = '', phase = 'Desarrollo') {
   if (typeof text !== 'string') return '';
   let cleaned = text;
 
-  // Detección de visualización de videos largos o actividades pasivas de pantalla
-  const hasPassiveVideo = /(?:los\s+estudiantes\s+)?(?:van\s+a\s+|se\s+procede\s+a\s+)?(?:ver|ve|ven|viendo|observar|observa|observan|observando|proyectar|proyecta|proyectan|proyectando|visualizar|visualiza|visualizan|visualizando|reproducir|reproduce|reproducen|reproduciendo|mirar|mira|miran|mirando|proyecci[oó]n\s+de|presentaci[oó]n\s+de)\s+(?:un\s+|el\s+)?(?:video|vídeo|documental|pel[ií]cula|conferencia|grabaci[oó]n|videotutorial)\b|(?:video|vídeo|documental|pel[ií]cula|videotutorial)\s*(?:de\s*)?(?:\d+\s*(?:minutos?|mins?|horas?|hrs?|h)|largo|extenso|completo)\b/i.test(cleaned);
+  const videoRegex = /\b(?:videos?|vídeos?|videotutorial(?:es)?|documental(?:es)?|pel[ií]culas?|cortometraj(?:es)?|largometraj(?:es)?|filmes?|cine[- ]?foros?|grabaci[oó]n(?:es)?|clips?|audiovisual(?:es)?|youtube|vimeo|netflix)\b/i;
 
-  if (hasPassiveVideo) {
-    // 1. Reemplazar frases verbales de ver videos pasivos por acciones pedagógicas activas
-    cleaned = cleaned
-      .replace(/(?:los\s+estudiantes\s+)?(?:van\s+a\s+|se\s+procede\s+a\s+)?(?:ver|ve|ven|viendo|observar|observa|observan|observando|proyectar|proyecta|proyectan|proyectando|visualizar|visualiza|visualizan|visualizando|reproducir|reproduce|reproducen|reproduciendo|mirar|mira|miran|mirando|proyecci[oó]n\s+de|presentaci[oó]n\s+de)\s+(?:un\s+|el\s+)?(?:video|vídeo|documental|pel[ií]cula|conferencia|grabaci[oó]n|videotutorial)(?:\s+(?:de\s+)?(?:\d+\s*(?:minutos?|mins?|horas?|hrs?|h)|largo|extenso|completo))?(?:\s+(?:en|de)\s+youtube)?/gi, () => {
+  if (videoRegex.test(cleaned)) {
+    // 1. Frases verbales completas: Sujeto opcional (el docente / los estudiantes) + verbo de ver/proyectar + video + adjetivo opcional + duración opcional + youtube opcional
+    cleaned = cleaned.replace(
+      /(?:(?:el|la)\s+docente\s+|los\s+estudiantes\s+|las\s+estudiantes\s+|el\s+grupo\s+)?(?:van\s+a\s+|se\s+procede\s+a\s+)?(?:ver|ve|ven|viendo|observar|observa|observan|observando|mirar|mira|miran|mirando|visualizar|visualiza|visualizan|visualizando|reproducir|reproduce|reproducen|reproduciendo|proyectar|proyecta|proyectan|proyectando|presentar|presenta|presentan|presentando|mostrar|muestra|muestran|mostrando|analizar|analiza|analizan|analizando)\s+(?:un\s+|el\s+|la\s+)?(?:video|vídeo|documental|pel[ií]cula|videotutorial|cortometraje|clip|grabaci[oó]n|filme|cine[- ]?foro|material\s+audiovisual)(?:\s+(?:explicativo|did[aá]ctico|introductorio|corto|breve|animado|interactivo|institucional))?(?:\s+(?:de\s+)?(?:\d+\s*(?:minutos?|mins?|horas?|hrs?|h)|largo|extenso|completo))?(?:\s+(?:en|de)\s+youtube)?/gi,
+      () => {
         if (/inicio/i.test(phase)) {
-          return 'Activación de saberes previos y preguntas detonantes guiadas por el docente en el tablero';
+          return 'Activación de saberes previos y preguntas orientadoras en el tablero';
         } else if (/cierre/i.test(phase)) {
           return 'Síntesis colaborativa en el tablero y retroalimentación del docente';
         }
         return 'Explicación dialogada y modelado por parte del docente en el tablero con ejercicios prácticos';
-      })
-      // 2. Reemplazar menciones sustantivas a videos de X minutos por talleres y guías
-      .replace(/(?:un\s+|el\s+)?(?:video|vídeo|documental|pel[ií]cula|videotutorial)\s*(?:de\s*)?(?:\d+\s*(?:minutos?|mins?|horas?|hrs?|h)|largo|extenso|completo)(?:\s+(?:en|de)\s+youtube)?/gi, 'taller práctico guiado con guía de trabajo y resolución en tablero')
-      // 3. Reemplazar enlaces y menciones a YouTube
+      }
+    );
+
+    // 2. Frases tipo 'a partir de un video...' o 'con base en el video...'
+    cleaned = cleaned.replace(
+      /(?:a\s+partir\s+de|con\s+base\s+en|a\s+trav[eé]s\s+de|luego\s+de\s+ver|despu[eé]s\s+de\s+ver)\s+(?:un\s+|el\s+)?(?:video|vídeo|documental|pel[ií]cula|videotutorial|clip)(?:\s+(?:explicativo|did[aá]ctico|introductorio|corto|breve|en\s+youtube))?/gi,
+      'a partir de la explicación dialogada y ejemplos del docente en el tablero'
+    );
+
+    // 3. Inicio de oración o tras punto: 'Video sobre...' o 'Videotutorial de...'
+    cleaned = cleaned.replace(
+      /(?:^|\.\s+)(?:un\s+|el\s+)?(?:video|vídeo|videotutorial|documental|cortometraje|clip)\s*(?:explicativo|did[aá]ctico|introductorio|corto|breve)?\s*(?:sobre|de|acerca\s+de)\s+/gi,
+      (match) => {
+        const prefix = match.startsWith('.') ? '. ' : '';
+        return prefix + 'Lectura guiada y explicación en el tablero sobre ';
+      }
+    );
+
+    // 4. Frases tipo 'con video didáctico...'
+    cleaned = cleaned.replace(
+      /(?:con|mediante|utilizando)\s+(?:un\s+|el\s+)?(?:video|vídeo|videotutorial|documental|clip)\s*(?:explicativo|did[aá]ctico|introductorio|corto|breve)?/gi,
+      'mediante guía de trabajo impresa y análisis en el tablero'
+    );
+
+    // 5. Limpieza residual de menciones a YouTube y videos
+    cleaned = cleaned
       .replace(/(?:,\s*)?(?:en|de|a\s+través\s+de|mediante|enlace\s+a)\s+youtube(?:\.com)?/gi, '')
-      .replace(/\byoutube(?:\.com)?\b/gi, 'material didáctico');
+      .replace(/\byoutube(?:\.com)?\b/gi, 'material didáctico impreso')
+      .replace(/(?:un\s+|el\s+)?(?:video|vídeo|videotutorial|documental|cortometraje|clip|audiovisual)\b/gi, 'guía práctica')
+      .replace(/\b(?:videos|vídeos|videotutoriales|documentales|cortometrajes|clips)\b/gi, 'ejercicios prácticos');
   }
 
   // Limpieza de puntuación y espacios redundantes
@@ -217,6 +241,11 @@ export function sanitizeRealisticActivityText(text = '', phase = 'Desarrollo') {
     .replace(/\s+([.,;:])/g, '$1')
     .replace(/\s{2,}/g, ' ')
     .trim();
+
+  // Asegurar mayúscula inicial
+  if (cleaned.length > 0) {
+    cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+  }
 
   // Si tras limpiar quedó algo excesivamente corto o vacío
   if (!cleaned || cleaned.length < 10) {
@@ -233,60 +262,114 @@ export function sanitizeRealisticActivityText(text = '', phase = 'Desarrollo') {
 }
 
 /**
- * Detecta y sanea recursos que sean inaccesibles, costosos o videos extensos,
- * asegurando materiales cotidianos y reales para el aula universitaria estándar.
+ * Detecta y sanea recursos que sean inaccesibles, costosos, equipos de proyección o videos,
+ * asegurando materiales cotidianos y 100% reales para el aula universitaria estándar
+ * (tablero, marcadores borrables, guías impresas, fotocopias, apuntes).
  */
 export function sanitizeRealisticResourceText(text = '') {
-  if (typeof text !== 'string') return 'Tablero, marcadores borrables, guía de estudio';
+  if (typeof text !== 'string') return 'Tablero, marcadores borrables, guía de estudio impresa';
   let cleaned = text;
 
-  // Reemplazar menciones a videos extensos, plataformas de video o software privativo
+  // 1. Reemplazar equipos de proyección, sonido y pantallas primero (evita colisiones con 'video')
   cleaned = cleaned
-    .replace(/(?:video|vídeo|documental|pel[ií]cula|videotutorial)\s*(?:de\s*)?(?:\d+\s*(?:minutos?|mins?|horas?|hrs?|h)|largo|extenso|completo)(?:\s+(?:en|de)\s+youtube)?/gi, 'Guía de ejercicios y lecturas impresas')
+    .replace(/\b(?:videobeam|video\s*beam|proyector(?:es)?|pantallas?\s+(?:gigante|inteligente|t[aá]ctil|interactiva|plana|led|lcd)?|smart\s*tv|smartboard|pizarra\s+digital|televisor(?:es)?|tv|parlantes?|bafles?|altavoces?|equipo\s+de\s+sonido|aud[ií]fonos?)\b/gi, 'tablero y marcadores borrables')
+    .replace(/\bpantallas?\b/gi, 'tablero');
+
+  // 2. Reemplazar videos y plataformas audiovisuales completas
+  cleaned = cleaned
+    .replace(/(?:un\s+|el\s+)?(?:video|vídeo|documental|pel[ií]cula|videotutorial|cortometraje|clip)(?:\s+(?:explicativo|did[aá]ctico|introductorio|interactivo|ilustrativo|informativo|extenso|largo|completo))?(?:\s+(?:de\s+)?(?:\d+\s*(?:minutos?|mins?|horas?|hrs?|h)|largo|extenso|completo))?(?:\s+(?:en|de)\s+youtube)?/gi, 'Guía de ejercicios y lecturas impresas')
     .replace(/(?:enlace\s+(?:a\s+)?)?youtube(?:\.com)?/gi, 'material didáctico institucional')
-    .replace(/(?:licencia\s+de\s+pago|software\s+de\s+pago|software\s+privativo|laboratorio\s+especializado|suscripción\s+costosa)\b/gi, 'Material impreso y recursos de libre acceso')
-    .replace(/(?:video|vídeo)\s+explicativo\s+extenso/gi, 'Guía didáctica y tablero')
-    .replace(/\b(?:video|vídeo)\s+de\s+\d+\b/gi, 'Guía de trabajo')
-    .replace(/\s*,\s*,/g, ', ')
+    .replace(/\b(?:vimeo|netflix|tiktok)\b/gi, 'material de lectura impreso')
+    .replace(/\b(?:videos?|vídeos?|documentales?|pel[ií]culas?|videotutoriales?|audiovisual(?:es)?)\b/gi, 'guías impresas');
+
+  // 3. Reemplazar diapositivas digitales por material impreso
+  cleaned = cleaned
+    .replace(/\bdiapositivas(?:\s+interactivas|\s+digitales|\s+en\s+powerpoint)?\b/gi, 'Guías de conceptos clave impresas');
+
+  // 4. Reemplazar dispositivos requeridos por estudiante
+  cleaned = cleaned
+    .replace(/\b(?:laptops?|tablets?|computadores?|ordenadores?|tel[eé]fonos?|celulares?)\s+(?:de\s+los\s+estudiantes|individuales|por\s+estudiante|personales)\b/gi, 'cuadernos de apuntes y hojas de trabajo')
+    .replace(/\b(?:laptops?|tablets?|computadores?\s+port[aá]tiles?)\b/gi, 'guías y fotocopias de trabajo');
+
+  // 5. Reemplazar software de pago, suscripciones privativas y laboratorios de alta tecnología
+  cleaned = cleaned
+    .replace(/(?:licencias?\s+de\s+pago|software\s+de\s+pago|software\s+privativo|laboratorios?\s+especializados?|suscripci[oó]n(?:\s+costosa|\s+a\s+\w+)?|(?:terminal\s+)?bloomberg(?:\s+terminal)?|spss|matlab)\b/gi, 'Material impreso y recursos de libre acceso')
+    .replace(/\b(?:conexi[oó]n\s+a\s+internet\s+obligatoria|internet\s+de\s+alta\s+velocidad)\b/gi, 'materiales impresos en el aula');
+
+  // 6. Limpieza de conectores redundantes y puntuación
+  cleaned = cleaned
+    .replace(/\btablero\s+y\s+marcadores\s+borrables\s+y\s+tablero\s+y\s+marcadores\s+borrables\b/gi, 'tablero y marcadores borrables')
+    .replace(/(?:Material impreso y recursos de libre acceso\s*)+/gi, 'Material impreso y recursos de libre acceso ')
+    .replace(/\s*,\s*,+/g, ', ')
+    .replace(/\s*;\s*;+/g, '; ')
     .replace(/^[\s,;.-]+|[\s,;.-]+$/g, '')
     .replace(/\s{2,}/g, ' ')
     .trim();
 
+  // Deduplicar términos separados por comas
+  const rawParts = cleaned.split(/\s*,\s*|\s*;\s*/).map(p => p.trim()).filter(Boolean);
+  const seen = new Set();
+  const deduped = [];
+  for (const part of rawParts) {
+    const key = part.toLowerCase().replace(/\s+/g, ' ');
+    if (!seen.has(key)) {
+      seen.add(key);
+      deduped.push(part);
+    }
+  }
+  cleaned = deduped.join(', ');
+
   if (!cleaned || cleaned.length < 4) {
-    return 'Tablero, marcadores borrables, guía de ejercicios y material didáctico';
+    return 'Tablero, marcadores borrables, guía de ejercicios y material didáctico impreso';
   }
 
-  return cleaned;
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
 }
 
 /**
  * Valida si una planeación de clase cumple con los criterios de ser 100% realizable,
- * activa y factible en un aula estándar (sin videos extensos ni recursos inaccesibles).
+ * activa y factible en un aula presencial estándar:
+ * - CERO videos (ni largos ni cortos).
+ * - CERO pantallas, proyectores indispensables ni equipos de sonido.
+ * - CERO exigencias de laptops/tablets individuales por estudiante.
+ * - CERO software de pago o licencias privativas.
  */
 export function validateLessonPlanFeasibility(plan = {}) {
   const issues = [];
   const rows = Array.isArray(plan.rows) ? plan.rows : [];
 
+  const videoRegex = /\b(?:videos?|vídeos?|documental(?:es)?|pel[ií]culas?|videotutorial(?:es)?|cortometraj(?:es)?|largometraj(?:es)?|filmes?|cine[- ]?foros?|grabaci[oó]n(?:es)?|clips?|audiovisual(?:es)?|youtube|vimeo|netflix)\b/i;
+  const inaccessibleEquipmentRegex = /\b(?:proyector(?:es)?|videobeam|video\s*beam|pantallas?\s+(?:gigante|inteligente|t[aá]ctil|interactiva|plana|led|lcd)?|smart\s*tv|smartboard|pizarra\s+digital|televisor(?:es)?|tv|parlantes?|bafles?|altavoces?|equipo\s+de\s+sonido|aud[ií]fonos?)\b/i;
+  const studentDevicesRegex = /\b(?:laptops?|tablets?|computadores?|ordenadores?|tel[eé]fonos?|celulares?)\s+(?:de\s+los\s+estudiantes|individuales|por\s+estudiante|personales)\b/i;
+  const paidSoftwareRegex = /(?:licencias?\s+de\s+pago|software\s+de\s+pago|software\s+privativo|laboratorios?\s+especializados?|suscripci[oó]n(?:\s+costosa|\s+a\s+\w+)?|(?:terminal\s+)?bloomberg(?:\s+terminal)?|spss|matlab)\b/i;
+
   rows.forEach((r, idx) => {
-    const act = (r.activities || '').toLowerCase();
-    const res = (r.resources || '').toLowerCase();
+    const act = (r.activities || '').trim();
+    const res = (r.resources || '').trim();
 
-    // Detección de videos largos en actividades (>5 min o videos que sustituyen la clase)
-    if (/(?:video|vídeo|documental|pel[ií]cula|videotutorial)\s*(?:de\s*)?(?:[1-9]\d+|[6-9])\s*(?:min|hora|h)/i.test(act) ||
-        /(?:ver|observar|mirar)\s+(?:un\s+)?(?:video|vídeo|documental|pel[ií]cula)\s+(?:de\s+)?\d+/i.test(act) ||
-        /(?:video|vídeo)\s+(?:largo|extenso|completo)/i.test(act)) {
-      issues.push(`Fila ${idx + 1} (${r.phase}): Contiene visualización de video extenso incompatible con una clase presencial activa.`);
+    // Detección de cualquier mención a videos en actividades
+    if (videoRegex.test(act)) {
+      issues.push(`Fila ${idx + 1} (${r.phase}): Contiene mención a video o material audiovisual en las actividades (incompatible con la política de clase 100% realizable y activa sin videos).`);
     }
 
-    // Detección de videos largos en recursos
-    if (/(?:video|vídeo|documental|pel[ií]cula)\s*(?:de\s*)?(?:[1-9]\d+|[6-9])\s*(?:min|hora|h)/i.test(res) ||
-        /(?:video|vídeo)\s+(?:largo|extenso|completo)/i.test(res)) {
-      issues.push(`Fila ${idx + 1} (${r.phase}): Los recursos incluyen un video extenso o documental.`);
+    // Detección de videos en recursos
+    if (videoRegex.test(res)) {
+      issues.push(`Fila ${idx + 1} (${r.phase}): Los recursos incluyen videos o plataformas audiovisuales.`);
     }
 
-    // Detección de software de pago o recursos inaccesibles
-    if (/software\s+de\s+pago|licencia\s+de\s+pago|laboratorio\s+especializado/i.test(res)) {
-      issues.push(`Fila ${idx + 1} (${r.phase}): Los recursos mencionan software de pago o inaccesible.`);
+    // Detección de equipos audiovisuales o pantallas inaccesibles
+    if (inaccessibleEquipmentRegex.test(res)) {
+      issues.push(`Fila ${idx + 1} (${r.phase}): Los recursos requieren equipos de proyección, pantallas o sonido inaccesibles en un aula física estándar.`);
+    }
+
+    // Detección de dispositivos requeridos por estudiante
+    if (studentDevicesRegex.test(res) || studentDevicesRegex.test(act)) {
+      issues.push(`Fila ${idx + 1} (${r.phase}): Exige dispositivos individuales (laptops/tablets) por estudiante en el aula.`);
+    }
+
+    // Detección de software de pago o licencias privativas
+    if (paidSoftwareRegex.test(res)) {
+      issues.push(`Fila ${idx + 1} (${r.phase}): Los recursos mencionan software de pago o licencias privativas.`);
     }
   });
 
