@@ -100,6 +100,7 @@ import {
   DEMO_REVIEWS,
   DEMO_BOOKS,
   DEMO_NOTES,
+  DEMO_VIDEOS,
   DEMO_ACADEMIC_GROUPS,
   DEMO_USER_MAPPINGS,
   DEMO_USER_PRESENCE,
@@ -126,6 +127,7 @@ const TasksTab = React.lazy(() => import('./components/TasksTab.jsx'))
 const ReviewsModule = React.lazy(() => import('./components/ReviewsModule.jsx'))
 const BooksLibraryModule = React.lazy(() => import('./components/BooksLibraryModule.jsx'))
 const NotesModule = React.lazy(() => import('./components/NotesModule.jsx'))
+const VideosModule = React.lazy(() => import('./components/VideosModule.jsx'))
 const GifPickerModal = React.lazy(() => import('./components/GifPickerModal.jsx'))
 import { LessonPlansModal } from './components/LessonPlansModal.jsx'
 import {
@@ -271,7 +273,7 @@ function App() {
       const kahootInfo = parseKahootUrlInfo(window.location.hash, window.location.search);
 
       return {
-        tab: ['tasks', 'reviews', 'books', 'notes', 'syllabus', 'evaluations', 'directory', 'groups', 'inbox', 'profile', 'settings', 'tools'].includes(mainTab) ? mainTab : 'tasks',
+        tab: ['tasks', 'reviews', 'books', 'notes', 'videos', 'syllabus', 'evaluations', 'directory', 'groups', 'inbox', 'profile', 'settings', 'tools'].includes(mainTab) ? mainTab : 'tasks',
         profileId: profileId || null,
         ovaId: ovaId || null,
         kahootRoute: kahootInfo.isKahootRoute,
@@ -798,6 +800,7 @@ function App() {
   const [rawReviews, setReviews] = useState(() => initialIsDemo ? DEMO_REVIEWS : []);
   const [rawBooks, setRawBooks] = useState(() => initialIsDemo ? DEMO_BOOKS : []);
   const [rawNotes, setRawNotes] = useState(() => initialIsDemo ? DEMO_NOTES : []);
+  const [rawVideos, setRawVideos] = useState(() => initialIsDemo ? DEMO_VIDEOS : []);
   const [inboxTab, setInboxTab] = useState('suggestions');
   const [inboxFilter, setInboxFilter] = useState('all');
   const [inboxSearch, setInboxSearch] = useState('');
@@ -1212,6 +1215,10 @@ function App() {
       return matchesStudentTeacher(n);
     });
   }, [rawNotes, isDemoMode, role, myChatId, currentTeacherId, studentEnrolledGroups, matchesStudentTeacher]);
+
+  const videos = useMemo(() => {
+    return rawVideos || [];
+  }, [rawVideos]);
 
   const removeStudentFromGroupHelper = async (groupId, studentKey) => {
     if (!groupId || !studentKey) return;
@@ -2338,7 +2345,7 @@ function App() {
               setViewingProfileId(null);
               try { sessionStorage.removeItem('englishTech_viewingProfileId'); } catch(e) {}
             }
-          } else if (mainTab && ['tasks', 'reviews', 'books', 'notes', 'syllabus', 'evaluations', 'directory', 'groups', 'inbox', 'profile', 'settings', 'tools'].includes(mainTab)) {
+          } else if (mainTab && ['tasks', 'reviews', 'books', 'notes', 'videos', 'syllabus', 'evaluations', 'directory', 'groups', 'inbox', 'profile', 'settings', 'tools'].includes(mainTab)) {
             setActiveTab(mainTab);
           } else if (!hash) {
             setActiveTab('tasks');
@@ -2454,6 +2461,7 @@ function App() {
       reviews: 'Diapositivas',
       books: 'Libros',
       notes: 'Notas',
+      videos: 'Vídeos',
       syllabus: 'Contenidos',
       evaluations: 'Evaluaciones',
       directory: 'Directorio',
@@ -2481,7 +2489,7 @@ function App() {
               if (tabName === 'chat') {
                   isActive = (isChatAppOpen || (!!activeChat && !isChatMinimized)) && !isMobileMenuOpen;
               } else if (tabName === 'menu') {
-                  isActive = isMobileMenuOpen || (!isChatAppOpen && (!activeChat || isChatMinimized) && ['reviews', 'books', 'notes', 'syllabus', 'directory', 'evaluations', 'tools'].includes(activeTab));
+                  isActive = isMobileMenuOpen || (!isChatAppOpen && (!activeChat || isChatMinimized) && ['reviews', 'books', 'notes', 'videos', 'syllabus', 'directory', 'evaluations', 'tools'].includes(activeTab));
               } else {
                   isActive = activeTab === tabName && !isChatAppOpen && (!activeChat || isChatMinimized) && !isMobileMenuOpen;
               }
@@ -3406,6 +3414,7 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
             setReviews(DEMO_REVIEWS);
             setRawBooks(DEMO_BOOKS);
             setRawNotes(DEMO_NOTES);
+            setRawVideos(DEMO_VIDEOS);
             setGrades([]);
             setActiveTakingEval(null);
             setViewingResultsFor(null);
@@ -3457,6 +3466,7 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
                 setReviews(mergeDemoItemsWithBase(DEMO_REVIEWS, [], 'reviews'));
                 setRawBooks(mergeDemoItemsWithBase(DEMO_BOOKS, [], 'books'));
                 setRawNotes(mergeDemoItemsWithBase(DEMO_NOTES, [], 'notes'));
+                setRawVideos(mergeDemoItemsWithBase(DEMO_VIDEOS, [], 'videos'));
                 setGrades(mergeDemoItemsWithBase([], [], 'grades'));
                 setTasksLoading(false);
               }
@@ -3957,6 +3967,7 @@ useEffect(() => {
     setReviews(mergeDemoItemsWithBase(DEMO_REVIEWS, [], 'reviews'));
     setRawBooks(mergeDemoItemsWithBase(DEMO_BOOKS, [], 'books'));
     setRawNotes(mergeDemoItemsWithBase(DEMO_NOTES, [], 'notes'));
+    setRawVideos(mergeDemoItemsWithBase(DEMO_VIDEOS, [], 'videos'));
     setGrades(mergeDemoItemsWithBase([], [], 'grades'));
     setUserPosts(mergeDemoItemsWithBase(DEMO_USER_POSTS, [], 'userPosts'));
     setSuggestions(mergeDemoItemsWithBase(DEMO_SUGGESTIONS, [], 'suggestions'));
@@ -4095,6 +4106,15 @@ useEffect(() => {
     const uNotes = onSnapshot(q, s => setRawNotes(s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0))), err => console.error(err));
     return () => uNotes();
 }, [hasEntered, myChatId, needsNotesSubscription, isDemoMode]);
+
+// 4d. PESTAÑA: VÍDEOS (Videoteca académica de clase)
+const needsVideosSubscription = activeTab === 'videos';
+useEffect(() => {
+    if (!hasEntered || !myChatId || isDemoMode || !needsVideosSubscription) return;
+    const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'videos'), orderBy('createdAt', 'desc'), limit(100));
+    const uVideos = onSnapshot(q, s => setRawVideos(s.docs.map(d => ({ id: d.id, ...d.data() }))), err => console.error(err));
+    return () => uVideos();
+}, [hasEntered, myChatId, needsVideosSubscription, isDemoMode]);
 
 // 5. PESTAÑA: SYLLABUS Y PLANES DE CLASE
 useEffect(() => {
@@ -7308,6 +7328,25 @@ useEffect(() => {
               </React.Suspense>
             );
           };
+
+          const renderVideos = () => (
+            <React.Suspense fallback={<div className="space-y-4 p-4">{[1,2,3].map(i => <div key={i} className="p-4 rounded-2xl border animate-pulse bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800"><div className="flex items-center gap-3 mb-4"><div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700" /><div className="flex-1 space-y-2"><div className="h-3 w-1/3 rounded bg-gray-200 dark:bg-gray-700" /></div></div><div className="h-4 w-full rounded mb-2 bg-gray-200 dark:bg-gray-700" /><div className="h-4 w-5/6 rounded bg-gray-200 dark:bg-gray-700" /></div>)}</div>}>
+              <VideosModule
+                videos={videos}
+                setVideos={setRawVideos}
+                role={role}
+                myChatId={myChatId}
+                loggedInName={myDisplayName || loggedInName || (role === 'teacher' ? 'Docente' : 'Estudiante')}
+                user={user}
+                academicGroups={academicGroups}
+                isDarkMode={isDarkMode}
+                isDemoMode={isDemoMode}
+                db={db}
+                appId={appId}
+                showMessage={(msg) => showMessage(msg)}
+              />
+            </React.Suspense>
+          );
 
           const renderSyllabus = () => {
             // Manejador del procesamiento de PDF con IA
@@ -15249,6 +15288,9 @@ Escribe en español con tono pedagógico moderno.`;
                               <button onClick={() => changeTab('notes')} className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-bold rounded-xl transition-colors ${activeTab === 'notes' ? 'bg-sky-50 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400' : isDarkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-100 text-gray-700'}`}>
                                   <PenTool size={18} className="text-sky-500" /> Notas
                               </button>
+                              <button onClick={() => changeTab('videos')} className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-bold rounded-xl transition-colors ${activeTab === 'videos' ? 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400' : isDarkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-100 text-gray-700'}`}>
+                                  <Film size={18} className="text-red-500" /> Vídeos
+                              </button>
                               <button onClick={() => changeTab('syllabus')} className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-bold rounded-xl transition-colors ${activeTab === 'syllabus' ? 'bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400' : isDarkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-100 text-gray-700'}`}>
                                   <NavFile size={18} className="text-green-500" /> Contenidos
                               </button>
@@ -15398,6 +15440,7 @@ Escribe en español con tono pedagógico moderno.`;
                       {activeTab === 'reviews' && renderReviews()}
                       {activeTab === 'books' && renderBooks()}
                       {activeTab === 'notes' && renderNotes()}
+                      {activeTab === 'videos' && renderVideos()}
                       {activeTab === 'syllabus' && renderSyllabus()}
                       {activeTab === 'evaluations' && renderEvaluations()}
                       {activeTab === 'directory' && role === 'teacher' && renderDirectory()}
@@ -17761,6 +17804,25 @@ Escribe en español con tono pedagógico moderno.`;
                                           <div>
                                               <p className="font-extrabold text-xs text-gray-900 dark:text-gray-100">Notas</p>
                                               <p className="text-[10px] text-gray-500 truncate">Cuaderno y apuntes</p>
+                                          </div>
+                                      </button>
+
+                                      {/* Vídeos */}
+                                      <button
+                                          type="button"
+                                          onClick={() => { setIsMobileMenuOpen(false); changeTab('videos'); }}
+                                          className={`p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between gap-2 shadow-2xs hover:scale-[1.01] active:scale-95 ${
+                                              activeTab === 'videos'
+                                                  ? (isDarkMode ? 'bg-red-950/40 border-red-800' : 'bg-red-50 border-red-200')
+                                                  : (isDarkMode ? 'bg-gray-800/80 border-gray-700' : 'bg-white border-gray-200')
+                                          }`}
+                                      >
+                                          <div className="w-9 h-9 rounded-xl bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 flex items-center justify-center shadow-xs">
+                                              <Film size={18} />
+                                          </div>
+                                          <div>
+                                              <p className="font-extrabold text-xs text-gray-900 dark:text-gray-100">Vídeos</p>
+                                              <p className="text-[10px] text-gray-500 truncate">Videoteca de clase</p>
                                           </div>
                                       </button>
 
