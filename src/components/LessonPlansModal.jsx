@@ -31,6 +31,7 @@ import {
   buildGenerateMaterialPrompt,
   generateDefaultDidacticMaterials
 } from '../utils/lessonPlanEngine.js';
+import { DidacticMaterialSheet } from './DidacticMaterialSheet.jsx';
 
 export function LessonPlansModal({
   isOpen,
@@ -911,6 +912,10 @@ export function LessonPlansModal({
                             <p className="text-[11px] text-gray-500 line-clamp-2">
                               {mat.description}
                             </p>
+                            <div className="flex items-center gap-1.5 pt-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                              <FileText size={12} />
+                              <span>Formato oficial: Hoja Blanca de Aula (UP)</span>
+                            </div>
                           </div>
 
                           <div className="flex items-center justify-between gap-2 pt-3 mt-3 border-t border-gray-100 dark:border-gray-700/60">
@@ -919,7 +924,7 @@ export function LessonPlansModal({
                               onClick={() => setActiveMaterialModal(mat)}
                               className="text-xs font-bold text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1 cursor-pointer"
                             >
-                              <Eye size={13} /> Ver material
+                              <Eye size={13} /> Ver hoja blanca
                             </button>
                             <div className="flex items-center gap-1.5">
                               <button
@@ -950,62 +955,68 @@ export function LessonPlansModal({
           </div>
         </div>
 
-        {/* Modal de Lectura y Visualización Completa de un Material Didáctico */}
+        {/* Modal de Lectura y Visualización Completa de un Material Didáctico en HOJA BLANCA */}
         {activeMaterialModal && (
-          <div className="fixed inset-0 z-[1000000] flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-xs animate-in fade-in">
+          <div className="fixed inset-0 z-[1000000] flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/85 backdrop-blur-xs animate-in fade-in">
             <div
-              className={`w-full max-w-3xl max-h-[90vh] rounded-3xl border shadow-2xl flex flex-col overflow-hidden ${
+              className={`w-full max-w-4xl max-h-[94vh] rounded-3xl border shadow-2xl flex flex-col overflow-hidden ${
                 isDarkMode ? 'bg-gray-900 border-gray-800 text-white' : 'bg-white border-gray-200 text-gray-900'
               }`}
             >
-              {/* Cabecera del material */}
-              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-800">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-purple-600/10 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold">
+              {/* Cabecera del modal */}
+              <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-200 dark:border-gray-800 bg-gray-50/80 dark:bg-gray-900/80 shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-2xl bg-purple-600/10 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold shrink-0 border border-purple-500/20">
                     <BookOpen size={20} />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 rounded-md bg-purple-600 text-white text-[10px] font-black uppercase">
-                        {activeMaterialModal.type}
+                      <span className="px-2 py-0.5 rounded-md bg-purple-600 text-white text-[10px] font-black uppercase tracking-wider">
+                        {activeMaterialModal.type || 'Material Didáctico'}
                       </span>
-                      <span className="text-xs text-gray-400 font-semibold">
-                        Fase: {activeMaterialModal.phase}
+                      <span className="text-xs text-gray-500 dark:text-gray-400 font-semibold truncate">
+                        Fase: {activeMaterialModal.phase || 'Desarrollo'} • Formato Hoja Blanca
                       </span>
                     </div>
-                    <h3 className="text-sm sm:text-base font-extrabold truncate max-w-md">
+                    <h3 className="text-sm sm:text-base font-extrabold truncate">
                       {activeMaterialModal.title}
                     </h3>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setActiveMaterialModal(null)}
-                  className="p-1.5 rounded-xl text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                >
-                  <X size={18} />
-                </button>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => handlePrintMaterial(activeMaterialModal)}
+                    className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                    title="Imprimir hoja de trabajo / Guardar como PDF"
+                  >
+                    <Printer size={13} />
+                    <span className="hidden sm:inline">Imprimir / PDF</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveMaterialModal(null)}
+                    className="p-1.5 rounded-xl text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
               </div>
 
-              {/* Contenido del material */}
-              <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4">
-                <div className="p-3.5 rounded-2xl bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 text-xs text-purple-900 dark:text-purple-200">
-                  <p className="font-bold mb-0.5">Uso didáctico en clase:</p>
-                  <p>{activeMaterialModal.description}</p>
-                </div>
-
-                <div
-                  className={`p-4 sm:p-5 rounded-2xl border font-mono text-xs whitespace-pre-wrap leading-relaxed ${
-                    isDarkMode ? 'bg-gray-950/70 border-gray-800 text-gray-200' : 'bg-gray-50 border-gray-200 text-gray-800'
-                  }`}
-                >
-                  {activeMaterialModal.content}
-                </div>
+              {/* Contenedor tipo mesa de trabajo / visor con la HOJA BLANCA en el centro */}
+              <div className="flex-1 overflow-y-auto p-3 sm:p-8 bg-gray-200/80 dark:bg-black/60">
+                <DidacticMaterialSheet
+                  material={activeMaterialModal}
+                  plan={activePlan}
+                />
               </div>
 
               {/* Footer con acciones */}
-              <div className="flex items-center justify-between px-5 py-3.5 border-t border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50">
-                <span className="text-xs text-gray-400">Listo para imprimir o copiar</span>
+              <div className="flex items-center justify-between px-5 py-3 border-t border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-900/70 shrink-0">
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  Hoja oficial de trabajo lista para imprimir o fotocopiar para la clase
+                </span>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
@@ -1019,7 +1030,7 @@ export function LessonPlansModal({
                     onClick={() => handlePrintMaterial(activeMaterialModal)}
                     className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
                   >
-                    <Printer size={13} /> Imprimir este material
+                    <Printer size={13} /> Imprimir hoja blanca
                   </button>
                 </div>
               </div>
@@ -1029,47 +1040,11 @@ export function LessonPlansModal({
 
         {/* Vista oculta exclusivamente para imprimir un solo material didáctico */}
         {printTargetMaterial && (
-          <div 
-            data-darkreader-ignore="true"
-            data-lesson-plan-sheet="true"
-            className="printable-material-single hidden p-8 bg-white text-black font-sans printable-lesson-plan"
-            style={{
-              color: '#000000',
-              WebkitTextFillColor: '#000000',
-              backgroundColor: '#ffffff',
-              colorScheme: 'only light',
-              forcedColorAdjust: 'none'
-            }}
-          >
-            <div className="border-b-2 border-black pb-3 mb-4 text-center">
-              <h2 className="text-sm font-black uppercase tracking-wider text-black" style={{ color: '#000000', WebkitTextFillColor: '#000000' }}>
-                UNIVERSIDAD DE PAMPLONA
-              </h2>
-              <h3 className="text-xs font-bold text-gray-800" style={{ color: '#000000', WebkitTextFillColor: '#000000' }}>
-                MATERIAL DIDÁCTICO DE AULA PRESENCIAL | SEMANA {activePlan.week}
-              </h3>
-              <div className="flex justify-between text-[11px] font-semibold mt-2 pt-2 border-t border-gray-300" style={{ color: '#000000', WebkitTextFillColor: '#000000' }}>
-                <span>Asignatura: {activePlan.subject || 'Inglés Técnico'}</span>
-                <span>Docente: {activePlan.teacher || ''}</span>
-                <span>Fase: {printTargetMaterial.phase}</span>
-              </div>
-            </div>
-
-            <div className="mb-4">
-              <div className="text-[10px] font-black uppercase tracking-wider text-gray-600" style={{ color: '#374151', WebkitTextFillColor: '#374151' }}>
-                [{printTargetMaterial.type}]
-              </div>
-              <h1 className="text-base font-black mt-1 text-black" style={{ color: '#000000', WebkitTextFillColor: '#000000' }}>
-                {printTargetMaterial.title}
-              </h1>
-              <p className="text-xs italic text-gray-600 mt-1" style={{ color: '#4b5563', WebkitTextFillColor: '#4b5563' }}>
-                {printTargetMaterial.description}
-              </p>
-            </div>
-
-            <div className="border-t border-gray-400 pt-3 text-xs leading-relaxed whitespace-pre-wrap font-mono text-black" style={{ color: '#000000', WebkitTextFillColor: '#000000' }}>
-              {printTargetMaterial.content}
-            </div>
+          <div className="printable-material-single hidden print:block bg-white text-black font-sans printable-lesson-plan">
+            <DidacticMaterialSheet
+              material={printTargetMaterial}
+              plan={activePlan}
+            />
           </div>
         )}
 
@@ -1130,12 +1105,19 @@ export function LessonPlansModal({
                     top: 0 !important;
                     width: 100% !important;
                     margin: 0 !important;
-                    padding: 24px !important;
+                    padding: 0 !important;
                     border: none !important;
                     box-shadow: none !important;
                     background: white !important;
                     color: black !important;
                     z-index: 99999999 !important;
+                  }
+                  .printable-material-sheet {
+                    border: none !important;
+                    box-shadow: none !important;
+                    max-width: 100% !important;
+                    padding: 0.5cm !important;
+                    border-radius: 0 !important;
                   }`
                 : `.printable-lesson-plan, .printable-lesson-plan * {
                     visibility: visible !important;
