@@ -542,7 +542,7 @@ export default function VideosModule({
               onClick={() => setSelectedClassFilter('all')}
               className={`px-3 py-1 rounded-full text-xs font-bold transition-all shrink-0 cursor-pointer ${
                 selectedClassFilter === 'all'
-                  ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 shadow-xs'
+                  ? 'bg-[#AD3333] text-white shadow-xs'
                   : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
               }`}
             >
