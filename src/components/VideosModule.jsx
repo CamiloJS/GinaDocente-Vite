@@ -580,7 +580,7 @@ export default function VideosModule({
             <p className="text-xs text-gray-500 max-w-md mx-auto">
               {searchQuery || selectedClassFilter !== 'all' || selectedFormatFilter !== 'all'
                 ? 'No encontramos vídeos que coincidan con tus filtros actuales. Intenta limpiar la búsqueda.'
-                : 'Sé el primero en compartir un vídeo de clase pegando un enlace de YouTube, TikTok, pCloud o File Garden.'}
+                : 'Sé el primero en compartir un vídeo'}
             </p>
           </div>
           <button
