@@ -801,7 +801,17 @@ function App() {
   const [inboxFilter, setInboxFilter] = useState('all');
   const [inboxSearch, setInboxSearch] = useState('');
 
-  const [syllabusAssistantModal, setSyllabusAssistantModal] = useState({ isOpen: false, weekItem: null, type: null, content: '', isLoading: false });
+  const [syllabusAssistantModal, setSyllabusAssistantModal] = useState({
+    isOpen: false,
+    weekItem: null,
+    type: null,
+    content: '',
+    planObject: null,
+    isLoading: false,
+    planHours: 2,
+    includeIcebreaker: true,
+    icebreakerResources: ''
+  });
   const [groupCoverModal, setGroupCoverModal] = useState({ isOpen: false, group: null, emoji: 'BookOpen', coverPattern: 'doodle-1', coverUrl: '', customFile: null, isSaving: false });
   const [newAcadGroupEmoji, setNewAcadGroupEmoji] = useState('BookOpen');
 
@@ -7981,15 +7991,175 @@ Escribe en español con tono pedagógico moderno.`;
                               </div>
 
                               <div
+                                onClick={() => {
+                                  setSyllabusAssistantModal(prev => ({
+                                    ...prev,
+                                    type: 'lesson_plan_config',
+                                    planHours: 2,
+                                    includeIcebreaker: true,
+                                    icebreakerResources: '',
+                                    content: '',
+                                    planObject: null
+                                  }));
+                                }}
+                                className={`p-5 rounded-2xl border transition-all cursor-pointer hover:scale-[1.02] flex flex-col justify-between gap-3 ${
+                                  isDarkMode ? 'bg-gray-800/80 border-gray-700 hover:border-purple-500/50' : 'bg-purple-50/50 border-purple-200/80 hover:border-purple-400 shadow-xs'
+                                }`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-600 flex items-center justify-center shrink-0">
+                                    <BookOpen size={20} />
+                                  </div>
+                                  <div>
+                                    <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100">Crear un plan de clase</h4>
+                                    <p className="text-[11px] text-gray-500 mt-1">Configura horas, actividad rompehielos y recursos para generar la planeación oficial de la Universidad de Pamplona.</p>
+                                  </div>
+                                </div>
+                                <span className="text-xs font-bold text-purple-600 dark:text-purple-400 flex items-center gap-1">
+                                  Configurar y generar <ChevronRight size={14} />
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        ) : syllabusAssistantModal.type === 'lesson_plan_config' ? (
+                          /* ================= MODAL CONFIGURACIÓN DE PLANEACIÓN ================= */
+                          <div className="space-y-5 py-2 animate-in fade-in">
+                            <div className="text-center space-y-1">
+                              <div className="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-600 flex items-center justify-center mx-auto mb-2">
+                                <Clock size={24} />
+                              </div>
+                              <h4 className="font-extrabold text-base sm:text-lg text-gray-900 dark:text-gray-100">
+                                Personalizar planeación de clase (Semana {syllabusAssistantModal.weekItem?.week})
+                              </h4>
+                              <p className="text-xs text-gray-500">
+                                Configura la duración y la fase de Inicio antes de que la IA elabore el formato oficial.
+                              </p>
+                            </div>
+
+                            {/* 1. Selección de Horas */}
+                            <div className="p-4 rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-800/50 space-y-2.5">
+                              <label className="text-xs font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                                <Clock size={15} className="text-purple-600" />
+                                <span>¿De cuántas horas será la sesión?</span>
+                              </label>
+                              <div className="grid grid-cols-4 gap-2">
+                                {[1, 2, 3, 4].map(h => (
+                                  <button
+                                    key={h}
+                                    type="button"
+                                    onClick={() => setSyllabusAssistantModal(prev => ({ ...prev, planHours: h }))}
+                                    className={`py-2.5 px-3 rounded-xl font-bold text-xs flex flex-col items-center gap-0.5 border transition-all ${
+                                      syllabusAssistantModal.planHours === h
+                                        ? 'bg-purple-600 text-white border-purple-600 shadow-xs scale-102'
+                                        : isDarkMode
+                                          ? 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700'
+                                          : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-100'
+                                    }`}
+                                  >
+                                    <span className="text-base font-black">{h}</span>
+                                    <span className="text-[10px] uppercase opacity-80">{h === 1 ? 'hora' : 'horas'}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* 2. Opción de Actividad Rompehielos */}
+                            <div className="p-4 rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-800/50 space-y-3">
+                              <label className="text-xs font-bold text-gray-800 dark:text-gray-200 flex items-center justify-between">
+                                <span className="flex items-center gap-2">
+                                  <Sparkles size={15} className="text-amber-500" />
+                                  <span>¿Deseas incluir una actividad rompehielos (Icebreaker)?</span>
+                                </span>
+                              </label>
+                              
+                              <div className="grid grid-cols-2 gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setSyllabusAssistantModal(prev => ({ ...prev, includeIcebreaker: true }))}
+                                  className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-2 ${
+                                    syllabusAssistantModal.includeIcebreaker
+                                      ? 'bg-amber-500 text-white border-amber-500 shadow-xs'
+                                      : isDarkMode
+                                        ? 'bg-gray-800 border-gray-700 text-gray-400'
+                                        : 'bg-white border-gray-300 text-gray-600'
+                                  }`}
+                                >
+                                  <span>Sí, incluir rompehielos</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setSyllabusAssistantModal(prev => ({ ...prev, includeIcebreaker: false }))}
+                                  className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-2 ${
+                                    !syllabusAssistantModal.includeIcebreaker
+                                      ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
+                                      : isDarkMode
+                                        ? 'bg-gray-800 border-gray-700 text-gray-400'
+                                        : 'bg-white border-gray-300 text-gray-600'
+                                  }`}
+                                >
+                                  <span>No, inicio directo</span>
+                                </button>
+                              </div>
+
+                              {/* Campo de Recursos si elige Rompehielos */}
+                              {syllabusAssistantModal.includeIcebreaker && (
+                                <div className="space-y-1.5 pt-1 animate-in fade-in">
+                                  <label className="text-[11px] font-bold text-gray-600 dark:text-gray-300 block">
+                                    ¿Qué recursos hay a disposición para la actividad rompehielos?
+                                  </label>
+                                  <textarea
+                                    rows={2}
+                                    value={syllabusAssistantModal.icebreakerResources || ''}
+                                    onChange={(e) => setSyllabusAssistantModal(prev => ({ ...prev, icebreakerResources: e.target.value }))}
+                                    placeholder="Ej: Marcadores, hojas recicladas, proyector, balones antiestrés, teléfonos de los estudiantes, música suave..."
+                                    className={`w-full p-2.5 rounded-xl border text-xs outline-none transition-colors ${
+                                      isDarkMode
+                                        ? 'bg-gray-800 border-gray-700 text-white focus:border-purple-500'
+                                        : 'bg-white border-gray-300 text-gray-900 focus:border-purple-500'
+                                    }`}
+                                  />
+                                  <p className="text-[10px] text-gray-400">
+                                    La IA adaptará la dinámica del rompehielos a los materiales que indiques.
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Botones de acción */}
+                            <div className="flex items-center justify-between gap-3 pt-1">
+                              <button
+                                type="button"
+                                onClick={() => setSyllabusAssistantModal(prev => ({ ...prev, type: null }))}
+                                className="px-4 py-2.5 text-xs font-semibold rounded-xl text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                              >
+                                Volver
+                              </button>
+
+                              <button
+                                type="button"
                                 onClick={async () => {
                                   const item = syllabusAssistantModal.weekItem;
-                                  setSyllabusAssistantModal(prev => ({ ...prev, type: 'lesson_plan', isLoading: true, content: '', planObject: null }));
+                                  const hours = syllabusAssistantModal.planHours || 2;
+                                  const includeIcebreaker = syllabusAssistantModal.includeIcebreaker;
+                                  const icebreakerResources = syllabusAssistantModal.icebreakerResources || '';
+
+                                  setSyllabusAssistantModal(prev => ({
+                                    ...prev,
+                                    type: 'lesson_plan',
+                                    isLoading: true,
+                                    content: '',
+                                    planObject: null
+                                  }));
+
                                   try {
                                     const teacherName = myDisplayName || 'Gina';
                                     const prompt = buildLessonPlanPrompt({
                                       weekItem: item,
                                       teacherName,
-                                      institution: 'Universidad de Pamplona'
+                                      institution: 'Universidad de Pamplona',
+                                      hours,
+                                      includeIcebreaker,
+                                      icebreakerResources
                                     });
                                     const res = await callGemini(prompt);
                                     const normalizedPlan = parseLessonPlanResponse(res, {
@@ -8028,23 +8198,11 @@ Escribe en español con tono pedagógico moderno.`;
                                     }));
                                   }
                                 }}
-                                className={`p-5 rounded-2xl border transition-all cursor-pointer hover:scale-[1.02] flex flex-col justify-between gap-3 ${
-                                  isDarkMode ? 'bg-gray-800/80 border-gray-700 hover:border-purple-500/50' : 'bg-purple-50/50 border-purple-200/80 hover:border-purple-400 shadow-xs'
-                                }`}
+                                className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-md transition-all hover:scale-102 cursor-pointer"
                               >
-                                <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-600 flex items-center justify-center shrink-0">
-                                    <BookOpen size={20} />
-                                  </div>
-                                  <div>
-                                    <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100">Crear un plan de clase</h4>
-                                    <p className="text-[11px] text-gray-500 mt-1">Genera la planeación semanal oficial de la Universidad de Pamplona (Inicio, Desarrollo y Cierre - Tarea).</p>
-                                  </div>
-                                </div>
-                                <span className="text-xs font-bold text-purple-600 dark:text-purple-400 flex items-center gap-1">
-                                  Generar plan de clase <ChevronRight size={14} />
-                                </span>
-                              </div>
+                                <Sparkles size={14} />
+                                <span>Generar planeación oficial ({syllabusAssistantModal.planHours}h)</span>
+                              </button>
                             </div>
                           </div>
                         ) : syllabusAssistantModal.isLoading ? (

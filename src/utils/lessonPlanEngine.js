@@ -8,7 +8,10 @@
 export function buildLessonPlanPrompt({
   weekItem,
   teacherName = 'Gina',
-  institution = 'Universidad de Pamplona'
+  institution = 'Universidad de Pamplona',
+  hours = 2,
+  includeIcebreaker = true,
+  icebreakerResources = ''
 }) {
   const week = weekItem?.week ?? 1;
   const topic = weekItem?.topic || 'Tema de la semana';
@@ -16,6 +19,20 @@ export function buildLessonPlanPrompt({
   const description = weekItem?.description || '';
   const keyConcepts = Array.isArray(weekItem?.keyConcepts) ? weekItem.keyConcepts.join(', ') : '';
   const activities = weekItem?.activities || '';
+  const totalMinutes = Math.max(30, Math.round(Number(hours) * 60) || 120);
+
+  // Distribución de tiempo según duración y si hay rompehielos
+  const inicioMins = includeIcebreaker ? Math.round(totalMinutes * 0.25) : Math.round(totalMinutes * 0.15);
+  const cierreMins = Math.round(totalMinutes * 0.20);
+  const desarrolloMins = totalMinutes - inicioMins - cierreMins;
+
+  const icebreakerGuideline = includeIcebreaker
+    ? `SÍ incluir una actividad rompehielos (Icebreaker / Warm-up dinámico) en la fase de "Inicio".${
+        icebreakerResources && icebreakerResources.trim()
+          ? ` RECURSOS A DISPOSICIÓN PARA EL ROMPEHIELOS: ${icebreakerResources.trim()}. Debes diseñar el rompehielos adaptado a estos recursos disponibles.`
+          : ' Diseña un rompehielos activo y motivador adaptado a estudiantes universitarios.'
+      }`
+    : `NO incluir actividad rompehielos; en la fase de "Inicio", enfócate directamente en activación de saberes previos, motivación y preguntas detonantes técnicas sobre el tema.`;
 
   return `Eres un diseñador instruccional y pedagogo universitario de alto nivel.
 Genera una planeación de clase semanal universitaria en ESPAÑOL basada en los siguientes datos del contenido programático:
@@ -23,6 +40,9 @@ Genera una planeación de clase semanal universitaria en ESPAÑOL basada en los 
 - Semana: ${week}
 - Unidad: ${unit}
 - Tema: ${topic}
+- Duración total de la sesión: ${hours} ${hours === 1 ? 'hora' : 'horas'} (${totalMinutes} minutos)
+- Distribución de tiempo aproximada: Inicio (${inicioMins} min), Desarrollo (${desarrolloMins} min), Cierre - Tarea (${cierreMins} min)
+- Directriz de rompehielos: ${icebreakerGuideline}
 - Descripción / Objetivos base: ${description}
 - Conceptos clave: ${keyConcepts}
 - Actividades base sugeridas: ${activities}
@@ -43,9 +63,9 @@ El formato del JSON debe ser exactamente:
       "date": "Semana ${week}",
       "phase": "Inicio",
       "topics": "Temas o conceptos a abordar en la fase de Inicio",
-      "activities": "Actividades detalladas para el Inicio (Warm-up, activación de saberes previos, motivación y preguntas detonantes)",
-      "resources": "Recursos, materiales, enlaces o diapositivas para Inicio",
-      "time": "20 min"
+      "activities": "Actividades detalladas para el Inicio (${includeIcebreaker ? 'Actividad rompehielos dinámica' : 'Activación de saberes previos'}, motivación y contextualización)",
+      "resources": "Recursos para Inicio${icebreakerResources ? ` (incluyendo: ${icebreakerResources.trim()})` : ''}",
+      "time": "${inicioMins} min"
     },
     {
       "date": "Semana ${week}",
@@ -53,7 +73,7 @@ El formato del JSON debe ser exactamente:
       "topics": "Temas centrales, vocabulario y estructuras clave",
       "activities": "Actividades detalladas de Desarrollo (Presentation & Practice: explicación docente, ejercicios interactivos, trabajo guiado y colaborativo)",
       "resources": "Recursos de desarrollo (guías, lecturas, plataformas, audios)",
-      "time": "50 min"
+      "time": "${desarrolloMins} min"
     },
     {
       "date": "Semana ${week}",
@@ -61,7 +81,7 @@ El formato del JSON debe ser exactamente:
       "topics": "Síntesis, conclusiones y evaluación formativa",
       "activities": "Actividades de Cierre y Tarea (Wrap-up: retroalimentación, verificación de aprendizaje y asignación de tarea o entregable)",
       "resources": "Recursos para el cierre y tarea (rubrica, plataforma virtual, formulario)",
-      "time": "20 min"
+      "time": "${cierreMins} min"
     }
   ]
 }
@@ -73,7 +93,8 @@ Reglas estrictas:
 4. "learningPurpose" debe ser un texto bien redactado.
 5. "specificPurposes" debe contener 2 o 3 propósitos específicos numerados.
 6. "rows" debe contener exactamente 3 filas correspondientes a las fases: "Inicio", "Desarrollo" y "Cierre - Tarea".
-7. Cada fila debe tener "date", "phase", "topics", "activities", "resources" y "time".`;
+7. Cada fila debe tener "date", "phase", "topics", "activities", "resources" y "time".
+8. La suma de tiempos de las 3 filas debe ser aproximadamente ${totalMinutes} minutos (${hours} ${hours === 1 ? 'hora' : 'horas'}).`;
 }
 
 /**

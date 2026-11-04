@@ -43,7 +43,10 @@ const mockWeek = {
 const prompt = buildLessonPlanPrompt({
   weekItem: mockWeek,
   teacherName: 'Camilo Docente',
-  institution: 'Universidad de Pamplona'
+  institution: 'Universidad de Pamplona',
+  hours: 3,
+  includeIcebreaker: true,
+  icebreakerResources: 'Marcadores de colores, balones y música'
 });
 
 check('Prompt incluye la Universidad de Pamplona', prompt.includes('Universidad de Pamplona'));
@@ -51,6 +54,20 @@ check('Prompt instruye dejar curso y asignatura vacíos', prompt.includes('"cour
 check('Prompt incluye el nombre del profesor', prompt.includes('Camilo Docente'));
 check('Prompt exige las 3 fases del cuadro (Inicio, Desarrollo, Cierre - Tarea)', 
   prompt.includes('Inicio') && prompt.includes('Desarrollo') && prompt.includes('Cierre - Tarea')
+);
+check('Prompt incluye la duración solicitada (3 horas / 180 minutos)', prompt.includes('3 horas') && prompt.includes('180 minutos'));
+check('Prompt incluye la directriz de rompehielos con los recursos a disposición', 
+  prompt.includes('Marcadores de colores, balones y música') && prompt.includes('rompehielos')
+);
+
+const promptNoIcebreaker = buildLessonPlanPrompt({
+  weekItem: mockWeek,
+  teacherName: 'Gina',
+  hours: 1,
+  includeIcebreaker: false
+});
+check('Prompt sin rompehielos instruye explícitamente no incluirlo y duración 1 hora', 
+  promptNoIcebreaker.includes('NO incluir actividad rompehielos') && promptNoIcebreaker.includes('1 hora')
 );
 
 console.log('\n== 2. Parseo y Normalización de Respuestas JSON de Gemini ==');
