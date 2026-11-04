@@ -2,6 +2,7 @@
 // Modal visor, editor y gestor de planeaciones de clase guardadas
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   FileText,
@@ -186,7 +187,7 @@ export function LessonPlansModal({
     }
   };
 
-  return (
+  const modalContent = (
     <div className="fixed inset-0 z-[999999] flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-xs animate-in fade-in duration-200">
       <div
         className={`w-full max-w-5xl max-h-[94vh] rounded-3xl border shadow-2xl flex flex-col overflow-hidden ${
@@ -1162,4 +1163,9 @@ export function LessonPlansModal({
       </div>
     </div>
   );
+
+  if (typeof document !== 'undefined') {
+    return createPortal(modalContent, document.body);
+  }
+  return modalContent;
 }
