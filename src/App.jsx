@@ -133,7 +133,8 @@ import {
   parseLessonPlanResponse,
   normalizeLessonPlan,
   createDefaultLessonPlan,
-  formatLessonPlanAsMarkdown
+  formatLessonPlanAsMarkdown,
+  stripTimeFromActivityText
 } from './utils/lessonPlanEngine.js'
 
 // --- CONSTANTES DE DISEÑO Y PERSONALIZACIÓN DE GRUPOS ---
@@ -8380,7 +8381,7 @@ Escribe en español con tono pedagógico moderno.`;
                                           {row.topics}
                                         </td>
                                         <td className="border border-black p-2 text-black font-normal whitespace-pre-line leading-relaxed">
-                                          {row.activities}
+                                          {stripTimeFromActivityText(row.activities)}
                                         </td>
                                         <td className="border border-black p-2 text-black font-medium whitespace-pre-line">
                                           {row.resources}

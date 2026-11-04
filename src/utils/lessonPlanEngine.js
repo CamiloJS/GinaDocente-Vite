@@ -246,7 +246,7 @@ export function createDefaultLessonPlan(fallbackData = {}, rawNotes = '') {
         topics: topic,
         activities: 'Saludo, activación de conocimientos previos y motivación inicial.',
         resources: 'Pizarra, diapositivas, preguntas guía',
-        time: '20 min'
+        time: '15 min'
       },
       {
         date: `Semana ${week}`,
@@ -254,7 +254,7 @@ export function createDefaultLessonPlan(fallbackData = {}, rawNotes = '') {
         topics: topic,
         activities: 'Explicación magistral, análisis de ejemplos y trabajo práctico en parejas.',
         resources: 'Guía de trabajo, lecturas, proyector',
-        time: '50 min'
+        time: '55 min'
       },
       {
         date: `Semana ${week}`,
@@ -293,6 +293,6 @@ ${plan.specificPurposes || ''}
 ---------------------------------------------------------------------------------------------------------
 | Fecha | Fases | Temas | Actividades | Recursos | Tiempo |
 ---------------------------------------------------------------------------------------------------------
-${rows.map(r => `| ${r.date} | ${r.phase} | ${r.topics} | ${r.activities} | ${r.resources} | ${r.time} |`).join('\n')}
+${rows.map(r => `| ${r.date} | ${r.phase} | ${r.topics} | ${stripTimeFromActivityText(r.activities)} | ${r.resources} | ${r.time} |`).join('\n')}
 ---------------------------------------------------------------------------------------------------------`;
 }

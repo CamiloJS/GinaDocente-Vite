@@ -17,7 +17,7 @@ import {
   ChevronRight,
   BookOpen
 } from './Icons.jsx';
-import { formatLessonPlanAsMarkdown } from '../utils/lessonPlanEngine.js';
+import { formatLessonPlanAsMarkdown, stripTimeFromActivityText } from '../utils/lessonPlanEngine.js';
 
 export function LessonPlansModal({
   isOpen,
@@ -264,6 +264,20 @@ export function LessonPlansModal({
                     />
                   </div>
                   <div className="sm:col-span-2">
+                    <label className="font-bold text-gray-600 dark:text-gray-300 block mb-1">Fecha / Rango de fechas (Columna Fecha)</label>
+                    <input
+                      type="text"
+                      placeholder="Ej: Semana 1 o 15 de Noviembre..."
+                      value={editForm.rows?.[0]?.date || `Semana ${editForm.week || 1}`}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const newRows = (editForm.rows || []).map(r => ({ ...r, date: val }));
+                        setEditForm({ ...editForm, rows: newRows });
+                      }}
+                      className="w-full p-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
                     <label className="font-bold text-gray-600 dark:text-gray-300 block mb-1">Propósito de aprendizaje</label>
                     <textarea
                       rows={2}
@@ -372,8 +386,16 @@ export function LessonPlansModal({
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
+                      onClick={handlePrint}
+                      className="px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                      title="Imprimir o guardar como PDF"
+                    >
+                      <Printer size={13} /> Imprimir / PDF
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => handleCopyMarkdown(activePlan)}
-                      className="px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 text-xs font-bold flex items-center gap-1.5 transition-colors"
+                      className="px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
                       title="Copiar texto estructurado"
                     >
                       <Copy size={13} /> Copiar
@@ -381,7 +403,7 @@ export function LessonPlansModal({
                     <button
                       type="button"
                       onClick={() => startEditing(activePlan)}
-                      className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors"
+                      className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
                     >
                       <Edit3 size={13} /> Editar
                     </button>
@@ -397,7 +419,7 @@ export function LessonPlansModal({
                           showMessage?.('Planeación eliminada.');
                         }
                       }}
-                      className="px-2.5 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 text-xs font-bold border border-red-500/20 transition-colors"
+                      className="px-2.5 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 text-xs font-bold border border-red-500/20 transition-colors cursor-pointer"
                       title="Eliminar planeación"
                     >
                       <Trash2 size={14} />
@@ -531,7 +553,7 @@ export function LessonPlansModal({
 
                             {/* Actividades */}
                             <td className="border border-black p-2.5 text-black font-normal whitespace-pre-line leading-relaxed">
-                              {row.activities}
+                              {stripTimeFromActivityText(row.activities)}
                             </td>
 
                             {/* Recursos */}
@@ -567,6 +589,35 @@ export function LessonPlansModal({
             Cerrar
           </button>
         </div>
+
+        {/* Estilos CSS para impresión limpia en blanco y negro sin el fondo oscuro del modal */}
+        <style>{`
+          @media print {
+            body * {
+              visibility: hidden !important;
+            }
+            .printable-lesson-plan, .printable-lesson-plan * {
+              visibility: visible !important;
+            }
+            .printable-lesson-plan {
+              position: fixed !important;
+              left: 0 !important;
+              top: 0 !important;
+              width: 100% !important;
+              margin: 0 !important;
+              padding: 24px !important;
+              border: none !important;
+              box-shadow: none !important;
+              background: white !important;
+              color: black !important;
+              z-index: 99999999 !important;
+            }
+            @page {
+              margin: 1cm;
+              size: portrait;
+            }
+          }
+        `}</style>
       </div>
     </div>
   );
