@@ -8042,7 +8042,7 @@ Escribe en español con tono pedagógico moderno.`;
                                   </div>
                                   <div>
                                     <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100">Crear un plan de clase</h4>
-                                    <p className="text-[11px] text-gray-500 mt-1">Configura horas, actividad rompehielos y recursos para generar la planeación oficial de la Universidad de Pamplona.</p>
+                                    <p className="text-[11px] text-gray-500 mt-1">Configura horas, actividad rompehielos y recursos para generar la planeación oficial de la Universidad de Pamplona (100% realizable en aula presencial).</p>
                                   </div>
                                 </div>
                                 <span className="text-xs font-bold text-purple-600 dark:text-purple-400 flex items-center gap-1">
@@ -8153,6 +8153,17 @@ Escribe en español con tono pedagógico moderno.`;
                                   </p>
                                 </div>
                               )}
+                            </div>
+
+                            {/* Garantía de clase realizable */}
+                            <div className="p-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 text-xs flex items-start gap-2.5">
+                              <CheckCheck size={16} className="shrink-0 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+                              <div className="space-y-0.5">
+                                <span className="font-bold block">Planeación 100% realista y realizable:</span>
+                                <span className="text-[11px] opacity-90 block">
+                                  Diseñada para el aula física estándar (docente enseñando activamente y estudiantes practicando con tablero, marcadores y guías). Sin videos extensos ni recursos inaccesibles.
+                                </span>
+                              </div>
                             </div>
 
                             {/* Botones de acción */}

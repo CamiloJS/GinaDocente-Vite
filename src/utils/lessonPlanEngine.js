@@ -50,8 +50,8 @@ export function buildLessonPlanPrompt({
       }`
     : `NO incluir actividad rompehielos; en la fase de "Inicio", realiza una activación breve y directa de saberes previos y preguntas detonantes (5 a 10 min).`;
 
-  return `Eres un diseñador instruccional y pedagogo universitario de alto nivel.
-Genera una planeación de clase semanal universitaria en ESPAÑOL basada en los siguientes datos del contenido programático:
+  return `Eres un diseñador instruccional y pedagogo universitario de alto nivel para la Universidad de Pamplona.
+Genera una planeación de clase semanal universitaria en ESPAÑOL, 100% REALISTA, FACTIBLE Y PEDAGÓGICAMENTE ACTIVA, basada en los siguientes datos del contenido programático:
 
 - Semana: ${week}
 - Unidad: ${unit}
@@ -64,6 +64,19 @@ Genera una planeación de clase semanal universitaria en ESPAÑOL basada en los 
 - Actividades base sugeridas: ${activities}
 
 IMPORTANTE: Responde ÚNICAMENTE con un objeto JSON válido (sin comentarios, sin texto introductorio ni explicaciones fuera del bloque JSON).
+
+PRINCIPIOS PEDAGÓGICOS CRÍTICOS Y OBLIGATORIOS (CLASE 100% REALISTA Y REALIZABLE):
+1. PROHIBICIÓN TERMINANTE DE VIDEOS LARGOS O SESIONES PASIVAS DE PANTALLA:
+   - Queda terminantemente PROHIBIDO programar la visualización de videos largos, documentales, películas o tutoriales extensos (NADA de videos de 15, 30, 45, 60 ni 90 minutos; NUNCA uses un video como sustituto de la clase).
+   - Los estudiantes universitarios NO van al salón a sentarse a mirar una pantalla. La clase universitaria NO es una sesión de cine.
+   - Si se requiere un estímulo audiovisual, debe ser exclusivamente un micro-audio o clip introductorio de 2 a 3 minutos como máximo; de lo contrario, no incluyas videos.
+2. RECURSOS 100% ACCESIBLES Y REALES PARA EL AULA PRESENCIAL:
+   - Prohibido exigir software de pago, licencias privativas costosas, plataformas especializadas inaccesibles o equipos de laboratorio inexistentes en un aula estándar.
+   - Emplea exclusivamente recursos cotidianos, accesibles y reales: tablero (pizarra), marcadores borrables, guías de ejercicios impresas, fotocopias, lecturas breves, diapositivas/proyector básico, cuadernos de apuntes y campus virtual institucional.
+3. PEDAGOGÍA ACTIVA: EL DOCENTE ENSEÑA Y LOS ESTUDIANTES PRACTICAN EN EL AULA:
+   - En Inicio: El docente lidera la bienvenida, motivación y activación de saberes previos o rompehielos corto (10 a 15 min máximo) con preguntas orientadoras en el tablero o lluvia de ideas.
+   - En Desarrollo: El docente realiza la explicación magistral y modela los conceptos clave; luego los estudiantes realizan ejercicios prácticos, análisis de casos en parejas, talleres colaborativos o dinámicas activas de aplicación directa en el aula. El docente circula, asesora y retroalimenta activamente.
+   - En Cierre - Tarea: Síntesis formativa en el tablero, verificación oral de aprendizajes (preguntas de comprobación), retroalimentación del docente y asignación puntual de trabajo autónomo.
 
 El formato del JSON debe ser exactamente:
 {
@@ -79,24 +92,24 @@ El formato del JSON debe ser exactamente:
       "date": "Semana ${week}",
       "phase": "Inicio",
       "topics": "Temas o conceptos a abordar en la fase de Inicio",
-      "activities": "Descripción detallada de las actividades de Inicio (${includeIcebreaker ? 'dinámica rompehielos y contextualización' : 'activación de saberes previos'} - SIN incluir minutos ni duración aquí)",
-      "resources": "Recursos para Inicio${icebreakerResources ? ` (incluyendo: ${icebreakerResources.trim()})` : ''}",
+      "activities": "Descripción detallada de las actividades de Inicio (${includeIcebreaker ? 'dinámica rompehielos corta de 10-15 min y contextualización' : 'activación de saberes previos'} con preguntas en tablero - SIN minutos ni duración aquí)",
+      "resources": "Recursos accesibles para Inicio (tablero, marcadores, tarjetas impresas)${icebreakerResources ? ` (incluyendo: ${icebreakerResources.trim()})` : ''}",
       "time": "${inicioMins} min"
     },
     {
       "date": "Semana ${week}",
       "phase": "Desarrollo",
       "topics": "Temas centrales, vocabulario y estructuras clave",
-      "activities": "Actividades detalladas de Desarrollo (Presentation & Practice: explicación docente, ejercicios interactivos, trabajo guiado y colaborativo - SIN incluir minutos ni duración aquí)",
-      "resources": "Recursos de desarrollo (guías, lecturas, plataformas, audios)",
+      "activities": "Actividades detalladas de Desarrollo (Presentation & Practice: explicación dialogada del docente, modelado en tablero, taller práctico colaborativo en parejas - PROHIBIDO videos largos o sesiones pasivas de pantalla - SIN incluir minutos ni duración aquí)",
+      "resources": "Recursos de desarrollo accesibles y cotidianos (guías de trabajo impresas, lecturas breves, tablero, marcadores)",
       "time": "${desarrolloMins} min"
     },
     {
       "date": "Semana ${week}",
       "phase": "Cierre - Tarea",
       "topics": "Síntesis, conclusiones y evaluación formativa",
-      "activities": "Actividades de Cierre y Tarea (Wrap-up: retroalimentación, verificación de aprendizaje y asignación de tarea o entregable - SIN incluir minutos ni duración aquí)",
-      "resources": "Recursos para el cierre y tarea (rubrica, plataforma virtual, formulario)",
+      "activities": "Actividades de Cierre y Tarea (Wrap-up: retroalimentación del docente, síntesis en el tablero, verificación de aprendizaje y asignación de trabajo autónomo o entregable - SIN incluir minutos ni duración aquí)",
+      "resources": "Recursos para el cierre y tarea (tablero, rúbrica impresa, cuaderno de apuntes, campus virtual)",
       "time": "${cierreMins} min"
     }
   ]
@@ -112,7 +125,10 @@ Reglas estrictas:
 7. Cada fila debe tener "date", "phase", "topics", "activities", "resources" y "time".
 8. La suma de tiempos de las 3 filas debe ser aproximadamente ${totalMinutes} minutos (${hours} ${hours === 1 ? 'hora' : 'horas'}).
 9. DURACIÓN DEL ROMPEHIELOS: Si se incluye rompehielos, la actividad de "Inicio" DEBE ser CORTA, de 10 a 15 minutos como máximo (tiempo asignado: "${inicioMins} min"). NUNCA programes un rompehielos de media hora ni mayor a 15 minutos.
-10. SIN TIEMPOS EN "activities": En el campo "activities" (descripción de la actividad) NUNCA escribas el tiempo ni la duración (NO pongas "(10 min)", "(15 min)", "10 minutos", etc.). La duración va ÚNICAMENTE en la columna "time" para evitar contradicciones.`;
+10. SIN TIEMPOS EN "activities": En el campo "activities" (descripción de la actividad) NUNCA escribas el tiempo ni la duración (NO pongas "(10 min)", "(15 min)", "10 minutos", etc.). La duración va ÚNICAMENTE en la columna "time" para evitar contradicciones.
+11. CLASE 100% REALIZABLE Y ACTIVIDADES EN EL AULA: Cada actividad propuesta debe ser algo que el docente y los estudiantes universitarios puedan ejecutar físicamente en un aula presencial estándar. El docente enseña directamente y los estudiantes resuelven, debaten y practican.
+12. PROHIBICIÓN TOTAL DE VIDEOS LARGOS: Está terminantemente prohibido incluir videos largos (por ejemplo videos de 15, 30, 45, 60 o 90 minutos) o actividades pasivas donde los estudiantes solo vean pantallas o videos. NUNCA sustituyas la clase presencial por la visualización de un video.
+13. RECURSOS 100% ACCESIBLES: En "resources" usa únicamente materiales de fácil acceso y uso universal en la Universidad de Pamplona (tablero, marcadores, fotocopias, guías impresas, lecturas de texto, apuntes, proyector básico, campus virtual). No menciones software de pago, plataformas complejas ni recursos inaccesibles.`;
 }
 
 /**
@@ -167,8 +183,122 @@ export function stripTimeFromActivityText(text = '') {
 }
 
 /**
+ * Detecta y sanea actividades que propongan videos largos o sesiones pasivas de pantalla,
+ * transformándolas en dinámicas pedagógicas activas, realistas y realizables en el aula
+ * presencial, guiadas por la explicación del docente y práctica de los estudiantes.
+ */
+export function sanitizeRealisticActivityText(text = '', phase = 'Desarrollo') {
+  if (typeof text !== 'string') return '';
+  let cleaned = text;
+
+  // Detección de visualización de videos largos o actividades pasivas de pantalla
+  const hasPassiveVideo = /(?:los\s+estudiantes\s+)?(?:van\s+a\s+|se\s+procede\s+a\s+)?(?:ver|ve|ven|viendo|observar|observa|observan|observando|proyectar|proyecta|proyectan|proyectando|visualizar|visualiza|visualizan|visualizando|reproducir|reproduce|reproducen|reproduciendo|mirar|mira|miran|mirando|proyecci[oó]n\s+de|presentaci[oó]n\s+de)\s+(?:un\s+|el\s+)?(?:video|vídeo|documental|pel[ií]cula|conferencia|grabaci[oó]n|videotutorial)\b|(?:video|vídeo|documental|pel[ií]cula|videotutorial)\s*(?:de\s*)?(?:\d+\s*(?:minutos?|mins?|horas?|hrs?|h)|largo|extenso|completo)\b/i.test(cleaned);
+
+  if (hasPassiveVideo) {
+    // 1. Reemplazar frases verbales de ver videos pasivos por acciones pedagógicas activas
+    cleaned = cleaned
+      .replace(/(?:los\s+estudiantes\s+)?(?:van\s+a\s+|se\s+procede\s+a\s+)?(?:ver|ve|ven|viendo|observar|observa|observan|observando|proyectar|proyecta|proyectan|proyectando|visualizar|visualiza|visualizan|visualizando|reproducir|reproduce|reproducen|reproduciendo|mirar|mira|miran|mirando|proyecci[oó]n\s+de|presentaci[oó]n\s+de)\s+(?:un\s+|el\s+)?(?:video|vídeo|documental|pel[ií]cula|conferencia|grabaci[oó]n|videotutorial)(?:\s+(?:de\s+)?(?:\d+\s*(?:minutos?|mins?|horas?|hrs?|h)|largo|extenso|completo))?(?:\s+(?:en|de)\s+youtube)?/gi, () => {
+        if (/inicio/i.test(phase)) {
+          return 'Activación de saberes previos y preguntas detonantes guiadas por el docente en el tablero';
+        } else if (/cierre/i.test(phase)) {
+          return 'Síntesis colaborativa en el tablero y retroalimentación del docente';
+        }
+        return 'Explicación dialogada y modelado por parte del docente en el tablero con ejercicios prácticos';
+      })
+      // 2. Reemplazar menciones sustantivas a videos de X minutos por talleres y guías
+      .replace(/(?:un\s+|el\s+)?(?:video|vídeo|documental|pel[ií]cula|videotutorial)\s*(?:de\s*)?(?:\d+\s*(?:minutos?|mins?|horas?|hrs?|h)|largo|extenso|completo)(?:\s+(?:en|de)\s+youtube)?/gi, 'taller práctico guiado con guía de trabajo y resolución en tablero')
+      // 3. Reemplazar enlaces y menciones a YouTube
+      .replace(/(?:,\s*)?(?:en|de|a\s+través\s+de|mediante|enlace\s+a)\s+youtube(?:\.com)?/gi, '')
+      .replace(/\byoutube(?:\.com)?\b/gi, 'material didáctico');
+  }
+
+  // Limpieza de puntuación y espacios redundantes
+  cleaned = cleaned
+    .replace(/\s+([.,;:])/g, '$1')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+  // Si tras limpiar quedó algo excesivamente corto o vacío
+  if (!cleaned || cleaned.length < 10) {
+    if (/inicio/i.test(phase)) {
+      cleaned = 'Saludo institucional, contextualización y activación de conocimientos previos con preguntas orientadoras en el tablero.';
+    } else if (/cierre/i.test(phase)) {
+      cleaned = 'Síntesis grupal de conceptos clave, resolución de dudas y asignación de actividades de aprendizaje autónomo.';
+    } else {
+      cleaned = 'Explicación magistral dialogada y modelado por parte del docente, seguida de taller de ejercicios prácticos guiados en parejas.';
+    }
+  }
+
+  return cleaned;
+}
+
+/**
+ * Detecta y sanea recursos que sean inaccesibles, costosos o videos extensos,
+ * asegurando materiales cotidianos y reales para el aula universitaria estándar.
+ */
+export function sanitizeRealisticResourceText(text = '') {
+  if (typeof text !== 'string') return 'Tablero, marcadores borrables, guía de estudio';
+  let cleaned = text;
+
+  // Reemplazar menciones a videos extensos, plataformas de video o software privativo
+  cleaned = cleaned
+    .replace(/(?:video|vídeo|documental|pel[ií]cula|videotutorial)\s*(?:de\s*)?(?:\d+\s*(?:minutos?|mins?|horas?|hrs?|h)|largo|extenso|completo)(?:\s+(?:en|de)\s+youtube)?/gi, 'Guía de ejercicios y lecturas impresas')
+    .replace(/(?:enlace\s+(?:a\s+)?)?youtube(?:\.com)?/gi, 'material didáctico institucional')
+    .replace(/(?:licencia\s+de\s+pago|software\s+de\s+pago|software\s+privativo|laboratorio\s+especializado|suscripción\s+costosa)\b/gi, 'Material impreso y recursos de libre acceso')
+    .replace(/(?:video|vídeo)\s+explicativo\s+extenso/gi, 'Guía didáctica y tablero')
+    .replace(/\b(?:video|vídeo)\s+de\s+\d+\b/gi, 'Guía de trabajo')
+    .replace(/\s*,\s*,/g, ', ')
+    .replace(/^[\s,;.-]+|[\s,;.-]+$/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+  if (!cleaned || cleaned.length < 4) {
+    return 'Tablero, marcadores borrables, guía de ejercicios y material didáctico';
+  }
+
+  return cleaned;
+}
+
+/**
+ * Valida si una planeación de clase cumple con los criterios de ser 100% realizable,
+ * activa y factible en un aula estándar (sin videos extensos ni recursos inaccesibles).
+ */
+export function validateLessonPlanFeasibility(plan = {}) {
+  const issues = [];
+  const rows = Array.isArray(plan.rows) ? plan.rows : [];
+
+  rows.forEach((r, idx) => {
+    const act = (r.activities || '').toLowerCase();
+    const res = (r.resources || '').toLowerCase();
+
+    // Detección de videos largos en actividades (>5 min o videos que sustituyen la clase)
+    if (/(?:video|vídeo|documental|pel[ií]cula|videotutorial)\s*(?:de\s*)?(?:[1-9]\d+|[6-9])\s*(?:min|hora|h)/i.test(act) ||
+        /(?:ver|observar|mirar)\s+(?:un\s+)?(?:video|vídeo|documental|pel[ií]cula)\s+(?:de\s+)?\d+/i.test(act) ||
+        /(?:video|vídeo)\s+(?:largo|extenso|completo)/i.test(act)) {
+      issues.push(`Fila ${idx + 1} (${r.phase}): Contiene visualización de video extenso incompatible con una clase presencial activa.`);
+    }
+
+    // Detección de videos largos en recursos
+    if (/(?:video|vídeo|documental|pel[ií]cula)\s*(?:de\s*)?(?:[1-9]\d+|[6-9])\s*(?:min|hora|h)/i.test(res) ||
+        /(?:video|vídeo)\s+(?:largo|extenso|completo)/i.test(res)) {
+      issues.push(`Fila ${idx + 1} (${r.phase}): Los recursos incluyen un video extenso o documental.`);
+    }
+
+    // Detección de software de pago o recursos inaccesibles
+    if (/software\s+de\s+pago|licencia\s+de\s+pago|laboratorio\s+especializado/i.test(res)) {
+      issues.push(`Fila ${idx + 1} (${r.phase}): Los recursos mencionan software de pago o inaccesible.`);
+    }
+  });
+
+  return {
+    isRealistic: issues.length === 0,
+    issues
+  };
+}
+
+/**
  * Normaliza un plan de clase para garantizar que todos los campos requeridos existan
- * con la estructura visual y de datos esperada.
+ * con la estructura visual y de datos esperada, garantizando pedagogía activa y realizable.
  */
 export function normalizeLessonPlan(plan = {}, fallbackData = {}) {
   const fallbackWeek = fallbackData?.weekItem?.week ?? 1;
@@ -189,13 +319,22 @@ export function normalizeLessonPlan(plan = {}, fallbackData = {}) {
 
   const rows = defaultPhases.map((phaseName, idx) => {
     const found = rawRows.find(r => (r.phase || '').toLowerCase().includes(phaseName.split(' ')[0].toLowerCase())) || rawRows[idx] || {};
-    const rawActivity = found.activities || (idx === 0 ? 'Activación de saberes previos y presentación.' : idx === 1 ? 'Explicación del docente y práctica de los estudiantes.' : 'Conclusiones y asignación de trabajo autónomo.');
+    const rawActivity = found.activities || (idx === 0 ? 'Saludo institucional y activación de saberes previos con preguntas orientadoras en el tablero.' : idx === 1 ? 'Explicación dialogada del docente, modelado de ejemplos y taller práctico guiado en parejas.' : 'Síntesis grupal, retroalimentación del docente y asignación de trabajo autónomo.');
+    const rawResources = found.resources || (idx === 0 ? 'Tablero, marcadores borrables, preguntas guía impresas' : idx === 1 ? 'Guía de ejercicios impresa, lecturas de apoyo, tablero y marcadores' : 'Tablero, apuntes de clase, campus virtual');
+
+    // Saneamiento de pedagogía realista (elimina videos largos y actividades pasivas)
+    const sanitizedActivity = sanitizeRealisticActivityText(rawActivity, phaseName);
+    // Eliminación de tiempos embebidos en el texto descriptivo
+    const cleanedActivity = stripTimeFromActivityText(sanitizedActivity);
+    // Saneamiento de recursos para garantizar materiales 100% accesibles
+    const cleanedResources = sanitizeRealisticResourceText(rawResources);
+
     return {
       date: (found.date || `Semana ${plan.week || fallbackWeek}`).trim(),
       phase: phaseName,
       topics: (found.topics || plan.weekTopic || fallbackTopic).trim(),
-      activities: stripTimeFromActivityText(rawActivity).trim(),
-      resources: (found.resources || 'Material didáctico, proyector, campus virtual').trim(),
+      activities: cleanedActivity.trim(),
+      resources: cleanedResources.trim(),
       time: (found.time || (idx === 0 ? '15 min' : idx === 1 ? '50 min' : '20 min')).trim()
     };
   });
@@ -220,7 +359,7 @@ export function normalizeLessonPlan(plan = {}, fallbackData = {}) {
 }
 
 /**
- * Crea un plan de clase por defecto con la plantilla oficial.
+ * Crea un plan de clase por defecto con la plantilla oficial y recursos 100% accesibles.
  */
 export function createDefaultLessonPlan(fallbackData = {}, rawNotes = '') {
   const week = fallbackData?.weekItem?.week ?? 1;
@@ -244,24 +383,24 @@ export function createDefaultLessonPlan(fallbackData = {}, rawNotes = '') {
         date: `Semana ${week}`,
         phase: 'Inicio',
         topics: topic,
-        activities: 'Saludo, activación de conocimientos previos y motivación inicial.',
-        resources: 'Pizarra, diapositivas, preguntas guía',
+        activities: 'Saludo institucional, presentación del tema y activación de conocimientos previos mediante lluvia de ideas y preguntas orientadoras en el tablero.',
+        resources: 'Tablero, marcadores borrables, preguntas guía impresas',
         time: '15 min'
       },
       {
         date: `Semana ${week}`,
         phase: 'Desarrollo',
         topics: topic,
-        activities: 'Explicación magistral, análisis de ejemplos y trabajo práctico en parejas.',
-        resources: 'Guía de trabajo, lecturas, proyector',
+        activities: 'Explicación magistral dialogada y modelado por parte del docente, seguida de taller de ejercicios prácticos guiados y trabajo colaborativo en parejas.',
+        resources: 'Guía de ejercicios impresa, lecturas de apoyo, tablero y marcadores',
         time: '55 min'
       },
       {
         date: `Semana ${week}`,
         phase: 'Cierre - Tarea',
         topics: 'Síntesis y evaluación',
-        activities: 'Puesta en común, retroalimentación del docente y orientación de la tarea semanal.',
-        resources: 'Campus virtual, rúbrica de evaluación',
+        activities: 'Síntesis grupal de conceptos clave, retroalimentación del docente, resolución de dudas y asignación de actividades de aprendizaje autónomo.',
+        resources: 'Tablero, apuntes de clase, campus virtual',
         time: '20 min'
       }
     ],
@@ -293,6 +432,6 @@ ${plan.specificPurposes || ''}
 ---------------------------------------------------------------------------------------------------------
 | Fecha | Fases | Temas | Actividades | Recursos | Tiempo |
 ---------------------------------------------------------------------------------------------------------
-${rows.map(r => `| ${r.date} | ${r.phase} | ${r.topics} | ${stripTimeFromActivityText(r.activities)} | ${r.resources} | ${r.time} |`).join('\n')}
+${rows.map(r => `| ${r.date} | ${r.phase} | ${r.topics} | ${stripTimeFromActivityText(sanitizeRealisticActivityText(r.activities, r.phase))} | ${sanitizeRealisticResourceText(r.resources)} | ${r.time} |`).join('\n')}
 ---------------------------------------------------------------------------------------------------------`;
 }

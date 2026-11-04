@@ -7,7 +7,10 @@ import {
   normalizeLessonPlan,
   createDefaultLessonPlan,
   formatLessonPlanAsMarkdown,
-  stripTimeFromActivityText
+  stripTimeFromActivityText,
+  sanitizeRealisticActivityText,
+  sanitizeRealisticResourceText,
+  validateLessonPlanFeasibility
 } from '../src/utils/lessonPlanEngine.js';
 
 import {
@@ -237,6 +240,94 @@ check('Normalizador remueve tiempos de activities en la fila de Inicio', !normal
 check('Normalizador conserva el tiempo oficial en la columna time', normalizedTimeClean.rows[0].time === '15 min');
 check('Prompt instruye estrictamente no escribir tiempos en activities', 
   prompt.includes('SIN TIEMPOS EN "activities"') && prompt.includes('columna "time"')
+);
+
+console.log('\n== 8. Clases Realizables: Prohibición de Videos Largos y Recursos Inaccesibles ==');
+check('Prompt prohíbe terminantemente videos largos y actividades pasivas de cine',
+  prompt.includes('PROHIBICIÓN TERMINANTE DE VIDEOS LARGOS') &&
+  prompt.includes('PROHIBICIÓN TOTAL DE VIDEOS LARGOS') &&
+  prompt.includes('NUNCA uses un video como sustituto de la clase')
+);
+
+check('Prompt exige recursos 100% accesibles en aula física (tablero, marcadores, guías impresas)',
+  prompt.includes('RECURSOS 100% ACCESIBLES') &&
+  prompt.includes('tablero') &&
+  prompt.includes('marcadores') &&
+  prompt.includes('guías')
+);
+
+check('Prompt define pedagogía activa: docente explica magistralmente y estudiantes practican',
+  prompt.includes('PEDAGOGÍA ACTIVA: EL DOCENTE ENSEÑA Y LOS ESTUDIANTES PRACTICAN') &&
+  prompt.includes('CLASE 100% REALIZABLE')
+);
+
+// Prueba directa de saneamiento de la queja exacta del usuario: "video de 90 minutos"
+const userBugActivity = "Ver video de 90 minutos sobre cómo aprender a hacer estados financieros y tomar notas.";
+const sanitizedActivity = sanitizeRealisticActivityText(userBugActivity, 'Desarrollo');
+check('Sanea y sustituye video de 90 min por explicación dialogada del docente en el tablero y práctica',
+  !sanitizedActivity.toLowerCase().includes('90 min') &&
+  !sanitizedActivity.toLowerCase().includes('video') &&
+  sanitizedActivity.includes('docente') &&
+  sanitizedActivity.includes('tablero')
+);
+
+// Prueba con documental pasivo en YouTube
+const docuActivity = "Los estudiantes observan un documental de 1 hora sobre macroeconomía en YouTube.";
+const sanitizedDocu = sanitizeRealisticActivityText(docuActivity, 'Desarrollo');
+check('Sanea visualización pasiva de documental reemplazándola por explicación docente activa',
+  !sanitizedDocu.toLowerCase().includes('documental') &&
+  !sanitizedDocu.toLowerCase().includes('youtube') &&
+  sanitizedDocu.includes('docente')
+);
+
+// Prueba de saneamiento de recursos con videos extensos o software de pago
+const badResources = "Video de 90 minutos en YouTube, software de pago Bloomberg Terminal, pantalla gigante";
+const cleanedResources = sanitizeRealisticResourceText(badResources);
+check('Sanea recursos reemplazando video de 90 min y software de pago por recursos accesibles',
+  !cleanedResources.toLowerCase().includes('90 min') &&
+  !cleanedResources.toLowerCase().includes('software de pago') &&
+  !cleanedResources.toLowerCase().includes('youtube') &&
+  cleanedResources.includes('Guía de ejercicios')
+);
+
+// Prueba de normalización de plan completo con videos largos (caso real del usuario)
+const badPlan = {
+  id: 'lp_bad_video_test',
+  week: 2,
+  rows: [
+    { phase: 'Inicio', activities: 'Saludo y activación de saberes previos', resources: 'Tablero', time: '15 min' },
+    { phase: 'Desarrollo', activities: 'Ver video de 90 minutos sobre cómo aprender a hacer X cosa y discutir', resources: 'Video de 90 minutos de YouTube, pantalla', time: '90 min' },
+    { phase: 'Cierre - Tarea', activities: 'Conclusiones y tarea semanal', resources: 'Campus virtual', time: '15 min' }
+  ]
+};
+
+const validationBefore = validateLessonPlanFeasibility(badPlan);
+check('validateLessonPlanFeasibility detecta video extenso y recursos no factibles en plan inválido',
+  !validationBefore.isRealistic && validationBefore.issues.length >= 2
+);
+
+const normalizedBadPlan = normalizeLessonPlan(badPlan);
+check('Normalizador reemplaza la actividad de video de 90 minutos por docencia activa y práctica',
+  !normalizedBadPlan.rows[1].activities.toLowerCase().includes('90 min') &&
+  !normalizedBadPlan.rows[1].activities.toLowerCase().includes('video') &&
+  normalizedBadPlan.rows[1].activities.includes('docente')
+);
+
+check('Normalizador reemplaza recursos inaccesibles por materiales de aula reales',
+  !normalizedBadPlan.rows[1].resources.toLowerCase().includes('90 minutos') &&
+  !normalizedBadPlan.rows[1].resources.toLowerCase().includes('youtube')
+);
+
+const validationAfter = validateLessonPlanFeasibility(normalizedBadPlan);
+check('validateLessonPlanFeasibility aprueba el plan normalizado como 100% realizable',
+  validationAfter.isRealistic && validationAfter.issues.length === 0
+);
+
+// Prueba de plan por defecto
+const defPlan = createDefaultLessonPlan();
+const defValidation = validateLessonPlanFeasibility(defPlan);
+check('createDefaultLessonPlan genera un plan 100% realizable y activo sin videos',
+  defValidation.isRealistic && defValidation.issues.length === 0 && defPlan.rows[1].resources.includes('tablero')
 );
 
 console.log(`\n========================================`);
