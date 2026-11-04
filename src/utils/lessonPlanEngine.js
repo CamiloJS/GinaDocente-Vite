@@ -79,7 +79,7 @@ El formato del JSON debe ser exactamente:
       "date": "Semana ${week}",
       "phase": "Inicio",
       "topics": "Temas o conceptos a abordar en la fase de Inicio",
-      "activities": "Actividades detalladas para el Inicio (${includeIcebreaker ? 'Dinámica rompehielos CORTA de 10 a 15 minutos como máximo' : 'Activación breve de saberes previos'}, motivación y contextualización)",
+      "activities": "Descripción detallada de las actividades de Inicio (${includeIcebreaker ? 'dinámica rompehielos y contextualización' : 'activación de saberes previos'} - SIN incluir minutos ni duración aquí)",
       "resources": "Recursos para Inicio${icebreakerResources ? ` (incluyendo: ${icebreakerResources.trim()})` : ''}",
       "time": "${inicioMins} min"
     },
@@ -87,7 +87,7 @@ El formato del JSON debe ser exactamente:
       "date": "Semana ${week}",
       "phase": "Desarrollo",
       "topics": "Temas centrales, vocabulario y estructuras clave",
-      "activities": "Actividades detalladas de Desarrollo (Presentation & Practice: explicación docente, ejercicios interactivos, trabajo guiado y colaborativo)",
+      "activities": "Actividades detalladas de Desarrollo (Presentation & Practice: explicación docente, ejercicios interactivos, trabajo guiado y colaborativo - SIN incluir minutos ni duración aquí)",
       "resources": "Recursos de desarrollo (guías, lecturas, plataformas, audios)",
       "time": "${desarrolloMins} min"
     },
@@ -95,7 +95,7 @@ El formato del JSON debe ser exactamente:
       "date": "Semana ${week}",
       "phase": "Cierre - Tarea",
       "topics": "Síntesis, conclusiones y evaluación formativa",
-      "activities": "Actividades de Cierre y Tarea (Wrap-up: retroalimentación, verificación de aprendizaje y asignación de tarea o entregable)",
+      "activities": "Actividades de Cierre y Tarea (Wrap-up: retroalimentación, verificación de aprendizaje y asignación de tarea o entregable - SIN incluir minutos ni duración aquí)",
       "resources": "Recursos para el cierre y tarea (rubrica, plataforma virtual, formulario)",
       "time": "${cierreMins} min"
     }
@@ -111,7 +111,8 @@ Reglas estrictas:
 6. "rows" debe contener exactamente 3 filas correspondientes a las fases: "Inicio", "Desarrollo" y "Cierre - Tarea".
 7. Cada fila debe tener "date", "phase", "topics", "activities", "resources" y "time".
 8. La suma de tiempos de las 3 filas debe ser aproximadamente ${totalMinutes} minutos (${hours} ${hours === 1 ? 'hora' : 'horas'}).
-9. DURACIÓN DEL ROMPEHIELOS: Si se incluye rompehielos, la actividad de "Inicio" DEBE ser CORTA, de 10 a 15 minutos como máximo (tiempo asignado: "${inicioMins} min"). NUNCA programes un rompehielos de media hora ni mayor a 15 minutos.`;
+9. DURACIÓN DEL ROMPEHIELOS: Si se incluye rompehielos, la actividad de "Inicio" DEBE ser CORTA, de 10 a 15 minutos como máximo (tiempo asignado: "${inicioMins} min"). NUNCA programes un rompehielos de media hora ni mayor a 15 minutos.
+10. SIN TIEMPOS EN "activities": En el campo "activities" (descripción de la actividad) NUNCA escribas el tiempo ni la duración (NO pongas "(10 min)", "(15 min)", "10 minutos", etc.). La duración va ÚNICAMENTE en la columna "time" para evitar contradicciones.`;
 }
 
 /**
@@ -146,6 +147,26 @@ export function parseLessonPlanResponse(rawText, fallbackData = {}) {
 }
 
 /**
+ * Elimina cualquier mención de duración o tiempo dentro de la descripción de la actividad,
+ * ya que la duración debe figurar ÚNICAMENTE en la columna "time" (Tiempo) y no dentro
+ * del texto descriptivo (evitando discrepancias visuales como "(10 min)" vs "15 min").
+ */
+export function stripTimeFromActivityText(text = '') {
+  if (typeof text !== 'string') return '';
+  return text
+    // Paréntesis, corchetes o llaves con tiempo: (10 min), (15 mins), [10 minutos], (10-15 min), etc.
+    .replace(/\s*[\(\[\{]\s*(?:\d+(?:\s*[-–y\/]\s*\d+)?)\s*(?:minutos?|mins?|m|segundos?|segs?|s|horas?|hrs?|h)\s*[\)\]\}]/gi, '')
+    // Prefijos tipo "Rompehielos 10 min:" o "Warm-up 15 min:"
+    .replace(/(?:^|\b)(rompehielos|warm-?up|icebreaker)\s*[-–:]?\s*\d+\s*(?:minutos?|mins?)\s*[:-]?\s*/gi, '$1: ')
+    // Tiempos pegados a dos puntos: ": 10 min -"
+    .replace(/:\s*\d+\s*(?:minutos?|mins?)\b\s*[:-]?\s*/gi, ': ')
+    // Limpieza de espacios y dos puntos redundantes
+    .replace(/\s*:\s*:\s*/g, ': ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+/**
  * Normaliza un plan de clase para garantizar que todos los campos requeridos existan
  * con la estructura visual y de datos esperada.
  */
@@ -168,13 +189,14 @@ export function normalizeLessonPlan(plan = {}, fallbackData = {}) {
 
   const rows = defaultPhases.map((phaseName, idx) => {
     const found = rawRows.find(r => (r.phase || '').toLowerCase().includes(phaseName.split(' ')[0].toLowerCase())) || rawRows[idx] || {};
+    const rawActivity = found.activities || (idx === 0 ? 'Activación de saberes previos y presentación.' : idx === 1 ? 'Explicación del docente y práctica de los estudiantes.' : 'Conclusiones y asignación de trabajo autónomo.');
     return {
       date: (found.date || `Semana ${plan.week || fallbackWeek}`).trim(),
       phase: phaseName,
       topics: (found.topics || plan.weekTopic || fallbackTopic).trim(),
-      activities: (found.activities || (idx === 0 ? 'Activación de saberes previos y presentación.' : idx === 1 ? 'Explicación del docente y práctica de los estudiantes.' : 'Conclusiones y asignación de trabajo autónomo.')).trim(),
+      activities: stripTimeFromActivityText(rawActivity).trim(),
       resources: (found.resources || 'Material didáctico, proyector, campus virtual').trim(),
-      time: (found.time || (idx === 0 ? '20 min' : idx === 1 ? '50 min' : '20 min')).trim()
+      time: (found.time || (idx === 0 ? '15 min' : idx === 1 ? '50 min' : '20 min')).trim()
     };
   });
 

@@ -1219,7 +1219,7 @@ export const DEMO_LESSON_PLANS = [
         topics: 'Escasez y conceptos introductorios',
         activities: 'Dinámica de rompehielos (Warm-up): Pregunta detonante sobre bienes escasos en la vida cotidiana y lluvia de ideas.',
         resources: 'Diapositivas interactivas, pizarra digital',
-        time: '20 min'
+        time: '15 min'
       },
       {
         date: 'Semana 1',
@@ -1227,7 +1227,7 @@ export const DEMO_LESSON_PLANS = [
         topics: 'Leyes de oferta y demanda, punto de equilibrio',
         activities: 'Presentación guiada con ejemplos de mercado internacional y taller en parejas de lectura de reportes económicos.',
         resources: 'Guía de lectura técnica, gráficas de oferta y demanda',
-        time: '50 min'
+        time: '55 min'
       },
       {
         date: 'Semana 1',

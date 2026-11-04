@@ -6,7 +6,8 @@ import {
   parseLessonPlanResponse,
   normalizeLessonPlan,
   createDefaultLessonPlan,
-  formatLessonPlanAsMarkdown
+  formatLessonPlanAsMarkdown,
+  stripTimeFromActivityText
 } from '../src/utils/lessonPlanEngine.js';
 
 import {
@@ -207,6 +208,36 @@ duplicateSnapshots.forEach(d => {
   }
 });
 check('Deduplicador colapsa entradas duplicadas en un solo registro con la versión más reciente', dedupMap.size === 1 && dedupMap.get(originalPlan.id).unit === 'Unidad 3: Análisis Avanzado');
+
+console.log('\n== 7. Eliminación de Tiempos en la Descripción de Actividades ==');
+const userExampleText = "Rompehielos (10 min): 'Palabras Clave Visuales'. El docente escribe en el tablero 'CALL' y 'ALAO'.";
+const cleanedUserExample = stripTimeFromActivityText(userExampleText);
+check('Limpia el tiempo (10 min) del texto descriptivo del usuario', 
+  !cleanedUserExample.includes('(10 min)') && !cleanedUserExample.includes('10 min') && cleanedUserExample.includes("'Palabras Clave Visuales'")
+);
+
+const textWithVariousTimes = "Actividad inicial (15 mins) y luego taller [50 minutos] con cierre (20 min).";
+const cleanedVarious = stripTimeFromActivityText(textWithVariousTimes);
+check('Limpia múltiples formatos de tiempo entre paréntesis o corchetes',
+  !cleanedVarious.includes('15') && !cleanedVarious.includes('50') && !cleanedVarious.includes('20')
+);
+
+// Prueba de normalización de filas con tiempos embebidos
+const planWithTimeInActivities = {
+  id: 'lp_test_time_clean',
+  week: 1,
+  rows: [
+    { phase: 'Inicio', activities: "Rompehielos (10 min): Dinámica rápida", time: '15 min' },
+    { phase: 'Desarrollo', activities: "Explicación magistral (50 min) y práctica", time: '55 min' },
+    { phase: 'Cierre - Tarea', activities: "Conclusiones (20 min) y entrega", time: '20 min' }
+  ]
+};
+const normalizedTimeClean = normalizeLessonPlan(planWithTimeInActivities);
+check('Normalizador remueve tiempos de activities en la fila de Inicio', !normalizedTimeClean.rows[0].activities.includes('10 min'));
+check('Normalizador conserva el tiempo oficial en la columna time', normalizedTimeClean.rows[0].time === '15 min');
+check('Prompt instruye estrictamente no escribir tiempos en activities', 
+  prompt.includes('SIN TIEMPOS EN "activities"') && prompt.includes('columna "time"')
+);
 
 console.log(`\n========================================`);
 console.log(`Total pruebas Planes de Clase: ${okCount + failCount} | OK: ${okCount} | FAIL: ${failCount}`);
