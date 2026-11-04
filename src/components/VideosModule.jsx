@@ -19,7 +19,7 @@ import {
   Clapperboard,
   Filter,
   CheckCircle2,
-  Sparkles,
+  Smartphone,
   Loader2,
   User
 } from './Icons.jsx';
@@ -441,7 +441,7 @@ export default function VideosModule({
             <span>Vídeos</span>
           </h2>
           <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Videoteca académica: clases grabadas, explicaciones técnicas y tutoriales cortos en formato TikTok y horizontal.
+            Videoteca académica: clases grabadas, explicaciones técnicas y tutoriales de clase.
           </p>
         </div>
 
@@ -487,7 +487,7 @@ export default function VideosModule({
               }`}
             >
               <Video size={14} />
-              <span>Formato largo (16:9)</span>
+              <span>Largos</span>
             </button>
 
             <button
@@ -499,8 +499,8 @@ export default function VideosModule({
                   : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
               }`}
             >
-              <Sparkles size={14} className="text-amber-500" />
-              <span>Cortos / TikTok</span>
+              <Smartphone size={14} />
+              <span>Cortos</span>
             </button>
           </div>
 
@@ -598,13 +598,13 @@ export default function VideosModule({
         </div>
       ) : (
         <div className="space-y-8">
-          {/* 1. SECCIÓN DE CORTOS / TIKTOK (Se muestra en 'all' o en 'short') */}
+          {/* 1. SECCIÓN DE CORTOS (Se muestra en 'all' o en 'short') */}
           {(selectedFormatFilter === 'all' || selectedFormatFilter === 'short') && shortVideos.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-base sm:text-lg font-black text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                  <Sparkles size={18} className="text-amber-500" />
-                  <span>Cortos de Clase & TikToks</span>
+                  <Smartphone size={18} className="text-[#AD3333] dark:text-red-400" />
+                  <span>Cortos</span>
                 </h3>
                 <span className="text-xs text-gray-400 font-bold">
                   {shortVideos.length} {shortVideos.length === 1 ? 'corto' : 'cortos'}
@@ -699,13 +699,13 @@ export default function VideosModule({
             </div>
           )}
 
-          {/* 2. SECCIÓN DE VÍDEOS EN FORMATO LARGO (16:9) */}
+          {/* 2. SECCIÓN DE VÍDEOS LARGOS (Se muestra en 'all' o en 'long') */}
           {(selectedFormatFilter === 'all' || selectedFormatFilter === 'long') && longVideos.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-base sm:text-lg font-black text-gray-900 dark:text-gray-100 flex items-center gap-2">
                   <Video size={18} className="text-[#AD3333]" />
-                  <span>Vídeos de Clase</span>
+                  <span>Largos</span>
                 </h3>
                 <span className="text-xs text-gray-400 font-bold">
                   {longVideos.length} {longVideos.length === 1 ? 'vídeo' : 'vídeos'}
@@ -1117,7 +1117,7 @@ export default function VideosModule({
                 )}
               </div>
 
-              {/* 4. Formato: Largo o Corto / TikTok */}
+              {/* 4. Formato: Largos o Cortos */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
                   Formato de visualización
@@ -1133,7 +1133,7 @@ export default function VideosModule({
                     }`}
                   >
                     <Video size={14} />
-                    <span>Formato Largo (16:9)</span>
+                    <span>Largos</span>
                   </button>
 
                   <button
@@ -1145,8 +1145,8 @@ export default function VideosModule({
                         : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400'
                     }`}
                   >
-                    <Sparkles size={14} />
-                    <span>Corto / TikTok (9:16)</span>
+                    <Smartphone size={14} />
+                    <span>Cortos</span>
                   </button>
                 </div>
               </div>
