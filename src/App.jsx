@@ -8394,6 +8394,74 @@ Escribe en español con tono pedagógico moderno.`;
                                   </tbody>
                                 </table>
                               </div>
+
+                              {/* Materiales Didácticos Creados con la Planeación */}
+                              {Array.isArray(syllabusAssistantModal.planObject.didacticMaterials) && syllabusAssistantModal.planObject.didacticMaterials.length > 0 && (
+                                <div className="mt-4 pt-4 border-t border-gray-300 space-y-2.5">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-xs font-black uppercase text-black flex items-center gap-1.5">
+                                      <Sparkles size={14} className="text-purple-600" />
+                                      <span>Materiales didácticos de la clase ({syllabusAssistantModal.planObject.didacticMaterials.length})</span>
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setShowLessonPlansModal(true);
+                                        setSyllabusAssistantModal(prev => ({ ...prev, isOpen: false }));
+                                      }}
+                                      className="text-xs font-bold text-purple-700 hover:underline"
+                                    >
+                                      Abrir en respaldos →
+                                    </button>
+                                  </div>
+
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                    {syllabusAssistantModal.planObject.didacticMaterials.map((mat, mIdx) => (
+                                      <div
+                                        key={mat.id || mIdx}
+                                        className="p-3 rounded-xl border border-gray-300 bg-gray-50 text-left space-y-1"
+                                      >
+                                        <div className="flex items-center justify-between gap-1">
+                                          <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase bg-purple-600 text-white">
+                                            {mat.type}
+                                          </span>
+                                          <span className="text-[10px] text-gray-500 font-bold">
+                                            Fase: {mat.phase}
+                                          </span>
+                                        </div>
+                                        <h5 className="text-xs font-bold truncate text-black">
+                                          {mat.title}
+                                        </h5>
+                                        <p className="text-[11px] text-gray-600 line-clamp-1">
+                                          {mat.description}
+                                        </p>
+                                        <div className="pt-1 flex items-center justify-between">
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              navigator.clipboard.writeText(mat.content || '');
+                                              showMessage('Contenido del material copiado.');
+                                            }}
+                                            className="text-[11px] font-bold text-purple-700 hover:underline flex items-center gap-1 cursor-pointer"
+                                          >
+                                            <Copy size={11} /> Copiar texto
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setShowLessonPlansModal(true);
+                                              setSyllabusAssistantModal(prev => ({ ...prev, isOpen: false }));
+                                            }}
+                                            className="text-[11px] font-bold text-gray-700 hover:underline flex items-center gap-1 cursor-pointer"
+                                          >
+                                            <Eye size={11} /> Ver completo
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
                         ) : (
@@ -8663,6 +8731,7 @@ Escribe en español con tono pedagógico moderno.`;
                   }}
                   isDarkMode={isDarkMode}
                   showMessage={showMessage}
+                  callGemini={callGemini}
                 />
               </div>
             );

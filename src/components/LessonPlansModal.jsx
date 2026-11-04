@@ -1,7 +1,7 @@
 // src/components/LessonPlansModal.jsx
 // Modal visor, editor y gestor de planeaciones de clase guardadas
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   X,
   FileText,
@@ -15,14 +15,20 @@ import {
   Copy,
   ChevronDown,
   ChevronRight,
-  BookOpen
+  BookOpen,
+  Sparkles,
+  Loader2,
+  Eye,
+  CheckCheck
 } from './Icons.jsx';
 import {
   formatLessonPlanAsMarkdown,
   stripTimeFromActivityText,
   sanitizeRealisticActivityText,
   sanitizeRealisticResourceText,
-  normalizeLessonPlan
+  normalizeLessonPlan,
+  buildGenerateMaterialPrompt,
+  generateDefaultDidacticMaterials
 } from '../utils/lessonPlanEngine.js';
 
 export function LessonPlansModal({
@@ -32,14 +38,25 @@ export function LessonPlansModal({
   onUpdatePlan,
   onDeletePlan,
   isDarkMode = false,
-  showMessage
+  showMessage,
+  callGemini
 }) {
   const [selectedPlanId, setSelectedPlanId] = useState(null);
   const [editingPlanId, setEditingPlanId] = useState(null);
   const [editForm, setEditForm] = useState(null);
+  const [activeMaterialModal, setActiveMaterialModal] = useState(null);
+  const [printTargetMaterial, setPrintTargetMaterial] = useState(null);
+  const [isGeneratingMaterial, setIsGeneratingMaterial] = useState(false);
+
+  // Limpiar objetivo de impresión al finalizar
+  useEffect(() => {
+    const handleAfterPrint = () => setPrintTargetMaterial(null);
+    window.addEventListener('afterprint', handleAfterPrint);
+    return () => window.removeEventListener('afterprint', handleAfterPrint);
+  }, []);
 
   // Asegurar lista única sin duplicados por id
-  const uniquePlans = React.useMemo(() => {
+  const uniquePlans = useMemo(() => {
     const map = new Map();
     (lessonPlans || []).forEach((p) => {
       if (!p || !p.id) return;
@@ -57,10 +74,23 @@ export function LessonPlansModal({
   // Plan actualmente seleccionado
   const activePlan = uniquePlans.find((p) => p.id === (selectedPlanId || uniquePlans[0]?.id)) || uniquePlans[0] || null;
 
+  // Asegurar que activePlan tenga didacticMaterials
+  const activeMaterials = useMemo(() => {
+    if (!activePlan) return [];
+    if (Array.isArray(activePlan.didacticMaterials) && activePlan.didacticMaterials.length > 0) {
+      return activePlan.didacticMaterials;
+    }
+    return generateDefaultDidacticMaterials(activePlan);
+  }, [activePlan]);
+
   const startEditing = (plan) => {
     setEditingPlanId(plan.id);
     setSelectedPlanId(plan.id);
-    setEditForm(JSON.parse(JSON.stringify(plan)));
+    const cloned = JSON.parse(JSON.stringify(plan));
+    if (!Array.isArray(cloned.didacticMaterials) || cloned.didacticMaterials.length === 0) {
+      cloned.didacticMaterials = generateDefaultDidacticMaterials(plan);
+    }
+    setEditForm(cloned);
   };
 
   const cancelEditing = () => {
@@ -75,17 +105,85 @@ export function LessonPlansModal({
     await onUpdatePlan(planToSave);
     setEditingPlanId(null);
     setEditForm(null);
-    showMessage?.('Planeación actualizada correctamente.');
+    showMessage?.('Planeación y materiales didácticos actualizados con éxito.');
   };
 
   const handleCopyMarkdown = (plan) => {
     const text = formatLessonPlanAsMarkdown(plan);
     navigator.clipboard.writeText(text);
-    showMessage?.('Planeación copiada al portapapeles.');
+    showMessage?.('Planeación completa con materiales copiada al portapapeles.');
+  };
+
+  const handleCopyMaterial = (mat) => {
+    if (!mat) return;
+    const header = `UNIVERSIDAD DE PAMPLONA\nMATERIAL DIDÁCTICO: ${mat.title}\nTipo: ${mat.type} | Fase: ${mat.phase}\nDescripción: ${mat.description}\n\n`;
+    navigator.clipboard.writeText(header + (mat.content || ''));
+    showMessage?.(`Material "${mat.title}" copiado al portapapeles.`);
   };
 
   const handlePrint = () => {
-    window.print();
+    setPrintTargetMaterial(null);
+    setTimeout(() => {
+      window.print();
+    }, 50);
+  };
+
+  const handlePrintMaterial = (mat) => {
+    setPrintTargetMaterial(mat);
+    setTimeout(() => {
+      window.print();
+    }, 100);
+  };
+
+  const handleGenerateNewMaterialWithAi = async () => {
+    if (!callGemini || !activePlan || isGeneratingMaterial) return;
+    setIsGeneratingMaterial(true);
+    try {
+      const prompt = buildGenerateMaterialPrompt({
+        plan: activePlan,
+        materialType: 'Guía de ejercicios',
+        phase: 'Desarrollo'
+      });
+      const res = await callGemini(prompt);
+      let parsed = null;
+      try {
+        let clean = res.trim();
+        const jsonMatch = clean.match(/```(?:json)?\s*([\s\S]*?)```/i);
+        if (jsonMatch) clean = jsonMatch[1].trim();
+        parsed = JSON.parse(clean);
+      } catch {
+        parsed = {
+          title: `Guía Práctica de Aplicación: ${activePlan.weekTopic || 'Tema de Clase'}`,
+          type: 'Guía de ejercicios',
+          phase: 'Desarrollo',
+          description: 'Guía complementaria generada con IA para trabajo en el aula.',
+          content: res
+        };
+      }
+
+      const newMaterial = {
+        id: `mat_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        title: parsed.title || `Material Didáctico: ${activePlan.weekTopic || 'Tema'}`,
+        type: parsed.type || 'Guía de ejercicios',
+        phase: parsed.phase || 'Desarrollo',
+        description: parsed.description || 'Material didáctico para uso activo en clase.',
+        content: stripTimeFromActivityText(sanitizeRealisticActivityText(parsed.content || ''))
+      };
+
+      const updatedPlan = {
+        ...activePlan,
+        didacticMaterials: [...(activePlan.didacticMaterials || activeMaterials), newMaterial],
+        updatedAt: Date.now()
+      };
+
+      await onUpdatePlan(updatedPlan);
+      showMessage?.('¡Nuevo material didáctico generado con IA y guardado en la planeación!');
+    } catch (err) {
+      console.error('Error generando material didáctico:', err);
+      showMessage?.('No se pudo generar el material con IA en este momento.');
+    } finally {
+      setIsGeneratingMaterial(false);
+    }
   };
 
   return (
@@ -374,6 +472,141 @@ export function LessonPlansModal({
                     </div>
                   ))}
                 </div>
+
+                {/* Edición de Materiales Didácticos */}
+                <div className="space-y-3 pt-3 border-t border-gray-200 dark:border-gray-800">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <h5 className="text-xs font-black uppercase text-gray-700 dark:text-gray-300">
+                        Materiales didácticos de la clase ({editForm.didacticMaterials?.length || 0})
+                      </h5>
+                      <p className="text-[11px] text-gray-500">
+                        Guías, lecturas y talleres prácticos listos para imprimir
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const current = editForm.didacticMaterials || [];
+                        const newMat = {
+                          id: `mat_${Date.now()}`,
+                          title: `Guía Práctica: ${editForm.weekTopic || 'Tema de Clase'}`,
+                          type: 'Guía de ejercicios',
+                          phase: 'Desarrollo',
+                          description: 'Taller de aplicación práctica para resolución en parejas.',
+                          content: `UNIVERSIDAD DE PAMPLONA\nGUÍA DE TRABAJO PRÁCTICO\nTema: ${editForm.weekTopic || ''}\n\nINSTRUCCIONES:\n...\n\nEJERCICIOS PRÁCTICOS:\n1. ...\n2. ...`
+                        };
+                        setEditForm({ ...editForm, didacticMaterials: [...current, newMat] });
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-purple-600/10 hover:bg-purple-600/20 text-purple-600 dark:text-purple-400 border border-purple-500/20 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <Plus size={13} /> Agregar material didáctico
+                    </button>
+                  </div>
+
+                  {(editForm.didacticMaterials || []).map((mat, mIdx) => (
+                    <div
+                      key={mat.id || mIdx}
+                      className={`p-3.5 rounded-2xl border space-y-2.5 ${
+                        isDarkMode ? 'bg-gray-800/40 border-gray-700' : 'bg-gray-50 border-gray-200'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between text-xs font-bold">
+                        <span className="text-purple-600 dark:text-purple-400">
+                          Material #{mIdx + 1}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = editForm.didacticMaterials.filter((_, idx) => idx !== mIdx);
+                            setEditForm({ ...editForm, didacticMaterials: updated });
+                          }}
+                          className="text-red-500 hover:text-red-700 text-xs flex items-center gap-1 cursor-pointer"
+                        >
+                          <Trash2 size={13} /> Eliminar
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                        <div className="sm:col-span-2">
+                          <label className="font-bold text-gray-500 block mb-1 text-[11px]">Título del material</label>
+                          <input
+                            type="text"
+                            value={mat.title || ''}
+                            onChange={(e) => {
+                              const updated = [...editForm.didacticMaterials];
+                              updated[mIdx].title = e.target.value;
+                              setEditForm({ ...editForm, didacticMaterials: updated });
+                            }}
+                            className="w-full p-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs font-bold"
+                          />
+                        </div>
+                        <div>
+                          <label className="font-bold text-gray-500 block mb-1 text-[11px]">Tipo de material</label>
+                          <select
+                            value={mat.type || 'Guía de ejercicios'}
+                            onChange={(e) => {
+                              const updated = [...editForm.didacticMaterials];
+                              updated[mIdx].type = e.target.value;
+                              setEditForm({ ...editForm, didacticMaterials: updated });
+                            }}
+                            className="w-full p-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs font-semibold"
+                          >
+                            <option value="Guía de ejercicios">Guía de ejercicios</option>
+                            <option value="Lectura técnica">Lectura técnica</option>
+                            <option value="Taller práctico">Taller práctico</option>
+                            <option value="Ficha de trabajo">Ficha de trabajo</option>
+                            <option value="Rúbrica de evaluación">Rúbrica de evaluación</option>
+                          </select>
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="font-bold text-gray-500 block mb-1 text-[11px]">Descripción / Instrucciones de uso</label>
+                          <input
+                            type="text"
+                            value={mat.description || ''}
+                            onChange={(e) => {
+                              const updated = [...editForm.didacticMaterials];
+                              updated[mIdx].description = e.target.value;
+                              setEditForm({ ...editForm, didacticMaterials: updated });
+                            }}
+                            className="w-full p-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="font-bold text-gray-500 block mb-1 text-[11px]">Fase de la clase</label>
+                          <select
+                            value={mat.phase || 'Desarrollo'}
+                            onChange={(e) => {
+                              const updated = [...editForm.didacticMaterials];
+                              updated[mIdx].phase = e.target.value;
+                              setEditForm({ ...editForm, didacticMaterials: updated });
+                            }}
+                            className="w-full p-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs font-semibold"
+                          >
+                            <option value="Inicio">Inicio</option>
+                            <option value="Desarrollo">Desarrollo</option>
+                            <option value="Cierre - Tarea">Cierre - Tarea</option>
+                          </select>
+                        </div>
+                        <div className="sm:col-span-3">
+                          <label className="font-bold text-gray-500 block mb-1 text-[11px]">
+                            Contenido completo y redactado (Listo para imprimir)
+                          </label>
+                          <textarea
+                            rows={6}
+                            value={mat.content || ''}
+                            onChange={(e) => {
+                              const updated = [...editForm.didacticMaterials];
+                              updated[mIdx].content = e.target.value;
+                              setEditForm({ ...editForm, didacticMaterials: updated });
+                            }}
+                            className="w-full p-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs font-mono leading-relaxed"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : (
               /* ================= MODO VISUALIZACIÓN OFICIAL (IDÉNTICO A LA IMAGEN) ================= */
@@ -577,10 +810,231 @@ export function LessonPlansModal({
                     </table>
                   </div>
                 </div>
+
+                {/* ================= SECCIÓN DE MATERIALES DIDÁCTICOS (LISTOS PARA IMPRIMIR O USAR) ================= */}
+                <div className="pt-4 border-t border-gray-200 dark:border-gray-800 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-purple-600/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 flex items-center justify-center">
+                        <BookOpen size={16} />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-xs font-black uppercase tracking-wider text-gray-800 dark:text-gray-100">
+                            Materiales Didácticos de la Clase
+                          </h4>
+                          <span className="px-2 py-0.5 rounded-md bg-purple-600 text-white text-[10px] font-black">
+                            {activeMaterials.length}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-500">
+                          Guías, lecturas y talleres prácticos listos para imprimir o entregar en clase
+                        </p>
+                      </div>
+                    </div>
+
+                    {callGemini && (
+                      <button
+                        type="button"
+                        onClick={handleGenerateNewMaterialWithAi}
+                        disabled={isGeneratingMaterial}
+                        className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        {isGeneratingMaterial ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                        <span>{isGeneratingMaterial ? 'Generando con IA...' : '✨ Diseñar nuevo material con IA'}</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {activeMaterials.length === 0 ? (
+                    <div className="p-6 text-center border rounded-2xl border-dashed border-gray-300 dark:border-gray-700 space-y-1">
+                      <p className="text-xs font-semibold text-gray-500">No hay materiales didácticos adicionales generados.</p>
+                      {callGemini && (
+                        <button
+                          type="button"
+                          onClick={handleGenerateNewMaterialWithAi}
+                          className="text-xs font-bold text-purple-600 hover:underline"
+                        >
+                          Generar guía práctica con IA ahora
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                      {activeMaterials.map((mat, mIdx) => (
+                        <div
+                          key={mat.id || mIdx}
+                          className={`p-4 rounded-2xl border flex flex-col justify-between transition-all ${
+                            isDarkMode
+                              ? 'bg-gray-800/40 border-gray-700/80 hover:border-purple-500/50'
+                              : 'bg-white border-gray-200 hover:border-purple-300 shadow-xs'
+                          }`}
+                        >
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="px-2 py-0.5 rounded-md bg-purple-600/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 text-[10px] font-black uppercase">
+                                {mat.type || 'Guía de ejercicios'}
+                              </span>
+                              <span className="text-[10px] font-bold text-gray-400">
+                                Fase: {mat.phase || 'Desarrollo'}
+                              </span>
+                            </div>
+                            <h5 className="text-xs font-bold text-gray-900 dark:text-gray-100 leading-snug">
+                              {mat.title}
+                            </h5>
+                            <p className="text-[11px] text-gray-500 line-clamp-2">
+                              {mat.description}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center justify-between gap-2 pt-3 mt-3 border-t border-gray-100 dark:border-gray-700/60">
+                            <button
+                              type="button"
+                              onClick={() => setActiveMaterialModal(mat)}
+                              className="text-xs font-bold text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1 cursor-pointer"
+                            >
+                              <Eye size={13} /> Ver material
+                            </button>
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleCopyMaterial(mat)}
+                                className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                                title="Copiar texto del material"
+                              >
+                                <Copy size={13} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handlePrintMaterial(mat)}
+                                className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                                title="Imprimir este material"
+                              >
+                                <Printer size={13} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
         </div>
+
+        {/* Modal de Lectura y Visualización Completa de un Material Didáctico */}
+        {activeMaterialModal && (
+          <div className="fixed inset-0 z-[1000000] flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-xs animate-in fade-in">
+            <div
+              className={`w-full max-w-3xl max-h-[90vh] rounded-3xl border shadow-2xl flex flex-col overflow-hidden ${
+                isDarkMode ? 'bg-gray-900 border-gray-800 text-white' : 'bg-white border-gray-200 text-gray-900'
+              }`}
+            >
+              {/* Cabecera del material */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-800">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-purple-600/10 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold">
+                    <BookOpen size={20} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded-md bg-purple-600 text-white text-[10px] font-black uppercase">
+                        {activeMaterialModal.type}
+                      </span>
+                      <span className="text-xs text-gray-400 font-semibold">
+                        Fase: {activeMaterialModal.phase}
+                      </span>
+                    </div>
+                    <h3 className="text-sm sm:text-base font-extrabold truncate max-w-md">
+                      {activeMaterialModal.title}
+                    </h3>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveMaterialModal(null)}
+                  className="p-1.5 rounded-xl text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Contenido del material */}
+              <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4">
+                <div className="p-3.5 rounded-2xl bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 text-xs text-purple-900 dark:text-purple-200">
+                  <p className="font-bold mb-0.5">Uso didáctico en clase:</p>
+                  <p>{activeMaterialModal.description}</p>
+                </div>
+
+                <div
+                  className={`p-4 sm:p-5 rounded-2xl border font-mono text-xs whitespace-pre-wrap leading-relaxed ${
+                    isDarkMode ? 'bg-gray-950/70 border-gray-800 text-gray-200' : 'bg-gray-50 border-gray-200 text-gray-800'
+                  }`}
+                >
+                  {activeMaterialModal.content}
+                </div>
+              </div>
+
+              {/* Footer con acciones */}
+              <div className="flex items-center justify-between px-5 py-3.5 border-t border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50">
+                <span className="text-xs text-gray-400">Listo para imprimir o copiar</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleCopyMaterial(activeMaterialModal)}
+                    className="px-3.5 py-2 rounded-xl border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Copy size={13} /> Copiar texto
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handlePrintMaterial(activeMaterialModal)}
+                    className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                  >
+                    <Printer size={13} /> Imprimir este material
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Vista oculta exclusivamente para imprimir un solo material didáctico */}
+        {printTargetMaterial && (
+          <div className="printable-material-single hidden p-8 bg-white text-black font-sans">
+            <div className="border-b-2 border-black pb-3 mb-4 text-center">
+              <h2 className="text-sm font-black uppercase tracking-wider text-black">
+                UNIVERSIDAD DE PAMPLONA
+              </h2>
+              <h3 className="text-xs font-bold text-gray-800">
+                MATERIAL DIDÁCTICO DE AULA PRESENCIAL | SEMANA {activePlan.week}
+              </h3>
+              <div className="flex justify-between text-[11px] font-semibold mt-2 pt-2 border-t border-gray-300">
+                <span>Asignatura: {activePlan.subject || 'Inglés Técnico'}</span>
+                <span>Docente: {activePlan.teacher || ''}</span>
+                <span>Fase: {printTargetMaterial.phase}</span>
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <div className="text-[10px] font-black uppercase tracking-wider text-gray-600">
+                [{printTargetMaterial.type}]
+              </div>
+              <h1 className="text-base font-black mt-1 text-black">
+                {printTargetMaterial.title}
+              </h1>
+              <p className="text-xs italic text-gray-600 mt-1">
+                {printTargetMaterial.description}
+              </p>
+            </div>
+
+            <div className="border-t border-gray-400 pt-3 text-xs leading-relaxed whitespace-pre-wrap font-mono text-black">
+              {printTargetMaterial.content}
+            </div>
+          </div>
+        )}
 
         {/* Footer */}
         <div className="flex items-center justify-between px-5 py-3 border-t border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 shrink-0">
@@ -590,7 +1044,7 @@ export function LessonPlansModal({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-xs font-semibold rounded-xl text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            className="px-4 py-2 text-xs font-semibold rounded-xl text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
           >
             Cerrar
           </button>
@@ -602,21 +1056,41 @@ export function LessonPlansModal({
             body * {
               visibility: hidden !important;
             }
-            .printable-lesson-plan, .printable-lesson-plan * {
-              visibility: visible !important;
-            }
-            .printable-lesson-plan {
-              position: fixed !important;
-              left: 0 !important;
-              top: 0 !important;
-              width: 100% !important;
-              margin: 0 !important;
-              padding: 24px !important;
-              border: none !important;
-              box-shadow: none !important;
-              background: white !important;
-              color: black !important;
-              z-index: 99999999 !important;
+            ${
+              printTargetMaterial
+                ? `.printable-material-single, .printable-material-single * {
+                    visibility: visible !important;
+                  }
+                  .printable-material-single {
+                    display: block !important;
+                    position: fixed !important;
+                    left: 0 !important;
+                    top: 0 !important;
+                    width: 100% !important;
+                    margin: 0 !important;
+                    padding: 24px !important;
+                    border: none !important;
+                    box-shadow: none !important;
+                    background: white !important;
+                    color: black !important;
+                    z-index: 99999999 !important;
+                  }`
+                : `.printable-lesson-plan, .printable-lesson-plan * {
+                    visibility: visible !important;
+                  }
+                  .printable-lesson-plan {
+                    position: fixed !important;
+                    left: 0 !important;
+                    top: 0 !important;
+                    width: 100% !important;
+                    margin: 0 !important;
+                    padding: 24px !important;
+                    border: none !important;
+                    box-shadow: none !important;
+                    background: white !important;
+                    color: black !important;
+                    z-index: 99999999 !important;
+                  }`
             }
             @page {
               margin: 1cm;

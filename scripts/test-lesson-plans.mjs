@@ -10,7 +10,9 @@ import {
   stripTimeFromActivityText,
   sanitizeRealisticActivityText,
   sanitizeRealisticResourceText,
-  validateLessonPlanFeasibility
+  validateLessonPlanFeasibility,
+  generateDefaultDidacticMaterials,
+  buildGenerateMaterialPrompt
 } from '../src/utils/lessonPlanEngine.js';
 
 import {
@@ -417,6 +419,107 @@ const defPlan = createDefaultLessonPlan();
 const defValidation = validateLessonPlanFeasibility(defPlan);
 check('createDefaultLessonPlan genera un plan 100% realizable y activo sin videos',
   defValidation.isRealistic && defValidation.issues.length === 0 && defPlan.rows[1].resources.includes('tablero')
+);
+
+console.log('\n== 9. Generación, Creación y Normalización de Materiales Didácticos Específicos (didacticMaterials) ==');
+// 1. Prompt solicita didacticMaterials
+check('Prompt exige explícitamente didacticMaterials', prompt.includes('"didacticMaterials"') && prompt.includes('CREACIÓN COMPLETA DE MATERIAL DIDÁCTICO'));
+check('Prompt instruye que los materiales deben estar listos para imprimir y libres de videos', 
+  prompt.includes('listo para imprimir') && prompt.includes('CERO VIDEOS')
+);
+
+// 2. generateDefaultDidacticMaterials
+const autoMaterials = generateDefaultDidacticMaterials({
+  week: 4,
+  weekTopic: 'International Trade & Tariffs',
+  unit: 'Unidad 3: Comercio Exterior'
+});
+check('generateDefaultDidacticMaterials genera al menos 2 materiales completos', Array.isArray(autoMaterials) && autoMaterials.length >= 2);
+check('Material 1 es una Guía de ejercicios con encabezado institucional', 
+  autoMaterials[0].type === 'Guía de ejercicios' && 
+  autoMaterials[0].content.includes('UNIVERSIDAD DE PAMPLONA') &&
+  autoMaterials[0].content.includes('International Trade & Tariffs')
+);
+check('Material 2 es una Lectura técnica con preguntas de comprensión', 
+  autoMaterials[1].type === 'Lectura técnica' &&
+  autoMaterials[1].content.includes('UNIVERSIDAD DE PAMPLONA') &&
+  autoMaterials[1].content.includes('CUESTIONARIO DE COMPROBACIÓN')
+);
+
+// 3. buildGenerateMaterialPrompt
+const genPrompt = buildGenerateMaterialPrompt({
+  plan: { week: 2, weekTopic: 'Fiscal Policy', unit: 'Unidad 2' },
+  materialType: 'Taller práctico',
+  phase: 'Desarrollo'
+});
+check('buildGenerateMaterialPrompt crea un prompt para material específico', 
+  genPrompt.includes('Fiscal Policy') && 
+  genPrompt.includes('Taller práctico') &&
+  genPrompt.includes('CERO VIDEOS') &&
+  genPrompt.includes('Universidad de Pamplona')
+);
+
+// 4. normalizador asegura didacticMaterials cuando vienen vacíos
+const planWithoutMaterials = {
+  id: 'lp_no_mat',
+  week: 5,
+  weekTopic: 'Monetary Policy',
+  unit: 'Unidad 4',
+  rows: [
+    { phase: 'Inicio', activities: 'Actividad', resources: 'Tablero', time: '10 min' },
+    { phase: 'Desarrollo', activities: 'Explicación del docente', resources: 'Guía impresa', time: '60 min' },
+    { phase: 'Cierre - Tarea', activities: 'Cierre', resources: 'Campus', time: '20 min' }
+  ]
+};
+const normalizedWithMaterials = normalizeLessonPlan(planWithoutMaterials);
+check('Normalizador crea automáticamente didacticMaterials cuando el plan no los traía', 
+  Array.isArray(normalizedWithMaterials.didacticMaterials) && 
+  normalizedWithMaterials.didacticMaterials.length >= 2 &&
+  normalizedWithMaterials.didacticMaterials[0].content.includes('Monetary Policy')
+);
+
+// 5. normalizador preserva y sanea materiales proporcionados por la IA
+const aiGeneratedMaterialsPlan = {
+  id: 'lp_with_ai_mat',
+  week: 2,
+  weekTopic: 'Microeconomics',
+  rows: [
+    { phase: 'Inicio', activities: 'Saludo', resources: 'Tablero', time: '15 min' },
+    { phase: 'Desarrollo', activities: 'Desarrollo', resources: 'Guías', time: '55 min' },
+    { phase: 'Cierre - Tarea', activities: 'Cierre', resources: 'Cuaderno', time: '20 min' }
+  ],
+  didacticMaterials: [
+    {
+      id: 'custom_1',
+      title: 'Taller Colaborativo de Curvas de Costos',
+      type: 'Taller práctico',
+      phase: 'Desarrollo',
+      description: 'Taller para calcular costo marginal y costo medio en grupos.',
+      content: 'UNIVERSIDAD DE PAMPLONA\nTALLER DE COSTOS\n1. Calcule el costo marginal...'
+    }
+  ]
+};
+const normalizedAiMat = normalizeLessonPlan(aiGeneratedMaterialsPlan);
+check('Normalizador preserva materiales didácticos personalizados generados por IA', 
+  normalizedAiMat.didacticMaterials.length === 1 &&
+  normalizedAiMat.didacticMaterials[0].title === 'Taller Colaborativo de Curvas de Costos' &&
+  normalizedAiMat.didacticMaterials[0].type === 'Taller práctico'
+);
+
+// 6. formatLessonPlanAsMarkdown incluye los materiales didácticos completos
+const markdownWithMat = formatLessonPlanAsMarkdown(normalizedAiMat);
+check('formatLessonPlanAsMarkdown exporta los materiales didácticos completos', 
+  markdownWithMat.includes('MATERIALES DIDÁCTICOS DE LA CLASE') &&
+  markdownWithMat.includes('Taller Colaborativo de Curvas de Costos') &&
+  markdownWithMat.includes('Calcule el costo marginal')
+);
+
+// 7. DEMO_LESSON_PLANS contiene materiales didácticos precargados
+check('DEMO_LESSON_PLANS contiene materiales didácticos completos listos para imprimir', 
+  Array.isArray(DEMO_LESSON_PLANS[0].didacticMaterials) &&
+  DEMO_LESSON_PLANS[0].didacticMaterials.length >= 2 &&
+  DEMO_LESSON_PLANS[0].didacticMaterials[0].content.includes('UNIVERSIDAD DE PAMPLONA') &&
+  DEMO_LESSON_PLANS[0].didacticMaterials[0].content.includes('Market Equilibrium')
 );
 
 console.log(`\n========================================`);

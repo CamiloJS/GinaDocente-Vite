@@ -77,6 +77,9 @@ PRINCIPIOS PEDAGÓGICOS CRÍTICOS Y OBLIGATORIOS (CLASE 100% REALISTA Y REALIZAB
    - En Inicio: El docente lidera la bienvenida, contextualización y activación de saberes previos o rompehielos corto (10 a 15 min máximo) con preguntas orientadoras en el tablero o lluvia de ideas participativa.
    - En Desarrollo: El docente realiza la explicación magistral dialogada y modela los conceptos clave en el tablero; luego los estudiantes realizan ejercicios prácticos, análisis de casos en parejas, talleres colaborativos con guías impresas o dinámicas activas de aplicación directa en el aula. El docente circula, asesora y retroalimenta activamente.
    - En Cierre - Tarea: Síntesis formativa en el tablero, verificación oral de aprendizajes (preguntas de comprobación), retroalimentación del docente y asignación puntual de trabajo autónomo en el campus virtual.
+4. CREACIÓN COMPLETA DE MATERIAL DIDÁCTICO ESPECÍFICO (didacticMaterials):
+   - Si en la planeación se especifica que se necesita material didáctico (guías de ejercicios, lecturas técnicas, talleres prácticos en parejas, fichas de análisis de casos, cuestionarios formativos o rúbricas), DEBES CREAR Y REDACTAR EL CONTENIDO COMPLETO Y LISTO PARA IMPRIMIR de cada uno de ellos en el arreglo "didacticMaterials".
+   - Cada material didáctico debe contener texto completo, profesional y pedagógico (instrucciones, preguntas, ejercicios prácticos numerados y criterios). ¡Cero texto incompleto, cero placeholders y cero videos!
 
 El formato del JSON debe ser exactamente:
 {
@@ -112,6 +115,16 @@ El formato del JSON debe ser exactamente:
       "resources": "Recursos para el cierre y tarea (tablero, rúbrica impresa, cuaderno de apuntes, campus virtual)",
       "time": "${cierreMins} min"
     }
+  ],
+  "didacticMaterials": [
+    {
+      "id": "mat_1",
+      "title": "Título completo del material (ej: Guía de Ejercicios Prácticos: ${topic})",
+      "type": "Guía de ejercicios",
+      "phase": "Desarrollo",
+      "description": "Descripción clara de cómo se utiliza el material en el aula con los estudiantes.",
+      "content": "Contenido pedagógico completo, redactado minuciosamente con encabezado de la Universidad de Pamplona, instrucciones, ejercicios numerados 1, 2, 3... o lectura completa, listo para imprimir y repartir en el aula física."
+    }
   ]
 }
 
@@ -128,7 +141,8 @@ Reglas estrictas:
 10. SIN TIEMPOS EN "activities": En el campo "activities" (descripción de la actividad) NUNCA escribas el tiempo ni la duración (NO pongas "(10 min)", "(15 min)", "10 minutos", etc.). La duración va ÚNICAMENTE en la columna "time" para evitar contradicciones.
 11. CLASE 100% REALIZABLE Y ACTIVIDADES EN EL AULA: Cada actividad propuesta debe ser algo que el docente y los estudiantes universitarios puedan ejecutar físicamente en un aula presencial estándar. El docente enseña directamente en el tablero y los estudiantes resuelven, debaten y practican activamente.
 12. PROHIBICIÓN TOTAL DE VIDEOS (CERO VIDEOS): Queda terminantemente prohibido incluir videos de cualquier tipo o duración (ni cortos ni largos), documentales, películas, tutoriales audiovisuales, YouTube o transmisiones. La sesión es 100% presencial, pedagógica y activa en el aula.
-13. RECURSOS 100% ACCESIBLES: En "resources" usa únicamente materiales de fácil acceso y uso universal en la Universidad de Pamplona (tablero, marcadores borrables, fotocopias, guías impresas, lecturas de texto, apuntes de clase, campus virtual). Queda prohibido mencionar videos, pantallas, proyectores indispensables, televisores, parlantes, dispositivos por estudiante, software de pago ni plataformas inaccesibles.`;
+13. RECURSOS 100% ACCESIBLES: En "resources" usa únicamente materiales de fácil acceso y uso universal en la Universidad de Pamplona (tablero, marcadores borrables, fotocopias, guías impresas, lecturas de texto, apuntes de clase, campus virtual). Queda prohibido mencionar videos, pantallas, proyectores indispensables, televisores, parlantes, dispositivos por estudiante, software de pago ni plataformas inaccesibles.
+14. CREACIÓN COMPLETA DE MATERIALES DIDÁCTICOS (didacticMaterials): Si en las filas de la planeación se menciona que se requiere una guía, lectura, taller, ficha o rúbrica, DEBES redáctarla de principio a fin en el arreglo "didacticMaterials". Cada material debe ser rico en contenido, pedagógicamente impecable y listo para imprimir sin requerir redacción adicional.`;
 }
 
 /**
@@ -380,6 +394,123 @@ export function validateLessonPlanFeasibility(plan = {}) {
 }
 
 /**
+ * Genera materiales didácticos completos (guías de trabajo, lecturas técnicas, talleres prácticos)
+ * listos para imprimir y usar en el aula física presencial.
+ */
+export function generateDefaultDidacticMaterials(plan = {}) {
+  const topic = (plan.weekTopic || 'Tema de la sesión').trim();
+  const unit = (plan.unit || 'Unidad de Aprendizaje').trim();
+  const week = plan.week || 1;
+
+  return [
+    {
+      id: `mat_guide_${Date.now()}_1`,
+      title: `Guía de Ejercicios y Taller Práctico: ${topic}`,
+      type: 'Guía de ejercicios',
+      phase: 'Desarrollo',
+      description: 'Guía impresa para resolución en parejas durante la fase de desarrollo. Incluye ejercicios prácticos de aplicación directa y resolución colaborativa.',
+      content: `UNIVERSIDAD DE PAMPLONA
+FACULTAD DE CIENCIAS ECONÓMICAS Y ADMINISTRATIVAS
+GUÍA DE TRABAJO PRÁCTICO EN AULA
+Asignatura: Inglés Técnico / Especializado | ${unit}
+Semana: ${week} | Tema: ${topic}
+Estudiantes (Pareja): ________________________________________________ Fecha: _____________
+
+-----------------------------------------------------------------------------------------
+INSTRUCCIONES GENERALES:
+Resuelvan los siguientes ejercicios de manera colaborativa en parejas de 2 estudiantes en el aula de clase.
+Tiempo estimado: 40 minutos.
+Al finalizar, el docente liderará una sesión de socialización y resolución en el tablero.
+-----------------------------------------------------------------------------------------
+
+SECCIÓN 1: CONCEPTOS FUNDAMENTALES Y VOCABULARIO TÉCNICO
+1. Con base en la explicación del docente en el tablero, definan con precisión técnica los siguientes términos esenciales vinculados a "${topic}":
+   a) Concepto Clave 1: _________________________________________________________________
+   b) Concepto Clave 2: _________________________________________________________________
+   c) Concepto Clave 3: _________________________________________________________________
+
+2. Relacione cada principio con su aplicación en el análisis de ${topic}:
+   [  ] Principio A: Identificación de variables determinantes
+   [  ] Principio B: Medición de impacto y respuesta de los agentes
+   [  ] Principio C: Evaluación de escenarios de equilibrio y ajuste
+
+SECCIÓN 2: TALLER PRÁCTICO Y ANÁLISIS DE CASO
+Lean detenidamente el siguiente caso de estudio y respondan las preguntas en su cuaderno o al respaldo de esta hoja:
+
+"Una organización del sector productivo experimenta un cambio significativo en las condiciones de ${topic}. La administración debe presentar una propuesta técnica que permita optimizar los recursos disponibles, mitigar los riesgos operativos y fundamentar la toma de decisiones económicas ante un entorno de alta variabilidad."
+
+Preguntas de aplicación práctica:
+a) Identifiquen y describan 2 desafíos críticos que este escenario plantea para la organización.
+b) Formulen una propuesta de solución estructurada en 3 pasos concretos, aplicando los conceptos de ${topic} vistos en clase.
+c) ¿Cuál es el costo de oportunidad de la decisión adoptada? Justifiquen su respuesta técnica.
+
+SECCIÓN 3: SÍNTESIS Y SOCIALIZACIÓN EN EL TABLERO
+Cada pareja sintetizará su conclusión principal en una sola frase clave para ser compartida en la plenaria con el docente.`
+    },
+    {
+      id: `mat_reading_${Date.now()}_2`,
+      title: `Lectura Técnica de Análisis: Fundamentos de ${topic}`,
+      type: 'Lectura técnica',
+      phase: 'Desarrollo',
+      description: 'Texto técnico estructurado para lectura comprensiva y discusión crítica en el aula física.',
+      content: `UNIVERSIDAD DE PAMPLONA
+DOCUMENTO DE LECTURA TÉCNICA Y ANÁLISIS CONCEPTUAL
+Unidad: ${unit} | Tema Central: ${topic}
+Material de lectura y discusión para la sesión presencial
+
+1. INTRODUCCIÓN Y CONTEXTO DISCIPLINAR
+El análisis riguroso de "${topic}" representa uno de los núcleos formativos fundamentales en la educación superior universitaria. En un entorno globalizado y altamente interconectado, la comprensión profunda de los mecanismos que articulan ${topic} faculta a los futuros profesionales para diagnosticar problemáticas complejas, evaluar alternativas estratégicas y emitir juicios fundamentados con solvencia metodológica.
+
+2. DESARROLLO CONCEPTUAL Y DINÁMICAS OPERATIVAS
+Desde la perspectiva teórica y empírica, ${topic} no opera como un elemento aislado, sino como parte de un sistema dinámico donde convergen múltiples variables socioeconómicas y técnicas. La interacción continua entre la oferta, la demanda y las restricciones estructurales exige que el análisis trascienda los síntomas superficiales para identificar las causas determinantes. Los modelos conceptuales discutidos por el docente demuestran que una adecuada modelación en el tablero permite anticipar desequilibrios y diseñar mecanismos de estabilización eficaces.
+
+3. RELEVANCIA PROFESIONAL Y APLICACIÓN PRÁCTICA
+El dominio de la terminología técnica bilingüe vinculada a este tema no solo potencia las competencias comunicativas especializadas, sino que constituye una ventaja competitiva esencial en la redacción de informes, la negociación comercial y el liderazgo de proyectos de desarrollo regional.
+
+-----------------------------------------------------------------------------------------
+CUESTIONARIO DE COMPROBACIÓN Y DEBATE:
+1. ¿Cuál es el postulado central del texto respecto al rol de ${topic} en la toma de decisiones?
+2. Expliquen la relación entre las variables analizadas y los mecanismos de ajuste explicados por el docente.
+3. Propongan un ejemplo concreto de cómo se manifiesta este fenómeno en el contexto económico y social local.
+4. Redacten una pregunta orientadora para plantearle al docente durante la sesión de preguntas y respuestas.`
+    }
+  ];
+}
+
+/**
+ * Genera el prompt para diseñar o enriquecer un material didáctico específico con Gemini.
+ */
+export function buildGenerateMaterialPrompt({ plan, materialTitle = '', materialType = 'Guía de ejercicios', phase = 'Desarrollo' }) {
+  const topic = plan?.weekTopic || 'Tema de clase';
+  const unit = plan?.unit || 'Unidad de Aprendizaje';
+  const week = plan?.week || 1;
+
+  return `Eres un pedagogo universitario de alto nivel de la Universidad de Pamplona.
+Diseña un MATERIAL DIDÁCTICO COMPLETO, PROFESIONAL, REALISTA Y LISTO PARA IMPRIMIR para la siguiente clase presencial:
+
+- Semana: ${week}
+- Unidad: ${unit}
+- Tema: ${topic}
+- Fase de la clase: ${phase}
+- Tipo de material: ${materialType}
+${materialTitle ? `- Título sugerido: ${materialTitle}` : ''}
+
+REGLAS PEDAGÓGICAS ESTRICTAS (CLASE 100% REALIZABLE):
+1. PROHIBICIÓN TOTAL DE VIDEOS (CERO VIDEOS): Queda terminantemente prohibido incluir videos, documentales, YouTube, proyectores indispensables ni enlaces audiovisuales.
+2. RECURSOS DEL AULA FÍSICA: El material debe ser un documento impreso en papel (guía, taller, lectura o rúbrica) para resolver en el aula con lápiz, papel y tablero.
+3. TEXTO COMPLETO Y DETALLADO: Redacta TODO el contenido del material: encabezado institucional de la Universidad de Pamplona, título, objetivos pedagógicos, instrucciones claras paso a paso, ejercicios numerados con preguntas concretas o lectura completa, espacios para respuestas y criterios claros. ¡CERO texto incompleto, cero "etc.", cero Lorem Ipsum!
+
+Responde ÚNICAMENTE con un objeto JSON válido con la siguiente estructura:
+{
+  "title": "Título completo y formal del material didáctico",
+  "type": "${materialType}",
+  "phase": "${phase}",
+  "description": "Breve explicación de 1 o 2 líneas de cómo se emplea en el aula",
+  "content": "Texto completo y detallado del material, listo para imprimir..."
+}`;
+}
+
+/**
  * Normaliza un plan de clase para garantizar que todos los campos requeridos existan
  * con la estructura visual y de datos esperada, garantizando pedagogía activa y realizable.
  */
@@ -422,6 +553,30 @@ export function normalizeLessonPlan(plan = {}, fallbackData = {}) {
     };
   });
 
+  // Procesamiento y aseguramiento de materiales didácticos completos
+  let didacticMaterials = [];
+  if (Array.isArray(plan.didacticMaterials) && plan.didacticMaterials.length > 0) {
+    didacticMaterials = plan.didacticMaterials.map((m, mIdx) => {
+      const rawContent = typeof m.content === 'string' ? m.content : (m.text || m.body || '');
+      const cleanContent = stripTimeFromActivityText(sanitizeRealisticActivityText(rawContent, m.phase || 'Desarrollo'));
+      return {
+        id: String(m.id || `mat_${mIdx + 1}_${Date.now()}`),
+        title: String(m.title || `Material Didáctico ${mIdx + 1}: ${plan.weekTopic || fallbackTopic}`).trim(),
+        type: String(m.type || 'Guía de ejercicios').trim(),
+        phase: String(m.phase || 'Desarrollo').trim(),
+        description: String(m.description || 'Material didáctico para uso presencial en el aula.').trim(),
+        content: cleanContent || `Guía de trabajo práctico para la sesión de ${plan.weekTopic || fallbackTopic}.`
+      };
+    });
+  } else {
+    didacticMaterials = generateDefaultDidacticMaterials({
+      week: Number(plan.week || fallbackWeek) || 1,
+      weekTopic: (plan.weekTopic || fallbackTopic).trim(),
+      unit,
+      learningPurpose
+    });
+  }
+
   const planId = String(plan.id || '').trim();
 
   return {
@@ -436,6 +591,7 @@ export function normalizeLessonPlan(plan = {}, fallbackData = {}) {
     learningPurpose,
     specificPurposes,
     rows,
+    didacticMaterials,
     createdAt: Number(plan.createdAt) || Date.now(),
     updatedAt: Number(plan.updatedAt) || Date.now()
   };
@@ -449,6 +605,14 @@ export function createDefaultLessonPlan(fallbackData = {}, rawNotes = '') {
   const topic = fallbackData?.weekItem?.topic || 'Tema de la semana';
   const unit = fallbackData?.weekItem?.unit || 'Unidad 1';
   const teacher = (fallbackData?.teacherName || 'Docente').trim();
+  const learningPurpose = `Identificar y aplicar los conceptos fundamentales de ${topic}.`;
+
+  const defaultMaterials = generateDefaultDidacticMaterials({
+    week,
+    weekTopic: topic,
+    unit,
+    learningPurpose
+  });
 
   return {
     id: `lp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
@@ -459,7 +623,7 @@ export function createDefaultLessonPlan(fallbackData = {}, rawNotes = '') {
     teacher,
     course: '',
     unit,
-    learningPurpose: `Identificar y aplicar los conceptos fundamentales de ${topic}.`,
+    learningPurpose,
     specificPurposes: `1. Analizar los fundamentos de ${topic}.\n2. Realizar ejercicios prácticos y colaborativos.\n3. Evaluar formativamente los resultados obtenidos.${rawNotes ? `\n\nNotas adicionales: ${rawNotes}` : ''}`,
     rows: [
       {
@@ -487,19 +651,22 @@ export function createDefaultLessonPlan(fallbackData = {}, rawNotes = '') {
         time: '20 min'
       }
     ],
+    didacticMaterials: defaultMaterials,
     createdAt: Date.now(),
     updatedAt: Date.now()
   };
 }
 
 /**
- * Exporta el plan de clase en texto plano / markdown estructurado
+ * Exporta el plan de clase en texto plano / markdown estructurado,
+ * incluyendo los materiales didácticos generados completos.
  */
 export function formatLessonPlanAsMarkdown(plan) {
   if (!plan) return '';
   const rows = Array.isArray(plan.rows) ? plan.rows : [];
+  const materials = Array.isArray(plan.didacticMaterials) ? plan.didacticMaterials : [];
   
-  return `FORMATO PLANEACIÓN DE CLASE (SEMANAL)
+  let md = `FORMATO PLANEACIÓN DE CLASE (SEMANAL)
 Institución educativa: ${plan.institution || 'Universidad de Pamplona'}
 Asignatura: ${plan.subject || '___________________'}
 Profesor: ${plan.teacher || '___________________'}
@@ -517,4 +684,19 @@ ${plan.specificPurposes || ''}
 ---------------------------------------------------------------------------------------------------------
 ${rows.map(r => `| ${r.date} | ${r.phase} | ${r.topics} | ${stripTimeFromActivityText(sanitizeRealisticActivityText(r.activities, r.phase))} | ${sanitizeRealisticResourceText(r.resources)} | ${r.time} |`).join('\n')}
 ---------------------------------------------------------------------------------------------------------`;
+
+  if (materials.length > 0) {
+    md += `\n\n=========================================================================================================
+MATERIALES DIDÁCTICOS DE LA CLASE (LISTOS PARA IMPRIMIR O USAR):
+=========================================================================================================\n`;
+    materials.forEach((mat, idx) => {
+      md += `\n[MATERIAL ${idx + 1}] ${mat.title} (${mat.type} - Fase: ${mat.phase})\n`;
+      md += `Descripción de uso: ${mat.description}\n`;
+      md += `--- CONTENIDO IMPRESO / GUÍA COMPLETA ---\n`;
+      md += `${mat.content}\n`;
+      md += `-----------------------------------------------------------------------------------------\n`;
+    });
+  }
+
+  return md;
 }

@@ -1238,6 +1238,70 @@ export const DEMO_LESSON_PLANS = [
         time: '20 min'
       }
     ],
+    didacticMaterials: [
+      {
+        id: 'demo-mat-1',
+        title: 'Guía de Ejercicios Prácticos: Market Equilibrium & Opportunity Cost',
+        type: 'Guía de ejercicios',
+        phase: 'Desarrollo',
+        description: 'Taller práctico en parejas para calcular variaciones de oferta y demanda a partir de escenarios reales de mercado.',
+        content: `UNIVERSIDAD DE PAMPLONA
+FACULTAD DE CIENCIAS ECONÓMICAS Y ADMINISTRATIVAS
+GUÍA DE EJERCICIOS PRÁCTICOS EN AULA
+Asignatura: Inglés Técnico | Unidad 1: Fundamentos de Economía
+Semana 1: Scarcity, Supply & Demand
+Nombres de los estudiantes: __________________________________________ Fecha: _____________
+
+-----------------------------------------------------------------------------------------
+INSTRUCCIONES:
+Trabajen en parejas de dos estudiantes. Completen los 3 ejercicios prácticos en 35 minutos.
+Al finalizar, dos parejas voluntarias modelarán las soluciones en el tablero junto al docente.
+-----------------------------------------------------------------------------------------
+
+EJERCICIO 1: VOCABULARY MATCHING & CONTEXTUAL DEFINITION
+Relacione el término económico en inglés con su definición conceptual precisa:
+a) Scarcity          [   ] 1. The point where the quantity supplied equals the quantity demanded.
+b) Opportunity Cost  [   ] 2. The fundamental economic problem of having unlimited human wants in a world of limited resources.
+c) Market Equilibrium[   ] 3. The loss of potential gain from other alternatives when one alternative is chosen.
+
+EJERCICIO 2: SCENARIO ANALYSIS (COFFEE EXPORT MARKET)
+Read the following short business situation:
+"Due to extreme weather conditions in major agricultural regions, national coffee production decreases by 30%. At the same time, international demand for specialty coffee rises sharply in North American and European markets."
+
+Questions for pair discussion:
+1. Draw and explain on your worksheet the expected shift in the supply curve (Leftward or Rightward shift).
+2. What will be the direct effect on the equilibrium price (Pe) and equilibrium quantity (Qe)?
+3. Propose two strategic measures that an export company in Colombia could adopt to address this supply shock without losing customer trust.
+
+EJERCICIO 3: MINI-CASE DEBATE
+If the national government considers introducing a price ceiling on basic food products, what are two potential unintended consequences according to economic theory (e.g., shortages, black markets, lower product quality)?
+Write a 3-sentence technical summary in English to share in the blackboard synthesis.`
+      },
+      {
+        id: 'demo-mat-2',
+        title: 'Lectura Técnica Especializada: The Fundamentals of Scarcity and Resource Allocation',
+        type: 'Lectura técnica',
+        phase: 'Desarrollo',
+        description: 'Texto técnico de lectura comprensiva y análisis terminológico en inglés para discusión guiada.',
+        content: `UNIVERSIDAD DE PAMPLONA
+TECHNICAL READING COMPREHENSION HANDOUT
+Course: Technical English for Economists | Unit 1
+Topic: The Fundamentals of Scarcity and Resource Allocation
+
+1. THE ECONOMIC PROBLEM OF SCARCITY
+At the core of all economic inquiry lies a simple yet profound condition: resources are finite, while human wants are virtually limitless. Economists define scarcity not as a temporary physical shortage of goods, but as a permanent structural condition of the universe. Because societies cannot produce enough goods and services to satisfy everyone completely, individuals, firms, and governments must make systematic choices about what to produce, how to produce it, and for whom to distribute it.
+
+2. SUPPLY, DEMAND, AND THE PRICE MECHANISM
+In competitive markets, prices act as vital informational signals. When demand exceeds supply, prices rise, signaling producers to allocate more productive capacity toward that sector while simultaneously rationing demand among consumers. Conversely, an excess of supply prompts price reductions, encouraging broader consumption and prompting inefficient producers to reallocate their capital. Understanding how these price mechanisms operate without central commands is fundamental to analyzing both domestic policy and international trade.
+
+-----------------------------------------------------------------------------------------
+CRITICAL READING COMPREHENSION QUESTIONS:
+1. Explain in your own words the fundamental distinction between "scarcity" and a "temporary shortage".
+2. According to paragraph 2, what primary role do market prices serve in an economy?
+3. How does understanding the concept of Opportunity Cost empower business managers to make more rational capital investments?
+4. Identify 3 specialized technical terms in the text and write a bilingual definition for your class glossary.`
+      }
+    ],
     createdAt: Date.now() - 1000 * 60 * 60 * 24 * 3,
     updatedAt: Date.now() - 1000 * 60 * 60 * 24 * 3
   }
