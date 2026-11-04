@@ -197,3 +197,45 @@ html.theme-lights-out.dark .hover\:bg-gray-700:hover {
   user-select: none;
 }
 
+/* ===== HOJA OFICIAL DE PLANEACIÓN DE CLASE (MÁXIMO CONTRASTE Y SOPORTE TOTAL) ===== */
+.printable-lesson-plan,
+.printable-lesson-plan *,
+[data-lesson-plan-sheet],
+[data-lesson-plan-sheet] * {
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000 !important;
+  border-color: #000000 !important;
+  color-scheme: only light !important;
+  forced-color-adjust: none !important;
+  --darkreader-inline-color: #000000 !important;
+  --darkreader-inline-bg: #ffffff !important;
+  --darkreader-inline-border: #000000 !important;
+}
+
+.printable-lesson-plan,
+[data-lesson-plan-sheet] {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000 !important;
+  color-scheme: only light !important;
+  forced-color-adjust: none !important;
+  isolation: isolate !important;
+}
+
+.printable-lesson-plan th,
+[data-lesson-plan-sheet] th {
+  background-color: #f3f4f6 !important;
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000 !important;
+  border-color: #000000 !important;
+  font-weight: 900 !important;
+}
+
+.printable-lesson-plan td,
+[data-lesson-plan-sheet] td {
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000 !important;
+  border-color: #000000 !important;
+}
+
+

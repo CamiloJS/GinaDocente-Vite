@@ -678,12 +678,21 @@ export function LessonPlansModal({
 
                 {/* HOJA OFICIAL CON EL FORMATO IDÉNTICO A LA IMAGEN */}
                 <div 
+                  data-darkreader-ignore="true"
+                  data-lesson-plan-sheet="true"
                   className="p-6 sm:p-8 rounded-2xl bg-white text-black border-2 border-gray-300 shadow-md font-sans text-xs leading-relaxed space-y-4 printable-lesson-plan"
-                  style={{ color: '#000000', backgroundColor: '#ffffff', colorScheme: 'light' }}
+                  style={{
+                    color: '#000000',
+                    WebkitTextFillColor: '#000000',
+                    backgroundColor: '#ffffff',
+                    colorScheme: 'only light',
+                    forcedColorAdjust: 'none',
+                    isolation: 'isolate'
+                  }}
                 >
                   {/* Título Principal */}
                   <div className="text-center">
-                    <h2 className="text-base sm:text-lg font-black tracking-wide uppercase text-black" style={{ color: '#000000' }}>
+                    <h2 className="text-base sm:text-lg font-black tracking-wide uppercase text-black" style={{ color: '#000000', WebkitTextFillColor: '#000000' }}>
                       FORMATO PLANEACIÓN DE CLASE (SEMANAL)
                     </h2>
                   </div>
@@ -693,19 +702,19 @@ export function LessonPlansModal({
                     {/* Fila 1: Institución educativa y Asignatura */}
                     <div className="flex flex-col sm:flex-row gap-3 sm:gap-6">
                       <div className="flex-1 flex items-baseline min-w-0">
-                        <span className="font-black text-black shrink-0 whitespace-nowrap" style={{ color: '#000000' }}>
+                        <span className="font-black text-black shrink-0 whitespace-nowrap" style={{ color: '#000000', WebkitTextFillColor: '#000000' }}>
                           Institución educativa:&nbsp;
                         </span>
-                        <span className="flex-1 border-b-2 border-black font-bold text-black px-1.5 truncate" style={{ color: '#000000', borderColor: '#000000' }}>
+                        <span className="flex-1 border-b-2 border-black font-bold text-black px-1.5 truncate" style={{ color: '#000000', borderColor: '#000000', WebkitTextFillColor: '#000000' }}>
                           {activePlan.institution || 'Universidad de Pamplona'}
                         </span>
                       </div>
 
                       <div className="w-full sm:w-2/5 flex items-baseline min-w-0">
-                        <span className="font-black text-black shrink-0 whitespace-nowrap" style={{ color: '#000000' }}>
+                        <span className="font-black text-black shrink-0 whitespace-nowrap" style={{ color: '#000000', WebkitTextFillColor: '#000000' }}>
                           Asignatura:&nbsp;
                         </span>
-                        <span className="flex-1 border-b-2 border-black font-bold text-black px-1.5 min-h-[1.25rem] truncate" style={{ color: '#000000', borderColor: '#000000' }}>
+                        <span className="flex-1 border-b-2 border-black font-bold text-black px-1.5 min-h-[1.25rem] truncate" style={{ color: '#000000', borderColor: '#000000', WebkitTextFillColor: '#000000' }}>
                           {activePlan.subject || ''}
                         </span>
                       </div>
@@ -714,28 +723,28 @@ export function LessonPlansModal({
                     {/* Fila 2: Profesor, Curso y Unidad */}
                     <div className="flex flex-col sm:flex-row gap-3 sm:gap-6">
                       <div className="flex-1 flex items-baseline min-w-0">
-                        <span className="font-black text-black shrink-0 whitespace-nowrap" style={{ color: '#000000' }}>
+                        <span className="font-black text-black shrink-0 whitespace-nowrap" style={{ color: '#000000', WebkitTextFillColor: '#000000' }}>
                           Profesor:&nbsp;
                         </span>
-                        <span className="flex-1 border-b-2 border-black font-bold text-black px-1.5 truncate" style={{ color: '#000000', borderColor: '#000000' }}>
+                        <span className="flex-1 border-b-2 border-black font-bold text-black px-1.5 truncate" style={{ color: '#000000', borderColor: '#000000', WebkitTextFillColor: '#000000' }}>
                           {activePlan.teacher || ''}
                         </span>
                       </div>
 
                       <div className="w-full sm:w-36 flex items-baseline min-w-0">
-                        <span className="font-black text-black shrink-0 whitespace-nowrap" style={{ color: '#000000' }}>
+                        <span className="font-black text-black shrink-0 whitespace-nowrap" style={{ color: '#000000', WebkitTextFillColor: '#000000' }}>
                           Curso:&nbsp;
                         </span>
-                        <span className="flex-1 border-b-2 border-black font-bold text-black px-1.5 min-h-[1.25rem] truncate" style={{ color: '#000000', borderColor: '#000000' }}>
+                        <span className="flex-1 border-b-2 border-black font-bold text-black px-1.5 min-h-[1.25rem] truncate" style={{ color: '#000000', borderColor: '#000000', WebkitTextFillColor: '#000000' }}>
                           {activePlan.course || ''}
                         </span>
                       </div>
 
                       <div className="w-full sm:w-56 flex items-baseline min-w-0">
-                        <span className="font-black text-black shrink-0 whitespace-nowrap" style={{ color: '#000000' }}>
+                        <span className="font-black text-black shrink-0 whitespace-nowrap" style={{ color: '#000000', WebkitTextFillColor: '#000000' }}>
                           Unidad:&nbsp;
                         </span>
-                        <span className="flex-1 border-b-2 border-black font-bold text-black px-1.5 truncate" style={{ color: '#000000', borderColor: '#000000' }} title={activePlan.unit || ''}>
+                        <span className="flex-1 border-b-2 border-black font-bold text-black px-1.5 truncate" style={{ color: '#000000', borderColor: '#000000', WebkitTextFillColor: '#000000' }} title={activePlan.unit || ''}>
                           {activePlan.unit || ''}
                         </span>
                       </div>
@@ -745,10 +754,10 @@ export function LessonPlansModal({
                   {/* Propósito de aprendizaje */}
                   <div className="pt-2">
                     <div className="flex items-baseline flex-wrap">
-                      <span className="font-black text-black shrink-0" style={{ color: '#000000' }}>
+                      <span className="font-black text-black shrink-0" style={{ color: '#000000', WebkitTextFillColor: '#000000' }}>
                         Propósito de aprendizaje:&nbsp;
                       </span>
-                      <span className="flex-1 min-w-[200px] border-b-2 border-black font-semibold text-black px-1.5" style={{ color: '#000000', borderColor: '#000000' }}>
+                      <span className="flex-1 min-w-[200px] border-b-2 border-black font-semibold text-black px-1.5" style={{ color: '#000000', borderColor: '#000000', WebkitTextFillColor: '#000000' }}>
                         {activePlan.learningPurpose || ''}
                       </span>
                     </div>
@@ -757,12 +766,12 @@ export function LessonPlansModal({
                   {/* Propósitos específicos */}
                   <div className="pt-1">
                     <div className="flex items-baseline">
-                      <span className="font-black text-black shrink-0" style={{ color: '#000000' }}>
+                      <span className="font-black text-black shrink-0" style={{ color: '#000000', WebkitTextFillColor: '#000000' }}>
                         Propósitos específicos:&nbsp;
                       </span>
                       <div className="flex-1 border-b-2 border-black min-h-[1.25rem]" style={{ borderColor: '#000000' }} />
                     </div>
-                    <div className="pt-1.5 pb-2 border-b-2 border-black whitespace-pre-line text-black font-medium pl-4" style={{ color: '#000000', borderColor: '#000000' }}>
+                    <div className="pt-1.5 pb-2 border-b-2 border-black whitespace-pre-line text-black font-medium pl-4" style={{ color: '#000000', borderColor: '#000000', WebkitTextFillColor: '#000000' }}>
                       {activePlan.specificPurposes || ''}
                     </div>
                     {/* Segunda línea de cierre para respetar la imagen */}
@@ -774,12 +783,12 @@ export function LessonPlansModal({
                     <table className="w-full border-collapse border-2 border-black text-left text-[11px] sm:text-xs" style={{ borderColor: '#000000' }}>
                       <thead>
                         <tr className="border-b-2 border-black bg-gray-100" style={{ borderColor: '#000000', backgroundColor: '#f3f4f6' }}>
-                          <th className="border border-black p-2 font-black text-black w-24 text-center" style={{ color: '#000000', borderColor: '#000000', backgroundColor: '#f3f4f6' }}>Fecha</th>
-                          <th className="border border-black p-2 font-black text-black w-28 text-center" style={{ color: '#000000', borderColor: '#000000', backgroundColor: '#f3f4f6' }}>Fases</th>
-                          <th className="border border-black p-2 font-black text-black w-44" style={{ color: '#000000', borderColor: '#000000', backgroundColor: '#f3f4f6' }}>Temas</th>
-                          <th className="border border-black p-2 font-black text-black" style={{ color: '#000000', borderColor: '#000000', backgroundColor: '#f3f4f6' }}>Actividades</th>
-                          <th className="border border-black p-2 font-black text-black w-36" style={{ color: '#000000', borderColor: '#000000', backgroundColor: '#f3f4f6' }}>Recursos</th>
-                          <th className="border border-black p-2 font-black text-black w-20 text-center" style={{ color: '#000000', borderColor: '#000000', backgroundColor: '#f3f4f6' }}>Tiempo</th>
+                          <th className="border border-black p-2 font-black text-black w-24 text-center" style={{ color: '#000000', borderColor: '#000000', backgroundColor: '#f3f4f6', WebkitTextFillColor: '#000000' }}>Fecha</th>
+                          <th className="border border-black p-2 font-black text-black w-28 text-center" style={{ color: '#000000', borderColor: '#000000', backgroundColor: '#f3f4f6', WebkitTextFillColor: '#000000' }}>Fases</th>
+                          <th className="border border-black p-2 font-black text-black w-44" style={{ color: '#000000', borderColor: '#000000', backgroundColor: '#f3f4f6', WebkitTextFillColor: '#000000' }}>Temas</th>
+                          <th className="border border-black p-2 font-black text-black" style={{ color: '#000000', borderColor: '#000000', backgroundColor: '#f3f4f6', WebkitTextFillColor: '#000000' }}>Actividades</th>
+                          <th className="border border-black p-2 font-black text-black w-36" style={{ color: '#000000', borderColor: '#000000', backgroundColor: '#f3f4f6', WebkitTextFillColor: '#000000' }}>Recursos</th>
+                          <th className="border border-black p-2 font-black text-black w-20 text-center" style={{ color: '#000000', borderColor: '#000000', backgroundColor: '#f3f4f6', WebkitTextFillColor: '#000000' }}>Tiempo</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -790,34 +799,34 @@ export function LessonPlansModal({
                               <td
                                 rowSpan={activePlan.rows.length}
                                 className="border border-black p-2.5 font-black text-black text-center align-middle bg-white"
-                                style={{ color: '#000000', borderColor: '#000000', backgroundColor: '#ffffff' }}
+                                style={{ color: '#000000', borderColor: '#000000', backgroundColor: '#ffffff', WebkitTextFillColor: '#000000' }}
                               >
                                 {row.date || `Semana ${activePlan.week || 1}`}
                               </td>
                             ) : null}
 
                             {/* Fase */}
-                            <td className="border border-black p-2.5 font-black text-black text-center bg-gray-50/70" style={{ color: '#000000', borderColor: '#000000' }}>
+                            <td className="border border-black p-2.5 font-black text-black text-center bg-gray-50/70" style={{ color: '#000000', borderColor: '#000000', WebkitTextFillColor: '#000000' }}>
                               {row.phase}
                             </td>
 
                             {/* Temas */}
-                            <td className="border border-black p-2.5 text-black font-semibold whitespace-pre-line" style={{ color: '#000000', borderColor: '#000000' }}>
+                            <td className="border border-black p-2.5 text-black font-semibold whitespace-pre-line" style={{ color: '#000000', borderColor: '#000000', WebkitTextFillColor: '#000000' }}>
                               {row.topics}
                             </td>
 
                             {/* Actividades */}
-                            <td className="border border-black p-2.5 text-black font-normal whitespace-pre-line leading-relaxed" style={{ color: '#000000', borderColor: '#000000' }}>
+                            <td className="border border-black p-2.5 text-black font-normal whitespace-pre-line leading-relaxed" style={{ color: '#000000', borderColor: '#000000', WebkitTextFillColor: '#000000' }}>
                               {stripTimeFromActivityText(sanitizeRealisticActivityText(row.activities, row.phase))}
                             </td>
 
                             {/* Recursos */}
-                            <td className="border border-black p-2.5 text-black font-medium whitespace-pre-line" style={{ color: '#000000', borderColor: '#000000' }}>
+                            <td className="border border-black p-2.5 text-black font-medium whitespace-pre-line" style={{ color: '#000000', borderColor: '#000000', WebkitTextFillColor: '#000000' }}>
                               {sanitizeRealisticResourceText(row.resources)}
                             </td>
 
                             {/* Tiempo */}
-                            <td className="border border-black p-2.5 font-black text-black text-center whitespace-nowrap" style={{ color: '#000000', borderColor: '#000000' }}>
+                            <td className="border border-black p-2.5 font-black text-black text-center whitespace-nowrap" style={{ color: '#000000', borderColor: '#000000', WebkitTextFillColor: '#000000' }}>
                               {row.time}
                             </td>
                           </tr>
@@ -1019,15 +1028,26 @@ export function LessonPlansModal({
 
         {/* Vista oculta exclusivamente para imprimir un solo material didáctico */}
         {printTargetMaterial && (
-          <div className="printable-material-single hidden p-8 bg-white text-black font-sans">
+          <div 
+            data-darkreader-ignore="true"
+            data-lesson-plan-sheet="true"
+            className="printable-material-single hidden p-8 bg-white text-black font-sans printable-lesson-plan"
+            style={{
+              color: '#000000',
+              WebkitTextFillColor: '#000000',
+              backgroundColor: '#ffffff',
+              colorScheme: 'only light',
+              forcedColorAdjust: 'none'
+            }}
+          >
             <div className="border-b-2 border-black pb-3 mb-4 text-center">
-              <h2 className="text-sm font-black uppercase tracking-wider text-black">
+              <h2 className="text-sm font-black uppercase tracking-wider text-black" style={{ color: '#000000', WebkitTextFillColor: '#000000' }}>
                 UNIVERSIDAD DE PAMPLONA
               </h2>
-              <h3 className="text-xs font-bold text-gray-800">
+              <h3 className="text-xs font-bold text-gray-800" style={{ color: '#000000', WebkitTextFillColor: '#000000' }}>
                 MATERIAL DIDÁCTICO DE AULA PRESENCIAL | SEMANA {activePlan.week}
               </h3>
-              <div className="flex justify-between text-[11px] font-semibold mt-2 pt-2 border-t border-gray-300">
+              <div className="flex justify-between text-[11px] font-semibold mt-2 pt-2 border-t border-gray-300" style={{ color: '#000000', WebkitTextFillColor: '#000000' }}>
                 <span>Asignatura: {activePlan.subject || 'Inglés Técnico'}</span>
                 <span>Docente: {activePlan.teacher || ''}</span>
                 <span>Fase: {printTargetMaterial.phase}</span>
@@ -1035,18 +1055,18 @@ export function LessonPlansModal({
             </div>
 
             <div className="mb-4">
-              <div className="text-[10px] font-black uppercase tracking-wider text-gray-600">
+              <div className="text-[10px] font-black uppercase tracking-wider text-gray-600" style={{ color: '#374151', WebkitTextFillColor: '#374151' }}>
                 [{printTargetMaterial.type}]
               </div>
-              <h1 className="text-base font-black mt-1 text-black">
+              <h1 className="text-base font-black mt-1 text-black" style={{ color: '#000000', WebkitTextFillColor: '#000000' }}>
                 {printTargetMaterial.title}
               </h1>
-              <p className="text-xs italic text-gray-600 mt-1">
+              <p className="text-xs italic text-gray-600 mt-1" style={{ color: '#4b5563', WebkitTextFillColor: '#4b5563' }}>
                 {printTargetMaterial.description}
               </p>
             </div>
 
-            <div className="border-t border-gray-400 pt-3 text-xs leading-relaxed whitespace-pre-wrap font-mono text-black">
+            <div className="border-t border-gray-400 pt-3 text-xs leading-relaxed whitespace-pre-wrap font-mono text-black" style={{ color: '#000000', WebkitTextFillColor: '#000000' }}>
               {printTargetMaterial.content}
             </div>
           </div>
@@ -1069,17 +1089,29 @@ export function LessonPlansModal({
         {/* Estilos CSS para contraste absoluto en pantalla y en impresión */}
         <style>{`
           .printable-lesson-plan,
-          .printable-lesson-plan * {
+          .printable-lesson-plan *,
+          [data-lesson-plan-sheet],
+          [data-lesson-plan-sheet] * {
             color: #000000 !important;
+            -webkit-text-fill-color: #000000 !important;
             border-color: #000000 !important;
+            color-scheme: only light !important;
+            forced-color-adjust: none !important;
+            --darkreader-inline-color: #000000 !important;
+            --darkreader-inline-bg: #ffffff !important;
+            --darkreader-inline-border: #000000 !important;
           }
-          .printable-lesson-plan th {
+          .printable-lesson-plan th,
+          [data-lesson-plan-sheet] th {
             background-color: #f3f4f6 !important;
             color: #000000 !important;
+            -webkit-text-fill-color: #000000 !important;
             font-weight: 900 !important;
           }
-          .printable-lesson-plan td {
+          .printable-lesson-plan td,
+          [data-lesson-plan-sheet] td {
             color: #000000 !important;
+            -webkit-text-fill-color: #000000 !important;
           }
           @media print {
             body * {
