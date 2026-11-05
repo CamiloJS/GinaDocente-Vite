@@ -4,7 +4,7 @@
 // ver la etiqueta de la clase a la que pertenecen, reaccionar con Me gusta y comentar interactivamente.
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
+import ReactDOM from 'react-dom';
 import {
   Video,
   Film,
@@ -36,6 +36,15 @@ import {
   updateDoc
 } from '../firebase/config.js';
 import { saveDemoSandboxItem, deleteDemoSandboxItem } from '../utils/demoData.js';
+
+// Helper seguro para renderizar portales en document.body evitando el error React #31
+const renderPortal = (children) => {
+  if (typeof document === 'undefined' || !document.body) return null;
+  if (ReactDOM && typeof ReactDOM.createPortal === 'function') {
+    return ReactDOM.createPortal(children, document.body);
+  }
+  return children;
+};
 
 export default function VideosModule({
   videos = [],
@@ -938,7 +947,7 @@ export default function VideosModule({
       )}
 
       {/* ================= MODAL DEL REPRODUCTOR INMERSIVO (CINE / THEATER) ================= */}
-      {activePlayingVideo && typeof document !== 'undefined' && createPortal(
+      {activePlayingVideo && renderPortal(
         <div className="fixed inset-0 z-[99999] flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
           <div className="relative w-full max-w-5xl max-h-[92vh] bg-white dark:bg-gray-900 rounded-3xl shadow-2xl border border-gray-200 dark:border-gray-800 overflow-hidden flex flex-col">
             {/* Barra superior del modal */}
@@ -1129,12 +1138,11 @@ export default function VideosModule({
               </div>
             </div>
           </div>
-        </div>,
-        document.body
+        </div>
       )}
 
       {/* ================= MODAL SUBIR VÍDEO (MINIMALISTA Y MODERNO) ================= */}
-      {isUploadModalOpen && typeof document !== 'undefined' && createPortal(
+      {isUploadModalOpen && renderPortal(
         <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150">
           <div className="w-full max-w-lg bg-white dark:bg-gray-900 rounded-3xl shadow-2xl border border-gray-200 dark:border-gray-800 p-5 sm:p-6 space-y-5 animate-in zoom-in-95 duration-200">
             {/* Header del Modal */}
@@ -1321,12 +1329,11 @@ export default function VideosModule({
               </div>
             </form>
           </div>
-        </div>,
-        document.body
+        </div>
       )}
 
       {/* ================= MODAL EDITAR VÍDEO (TÍTULO Y DESCRIPCIÓN) ================= */}
-      {editingVideo && typeof document !== 'undefined' && createPortal(
+      {editingVideo && renderPortal(
         <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150">
           <div className="w-full max-w-lg bg-white dark:bg-gray-900 rounded-3xl shadow-2xl border border-gray-200 dark:border-gray-800 p-5 sm:p-6 space-y-4 animate-in zoom-in-95 duration-200">
             {/* Header del Modal */}
@@ -1412,8 +1419,7 @@ export default function VideosModule({
               </div>
             </form>
           </div>
-        </div>,
-        document.body
+        </div>
       )}
     </div>
   );
