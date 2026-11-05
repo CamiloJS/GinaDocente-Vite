@@ -4194,19 +4194,7 @@ const TaskCard = React.memo(({
                                         <span className="hidden sm:inline">Convertir a Excel</span>
                                     </button>
                                 )}
-                                <button
-                                    type="button"
-                                    onClick={handleCopyPostLink}
-                                    className={`p-2 rounded-xl transition-all shadow-xs cursor-pointer border ${
-                                        isDarkMode 
-                                            ? 'bg-gray-800 hover:bg-gray-750 text-gray-300 hover:text-white border-gray-700' 
-                                            : 'bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-900 border-gray-200'
-                                    }`}
-                                    title="Copiar enlace directo a esta publicación"
-                                    aria-label="Copiar enlace directo a esta publicación"
-                                >
-                                    <Link2 size={16} />
-                                </button>
+
                                 <button
                                     type="button"
                                     onClick={() => setShowShareModal(true)}
