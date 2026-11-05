@@ -39,7 +39,8 @@ const TasksTab = React.memo(({
     fixedTargetGroup, isGroupChannelMode = false,
     evaluations = [], grades = [], reviews = [], books = [], setRawBooks,
     onStartEvaluation, onOpenEvaluationResults, onOpenImmediateFeedback,
-    onRetryDemoEvaluation, onOpenEvaluationsTab, onOpenReviewsTab, onOpenBooksTab
+    onRetryDemoEvaluation, onOpenEvaluationsTab, onOpenReviewsTab, onOpenBooksTab,
+    activePostModalId, setActivePostModalId, setUserPosts, chatGroups, students
 }) => {
 
     // ESTADOS DEL MENÚ LIQUID GLASS
@@ -2670,6 +2671,11 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                 onOpenEvaluationsTab={onOpenEvaluationsTab}
                                 onOpenReviewsTab={onOpenReviewsTab}
                                 onOpenBooksTab={onOpenBooksTab}
+                                activePostModalId={activePostModalId}
+                                setActivePostModalId={setActivePostModalId}
+                                setUserPosts={setUserPosts}
+                                chatGroups={chatGroups}
+                                students={students}
                             />
                         </div>
                     ))}
@@ -2712,6 +2718,11 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                             onOpenEvaluationsTab={onOpenEvaluationsTab}
                             onOpenReviewsTab={onOpenReviewsTab}
                             onOpenBooksTab={onOpenBooksTab}
+                            activePostModalId={activePostModalId}
+                            setActivePostModalId={setActivePostModalId}
+                            setUserPosts={setUserPosts}
+                            chatGroups={chatGroups}
+                            students={students}
                         />
                     </div>
                 ))}

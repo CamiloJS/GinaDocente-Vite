@@ -24,7 +24,25 @@ export const BAD_WORDS = [
   'mamaguevo', 'mamabicho', 'comemierda',
 ]
 
-export const REACTION_EMOJIS = { like: '👍', love: '❤️', sad: '😢', happy: '😃', wow: '😲' }
+export const REACTION_EMOJIS = { 
+  like: '👍', 
+  love: '❤️', 
+  care: '🥰', 
+  happy: '😆', 
+  wow: '😮', 
+  sad: '😢', 
+  angry: '😡' 
+};
+
+export const FACEBOOK_REACTIONS = [
+  { key: 'like', emoji: '👍', label: 'Me gusta' },
+  { key: 'love', emoji: '❤️', label: 'Me encanta' },
+  { key: 'care', emoji: '🥰', label: 'Me importa' },
+  { key: 'happy', emoji: '😆', label: 'Me divierte' },
+  { key: 'wow', emoji: '😮', label: 'Me asombra' },
+  { key: 'sad', emoji: '😢', label: 'Me entristece' },
+  { key: 'angry', emoji: '😡', label: 'Me enoja' },
+];
 export const COMMENT_EMOJIS = ['😀', '😂', '🥰', '😎', '👍', '🙏', '❤️', '🔥', '✨', '🤔']
 
 export const SLIDE_GRADIENTS = [

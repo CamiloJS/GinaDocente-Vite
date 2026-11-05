@@ -4,6 +4,14 @@ import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import './index.css'
+import { initGlobalAppleEmojiObserver } from './utils/appleEmoji.js'
+
+// Inicializar observador global para renderizar emojis de Apple en toda la aplicación
+try {
+  initGlobalAppleEmojiObserver();
+} catch (e) {
+  console.warn('Could not initialize Apple Emoji observer:', e);
+}
 
 // Desregistrar cualquier Service Worker antiguo y limpiar Storage Cache
 if ('serviceWorker' in navigator) {

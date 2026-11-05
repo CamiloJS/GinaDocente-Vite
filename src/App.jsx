@@ -42,7 +42,7 @@ import {
   Settings, VolumeX, Shield, Play, Pause, GoogleIcon, KeyRound, UserCheck, UserX,
   ChevronDown, ChevronUp, Minus, HelpCircle, Lightbulb, GraduationCap, Laptop, PenTool,
   Compass, Atom, Award, Star, Bookmark, Terminal, Folder, Globe, Target, Layers, RotateCcw,
-  Archive, ShieldAlert, Unlock, Menu, UserPlus, Camera, Upload, Phone, PhoneOff,
+  Archive, ShieldAlert, Unlock, Menu, UserPlus, Camera, Upload, Phone, PhoneOff, Share2,
   Lock, Key, ClipboardList, BarChart3, Music, Video, Film, Timer, Coins, Calculator
 } from './components/Icons.jsx'
 import FloatingToolsOverlay from './components/FloatingToolsOverlay.jsx'
@@ -242,7 +242,13 @@ function App() {
       const mainTab = raw.split('/')[0].split('?')[0];
       let profileId = null;
       let ovaId = null;
-      if (raw.startsWith('profile/')) {
+      let postId = null;
+
+      if (raw.startsWith('post/')) {
+        postId = safeDecodeURIComponent(raw.replace('post/', '').split('?')[0].trim());
+      } else if (raw.startsWith('task/')) {
+        postId = safeDecodeURIComponent(raw.replace('task/', '').split('?')[0].trim());
+      } else if (raw.startsWith('profile/')) {
         profileId = safeDecodeURIComponent(raw.replace('profile/', '').trim());
       } else if (raw.startsWith('profile?id=')) {
         profileId = safeDecodeURIComponent(raw.replace('profile?id=', '').trim());
@@ -274,14 +280,15 @@ function App() {
       const kahootInfo = parseKahootUrlInfo(window.location.hash, window.location.search);
 
       return {
-        tab: ['tasks', 'reviews', 'books', 'notes', 'videos', 'syllabus', 'evaluations', 'directory', 'groups', 'inbox', 'profile', 'settings', 'tools'].includes(mainTab) ? mainTab : 'tasks',
+        tab: postId ? 'tasks' : (['tasks', 'reviews', 'books', 'notes', 'videos', 'syllabus', 'evaluations', 'directory', 'groups', 'inbox', 'profile', 'settings', 'tools'].includes(mainTab) ? mainTab : 'tasks'),
         profileId: profileId || null,
+        postId: postId || null,
         ovaId: ovaId || null,
         kahootRoute: kahootInfo.isKahootRoute,
         kahootPin: kahootInfo.pin || ''
       };
     } catch (e) {
-      return { tab: 'tasks', profileId: null, ovaId: null, kahootRoute: false, kahootPin: '' };
+      return { tab: 'tasks', profileId: null, postId: null, ovaId: null, kahootRoute: false, kahootPin: '' };
     }
   };
   const initialHashInfo = getInitialHashInfo();
@@ -386,6 +393,7 @@ function App() {
   const [loginType, setLoginType] = useState(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [viewingProfileId, setViewingProfileId] = useState(() => initialHashInfo.profileId);
+  const [activePostModalId, setActivePostModalId] = useState(() => initialHashInfo.postId || null);
   const [publicOvaId, setPublicOvaId] = useState(() => initialHashInfo.ovaId);
   const [publicKahootActive, setPublicKahootActive] = useState(() => Boolean(initialHashInfo.kahootRoute));
   const [publicKahootPin, setPublicKahootPin] = useState(() => initialHashInfo.kahootPin || '');
@@ -2357,7 +2365,12 @@ function App() {
             setPublicOvaId(null);
           }
 
-          if (mainTab === 'profile') {
+          if (hash.startsWith('post/') || hash.startsWith('task/')) {
+            const pid = safeDecodeURIComponent(hash.replace(/^(post|task)\//, '').split('?')[0].trim());
+            setActivePostModalId(pid);
+            setActiveTab('tasks');
+          } else if (mainTab === 'profile') {
+            setActivePostModalId(null);
             setActiveTab('profile');
             let pid = null;
             if (hash.startsWith('profile/')) {
@@ -7112,6 +7125,44 @@ useEffect(() => {
                                     {post.title && <h4 className={`font-black text-base sm:text-lg leading-tight break-words ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}><LinkifyText text={post.title} isDarkMode={isDarkMode} embedVideos={false} /></h4>}
                                     {post.imageUrl && <img src={post.imageUrl} loading="lazy" onClick={() => setFullScreenImage(post.imageUrl)} alt="Post" className={`w-full max-h-96 object-cover rounded-xl cursor-pointer shadow-xs border ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`} />}
                                     {post.text && <div className={`text-xs sm:text-sm leading-relaxed break-words whitespace-pre-line ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}><LinkifyText text={post.text} colapsable /></div>}
+                                    {post.sharedPost && (
+                                        <div 
+                                            onClick={() => {
+                                                try {
+                                                    window.history.pushState(null, '', `#post/${post.sharedPost.id}`);
+                                                } catch(e) {
+                                                    window.location.hash = `post/${post.sharedPost.id}`;
+                                                }
+                                                setActivePostModalId(post.sharedPost.id);
+                                                setActiveTab('tasks');
+                                            }}
+                                            className={`mt-2 p-3.5 rounded-2xl border transition-all cursor-pointer hover:scale-[1.005] group/shared shadow-2xs ${
+                                                isDarkMode 
+                                                    ? 'bg-gray-800/90 border-gray-700 hover:border-blue-500/50' 
+                                                    : 'bg-slate-50 border-gray-200/90 hover:border-blue-400'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-2 mb-1 text-[11px] font-bold text-blue-600 dark:text-blue-400">
+                                                <Share2 size={12} className="shrink-0" />
+                                                <span>Publicación original de {post.sharedPost.author || 'English TECH'}</span>
+                                            </div>
+                                            <h5 className="font-extrabold text-sm text-gray-900 dark:text-gray-100 line-clamp-2">
+                                                {post.sharedPost.title}
+                                            </h5>
+                                            {post.sharedPost.description && (
+                                                <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2 mt-1">
+                                                    {post.sharedPost.description}
+                                                </p>
+                                            )}
+                                            {post.sharedPost.imageUrl && (
+                                                <img src={post.sharedPost.imageUrl} alt="Shared preview" className="mt-2 h-32 w-full object-cover rounded-xl border border-gray-200 dark:border-gray-700" onError={(e) => e.target.style.display = 'none'} />
+                                            )}
+                                            <div className="mt-2.5 flex items-center gap-1.5 text-xs font-bold text-blue-600 dark:text-blue-400 group-hover/shared:underline">
+                                                <span>Ver publicación completa</span>
+                                                <ChevronRight size={13} />
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                             
@@ -10881,6 +10932,10 @@ Escribe en español con tono pedagógico moderno.`;
                             reviews={reviews}
                             books={books}
                             setRawBooks={setRawBooks}
+                            activePostModalId={activePostModalId}
+                            setActivePostModalId={setActivePostModalId}
+                            setUserPosts={setUserPosts}
+                            chatGroups={chatGroups}
                             onStartEvaluation={(ev) => {
                                 if (!ev) return;
                                 const safeMinutes = Math.max(1, parseInt(ev.timeLimit, 10) || 30);
@@ -15490,6 +15545,10 @@ Escribe en español con tono pedagógico moderno.`;
                               reviews={reviews}
                               books={books}
                               setRawBooks={setRawBooks}
+                              activePostModalId={activePostModalId}
+                              setActivePostModalId={setActivePostModalId}
+                              setUserPosts={setUserPosts}
+                              chatGroups={chatGroups}
                               onStartEvaluation={(ev) => {
                                   if (!ev) return;
                                   const safeMinutes = Math.max(1, parseInt(ev.timeLimit, 10) || 30);

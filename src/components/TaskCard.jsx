@@ -2,10 +2,10 @@
 import React, { useState, useRef, useEffect } from 'react'
 import ReactDOM from 'react-dom'
 import {
-  CheckCheck, CheckCircle2, CheckLine, Clock, Edit3, EyeOff, FileDocIcon, FileText, ImageIcon, Loader2, Lock, Unlock, Share2, MessageSquareText, Mic, PaperclipIcon, Plus, ReplyIcon, Send, SmileIcon, Square, Star, Pin, Trash2, Upload, X, XLine, Volume2, VolumeX, Languages, UserIcon, BookOpen, NavNotebook, Play, Pause, Download, MessageCircle, BarChart2, Vote, Gamepad2, Trophy, Zap, Flame, NavSlides, ClipboardList, Shield, ShieldAlert, AlertTriangle, ChevronLeft, ChevronRight, Maximize2, Minimize2, ExternalLink, Layers, MonitorPlay, Globe, Sparkles, RotateCcw, Eye
+  CheckCheck, CheckCircle2, CheckLine, Clock, Edit3, EyeOff, FileDocIcon, FileText, ImageIcon, Loader2, Lock, Unlock, Share2, MessageSquareText, Mic, PaperclipIcon, Plus, ReplyIcon, Send, SmileIcon, Square, Star, Pin, Trash2, Upload, X, XLine, Volume2, VolumeX, Languages, UserIcon, BookOpen, NavNotebook, Play, Pause, Download, MessageCircle, BarChart2, Vote, Gamepad2, Trophy, Zap, Flame, NavSlides, ClipboardList, Shield, ShieldAlert, AlertTriangle, ChevronLeft, ChevronRight, Maximize2, Minimize2, ExternalLink, Layers, MonitorPlay, Globe, Sparkles, RotateCcw, Eye, ThumbsUp, Link2, Forward
 } from './Icons.jsx'
 import {
-  compressImage, containsBadWords, checkBadWordsAsync, uploadImageToStorage, uploadRawFileToStorage, deleteFileFromStorage, deleteAllStorageFilesInObject, deleteReplacedStorageFiles, TEACHER_NAME, SECOND_TEACHER_NAME, SECOND_TEACHER_ID, isCamiloTeacher, isTeacherId, getCanonicalTeacherId, getTeacherDisplayName, getItemTeacherId, COMMENT_EMOJIS, REACTION_EMOJIS, splitNameFirstAndLast, FALLBACK_MAP, format12HourTime, formatDateTime12H,
+  compressImage, containsBadWords, checkBadWordsAsync, uploadImageToStorage, uploadRawFileToStorage, deleteFileFromStorage, deleteAllStorageFilesInObject, deleteReplacedStorageFiles, TEACHER_NAME, SECOND_TEACHER_NAME, SECOND_TEACHER_ID, isCamiloTeacher, isTeacherId, getCanonicalTeacherId, getTeacherDisplayName, getItemTeacherId, COMMENT_EMOJIS, REACTION_EMOJIS, FACEBOOK_REACTIONS, splitNameFirstAndLast, FALLBACK_MAP, format12HourTime, formatDateTime12H,
   isImageLikeFile, convertHeicToJpeg, resolveUserDisplayName, resolveUserPhoto
 } from '../utils/helpers.js'
 import UniversalImage from './UniversalImage.jsx'
@@ -42,9 +42,9 @@ import {
 } from '../utils/flipbookEngine.js'
 import { useVoiceRecorder } from '../utils/useVoiceRecorder.js'
 import { auth, signInAnonymously, doc, setDoc, updateDoc, deleteDoc } from '../firebase/config.js'
-import { runTransaction } from 'firebase/firestore'
+import { runTransaction, collection, addDoc } from 'firebase/firestore'
 import AudioPlayer, { AudioRecordingVisualizer } from './AudioPlayer.jsx'
-import { saveDemoSandboxItem, removeDemoSandboxItem } from '../utils/demoData.js'
+import { saveDemoSandboxItem, removeDemoSandboxItem, loadDemoChatMessages, saveDemoChatMessages } from '../utils/demoData.js'
 
 const TaskCard = React.memo(({
     task,
@@ -75,7 +75,12 @@ const TaskCard = React.memo(({
     onRetryDemoEvaluation,
     onOpenEvaluationsTab,
     onOpenReviewsTab,
-    onOpenBooksTab
+    onOpenBooksTab,
+    activePostModalId,
+    setActivePostModalId,
+    setUserPosts,
+    chatGroups = [],
+    students = []
 }) => {
     const cardRef = React.useRef(null);
     const editTaskDescRef = React.useRef(null);
@@ -298,6 +303,214 @@ const TaskCard = React.memo(({
             } catch {}
             return next;
         });
+    };
+
+    const [showReactionDock, setShowReactionDock] = useState(false);
+    const reactionDockTimerRef = useRef(null);
+    const [showShareModal, setShowShareModal] = useState(false);
+    const [shareComment, setShareComment] = useState("");
+    const [shareSearchTerm, setShareSearchTerm] = useState("");
+    const [isSharing, setIsSharing] = useState(false);
+
+    // Detección de enlace directo a esta publicación (#post/<id> o #task/<id>)
+    useEffect(() => {
+        if (activePostModalId && String(activePostModalId) === String(task.id)) {
+            setShowCommentModal(true);
+        }
+    }, [activePostModalId, task.id]);
+
+    useEffect(() => {
+        try {
+            const h = (window.location.hash || '').replace('#', '').replace(/^\/+/, '');
+            if (h === `post/${task.id}` || h === `task/${task.id}`) {
+                setShowCommentModal(true);
+            }
+        } catch (e) {}
+    }, [task.id]);
+
+    const handleOpenCommentModal = () => {
+        setShowCommentModal(true);
+        try {
+            window.history.replaceState(null, '', `#post/${task.id}`);
+        } catch (e) {
+            window.location.hash = `post/${task.id}`;
+        }
+    };
+
+    const handleCloseCommentModal = () => {
+        setShowCommentModal(false);
+        if (typeof setActivePostModalId === 'function') {
+            setActivePostModalId(null);
+        }
+        try {
+            const currentHash = window.location.hash || '';
+            if (currentHash === `#post/${task.id}` || currentHash === `#task/${task.id}`) {
+                window.history.replaceState(null, '', window.location.pathname + (window.location.search || ''));
+            }
+        } catch (e) {}
+    };
+
+    const handleCopyPostLink = (e) => {
+        if (e) e.stopPropagation();
+        try {
+            const url = `${window.location.origin}${window.location.pathname}#post/${task.id}`;
+            navigator.clipboard.writeText(url);
+            showMessage("✅ ¡Enlace de la publicación copiado al portapapeles!");
+        } catch (err) {
+            showMessage("Enlace: " + window.location.origin + window.location.pathname + '#post/' + task.id);
+        }
+    };
+
+    const shareRecipientsList = React.useMemo(() => {
+        const list = [];
+        if (role !== 'teacher') {
+            list.push({ id: 'teacher', name: TEACHER_NAME, role: 'teacher', isGroup: false });
+            list.push({ id: SECOND_TEACHER_ID, name: SECOND_TEACHER_NAME, role: 'teacher', isGroup: false });
+        }
+        const seen = new Set([myChatId, 'teacher', SECOND_TEACHER_ID, 'undefined', 'null']);
+        if (Array.isArray(students)) {
+            students.forEach(st => {
+                const sId = st.id || st.username || st.email;
+                if (!sId || seen.has(sId)) return;
+                seen.add(sId);
+                const sName = st.fullName || st.name || sId;
+                if (!shareSearchTerm || sName.toLowerCase().includes(shareSearchTerm.toLowerCase())) {
+                    list.push({ id: sId, name: sName, role: 'student', isGroup: false });
+                }
+            });
+        }
+        if (userMappings && typeof userMappings === 'object') {
+            Object.entries(userMappings).forEach(([uid, uData]) => {
+                if (!uid || seen.has(uid) || isTeacherId(uid)) return;
+                seen.add(uid);
+                const name = uData?.fullName || uData?.name || uid;
+                if (!shareSearchTerm || name.toLowerCase().includes(shareSearchTerm.toLowerCase())) {
+                    list.push({ id: uid, name, role: 'student', isGroup: false });
+                }
+            });
+        }
+        (academicGroups || []).forEach(g => {
+            const grpName = g.name || 'Grupo';
+            if (!shareSearchTerm || grpName.toLowerCase().includes(shareSearchTerm.toLowerCase())) {
+                list.push({ id: `acad_${g.id}`, name: `Grupo: ${grpName}`, role: 'group', isGroup: true });
+            }
+        });
+        (chatGroups || []).forEach(g => {
+            const grpName = g.name || 'Grupo';
+            if (!shareSearchTerm || grpName.toLowerCase().includes(shareSearchTerm.toLowerCase())) {
+                list.push({ id: g.id, name: `Grupo: ${grpName}`, role: 'group', isGroup: true });
+            }
+        });
+        return list.slice(0, 25);
+    }, [userMappings, students, academicGroups, chatGroups, myChatId, role, shareSearchTerm]);
+
+    const handleShareToProfile = async () => {
+        if (isSharing) return;
+        setIsSharing(true);
+        try {
+            const cleanMyId = String(myChatId || '').replace(/^@/, '');
+            const studentFullName = userMappings?.[cleanMyId]?.fullName || userMappings?.[myChatId]?.fullName || loggedInName || 'Estudiante';
+            const postAuthorPhoto = userMappings?.[cleanMyId]?.profilePicUrl || userMappings?.[myChatId]?.profilePicUrl || '';
+            const authorRole = role === 'teacher' ? 'teacher' : 'student';
+
+            const sharePayload = {
+                authorId: role === 'teacher' ? (myChatId || 'teacher') : (currentUser?.uid || myChatId || 'user'),
+                authorUsername: myChatId || '',
+                authorName: role === 'teacher' ? (isCamiloTeacher(myChatId) ? SECOND_TEACHER_NAME : TEACHER_NAME) : studentFullName,
+                author: role === 'teacher' ? (isCamiloTeacher(myChatId) ? SECOND_TEACHER_NAME : TEACHER_NAME) : studentFullName,
+                authorRole: authorRole,
+                authorPhoto: postAuthorPhoto,
+                title: shareComment ? shareComment.slice(0, 100) : `Compartió una publicación`,
+                text: shareComment ? shareComment : `Compartió: "${task.title}"`,
+                imageUrl: '',
+                sharedPost: {
+                    id: task.id,
+                    title: task.title,
+                    author: task.authorName || getTeacherDisplayName(getItemTeacherId(task)),
+                    authorRole: task.authorRole || 'teacher',
+                    type: task.type || 'task',
+                    description: (task.description || '').slice(0, 180),
+                    imageUrl: task.imageUrl || (task.images && task.images[0]) || '',
+                    link: `${window.location.origin}${window.location.pathname}#post/${task.id}`
+                },
+                comments: [],
+                reactions: {},
+                createdAt: Date.now()
+            };
+
+            if (isDemoMode) {
+                const demoPost = { id: `demo_post_${Date.now()}`, ...sharePayload, isDemoCreated: true };
+                saveDemoSandboxItem('userPosts', demoPost);
+                if (typeof setUserPosts === 'function') {
+                    setUserPosts(prev => [demoPost, ...prev]);
+                }
+            } else {
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'userPosts'), sharePayload);
+            }
+            showMessage("✅ ¡Publicación compartida en tu perfil con éxito!");
+            setShowShareModal(false);
+            setShareComment("");
+        } catch (err) {
+            console.error("Error al compartir en perfil:", err);
+            showMessage("❌ No se pudo compartir en el perfil. Intenta de nuevo.");
+        } finally {
+            setIsSharing(false);
+        }
+    };
+
+    const handleShareViaMessage = async (recipient) => {
+        try {
+            const authorName = role === 'teacher' ? (isCamiloTeacher(myChatId) ? SECOND_TEACHER_NAME : TEACHER_NAME) : loggedInName;
+            const targetChatId = recipient.isGroup 
+                ? (recipient.id) 
+                : `dm_${[myChatId, recipient.id].sort().join('_')}`;
+            
+            const shareUrl = `${window.location.origin}${window.location.pathname}#post/${task.id}`;
+            const messageText = `📌 *${task.title}*\n${shareUrl}`;
+
+            const nowTs = Date.now();
+            if (isDemoMode) {
+                const newDemoMsg = {
+                    id: `demo_msg_${nowTs}`,
+                    text: messageText,
+                    author: authorName,
+                    authorId: myChatId,
+                    authorRole: role,
+                    senderId: myChatId,
+                    senderName: authorName,
+                    uid: myChatId,
+                    status: 'read',
+                    reactions: {},
+                    createdAt: nowTs,
+                    timestamp: nowTs
+                };
+                const existing = loadDemoChatMessages(targetChatId);
+                saveDemoChatMessages(targetChatId, [...existing, newDemoMsg]);
+            } else {
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'chats', targetChatId, 'messages'), {
+                    text: messageText,
+                    author: authorName,
+                    authorId: myChatId,
+                    uid: currentUser?.uid || myChatId || '',
+                    createdAt: nowTs,
+                    timestamp: nowTs,
+                    status: 'sent'
+                });
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'lastMessages', targetChatId), {
+                    text: `Compartió: ${task.title}`,
+                    author: authorName,
+                    authorId: myChatId,
+                    authorRole: role,
+                    createdAt: nowTs,
+                    timestamp: nowTs
+                }, { merge: true }).catch(() => {});
+            }
+            showMessage(`✅ Publicación enviada a ${recipient.name}.`);
+            setShowShareModal(false);
+        } catch (err) {
+            console.error("Error al compartir por mensaje:", err);
+            showMessage("❌ Error al enviar mensaje.");
+        }
     };
     const [localFullScreenImage, setLocalFullScreenImage] = useState(null);
     const [replyingTo, setReplyingTo] = useState(null);
@@ -1739,13 +1952,27 @@ const TaskCard = React.memo(({
         );
     };
 
-    const renderReactions = () => {
+    const renderReactions = (isInsideModal = false) => {
         if (isForum) {
             return renderForumStarRating();
         }
 
-        const counts = { like: 0, love: 0, sad: 0, happy: 0, wow: 0 };
-        const namesByType = { like: [], love: [], sad: [], happy: [], wow: [] };
+        const counts = { like: 0, love: 0, care: 0, happy: 0, wow: 0, sad: 0, angry: 0 };
+        const namesByType = { like: [], love: [], care: [], happy: [], wow: [], sad: [], angry: [] };
+
+        // Normalizador de tipos y emojis
+        const normalizeReactionType = (raw) => {
+            if (!raw) return 'like';
+            const s = String(raw).trim();
+            if (s === '👍' || s === 'like') return 'like';
+            if (s === '❤️' || s === 'love') return 'love';
+            if (s === '🥰' || s === '🤗' || s === 'care') return 'care';
+            if (s === '😆' || s === '😃' || s === '😂' || s === 'happy') return 'happy';
+            if (s === '😮' || s === '😲' || s === 'wow') return 'wow';
+            if (s === '😢' || s === 'sad') return 'sad';
+            if (s === '😡' || s === 'angry') return 'angry';
+            return counts[s] !== undefined ? s : 'like';
+        };
 
         // Llaves válidas para identificar inequívocamente al usuario actual
         const myValidKeys = role === 'teacher' 
@@ -1755,18 +1982,21 @@ const TaskCard = React.memo(({
             : [currentUserId, currentUser?.uid, loggedInName ? `name_${loggedInName.toLowerCase().replace(/[^a-z0-9]/g, '_')}` : null].filter(Boolean);
 
         let mySelectedReactionType = null;
+        let totalReactions = 0;
 
         if (task.reactions && typeof task.reactions === 'object') {
             Object.entries(task.reactions).forEach(([uidKey, r]) => {
                 // Ignorar llaves inválidas o corruptas de versiones antiguas
                 if (!uidKey || uidKey === 'undefined' || uidKey === 'null' || uidKey === 'type' || uidKey === 'count' || uidKey === 'name') return;
 
-                const rType = typeof r === 'object' ? (r.type || r.emoji) : r;
+                const rawType = typeof r === 'object' ? (r.type || r.emoji) : r;
                 let rName = typeof r === 'object' ? r.name : 'Un usuario';
                 if (rName === 'Profesora' || rName === 'La profe') rName = TEACHER_NAME;
 
+                const rType = normalizeReactionType(rawType);
                 if (rType && counts[rType] !== undefined) {
                     counts[rType]++;
+                    totalReactions++;
                     namesByType[rType].push(rName);
 
                     // Sólo marcar como seleccionada si esta reacción fue registrada explícitamente por el usuario en sesión
@@ -1777,44 +2007,162 @@ const TaskCard = React.memo(({
             });
         }
 
-        return (
-          <div className="flex items-center justify-between gap-1.5 pt-2 w-full">
-            <div className="flex flex-wrap items-center gap-1.5">
-              {Object.entries(REACTION_EMOJIS).map(([key, emoji]) => {
-                const isSelected = mySelectedReactionType === key;
-                const hoverText = namesByType[key].length > 0 ? `${namesByType[key].join(', ')} reaccionó así` : "";
-                return (
-                  <button 
-                    key={key} 
-                    type="button"
-                    onClick={() => toggleReaction(key)} 
-                    disabled={isLocked} 
-                    title={hoverText} 
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold transition-all border ${
-                      isSelected 
-                        ? 'bg-red-50 dark:bg-red-900/30 border-red-400 text-red-600 dark:text-red-300 ring-2 ring-red-500/20 shadow-xs scale-105' 
-                        : 'bg-gray-50 dark:bg-gray-800/80 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
-                    } ${isLocked ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer active:scale-95'}`}
-                  >
-                    <AppleEmoji emoji={emoji} size="18px" className="shrink-0" />
-                    {counts[key] > 0 && <span className="font-semibold text-[11px]">{counts[key]}</span>}
-                  </button>
-                );
-              })}
-            </div>
+        const topReactions = (FACEBOOK_REACTIONS || [])
+            .filter(r => counts[r.key] > 0)
+            .sort((a, b) => counts[b.key] - counts[a.key]);
 
-            {/* Contador de Vistas por Estudiantes exclusivo para Docentes */}
-            {role === 'teacher' && (
-              <button
-                type="button"
-                onClick={() => setShowViewsModal(true)}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold transition-all border bg-slate-50 dark:bg-gray-800/80 border-slate-200 dark:border-gray-700 hover:bg-slate-100 dark:hover:bg-gray-750 text-slate-700 dark:text-gray-300 ml-auto shrink-0 shadow-2xs hover:scale-105 cursor-pointer"
-                title={`Visto por ${viewedStudents.length} estudiante${viewedStudents.length === 1 ? '' : 's'}`}
+        const myReactionObj = (FACEBOOK_REACTIONS || []).find(r => r.key === mySelectedReactionType);
+
+        const allVoterNames = Object.values(namesByType).flat();
+        const tooltipVoterText = allVoterNames.length > 0 
+            ? (allVoterNames.length <= 3 
+                ? allVoterNames.join(', ') 
+                : `${allVoterNames.slice(0, 2).join(', ')} y ${allVoterNames.length - 2} más`)
+            : 'Reacciones';
+
+        return (
+          <div className="relative pt-2 w-full select-none">
+            {/* Dock flotante de reacciones estilo Facebook con Apple Emojis sin bordes individuales */}
+            {showReactionDock && !isLocked && (
+              <div 
+                className="absolute bottom-full left-0 mb-2 z-50 flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-full shadow-2xl bg-white dark:bg-gray-800 border border-gray-200/90 dark:border-gray-700 backdrop-blur-md animate-in fade-in zoom-in-95 duration-150"
+                onMouseEnter={() => {
+                  if (reactionDockTimerRef.current) clearTimeout(reactionDockTimerRef.current);
+                  setShowReactionDock(true);
+                }}
+                onMouseLeave={() => {
+                  reactionDockTimerRef.current = setTimeout(() => setShowReactionDock(false), 250);
+                }}
               >
-                <Eye size={13} className="text-blue-500" />
-                <span className="text-[11px] font-extrabold">{viewedStudents.length}</span>
-              </button>
+                {(FACEBOOK_REACTIONS || []).map((r) => {
+                  const isThisSelected = mySelectedReactionType === r.key;
+                  return (
+                    <button
+                      key={r.key}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleReaction(r.key);
+                        setShowReactionDock(false);
+                      }}
+                      title={r.label}
+                      className={`p-1 transition-all duration-150 cursor-pointer origin-bottom border-none bg-transparent outline-none flex items-center justify-center hover:scale-135 ${
+                        isThisSelected ? 'scale-115 -translate-y-0.5' : ''
+                      }`}
+                    >
+                      <AppleEmoji emoji={r.emoji} size="28px" className="pointer-events-none" />
+                    </button>
+                  );
+                })}
+              </div>
             )}
+
+            {/* Barra de Interacción Estilo Facebook: Like | Comentar | Compartir ------ Stacked Emojis */}
+            <div className="flex items-center justify-between gap-1.5 w-full">
+              {/* Botones de acción a la izquierda */}
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                {/* Botón Reaccionar / Me gusta */}
+                <div 
+                  className="relative"
+                  onMouseEnter={() => {
+                    if (reactionDockTimerRef.current) clearTimeout(reactionDockTimerRef.current);
+                    setShowReactionDock(true);
+                  }}
+                  onMouseLeave={() => {
+                    reactionDockTimerRef.current = setTimeout(() => setShowReactionDock(false), 300);
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (mySelectedReactionType) {
+                        toggleReaction(mySelectedReactionType);
+                      } else {
+                        toggleReaction('like');
+                      }
+                    }}
+                    disabled={isLocked}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                      mySelectedReactionType
+                        ? 'bg-blue-50/90 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800 text-blue-600 dark:text-blue-300 shadow-2xs'
+                        : 'bg-gray-50/90 dark:bg-gray-800/70 border-gray-200/90 dark:border-gray-700/80 hover:bg-gray-100 dark:hover:bg-gray-750 text-gray-700 dark:text-gray-300'
+                    } ${isLocked ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer active:scale-95'}`}
+                    title={myReactionObj ? myReactionObj.label : "Me gusta"}
+                  >
+                    {myReactionObj ? (
+                      <AppleEmoji emoji={myReactionObj.emoji} size="16px" className="shrink-0" />
+                    ) : (
+                      <ThumbsUp size={14} className="shrink-0 text-gray-500 dark:text-gray-400" />
+                    )}
+                    <span>{myReactionObj ? myReactionObj.label : (totalReactions > 0 ? totalReactions : 'Me gusta')}</span>
+                  </button>
+                </div>
+
+                {/* Botón Comentar (abre la publicación completa y sus comentarios) */}
+                <button
+                  type="button"
+                  onClick={handleOpenCommentModal}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border bg-gray-50/90 dark:bg-gray-800/70 border-gray-200/90 dark:border-gray-700/80 hover:bg-gray-100 dark:hover:bg-gray-750 text-gray-700 dark:text-gray-300 cursor-pointer active:scale-95"
+                  title="Abrir publicación completa y comentarios"
+                >
+                  <MessageCircle size={14} className="shrink-0 text-gray-500 dark:text-gray-400" />
+                  <span>{task.comments?.length > 0 ? `${task.comments.length}` : 'Comentar'}</span>
+                </button>
+
+                {/* Botón Compartir (en perfil, mensaje o copiar enlace) */}
+                <button
+                  type="button"
+                  onClick={() => setShowShareModal(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border bg-gray-50/90 dark:bg-gray-800/70 border-gray-200/90 dark:border-gray-700/80 hover:bg-gray-100 dark:hover:bg-gray-750 text-gray-700 dark:text-gray-300 cursor-pointer active:scale-95"
+                  title="Compartir publicación"
+                >
+                  <Share2 size={14} className="shrink-0 text-gray-500 dark:text-gray-400" />
+                  <span className="hidden sm:inline">Compartir</span>
+                </button>
+              </div>
+
+              {/* Lado derecho: Emojis superpuestos estilo Facebook y Contador de vistas docente */}
+              <div className="flex items-center gap-2 ml-auto shrink-0">
+                {/* Burbujas superpuestas de reacciones estilo Facebook */}
+                {topReactions.length > 0 && (
+                  <div 
+                    onClick={handleOpenCommentModal}
+                    className="flex items-center gap-1.5 cursor-pointer px-1 py-0.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800/60 transition-colors"
+                    title={tooltipVoterText}
+                  >
+                    <div className="flex items-center -space-x-1.5 py-0.5">
+                      {topReactions.slice(0, 3).map((r, i) => (
+                        <div
+                          key={r.key}
+                          className="w-5 h-5 rounded-full flex items-center justify-center bg-white dark:bg-gray-800 border border-white dark:border-gray-900 shadow-2xs shrink-0 select-none"
+                          style={{ zIndex: 10 - i }}
+                        >
+                          <AppleEmoji emoji={r.emoji} size="13px" />
+                        </div>
+                      ))}
+                    </div>
+                    {totalReactions > 0 && (
+                      <span className="text-[11.5px] font-bold text-gray-600 dark:text-gray-300">
+                        {totalReactions}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Contador de Vistas por Estudiantes exclusivo para Docentes */}
+                {role === 'teacher' && (
+                  <button
+                    type="button"
+                    onClick={() => setShowViewsModal(true)}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold transition-all border bg-slate-50 dark:bg-gray-800/80 border-slate-200 dark:border-gray-700 hover:bg-slate-100 dark:hover:bg-gray-750 text-slate-700 dark:text-gray-300 shrink-0 shadow-2xs hover:scale-105 cursor-pointer"
+                    title={`Visto por ${viewedStudents.length} estudiante${viewedStudents.length === 1 ? '' : 's'}`}
+                  >
+                    <Eye size={13} className="text-blue-500" />
+                    <span className="text-[11px] font-extrabold">{viewedStudents.length}</span>
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         );
     };
@@ -3803,7 +4151,7 @@ const TaskCard = React.memo(({
                                     ) : (
                                         <>
                                             <MessageSquareText className="text-blue-600 dark:text-blue-400" size={20} />
-                                            <span>Comentarios de la publicación</span>
+                                            <span>Publicación completa y comentarios</span>
                                         </>
                                     )}
                                 </h3>
@@ -3825,6 +4173,32 @@ const TaskCard = React.memo(({
                                 )}
                                 <button
                                     type="button"
+                                    onClick={handleCopyPostLink}
+                                    className={`p-2 rounded-xl transition-all shadow-xs cursor-pointer border ${
+                                        isDarkMode 
+                                            ? 'bg-gray-800 hover:bg-gray-750 text-gray-300 hover:text-white border-gray-700' 
+                                            : 'bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-900 border-gray-200'
+                                    }`}
+                                    title="Copiar enlace directo a esta publicación"
+                                    aria-label="Copiar enlace directo a esta publicación"
+                                >
+                                    <Link2 size={16} />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowShareModal(true)}
+                                    className={`p-2 rounded-xl transition-all shadow-xs cursor-pointer border ${
+                                        isDarkMode 
+                                            ? 'bg-gray-800 hover:bg-gray-750 text-gray-300 hover:text-white border-gray-700' 
+                                            : 'bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-900 border-gray-200'
+                                    }`}
+                                    title="Compartir publicación"
+                                    aria-label="Compartir publicación"
+                                >
+                                    <Share2 size={16} />
+                                </button>
+                                <button
+                                    type="button"
                                     onClick={toggleModalExpanded}
                                     className={`hidden md:inline-flex items-center justify-center p-2 rounded-xl transition-all shadow-xs cursor-pointer border ${
                                         isDarkMode 
@@ -3837,10 +4211,11 @@ const TaskCard = React.memo(({
                                     {isModalExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
                                 </button>
                                 <button 
-                                    onClick={() => setShowCommentModal(false)} 
+                                    onClick={handleCloseCommentModal} 
                                     className={`p-2 rounded-full transition-all shadow-xs ${
                                         isDarkMode ? 'text-gray-400 hover:text-red-400 bg-gray-800' : 'text-gray-500 hover:text-red-500 bg-gray-100'
                                     }`}
+                                    title="Cerrar"
                                 >
                                     <X size={18}/>
                                 </button>
@@ -3875,8 +4250,109 @@ const TaskCard = React.memo(({
                             </div>
                         )}
 
-                        {/* Lista de comentarios y respuestas anidadas (Estilo Hilos Reddit/Facebook) */}
-                        <div className="flex-1 overflow-y-auto space-y-3.5 pr-1.5 mb-3 scroll-smooth">
+                        {/* Contenedor desplazable que integra la Publicación Completa y los Comentarios */}
+                        <div className="flex-1 overflow-y-auto space-y-4 pr-1.5 mb-3 scroll-smooth">
+                            {/* Tarjeta de Publicación Completa */}
+                            <div className={`p-4 sm:p-5 rounded-2xl border shadow-xs ${
+                                isDarkMode 
+                                    ? 'bg-gray-800/70 border-gray-700 text-gray-100' 
+                                    : 'bg-slate-50/80 border-gray-200 text-gray-800'
+                            }`}>
+                                <div className="flex items-center justify-between gap-3 pb-3 border-b border-gray-200/80 dark:border-gray-700/80 mb-3">
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                        <button 
+                                            type="button"
+                                            onClick={() => handleOpenProfileByName(task.authorName, task.authorUsername || task.authorId)}
+                                            className="w-10 h-10 rounded-full text-white flex items-center justify-center font-bold text-sm shadow-xs shrink-0 border-2 border-white dark:border-gray-700 overflow-hidden hover:scale-105 transition-transform bg-gradient-to-br from-[#AD3333] to-[#8a2828]"
+                                        >
+                                            {authorPhoto ? (
+                                                <img loading="lazy" decoding="async" src={authorPhoto} alt={task.authorName || 'Autor'} className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; }} />
+                                            ) : (
+                                                task.authorName ? task.authorName.charAt(0).toUpperCase() : 'G'
+                                            )}
+                                        </button>
+                                        <div className="min-w-0">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => handleOpenProfileByName(task.authorName, task.authorUsername || task.authorId)}
+                                                    className="font-extrabold text-sm hover:underline text-gray-900 dark:text-gray-100 text-left"
+                                                >
+                                                    {task.authorName || getTeacherDisplayName(getItemTeacherId(task))}
+                                                </button>
+                                                {task.targetGroupName && (
+                                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+                                                        {task.targetGroupName}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {!task.hideDate && (
+                                                <span className="text-[11px] text-gray-400 dark:text-gray-400 block mt-0.5">
+                                                    {task.createdAt ? formatDateTime12H(task.createdAt) : 'Reciente'}
+                                                    {task.dueDate && ` • Cierre: ${task.dueDate}${task.dueTime ? ` (${format12HourTime(task.dueTime)})` : ''}`}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <h3 className="text-base sm:text-lg font-black text-gray-900 dark:text-gray-100 leading-snug mb-2.5">
+                                    <LinkifyText text={task.title} isDarkMode={isDarkMode} embedVideos={false} />
+                                </h3>
+
+                                {task.description && (
+                                    <div className="mb-3 space-y-2">
+                                        <div className={`text-sm leading-relaxed whitespace-pre-wrap break-words ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+                                            <LinkifyText text={showTranslated && translatedDescription ? translatedDescription : task.description} isDarkMode={isDarkMode} colapsable={false} embedVideos={!isEvaluation && !task.videoUrl && !task.imageUrl && !task.fileUrl && !task.audioUrl} />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {(task.imageUrl || (task.images && task.images.length > 0)) && (
+                                    <div className="my-3 rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700">
+                                        {task.images && task.images.length > 1 ? (
+                                            <ImageCarousel images={task.images} isDarkMode={isDarkMode} onImageClick={(url) => setLocalFullScreenImage(url)} />
+                                        ) : (
+                                            <UniversalImage 
+                                                src={task.imageUrl || task.images[0]} 
+                                                alt={task.title} 
+                                                onClick={() => setLocalFullScreenImage(task.imageUrl || task.images[0])}
+                                                className="w-full max-h-[420px] object-contain bg-black/5 dark:bg-black/30 cursor-pointer" 
+                                            />
+                                        )}
+                                    </div>
+                                )}
+
+                                {(task.fileUrl || (task.files && task.files.length > 0)) && (
+                                    <div className="my-2.5 flex flex-wrap gap-2">
+                                        {task.fileUrl && (
+                                            <a 
+                                                href={task.fileUrl} 
+                                                target="_blank" 
+                                                rel="noreferrer" 
+                                                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-xs font-bold hover:bg-blue-100 transition-colors"
+                                            >
+                                                <FileDocIcon size={14} className="text-blue-600 dark:text-blue-400" />
+                                                <span className="truncate max-w-[200px]">{task.fileName || 'Descargar archivo'}</span>
+                                                <Download size={13} className="shrink-0" />
+                                            </a>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Barra de Reacciones en el Modal de Publicación Completa */}
+                                <div className="pt-2 mt-2 border-t border-gray-200/80 dark:border-gray-700/80">
+                                    {renderReactions(true)}
+                                </div>
+                            </div>
+
+                            {/* Separador de Sección de Comentarios */}
+                            <div className="flex items-center justify-between gap-2 pt-1 pb-1 border-b border-gray-200 dark:border-gray-800">
+                                <span className="text-xs font-extrabold uppercase tracking-wider text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                                    <MessageCircle size={14} className="text-blue-500" />
+                                    Comentarios y Respuestas ({(task.comments || []).length})
+                                </span>
+                            </div>
                           {(() => {
                             const rawComments = task.comments || [];
                             const idMap = new Map();
@@ -4860,6 +5336,144 @@ const TaskCard = React.memo(({
                 </div>,
                 document.body
             )}
+
+            {/* MODAL DE COMPARTIR PUBLICACIÓN (EN PERFIL, MENSAJE O COPIAR ENLACE) */}
+            {showShareModal && ReactDOM.createPortal(
+                <div 
+                    className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+                    onClick={() => setShowShareModal(false)}
+                >
+                    <div 
+                        className={`max-w-md w-full rounded-3xl shadow-2xl p-5 sm:p-6 flex flex-col gap-4 border relative animate-in zoom-in-95 duration-200 ${
+                            isDarkMode ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'
+                        }`}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        {/* Cabecera */}
+                        <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-gray-800">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/20 shrink-0">
+                                    <Share2 size={18} />
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-extrabold leading-tight">Compartir publicación</h3>
+                                    <p className="text-[11px] text-gray-500 dark:text-gray-400">Difunde este contenido en tu perfil o por mensaje</p>
+                                </div>
+                            </div>
+                            <button 
+                                onClick={() => setShowShareModal(false)} 
+                                className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        {/* Tarjeta previa de la publicación a compartir */}
+                        <div className={`p-3 rounded-2xl border ${isDarkMode ? 'bg-gray-800/60 border-gray-700' : 'bg-slate-50 border-gray-200'}`}>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                                Publicación seleccionada
+                            </span>
+                            <h4 className="font-extrabold text-sm text-gray-900 dark:text-gray-100 line-clamp-2 mt-0.5">
+                                {task.title}
+                            </h4>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
+                                Por {task.authorName || getTeacherDisplayName(getItemTeacherId(task))}
+                            </p>
+                        </div>
+
+                        {/* Opciones de Compartir */}
+                        <div className="space-y-3">
+                            {/* 1. Compartir en mi perfil de estudiante / docente */}
+                            <div className={`p-3.5 rounded-2xl border ${isDarkMode ? 'bg-gray-800/40 border-gray-700' : 'bg-gray-50/70 border-gray-200'}`}>
+                                <div className="flex items-center gap-2 mb-2 font-bold text-xs text-gray-800 dark:text-gray-200">
+                                    <UserIcon size={14} className="text-emerald-500" />
+                                    <span>Compartir en mi muro de perfil</span>
+                                </div>
+                                <textarea
+                                    value={shareComment}
+                                    onChange={(e) => setShareComment(e.target.value)}
+                                    placeholder="¿Qué opinas sobre esta publicación? (opcional)..."
+                                    rows={2}
+                                    className={`w-full p-2.5 rounded-xl text-xs border outline-none resize-none transition-all ${
+                                        isDarkMode 
+                                            ? 'bg-gray-900 border-gray-700 text-gray-100 placeholder-gray-500 focus:border-emerald-500' 
+                                            : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400 focus:border-emerald-500'
+                                    }`}
+                                />
+                                <button
+                                    type="button"
+                                    disabled={isSharing}
+                                    onClick={handleShareToProfile}
+                                    className="mt-2 w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all disabled:opacity-50 cursor-pointer"
+                                >
+                                    {isSharing ? <Loader2 size={14} className="animate-spin" /> : <Share2 size={14} />}
+                                    <span>Publicar en mi perfil</span>
+                                </button>
+                            </div>
+
+                            {/* 2. Enviar por mensaje directo o chat */}
+                            <div className={`p-3.5 rounded-2xl border ${isDarkMode ? 'bg-gray-800/40 border-gray-700' : 'bg-gray-50/70 border-gray-200'}`}>
+                                <div className="flex items-center justify-between gap-2 mb-2 font-bold text-xs text-gray-800 dark:text-gray-200">
+                                    <div className="flex items-center gap-2">
+                                        <MessageSquareText size={14} className="text-blue-500" />
+                                        <span>Compartir por mensaje</span>
+                                    </div>
+                                    <span className="text-[10px] text-gray-400 font-normal">Toca para enviar</span>
+                                </div>
+                                <input
+                                    type="text"
+                                    value={shareSearchTerm}
+                                    onChange={(e) => setShareSearchTerm(e.target.value)}
+                                    placeholder="Buscar contacto o grupo..."
+                                    className={`w-full p-2 rounded-xl text-xs border outline-none mb-2 ${
+                                        isDarkMode ? 'bg-gray-900 border-gray-700 text-gray-100 placeholder-gray-500' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
+                                    }`}
+                                />
+                                <div className="max-h-32 overflow-y-auto space-y-1.5 pr-1">
+                                    {shareRecipientsList.length === 0 ? (
+                                        <p className="text-[11px] text-gray-400 text-center py-2">No se encontraron contactos</p>
+                                    ) : (
+                                        shareRecipientsList.map((rec) => (
+                                            <button
+                                                key={rec.id}
+                                                type="button"
+                                                onClick={() => handleShareViaMessage(rec)}
+                                                className={`w-full p-2 rounded-xl flex items-center justify-between text-xs transition-colors text-left cursor-pointer ${
+                                                    isDarkMode ? 'hover:bg-gray-800 text-gray-200' : 'hover:bg-gray-100 text-gray-800'
+                                                }`}
+                                            >
+                                                <div className="flex items-center gap-2 truncate">
+                                                    <div className="w-6 h-6 rounded-full bg-blue-600 text-white font-bold text-[10px] flex items-center justify-center shrink-0">
+                                                        {rec.name.charAt(0).toUpperCase()}
+                                                    </div>
+                                                    <span className="font-semibold truncate">{rec.name}</span>
+                                                </div>
+                                                <span className="text-[11px] font-bold text-blue-500 shrink-0 flex items-center gap-1">
+                                                    Enviar <Send size={11} />
+                                                </span>
+                                            </button>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* 3. Copiar enlace único */}
+                            <button
+                                type="button"
+                                onClick={handleCopyPostLink}
+                                className={`w-full py-2.5 px-3 rounded-xl border font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                                    isDarkMode 
+                                        ? 'bg-gray-800 hover:bg-gray-750 text-gray-200 border-gray-700' 
+                                        : 'bg-white hover:bg-gray-100 text-gray-700 border-gray-300 shadow-2xs'
+                                }`}
+                            >
+                                <Link2 size={14} className="text-blue-500" />
+                                <span>Copiar enlace directo de esta publicación</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            , document.body)}
         </div>
     );
 });
