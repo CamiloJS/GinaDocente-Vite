@@ -60,7 +60,8 @@ export default function VideosModule({
   isDemoMode = false,
   db = defaultDb,
   appId = defaultAppId,
-  showMessage = (msg) => console.log(msg)
+  showMessage = (msg) => console.log(msg),
+  confirmAction
 }) {
   // Helper para resolver la foto de perfil en tiempo real de cualquier usuario / autor
   const resolveAuthorPhoto = (item) => {
@@ -68,6 +69,7 @@ export default function VideosModule({
     const authorId = item.authorId || item.userId || '';
     const authorName = item.authorName || item.userName || '';
     const explicitPhoto = item.authorAvatar || item.userAvatar || item.photoURL || '';
+    const authorRole = item.authorRole || item.userRole || '';
     return resolveUserPhoto({
       id: authorId,
       authorId,
@@ -75,10 +77,43 @@ export default function VideosModule({
       author: authorName,
       authorName,
       name: authorName,
+      authorRole,
+      role: authorRole,
       profilePicUrl: explicitPhoto,
       photoURL: explicitPhoto,
       avatar: explicitPhoto
     }, userMappings, explicitPhoto);
+  };
+
+  // Helper para confirmaciones elegantes en modal propio con fallback a window.confirm
+  const askConfirm = (msg, onConfirm) => {
+    if (typeof confirmAction === 'function') {
+      confirmAction(msg, onConfirm);
+    } else if (typeof window !== 'undefined' && window.confirm(msg)) {
+      onConfirm();
+    }
+  };
+
+  // Helper para determinar permisos de edición y eliminación de vídeos
+  const canModifyVideo = (vid) => {
+    if (!vid) return false;
+    if (role === 'teacher') return true;
+    const cleanAuth = String(vid.authorId || vid.authorUsername || '').toLowerCase().replace(/^@/, '').trim();
+    const cleanMyId = String(myChatId || '').toLowerCase().replace(/^@/, '').trim();
+    if (cleanAuth && cleanMyId && cleanAuth === cleanMyId) return true;
+    if (user?.uid && (vid.authorId === user.uid || vid.uid === user.uid)) return true;
+    return false;
+  };
+
+  // Helper para determinar permisos de eliminación de comentarios
+  const canModifyComment = (comm) => {
+    if (!comm) return false;
+    if (role === 'teacher') return true;
+    const cleanCommUser = String(comm.userId || comm.authorId || '').toLowerCase().replace(/^@/, '').trim();
+    const cleanMyId = String(myChatId || '').toLowerCase().replace(/^@/, '').trim();
+    if (cleanCommUser && cleanMyId && cleanCommUser === cleanMyId) return true;
+    if (user?.uid && comm.userId === user.uid) return true;
+    return false;
   };
   // Filtros de navegación
   const [selectedFormatFilter, setSelectedFormatFilter] = useState('all'); // 'all' | 'long' | 'short'
@@ -424,62 +459,63 @@ export default function VideosModule({
   // Manejador: Eliminar comentario
   const handleDeleteComment = async (commentId) => {
     if (!activePlayingVideo || !commentId) return;
-    if (!window.confirm('¿Deseas eliminar este comentario?')) return;
-    const currentComments = Array.isArray(activePlayingVideo.comments) ? activePlayingVideo.comments : [];
-    const updatedComments = currentComments.filter(c => String(c?.id) !== String(commentId));
+    askConfirm('¿Deseas eliminar este comentario?', async () => {
+      const currentComments = Array.isArray(activePlayingVideo.comments) ? activePlayingVideo.comments : [];
+      const updatedComments = currentComments.filter(c => String(c?.id) !== String(commentId));
 
-    const updatedVideo = {
-      ...activePlayingVideo,
-      comments: updatedComments,
-      updatedAt: Date.now()
-    };
+      const updatedVideo = {
+        ...activePlayingVideo,
+        comments: updatedComments,
+        updatedAt: Date.now()
+      };
 
-    setActivePlayingVideo(updatedVideo);
-    if (typeof setVideos === 'function') {
-      setVideos(prev => (prev || []).map(v => (String(v?.id) === String(activePlayingVideo.id) ? updatedVideo : v)));
-    }
-
-    try {
-      if (isDemoMode || String(activePlayingVideo.id).startsWith('demo_')) {
-        saveDemoSandboxItem('videos', updatedVideo);
-      } else {
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'videos', activePlayingVideo.id), {
-          comments: updatedComments,
-          updatedAt: Date.now()
-        });
+      setActivePlayingVideo(updatedVideo);
+      if (typeof setVideos === 'function') {
+        setVideos(prev => (prev || []).map(v => (String(v?.id) === String(activePlayingVideo.id) ? updatedVideo : v)));
       }
-    } catch (err) {
-      console.error('Error al borrar comentario:', err);
-    }
+
+      try {
+        if (isDemoMode || String(activePlayingVideo.id).startsWith('demo_')) {
+          saveDemoSandboxItem('videos', updatedVideo);
+        } else {
+          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'videos', activePlayingVideo.id), {
+            comments: updatedComments,
+            updatedAt: Date.now()
+          });
+        }
+      } catch (err) {
+        console.error('Error al borrar comentario:', err);
+      }
+    });
   };
 
   // Manejador: Eliminar vídeo
   const handleDeleteVideo = async (video, e) => {
     if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
     if (!video || !video.id) return;
-    if (!window.confirm(`¿Estás seguro de eliminar el vídeo "${video.title}"?`)) return;
+    askConfirm(`¿Estás seguro de eliminar el vídeo "${video.title}"?`, async () => {
+      const targetId = String(video.id);
 
-    const targetId = String(video.id);
-
-    if (activePlayingVideo && String(activePlayingVideo.id) === targetId) {
-      setActivePlayingVideo(null);
-    }
-
-    if (typeof setVideos === 'function') {
-      setVideos(prev => (prev || []).filter(v => String(v?.id) !== targetId));
-    }
-
-    try {
-      if (isDemoMode || targetId.startsWith('demo_')) {
-        deleteDemoSandboxItem('videos', targetId);
-      } else {
-        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'videos', targetId));
+      if (activePlayingVideo && String(activePlayingVideo.id) === targetId) {
+        setActivePlayingVideo(null);
       }
-      showMessage('Vídeo eliminado de la videoteca.');
-    } catch (err) {
-      console.error('Error al eliminar vídeo:', err);
-      showMessage('No se pudo eliminar el vídeo.');
-    }
+
+      if (typeof setVideos === 'function') {
+        setVideos(prev => (prev || []).filter(v => String(v?.id) !== targetId));
+      }
+
+      try {
+        if (isDemoMode || targetId.startsWith('demo_')) {
+          deleteDemoSandboxItem('videos', targetId);
+        } else {
+          await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'videos', targetId));
+        }
+        showMessage('Vídeo eliminado de la videoteca.');
+      } catch (err) {
+        console.error('Error al eliminar vídeo:', err);
+        showMessage('No se pudo eliminar el vídeo.');
+      }
+    });
   };
 
   // Manejador: Abrir modal de edición
@@ -812,9 +848,9 @@ export default function VideosModule({
               {/* Grid / Carrusel de Cortos 9:16 */}
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
                 {shortVideos.map((video) => {
-                  const hasLiked = (video.likes || []).includes(myChatId);
-                  const canEdit = role === 'teacher' || video.authorId === myChatId;
-                  const canDelete = role === 'teacher' || video.authorId === myChatId;
+                  const hasLiked = (video.likes || []).some(id => String(id || '').toLowerCase().replace(/^@/, '').trim() === String(myChatId || '').toLowerCase().replace(/^@/, '').trim() || (user?.uid && id === user.uid));
+                  const canEdit = canModifyVideo(video);
+                  const canDelete = canModifyVideo(video);
                   const authorPhoto = resolveAuthorPhoto(video);
 
                   return (
@@ -945,9 +981,9 @@ export default function VideosModule({
               {/* Grid 16:9 estilo mini-YouTube: miniaturas más grandes en escritorio y metadatos más compactos */}
               <div className="grid grid-cols-1 md:grid-cols-2 min-[1400px]:grid-cols-3 gap-6 sm:gap-7">
                 {longVideos.map((video) => {
-                  const hasLiked = (video.likes || []).includes(myChatId);
-                  const canEdit = role === 'teacher' || video.authorId === myChatId;
-                  const canDelete = role === 'teacher' || video.authorId === myChatId;
+                  const hasLiked = (video.likes || []).some(id => String(id || '').toLowerCase().replace(/^@/, '').trim() === String(myChatId || '').toLowerCase().replace(/^@/, '').trim() || (user?.uid && id === user.uid));
+                  const canEdit = canModifyVideo(video);
+                  const canDelete = canModifyVideo(video);
                   const authorPhoto = resolveAuthorPhoto(video);
 
                   return (
@@ -1201,7 +1237,7 @@ export default function VideosModule({
 
                       {/* Botones de acción */}
                       <div className="flex items-center gap-2">
-                        {(role === 'teacher' || activePlayingVideo.authorId === myChatId) && (
+                        {canModifyVideo(activePlayingVideo) && (
                           <>
                             <button
                               type="button"
@@ -1237,12 +1273,12 @@ export default function VideosModule({
                           type="button"
                           onClick={(e) => handleToggleLike(activePlayingVideo, e)}
                           className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                            (activePlayingVideo.likes || []).includes(myChatId)
+                            (activePlayingVideo.likes || []).some(id => String(id || '').toLowerCase().replace(/^@/, '').trim() === String(myChatId || '').toLowerCase().replace(/^@/, '').trim() || (user?.uid && id === user.uid))
                               ? 'bg-red-500 text-white shadow-xs'
                               : (isDarkMode ? 'bg-gray-800 text-gray-200 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
                           }`}
                         >
-                          <Heart size={14} fill={(activePlayingVideo.likes || []).includes(myChatId) ? '#ffffff' : 'none'} />
+                          <Heart size={14} fill={(activePlayingVideo.likes || []).some(id => String(id || '').toLowerCase().replace(/^@/, '').trim() === String(myChatId || '').toLowerCase().replace(/^@/, '').trim() || (user?.uid && id === user.uid)) ? '#ffffff' : 'none'} />
                           <span>{(activePlayingVideo.likes || []).length} Me gusta</span>
                         </button>
                       </div>
@@ -1290,7 +1326,7 @@ export default function VideosModule({
                       </div>
                     ) : (
                       (activePlayingVideo.comments || []).map((comm) => {
-                        const canDeleteComment = role === 'teacher' || comm.userId === myChatId;
+                        const canDeleteComment = canModifyComment(comm);
                         const commPhoto = resolveAuthorPhoto(comm);
                         return (
                           <div

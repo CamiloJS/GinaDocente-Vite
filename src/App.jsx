@@ -1680,7 +1680,7 @@ function App() {
     let targetId = null;
     if (isCamiloTeacher(cleanName) || isCamiloTeacher(cleanKey)) {
       targetId = 'camilodocente';
-    } else if (cleanName === TEACHER_NAME.toLowerCase() || cleanName === 'profesora' || cleanName === 'la profe' || cleanName === 'docente' || cleanName.includes('gina') || cleanKey === 'teacher') {
+    } else if (cleanName === TEACHER_NAME.toLowerCase() || isTeacherId(cleanName) || isTeacherId(cleanKey) || cleanName === 'profesora' || cleanName === 'la profe' || cleanName === 'docente' || cleanKey === 'teacher') {
       targetId = 'teacher';
     } else if (rawKey && Object.keys(userMappings || {}).some(k => k.toLowerCase() === rawKey.toLowerCase())) {
       targetId = Object.keys(userMappings || {}).find(k => k.toLowerCase() === rawKey.toLowerCase());
@@ -6493,12 +6493,15 @@ useEffect(() => {
         const post = userPosts.find(p => p.id === postId);
         if (!post) return;
         const rep = profileReplyingTo[postId];
-        const resolvedAuthor = resolveUserDisplayName(loggedInName, userMappings, loggedInName);
+        const resolvedAuthor = role === 'teacher'
+            ? (myDisplayName || getTeacherDisplayName(currentTeacherId))
+            : resolveUserDisplayName({ author: loggedInName, authorUsername: myChatId, authorId: user?.uid || myChatId, authorRole: 'student' }, userMappings, loggedInName);
         const newComment = {
             id: Date.now().toString(),
             author: resolvedAuthor,
             authorUsername: myChatId,
             authorId: user?.uid || myChatId,
+            authorRole: role === 'teacher' ? 'teacher' : 'student',
             text: text.trim(),
             createdAt: Date.now(),
             replyTo: rep ? { 
@@ -6524,6 +6527,25 @@ useEffect(() => {
         } catch (err) {
             console.error(err);
         }
+    };
+
+    const handleDeleteProfilePostComment = async (postId, commentId) => {
+        const post = userPosts.find(p => p.id === postId);
+        if (!post) return;
+        confirmAction("¿Deseas eliminar este comentario?", async () => {
+            const updatedComments = (post.comments || []).filter(c => String(c.id) !== String(commentId));
+            if (isDemoMode) {
+                const updated = { ...post, comments: updatedComments };
+                setUserPosts(prev => prev.map(p => p.id === postId ? updated : p));
+                saveDemoSandboxItem('userPosts', updated);
+                return;
+            }
+            try {
+                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userPosts', postId), { comments: updatedComments });
+            } catch (err) {
+                console.error("Error al borrar comentario de perfil:", err);
+            }
+        });
     };
 
     const renderProfile = () => {
@@ -7184,6 +7206,9 @@ useEffect(() => {
                                     {(post.comments || []).map(c => {
                                         const commentAuthorName = resolveUserDisplayName(c, userMappings, c.author);
                                         const replyAuthorName = c.replyTo ? resolveUserDisplayName(c.replyTo, userMappings, c.replyTo.author) : '';
+                                        const cleanCommUser = String(c.authorUsername || c.authorId || '').toLowerCase().replace(/^@/, '');
+                                        const cleanMyId = String(myChatId || '').toLowerCase().replace(/^@/, '');
+                                        const canDeleteComment = role === 'teacher' || (cleanCommUser && cleanMyId && cleanCommUser === cleanMyId) || (user?.uid && (c.authorId === user.uid || c.uid === user.uid)) || isMyProfile;
                                         return (
                                         <div key={c.id} className={`p-2 rounded-xl text-xs w-full min-w-0 break-words ${isDarkMode ? 'bg-gray-800 text-gray-300' : 'bg-white text-gray-700 shadow-2xs border border-gray-100'}`}>
                                             {c.replyTo && (
@@ -7197,7 +7222,12 @@ useEffect(() => {
                                                     <button onClick={() => handleOpenProfileByName(commentAuthorName, c.authorUsername || c.authorId)} className="font-bold text-blue-500 mb-0.5 hover:underline text-left block truncate">{commentAuthorName}</button>
                                                     <p className="break-words leading-relaxed">{c.text}</p>
                                                 </div>
-                                                <button onClick={() => setProfileReplyingTo({...profileReplyingTo, [post.id]: c})} className="opacity-0 group-hover/pcomm:opacity-100 text-gray-400 hover:text-blue-500 transition-opacity p-1 shrink-0"><ReplyIcon size={12}/></button>
+                                                <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover/pcomm:opacity-100 transition-opacity">
+                                                    <button type="button" onClick={() => setProfileReplyingTo({...profileReplyingTo, [post.id]: c})} className="text-gray-400 hover:text-blue-500 p-1 rounded-md" title="Responder"><ReplyIcon size={12}/></button>
+                                                    {canDeleteComment && (
+                                                        <button type="button" onClick={() => handleDeleteProfilePostComment(post.id, c.id)} className="text-gray-400 hover:text-red-500 p-1 rounded-md" title="Eliminar"><Trash2 size={12}/></button>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     )})}
@@ -7376,6 +7406,7 @@ useEffect(() => {
                 db={db}
                 appId={appId}
                 showMessage={(msg) => showMessage(msg)}
+                confirmAction={confirmAction}
               />
             </React.Suspense>
           );
