@@ -6,7 +6,7 @@ import {
 } from './Icons.jsx'
 import {
   compressImage, containsBadWords, checkBadWordsAsync, uploadImageToStorage, uploadRawFileToStorage, deleteFileFromStorage, deleteAllStorageFilesInObject, deleteReplacedStorageFiles, TEACHER_NAME, SECOND_TEACHER_NAME, SECOND_TEACHER_ID, isCamiloTeacher, isTeacherId, getCanonicalTeacherId, getTeacherDisplayName, getItemTeacherId, COMMENT_EMOJIS, REACTION_EMOJIS, FACEBOOK_REACTIONS, splitNameFirstAndLast, FALLBACK_MAP, format12HourTime, formatDateTime12H,
-  isImageLikeFile, convertHeicToJpeg, resolveUserDisplayName, resolveUserPhoto
+  isImageLikeFile, convertHeicToJpeg, resolveUserDisplayName, resolveUserPhoto, handleForceDownload
 } from '../utils/helpers.js'
 import UniversalImage from './UniversalImage.jsx'
 import { glassCard, glassInput } from '../utils/styles.js'
@@ -86,6 +86,20 @@ const TaskCard = React.memo(({
     const editTaskDescRef = React.useRef(null);
     const [isEditingTask, setIsEditingTask] = useState(false);
     const [previewDoc, setPreviewDoc] = useState(null);
+    const [downloadingUrl, setDownloadingUrl] = useState(null);
+    const handleDirectDownload = async (url, fileName, e) => {
+        e?.stopPropagation?.();
+        e?.preventDefault?.();
+        if (!url || downloadingUrl === url) return;
+        try {
+            setDownloadingUrl(url);
+            await handleForceDownload(url, fileName);
+        } catch (err) {
+            console.error('Error al descargar archivo:', err);
+        } finally {
+            setDownloadingUrl(null);
+        }
+    };
     const [activeFlipbookModal, setActiveFlipbookModal] = useState(null);
     const [bookPreviewSpreadIdx, setBookPreviewSpreadIdx] = useState(0);
     const [bookPreviewFlipAnim, setBookPreviewFlipAnim] = useState(null);
@@ -3205,17 +3219,20 @@ const TaskCard = React.memo(({
 
                                 {rev && (
                                     rev.pptxUrl ? (
-                                        <a
-                                            href={rev.pptxUrl}
-                                            download={rev.fileName || `${rev.topic || 'presentacion'}.pptx`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="px-3.5 py-2.5 rounded-xl text-xs font-extrabold bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
-                                            title="Descargar archivo PowerPoint (.pptx)"
+                                        <button
+                                            type="button"
+                                            onClick={(e) => handleDirectDownload(rev.pptxUrl, rev.fileName || `${rev.topic || 'presentacion'}.pptx`, e)}
+                                            disabled={downloadingUrl === rev.pptxUrl}
+                                            className="px-3.5 py-2.5 rounded-xl text-xs font-extrabold bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs disabled:opacity-50"
+                                            title="Descargar archivo PowerPoint (.pptx) directamente"
                                         >
-                                            <Download size={14} className="text-orange-500" />
+                                            {downloadingUrl === rev.pptxUrl ? (
+                                                <Loader2 size={14} className="animate-spin text-orange-500" />
+                                            ) : (
+                                                <Download size={14} className="text-orange-500" />
+                                            )}
                                             <span>Descargar</span>
-                                        </a>
+                                        </button>
                                     ) : (
                                         <button
                                             type="button"
@@ -3890,17 +3907,20 @@ const TaskCard = React.memo(({
                                 </button>
 
                                 {pdfSourceUrl && (
-                                    <a
-                                        href={pdfSourceUrl}
-                                        download={bk.fileName || `${bk.title || 'libro'}.pdf`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="px-3.5 py-2.5 rounded-xl text-xs font-extrabold bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
-                                        title="Descargar PDF"
+                                    <button
+                                        type="button"
+                                        onClick={(e) => handleDirectDownload(pdfSourceUrl, bk.fileName || `${bk.title || 'libro'}.pdf`, e)}
+                                        disabled={downloadingUrl === pdfSourceUrl}
+                                        className="px-3.5 py-2.5 rounded-xl text-xs font-extrabold bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs disabled:opacity-50"
+                                        title="Descargar PDF directamente"
                                     >
-                                        <Download size={14} className="text-indigo-600 dark:text-indigo-400" />
+                                        {downloadingUrl === pdfSourceUrl ? (
+                                            <Loader2 size={14} className="animate-spin text-indigo-600 dark:text-indigo-400" />
+                                        ) : (
+                                            <Download size={14} className="text-indigo-600 dark:text-indigo-400" />
+                                        )}
                                         <span>Descargar PDF</span>
-                                    </a>
+                                    </button>
                                 )}
 
                                 {typeof onOpenBooksTab === 'function' && (
@@ -4004,16 +4024,19 @@ const TaskCard = React.memo(({
                             </div>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-                            <a 
-                                href={docUrl} 
-                                download={task.fileName || (isPdfDoc ? "documento.pdf" : "documento")}
-                                target="_blank" 
-                                rel="noopener noreferrer" 
-                                className="p-2 rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                                title="Descargar archivo"
+                            <button 
+                                type="button"
+                                onClick={(e) => handleDirectDownload(docUrl, task.fileName || (isPdfDoc ? "documento.pdf" : "documento"), e)}
+                                disabled={downloadingUrl === docUrl}
+                                className="p-2 rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors cursor-pointer disabled:opacity-50"
+                                title="Descargar archivo directamente"
                             >
-                                <Download size={15} />
-                            </a>
+                                {downloadingUrl === docUrl ? (
+                                    <Loader2 size={15} className="animate-spin text-blue-600 dark:text-blue-400" />
+                                ) : (
+                                    <Download size={15} />
+                                )}
+                            </button>
                         </div>
                     </div>
                 );
@@ -4326,17 +4349,40 @@ const TaskCard = React.memo(({
                                 {(task.fileUrl || (task.files && task.files.length > 0)) && (
                                     <div className="my-2.5 flex flex-wrap gap-2">
                                         {task.fileUrl && (
-                                            <a 
-                                                href={task.fileUrl} 
-                                                target="_blank" 
-                                                rel="noreferrer" 
-                                                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-xs font-bold hover:bg-blue-100 transition-colors"
+                                            <button 
+                                                type="button"
+                                                onClick={(e) => handleDirectDownload(task.fileUrl, task.fileName || 'documento.pdf', e)}
+                                                disabled={downloadingUrl === task.fileUrl}
+                                                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-xs font-bold hover:bg-blue-100 transition-colors cursor-pointer disabled:opacity-50"
+                                                title="Descargar archivo directamente"
                                             >
                                                 <FileDocIcon size={14} className="text-blue-600 dark:text-blue-400" />
                                                 <span className="truncate max-w-[200px]">{task.fileName || 'Descargar archivo'}</span>
-                                                <Download size={13} className="shrink-0" />
-                                            </a>
+                                                {downloadingUrl === task.fileUrl ? (
+                                                    <Loader2 size={13} className="animate-spin text-blue-600 dark:text-blue-400 shrink-0" />
+                                                ) : (
+                                                    <Download size={13} className="shrink-0" />
+                                                )}
+                                            </button>
                                         )}
+                                        {Array.isArray(task.files) && task.files.map((f, fIdx) => (
+                                            <button 
+                                                key={f.url || fIdx}
+                                                type="button"
+                                                onClick={(e) => handleDirectDownload(f.url, f.name || 'documento.pdf', e)}
+                                                disabled={downloadingUrl === f.url}
+                                                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-xs font-bold hover:bg-blue-100 transition-colors cursor-pointer disabled:opacity-50"
+                                                title="Descargar archivo directamente"
+                                            >
+                                                <FileDocIcon size={14} className="text-blue-600 dark:text-blue-400" />
+                                                <span className="truncate max-w-[200px]">{f.name || 'Descargar archivo'}</span>
+                                                {downloadingUrl === f.url ? (
+                                                    <Loader2 size={13} className="animate-spin text-blue-600 dark:text-blue-400 shrink-0" />
+                                                ) : (
+                                                    <Download size={13} className="shrink-0" />
+                                                )}
+                                            </button>
+                                        ))}
                                     </div>
                                 )}
 
@@ -4635,16 +4681,19 @@ const TaskCard = React.memo(({
                                                             <span className="truncate max-w-[180px] text-gray-800 dark:text-gray-200 group-hover/doc:text-blue-600 dark:group-hover/doc:text-blue-400">{c.fileName || 'Documento adjunto'}</span>
                                                             <span className="ml-1 text-[11px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-md">Abrir</span>
                                                         </button>
-                                                        <a 
-                                                            href={c.fileUrl} 
-                                                            download={c.fileName || 'documento'} 
-                                                            target="_blank" 
-                                                            rel="noopener noreferrer"
-                                                            className="p-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors shadow-2xs"
-                                                            title="Descargar archivo"
+                                                        <button 
+                                                            type="button"
+                                                            onClick={(e) => handleDirectDownload(c.fileUrl, c.fileName || 'entrega.pdf', e)}
+                                                            disabled={downloadingUrl === c.fileUrl}
+                                                            className="p-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
+                                                            title="Descargar archivo directamente"
                                                         >
-                                                            <Download size={15} />
-                                                        </a>
+                                                            {downloadingUrl === c.fileUrl ? (
+                                                                <Loader2 size={15} className="animate-spin text-blue-600 dark:text-blue-400" />
+                                                            ) : (
+                                                                <Download size={15} />
+                                                            )}
+                                                        </button>
                                                     </div>
                                                 )}
                                             </div>

@@ -16,6 +16,7 @@ import {
 import UniversalImage from './UniversalImage.jsx';
 import { isImageLikeUrl, isHeicUrl } from '../utils/heicConverter.js';
 import { renderPdfToBookPages } from '../utils/flipbookEngine.js';
+import { handleForceDownload } from '../utils/helpers.js';
 
 export const getGoogleDocViewerUrl = (url) => {
   if (!url || typeof url !== 'string') return '';
@@ -154,27 +155,9 @@ export const DocumentPreviewModal = ({
       : (isImage ? 'imagen.jpg' : (isPdf ? 'documento.pdf' : 'documento'));
 
     try {
-      const response = await fetch(documentUrl);
-      if (!response.ok) throw new Error('Fetch failed');
-      const blob = await response.blob();
-      const blobUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = suggestedFileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 3000);
-    } catch {
-      // Fallback a enlace directo seguro
-      const a = document.createElement('a');
-      a.href = documentUrl;
-      a.target = '_blank';
-      a.download = suggestedFileName;
-      a.rel = 'noopener noreferrer';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      await handleForceDownload(documentUrl, suggestedFileName);
+    } catch (err) {
+      console.warn('Error downloading document in preview modal:', err);
     } finally {
       setIsDownloading(false);
     }

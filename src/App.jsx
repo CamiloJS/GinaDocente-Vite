@@ -25,7 +25,7 @@ import {
   uploadImageToStorage, uploadRawFileToStorage, deleteFileFromStorage, deleteFilesFromStorage,
   deleteAllStorageFilesInObject, deleteReplacedStorageFiles,
   speakText, splitNameFirstAndLast, format12HourTime, formatDateTime12H,
-  isImageLikeFile, isHeicFile, convertHeicToJpeg, resolveUserDisplayName, resolveUserPhoto
+  isImageLikeFile, isHeicFile, convertHeicToJpeg, resolveUserDisplayName, resolveUserPhoto, handleForceDownload
 } from './utils/helpers.js'
 import UniversalImage from './components/UniversalImage.jsx'
 import {
@@ -17184,15 +17184,28 @@ Escribe en español con tono pedagógico moderno.`;
                                                                                   {m.imageUrl && <img src={m.imageUrl} loading="lazy" decoding="async" alt="Adjunto" onLoad={(e) => { const container = e.target.closest('.overflow-y-auto'); if (container && container.scrollHeight - container.scrollTop - container.clientHeight < 300) chatMessagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }} onClick={() => setFullScreenImage(m.imageUrl)} className={isImageOnly ? "rounded-2xl max-h-60 object-contain cursor-pointer hover:opacity-90 transition-opacity drop-shadow-md" : "mt-1.5 rounded-xl max-h-48 object-contain cursor-pointer hover:opacity-90 transition-opacity bg-black/10 border border-white/20"} />}
                                                                                   
                                                                                   {m.fileUrl && (
-                                                                                      <button 
-                                                                                          type="button" 
-                                                                                          onClick={() => setAppPreviewDoc({ url: m.fileUrl, title: m.fileName || 'Documento adjunto' })} 
-                                                                                          className={`flex items-center gap-2 p-2 rounded-xl mt-1 w-fit transition-colors border cursor-pointer ${isMe ? 'bg-white/20 border-white/30 text-white hover:bg-white/30' : 'bg-black/10 border-black/10 dark:bg-white/10 dark:border-white/10 text-gray-800 dark:text-gray-100 hover:bg-black/20 dark:hover:bg-white/20'}`}
-                                                                                          title="Clic para ver documento"
-                                                                                      >
-                                                                                          <div className="bg-red-500 p-1 rounded-lg"><FileDocIcon size={15} className="text-white" /></div>
-                                                                                          <span className="text-xs font-medium truncate max-w-[140px]">{m.fileName || 'Documento'}</span>
-                                                                                      </button>
+                                                                                      <div className="flex items-center gap-1 mt-1">
+                                                                                          <button 
+                                                                                              type="button" 
+                                                                                              onClick={() => setAppPreviewDoc({ url: m.fileUrl, title: m.fileName || 'Documento adjunto' })} 
+                                                                                              className={`flex items-center gap-2 p-2 rounded-xl transition-colors border cursor-pointer ${isMe ? 'bg-white/20 border-white/30 text-white hover:bg-white/30' : 'bg-black/10 border-black/10 dark:bg-white/10 dark:border-white/10 text-gray-800 dark:text-gray-100 hover:bg-black/20 dark:hover:bg-white/20'}`}
+                                                                                              title="Clic para ver documento"
+                                                                                          >
+                                                                                              <div className="bg-red-500 p-1 rounded-lg"><FileDocIcon size={15} className="text-white" /></div>
+                                                                                              <span className="text-xs font-medium truncate max-w-[140px]">{m.fileName || 'Documento'}</span>
+                                                                                          </button>
+                                                                                          <button
+                                                                                              type="button"
+                                                                                              onClick={(e) => {
+                                                                                                  e.stopPropagation();
+                                                                                                  handleForceDownload(m.fileUrl, m.fileName || 'documento.pdf');
+                                                                                              }}
+                                                                                              className={`p-2 rounded-xl transition-colors border cursor-pointer ${isMe ? 'bg-white/20 border-white/30 text-white hover:bg-white/30' : 'bg-black/10 border-black/10 dark:bg-white/10 dark:border-white/10 text-gray-800 dark:text-gray-100 hover:bg-black/20 dark:hover:bg-white/20'}`}
+                                                                                              title="Descargar archivo directamente"
+                                                                                          >
+                                                                                              <Download size={15} />
+                                                                                          </button>
+                                                                                      </div>
                                                                                   )}
                                                                               </>
                                                                           )}

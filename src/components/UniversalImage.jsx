@@ -4,6 +4,7 @@
 import React from 'react';
 import { Loader2, ImageIcon, ExternalLink, Download } from './Icons.jsx';
 import { useUniversalImageUrl } from '../utils/heicConverter.js';
+import { handleForceDownload } from '../utils/helpers.js';
 
 export { useUniversalImageUrl };
 
@@ -49,15 +50,17 @@ export const UniversalImage = ({
             >
               <ExternalLink size={10} /> Abrir
             </a>
-            <a
-              href={src}
-              download="foto.jpg"
-              onClick={(e) => e.stopPropagation()}
-              className="p-1 rounded-md text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700"
-              title="Descargar"
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleForceDownload(src, 'foto.jpg');
+              }}
+              className="p-1 rounded-md text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer"
+              title="Descargar imagen"
             >
               <Download size={11} />
-            </a>
+            </button>
           </div>
         )}
       </div>

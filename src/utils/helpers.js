@@ -974,41 +974,63 @@ export const generateId = () => {
 };
 
 export const handleForceDownload = async (url, fileName = 'documento.pdf') => {
-  if (!url || typeof document === 'undefined') return;
+  if (!url || typeof document === 'undefined') return false;
+
+  let safeFileName = String(fileName || 'documento.pdf').trim();
+  const lowerUrl = String(url || '').toLowerCase();
+  const hasExtension = /\.[a-zA-Z0-9]{2,5}$/i.test(safeFileName);
+  const isPdf = lowerUrl.includes('.pdf') || lowerUrl.includes('application/pdf') || safeFileName.toLowerCase().endsWith('.pdf') || !hasExtension;
+  if (isPdf && !safeFileName.toLowerCase().endsWith('.pdf')) {
+    safeFileName = `${safeFileName}.pdf`;
+  }
+  // Limpiar caracteres problemáticos en nombres de archivo
+  safeFileName = safeFileName.replace(/["*/:<>?\\|]/g, '_');
+
   try {
     if (url.startsWith('data:') || url.startsWith('blob:')) {
       const a = document.createElement('a');
       a.href = url;
-      a.download = fileName || 'documento.pdf';
+      a.download = safeFileName;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      return;
+      return true;
     }
-    const response = await fetch(url);
+
+    const response = await fetch(url, { mode: 'cors' });
     if (response.ok) {
       const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
+      const blobUrl = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = blobUrl;
-      a.download = fileName || 'documento.pdf';
+      a.download = safeFileName;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
-      return;
+      setTimeout(() => {
+        try { window.URL.revokeObjectURL(blobUrl); } catch {}
+      }, 10000);
+      return true;
     }
-  } catch {
-    // Fallback to direct anchor open/download if CORS blocks fetch
+  } catch (err) {
+    console.warn('Direct blob download failed, attempting direct download trigger:', err);
   }
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = fileName || 'documento.pdf';
-  a.target = '_blank';
-  a.rel = 'noopener noreferrer';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+
+  // Fallback seguro si fetch tiene restricciones de red/CORS
+  try {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = safeFileName;
+    a.setAttribute('download', safeFileName);
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    return true;
+  } catch {
+    return false;
+  }
 };
 
 
