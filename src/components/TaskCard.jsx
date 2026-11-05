@@ -1821,7 +1821,7 @@ const TaskCard = React.memo(({
     return (
         <div ref={cardRef} className={`rounded-3xl border transition-all duration-300 p-4 sm:p-5 mb-4 shadow-xs hover:shadow-md relative overflow-hidden group ${
             isDarkMode 
-                ? 'bg-gray-850 bg-gray-800/90 border-gray-700/80 text-gray-100' 
+                ? 'bg-gray-850 border-gray-700/80 text-gray-100' 
                 : 'bg-white border-gray-200/90 text-gray-800'
         } ${task.isPinned ? 'ring-2 ring-amber-400/60 dark:ring-amber-500/50 border-amber-300 dark:border-amber-600' : ''}`}>
             
@@ -1998,7 +1998,7 @@ const TaskCard = React.memo(({
                                 return null;
                             }
                             return (
-                                <span className="inline-flex items-center text-[10px] font-bold px-1.5 py-0.2 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200/80 dark:border-gray-700/80 shrink-0 whitespace-nowrap">
+                                <span className="inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200/80 dark:border-gray-700/80 shrink-0 whitespace-nowrap">
                                     {grpName}
                                 </span>
                             );
@@ -2013,7 +2013,7 @@ const TaskCard = React.memo(({
                         {task.dueDate && (
                             <>
                                 <span className="text-gray-300 dark:text-gray-600 font-bold shrink-0">•</span>
-                                <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.2 rounded-md border shrink-0 whitespace-nowrap ${
+                                <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md border shrink-0 whitespace-nowrap ${
                                     isExpired 
                                         ? 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400' 
                                         : 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900/50 text-emerald-700 dark:text-emerald-400'
@@ -2021,7 +2021,7 @@ const TaskCard = React.memo(({
                                     <Clock size={9} className="shrink-0" />
                                     <span>Cierre: {task.dueDate}{task.dueTime ? ` • ${format12HourTime(task.dueTime)}` : ''}</span>
                                     {isExpired && (
-                                        <span className="font-bold text-[8px] uppercase ml-0.5 px-1 py-0.2 rounded bg-red-200/60 dark:bg-red-900/60 whitespace-nowrap">
+                                        <span className="font-bold text-[8px] uppercase ml-0.5 px-1 py-0.5 rounded bg-red-200/60 dark:bg-red-900/60 whitespace-nowrap">
                                             {task.allowLate ? 'Tardía' : 'Cerrado'}
                                         </span>
                                     )}
@@ -3925,7 +3925,7 @@ const TaskCard = React.memo(({
                                     if (role === 'teacher') {
                                         const wasRevealed = !!revealedComments[cid];
                                         return (
-                                            <div key={cid} className={`p-3 rounded-2xl text-xs border transition-all ${isDarkMode ? 'bg-gray-850/80 bg-gray-800/60 border-red-900/40 text-gray-300' : 'bg-red-50/50 border-red-200/70 text-gray-800'}`}>
+                                            <div key={cid} className={`p-3 rounded-2xl text-xs border transition-all ${isDarkMode ? 'bg-gray-800/60 border-red-900/40 text-gray-300' : 'bg-red-50/50 border-red-200/70 text-gray-800'}`}>
                                                 <div className="flex justify-between items-center">
                                                     <div className="flex items-center gap-1.5">
                                                         <span className="font-bold text-gray-700 dark:text-gray-200">{authorDisplayName}</span>
@@ -4334,7 +4334,7 @@ const TaskCard = React.memo(({
                                                         const avg = (sum / count).toFixed(1);
 
                                                         return (
-                                                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 text-[9.5px] font-bold">
+                                                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 text-[9.5px] font-bold">
                                                                 <span className="text-amber-500">★</span>
                                                                 <span>{avg}</span>
                                                                 <span className="text-gray-400 text-[8.5px]">({count})</span>

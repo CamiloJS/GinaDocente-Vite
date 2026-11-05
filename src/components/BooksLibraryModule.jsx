@@ -1762,6 +1762,7 @@ export default function BooksLibraryModule({
                                     onChangeOutline={handleOutlineChange}
                                     uploadImageFn={uploadImageFn}
                                     isDemoMode={isDemoMode}
+                                    confirmAction={confirmAction}
                                     onOpenPagePreview={(pageIdx) =>
                                         setActiveBookModal({
                                             id: editingBookId || 'preview_book',

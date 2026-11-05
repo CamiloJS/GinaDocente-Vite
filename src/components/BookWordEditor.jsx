@@ -28,7 +28,8 @@ export default function BookWordEditor({
     onChangeOutline,
     onOpenPagePreview,
     uploadImageFn,
-    isDemoMode = false
+    isDemoMode = false,
+    confirmAction
 }) {
     const [activePageIdx, setActivePageIdx] = useState(0);
     const [viewAllPages, setViewAllPages] = useState(false);
@@ -107,9 +108,26 @@ export default function BookWordEditor({
         if (outline.length <= 3) return;
         const page = outline[pageIdx];
         if (page?.isCover || page?.isBack || pageIdx === 0 || pageIdx === outline.length - 1) return;
-        const nextOutline = removeBookOutlinePage(outline, pageIdx);
-        onChangeOutline?.(nextOutline);
-        setActivePageIdx((prev) => Math.max(0, Math.min(prev, nextOutline.length - 1)));
+        const executeDelete = () => {
+            const nextOutline = removeBookOutlinePage(outline, pageIdx);
+            onChangeOutline?.(nextOutline);
+            setActivePageIdx((prev) => Math.max(0, Math.min(prev, nextOutline.length - 1)));
+        };
+        const hasContent = (page?.title && page.title.trim()) || 
+                           (Array.isArray(page?.body) && page.body.some(b => b && b.trim() && b !== 'Nuevo párrafo...')) ||
+                           (page?.image);
+        if (hasContent) {
+            if (typeof confirmAction === 'function') {
+                confirmAction(`¿Seguro que deseas eliminar la página ${pageIdx}? Se perderá el texto y las imágenes de esta página.`, executeDelete);
+                return;
+            }
+            if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
+                if (!window.confirm(`¿Seguro que deseas eliminar la página ${pageIdx}? Se perderá el contenido de esta página.`)) {
+                    return;
+                }
+            }
+        }
+        executeDelete();
     };
 
     const triggerImageUpload = (pageIdx) => {

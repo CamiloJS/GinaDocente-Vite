@@ -1381,7 +1381,7 @@ export default function NotesModule({
               <UsersIcon size={14} />
               <span>Notas compartidas</span>
               {scopeCounts.shared > 0 && (
-                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
                   activeScope === 'shared'
                     ? (isDarkMode ? 'bg-slate-700 text-slate-200' : 'bg-slate-100 text-slate-700')
                     : (isDarkMode ? 'bg-slate-800/80 text-slate-400' : 'bg-slate-200/70 text-slate-600')
@@ -1402,7 +1402,7 @@ export default function NotesModule({
               <UserIcon size={14} />
               <span>Notas privadas</span>
               {scopeCounts.private > 0 && (
-                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
                   activeScope === 'private'
                     ? (isDarkMode ? 'bg-slate-700 text-slate-200' : 'bg-slate-100 text-slate-700')
                     : (isDarkMode ? 'bg-slate-800/80 text-slate-400' : 'bg-slate-200/70 text-slate-600')
@@ -1428,7 +1428,7 @@ export default function NotesModule({
             >
               <span>Todo</span>
               {formatCounts.all > 0 && (
-                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
                   viewMode === 'all'
                     ? (isDarkMode ? 'bg-slate-700 text-slate-200' : 'bg-slate-100 text-slate-700')
                     : (isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-200/70 text-slate-600')
@@ -1449,7 +1449,7 @@ export default function NotesModule({
               <Grid size={12} />
               <span>Notas rápidas</span>
               {formatCounts.sticky > 0 && (
-                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
                   viewMode === 'sticky'
                     ? (isDarkMode ? 'bg-slate-700 text-slate-200' : 'bg-slate-100 text-slate-700')
                     : (isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-200/70 text-slate-600')
@@ -1470,7 +1470,7 @@ export default function NotesModule({
               <FileText size={12} />
               <span>Hojas</span>
               {formatCounts.sheet > 0 && (
-                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
                   viewMode === 'sheet'
                     ? (isDarkMode ? 'bg-slate-700 text-slate-200' : 'bg-slate-100 text-slate-700')
                     : (isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-200/70 text-slate-600')
@@ -1923,7 +1923,7 @@ export default function NotesModule({
                                     <div className="flex items-center gap-1.5 flex-wrap">
                                       <span className="font-bold">{entry.authorName}</span>
                                       {entry.authorRole === 'teacher' && (
-                                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-500/15 text-blue-600 dark:text-blue-400">
+                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/15 text-blue-600 dark:text-blue-400">
                                           Docente
                                         </span>
                                       )}
@@ -2091,7 +2091,7 @@ export default function NotesModule({
                       {note.authorName || 'Usuario'}
                     </span>
                     {note.authorRole === 'teacher' && (
-                      <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400">
                         Docente
                       </span>
                     )}
@@ -3103,7 +3103,7 @@ export default function NotesModule({
                         {activeSheetNote.authorName || 'Usuario'}
                       </span>
                       {activeSheetNote.authorRole === 'teacher' && (
-                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400">
                           Docente
                         </span>
                       )}

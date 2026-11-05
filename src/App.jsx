@@ -458,6 +458,32 @@ function App() {
       return [];
     }
   };
+  const safeSetSavedAccounts = (accounts) => {
+    try {
+      localStorage.setItem('englishTech_savedAccounts', JSON.stringify(accounts));
+    } catch (e) {
+      console.warn("Could not save accounts to localStorage", e);
+    }
+  };
+  const safeGetActiveSession = () => {
+    try {
+      const raw = localStorage.getItem('englishTech_activeSession');
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
+  };
+  const safeSetActiveSession = (session) => {
+    try {
+      if (session) {
+        localStorage.setItem('englishTech_activeSession', JSON.stringify(session));
+      } else {
+        localStorage.removeItem('englishTech_activeSession');
+      }
+    } catch (e) {
+      console.warn("Could not save active session to localStorage", e);
+    }
+  };
 
   const [editingUserLabelId, setEditingUserLabelId] = useState(null);
   const [editUserLabelValue, setEditUserLabelValue] = useState("");
@@ -2507,7 +2533,7 @@ function App() {
               // Seguridad: limpiar cualquier contraseña que hubiera quedado guardada antes
               const cleaned = accs.map(({ password, ...rest }) => rest);
               if (cleaned.length !== accs.length) {
-                  localStorage.setItem('englishTech_savedAccounts', JSON.stringify(cleaned));
+                  safeSetSavedAccounts(cleaned);
               }
               setSavedAccounts(cleaned);
           }, []);
@@ -2711,11 +2737,11 @@ function App() {
                 const accs = safeGetSavedAccounts();
                 const filtered = accs.filter(a => a.username !== cleanUser); 
                 const updatedAccs = [newAcc, ...filtered];
-                localStorage.setItem('englishTech_savedAccounts', JSON.stringify(updatedAccs));
+                safeSetSavedAccounts(updatedAccs);
                 setSavedAccounts(updatedAccs);
 
                 const sessionObj = { email: targetEmail, uid: auth.currentUser?.uid || cleanUser, userKey: cleanUser, name: finalDisplayName, role: expectedRole, isGoogle: false };
-                localStorage.setItem('englishTech_activeSession', JSON.stringify(sessionObj));
+                safeSetActiveSession(sessionObj);
 
                 setRole(expectedRole);
                 setLoggedInUser(expectedRole === 'teacher' ? getTeacherUsername(cleanUser) : `@${cleanUser}`);
@@ -2750,7 +2776,7 @@ function App() {
                   isGoogle: !!acc.isGoogle
               };
               
-              localStorage.setItem('englishTech_activeSession', JSON.stringify(sessionObj));
+              safeSetActiveSession(sessionObj);
               
               setRole(targetRole);
               setLoggedInUser(targetUser);
@@ -2908,11 +2934,11 @@ function App() {
                 const accs = safeGetSavedAccounts();
                 const filtered = accs.filter(a => a.username !== userKey); 
                 const updatedAccs = [newAcc, ...filtered];
-                localStorage.setItem('englishTech_savedAccounts', JSON.stringify(updatedAccs));
+                safeSetSavedAccounts(updatedAccs);
                 setSavedAccounts(updatedAccs);
 
                 const sessionObj = { email: email, uid: gUser.uid, userKey: userKey, name: finalDisplayName, role: targetRole, isGoogle: true, profilePicUrl: finalPhotoUrl, photoURL: finalPhotoUrl };
-                localStorage.setItem('englishTech_activeSession', JSON.stringify(sessionObj));
+                safeSetActiveSession(sessionObj);
 
                 setRole(targetRole);
                 setLoggedInUser(targetRole === 'teacher' ? getTeacherUsername(userKey || targetFullName) : `@${userKey}`);
@@ -3065,11 +3091,11 @@ function App() {
               const accs = safeGetSavedAccounts();
               const filtered = accs.filter(a => a.username !== rawUser); 
               const updatedAccs = [newAcc, ...filtered];
-              localStorage.setItem('englishTech_savedAccounts', JSON.stringify(updatedAccs));
+              safeSetSavedAccounts(updatedAccs);
               setSavedAccounts(updatedAccs);
 
               const sessionObj = { email: googleOnboarding.email, uid: googleOnboarding.uid, userKey: rawUser, name: preservedFullName, role: 'student', isGoogle: true };
-              localStorage.setItem('englishTech_activeSession', JSON.stringify(sessionObj));
+              safeSetActiveSession(sessionObj);
 
               setRole('student');
               setLoggedInUser(`@${rawUser}`);
@@ -3160,9 +3186,9 @@ function App() {
               const accs = safeGetSavedAccounts();
               const filtered = accs.filter(a => a.username !== username);
               const updatedAccs = [newAcc, ...filtered];
-              localStorage.setItem('englishTech_savedAccounts', JSON.stringify(updatedAccs));
+              safeSetSavedAccounts(updatedAccs);
               setSavedAccounts(updatedAccs);
-              localStorage.setItem('englishTech_activeSession', JSON.stringify({
+              safeSetActiveSession({
                 email,
                 uid: registeredUser ? registeredUser.uid : username,
                 userKey: username,
@@ -3170,7 +3196,7 @@ function App() {
                 name: fullName,
                 role: 'student',
                 isGoogle: false
-              }));
+              });
 
               setRole('student');
               setLoggedInUser('@' + username);
@@ -3255,7 +3281,7 @@ function App() {
 
           const removeSavedAccount = (username) => {
               const filtered = savedAccounts.filter(a => a.username !== username);
-              localStorage.setItem('englishTech_savedAccounts', JSON.stringify(filtered));
+              safeSetSavedAccounts(filtered);
               setSavedAccounts(filtered);
           };
 
@@ -3492,7 +3518,7 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
                     await deleteDoc(doc(db, 'artifacts', appId, 'users', user?.uid || myChatId, 'chatbot', 'history'));
                 } catch(e) { console.error(e); }
             }
-            localStorage.removeItem('englishTech_activeSession');
+            safeSetActiveSession(null);
             try { sessionStorage.removeItem('englishTech_viewingProfileId'); } catch(e) {}
             setActiveChat(null);
             setViewingProfileId(null);
@@ -3619,13 +3645,12 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
                     return;
                 }
                 
-                const rawSession = localStorage.getItem('englishTech_activeSession');
-                if (!rawSession) {
+                const activeSession = safeGetActiveSession();
+                if (!activeSession) {
                     return;
                 }
 
                 try {
-                    const activeSession = JSON.parse(rawSession);
                     if (activeSession && (activeSession.userKey || activeSession.username || activeSession.name)) {
                         const cleanKey = (activeSession.userKey || activeSession.username || '').replace('@', '').trim();
                         const finalRole = activeSession.role || 'student';
@@ -3706,7 +3731,7 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
                         setLoggedInName(finalName);
                         setHasEntered(true);
                         setLoginType(null);
-                        localStorage.setItem('englishTech_activeSession', JSON.stringify({ email: u.email, uid: u.uid, userKey: foundKey, name: finalName, role: finalRole, profilePicUrl: dbData.profilePicUrl || '' }));
+                        safeSetActiveSession({ email: u.email, uid: u.uid, userKey: foundKey, name: finalName, role: finalRole, profilePicUrl: dbData.profilePicUrl || '' });
                     }
                 }
             });
@@ -3722,15 +3747,14 @@ Descripción original: ${taskDesc || 'Sin descripción'}`;
               const newName = studentData.fullName.trim();
               setLoggedInName(newName);
               try {
-                const rawSession = localStorage.getItem('englishTech_activeSession');
-                if (rawSession) {
-                  const sessionObj = JSON.parse(rawSession);
+                const sessionObj = safeGetActiveSession();
+                if (sessionObj) {
                   sessionObj.name = newName;
-                  localStorage.setItem('englishTech_activeSession', JSON.stringify(sessionObj));
+                  safeSetActiveSession(sessionObj);
                 }
                 const accs = safeGetSavedAccounts();
                 const updated = accs.map(a => a.username === cleanUser ? { ...a, name: newName } : a);
-                localStorage.setItem('englishTech_savedAccounts', JSON.stringify(updated));
+                safeSetSavedAccounts(updated);
                 setSavedAccounts(updated);
               } catch (err) {
                 console.warn('Error sincronizando nombre corregido por docente:', err);
@@ -6306,15 +6330,14 @@ useEffect(() => {
             try {
                 const accs = safeGetSavedAccounts();
                 const updatedAccs = accs.map(a => (a.username === myChatId || a.username === cleanKey) ? { ...a, profilePicUrl: url, photoURL: url } : a);
-                localStorage.setItem('englishTech_savedAccounts', JSON.stringify(updatedAccs));
+                safeSetSavedAccounts(updatedAccs);
                 setSavedAccounts(updatedAccs);
 
-                const rawSession = localStorage.getItem('englishTech_activeSession');
-                if (rawSession) {
-                    const sObj = JSON.parse(rawSession);
+                const sObj = safeGetActiveSession();
+                if (sObj) {
                     sObj.profilePicUrl = url;
                     sObj.photoURL = url;
-                    localStorage.setItem('englishTech_activeSession', JSON.stringify(sObj));
+                    safeSetActiveSession(sObj);
                 }
             } catch (errLocal) {}
 
@@ -9194,6 +9217,22 @@ Escribe en español con tono pedagógico moderno.`;
                 return t;
             }));
 
+            setRawVideos(prev => (prev || []).map(vid => {
+                const { changed, comments } = updateCommentsWithNewName(vid.comments);
+                const vidAuthorKey = String(vid.authorUsername || vid.authorId || vid.author || '').toLowerCase().replace(/^@/, '');
+                const vidIsStudent = vidAuthorKey === studentEditModal.userKey.toLowerCase();
+                if (changed || (vidIsStudent && (vid.author !== trimmedFullName || vid.authorName !== trimmedFullName))) {
+                    const nextVid = {
+                        ...vid,
+                        ...(changed ? { comments } : {}),
+                        ...(vidIsStudent ? { author: trimmedFullName, authorName: trimmedFullName } : {})
+                    };
+                    saveDemoSandboxItem('videos', nextVid);
+                    return nextVid;
+                }
+                return vid;
+            }));
+
             showMessage("Perfil de estudiante actualizado.");
             setStudentEditModal({ isOpen: false, userKey: '', fullName: '', customLabel: '', email: '', profilePicUrl: '' });
             return;
@@ -9249,6 +9288,22 @@ Escribe en español con tono pedagógico moderno.`;
                     return { ...t, comments };
                 }
                 return t;
+            }));
+
+            setRawVideos(prev => (prev || []).map(vid => {
+                const { changed, comments } = updateCommentsWithNewName(vid.comments);
+                const vidAuthorKey = String(vid.authorUsername || vid.authorId || vid.author || '').toLowerCase().replace(/^@/, '');
+                const vidIsStudent = vidAuthorKey === studentEditModal.userKey.toLowerCase();
+                if (changed || (vidIsStudent && (vid.author !== trimmedFullName || vid.authorName !== trimmedFullName))) {
+                    const payload = {
+                        ...(changed ? { comments } : {}),
+                        ...(vidIsStudent ? { author: trimmedFullName, authorName: trimmedFullName } : {})
+                    };
+                    updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'videos', vid.id), payload)
+                        .catch(err => console.warn('Could not update video author on student edit:', err));
+                    return { ...vid, ...payload };
+                }
+                return vid;
             }));
 
             showMessage("Perfil de estudiante actualizado.");
@@ -13768,7 +13823,7 @@ Escribe en español con tono pedagógico moderno.`;
                               >
                                   <Mail size={15} />
                                   <span>Sugerencias</span>
-                                  <span className={`text-[10px] font-black px-1.5 py-0.2 rounded-full ${inboxTab === 'suggestions' ? 'bg-white/20 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}>
+                                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${inboxTab === 'suggestions' ? 'bg-white/20 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}>
                                       {suggestions.length}
                                   </span>
                                   {unreadSuggestionsCount > 0 && (
@@ -13787,7 +13842,7 @@ Escribe en español con tono pedagógico moderno.`;
                               >
                                   <Shield size={15} />
                                   <span>Negatividad</span>
-                                  <span className={`text-[10px] font-black px-1.5 py-0.2 rounded-full ${inboxTab === 'alerts' ? 'bg-white/20 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}>
+                                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${inboxTab === 'alerts' ? 'bg-white/20 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}>
                                       {alerts.length}
                                   </span>
                               </button>

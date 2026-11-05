@@ -1298,7 +1298,7 @@ const TasksTab = React.memo(({
                                                                 alt={`Preview ${idx + 1}`} 
                                                                 className="h-24 w-24 object-cover rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-black/5 shadow-xs" 
                                                             />
-                                                            <span className="absolute bottom-1 left-1 bg-black/70 text-white text-[9px] font-bold px-1.5 py-0.2 rounded-md">
+                                                            <span className="absolute bottom-1 left-1 bg-black/70 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md">
                                                                 {idx + 1}
                                                             </span>
                                                             <button 
@@ -1975,6 +1975,7 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                             onChangeOutline={handleBook3dOutlineChange}
                                             uploadImageFn={uploadImageToStorage}
                                             isDemoMode={isDemoMode}
+                                            confirmAction={confirmAction}
                                             onOpenPagePreview={(pageIdx) =>
                                                 setBook3dPreviewModal({
                                                     book: {

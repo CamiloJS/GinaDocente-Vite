@@ -94,6 +94,21 @@ export default function VideosModule({
     }
   };
 
+  // Helper seguro para formatear fechas de vídeos y comentarios sin riesgo de 'Invalid Date'
+  const formatVideoDate = (val) => {
+    if (!val) return '';
+    const ms = typeof val === 'number' ? val : (val.toMillis ? val.toMillis() : (val.toDate ? val.toDate().getTime() : (val.seconds ? val.seconds * 1000 : Number(val))));
+    if (!ms || isNaN(ms)) return '';
+    return new Date(ms).toLocaleDateString([], { day: 'numeric', month: 'numeric', year: 'numeric' });
+  };
+
+  const formatCommentDate = (val) => {
+    if (!val) return '';
+    const ms = typeof val === 'number' ? val : (val.toMillis ? val.toMillis() : (val.toDate ? val.toDate().getTime() : (val.seconds ? val.seconds * 1000 : Number(val))));
+    if (!ms || isNaN(ms)) return '';
+    return new Date(ms).toLocaleDateString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
   // Helper para determinar permisos de edición y eliminación de vídeos
   const canModifyVideo = (vid) => {
     if (!vid) return false;
@@ -1125,7 +1140,7 @@ export default function VideosModule({
                             </div>
 
                             <span>•</span>
-                            <span>{new Date(video.createdAt).toLocaleDateString()}</span>
+                            <span>{formatVideoDate(video.createdAt)}</span>
                           </div>
                         </div>
                       </div>
@@ -1245,7 +1260,7 @@ export default function VideosModule({
                           <p className={`text-[10px] ${
                             isDarkMode ? 'text-gray-400' : 'text-gray-400'
                           }`}>
-                            {activePlayingVideo.authorRole === 'teacher' ? 'Docente' : 'Estudiante'} • {new Date(activePlayingVideo.createdAt).toLocaleDateString()}
+                            {activePlayingVideo.authorRole === 'teacher' ? 'Docente' : 'Estudiante'} • {formatVideoDate(activePlayingVideo.createdAt)}
                           </p>
                         </div>
                       </div>
@@ -1374,7 +1389,7 @@ export default function VideosModule({
                                 }`}>
                                   {comm.userName}
                                   {comm.userRole === 'teacher' && (
-                                    <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-[#AD3333] text-white shrink-0">
+                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-[#AD3333] text-white shrink-0">
                                       Docente
                                     </span>
                                   )}
@@ -1383,7 +1398,7 @@ export default function VideosModule({
                               <span className={`text-[10px] shrink-0 ${
                                 isDarkMode ? 'text-gray-400' : 'text-gray-400'
                               }`}>
-                                {new Date(comm.createdAt).toLocaleDateString([], { hour: '2-digit', minute: '2-digit' })}
+                                {formatCommentDate(comm.createdAt)}
                               </span>
                             </div>
 

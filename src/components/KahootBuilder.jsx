@@ -645,7 +645,7 @@ const KahootBuilder = ({
                 <div className="flex items-center gap-1 leading-none">
                   <span>{typeInfo.shortLabel}</span>
                   {norm.pointsMultiplier === 2 && (
-                    <span className="text-[9px] px-1 py-0.2 rounded bg-amber-400 text-gray-950 font-black">
+                    <span className="text-[9px] px-1 py-0.5 rounded bg-amber-400 text-gray-950 font-black">
                       x2
                     </span>
                   )}
