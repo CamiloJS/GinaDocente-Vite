@@ -11,3 +11,6 @@ Thumbs.db
 functions/serviceAccountKey.json
 serviceAccountKey.json
 *-firebase-adminsdk-*.json
+
+.vercel
+.env*
