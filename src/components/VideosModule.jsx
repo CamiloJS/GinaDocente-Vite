@@ -27,6 +27,7 @@ import {
   User
 } from './Icons.jsx';
 import { parseVideoUrl, normalizeVideoItem, deduplicateVideos } from '../utils/videoEngine.js';
+import { resolveUserPhoto } from '../utils/helpers.js';
 import {
   db as defaultDb,
   appId as defaultAppId,
@@ -53,6 +54,7 @@ export default function VideosModule({
   myChatId = 'user_guest',
   loggedInName = 'Usuario',
   user = null,
+  userMappings = {},
   academicGroups = [],
   isDarkMode = false,
   isDemoMode = false,
@@ -60,6 +62,24 @@ export default function VideosModule({
   appId = defaultAppId,
   showMessage = (msg) => console.log(msg)
 }) {
+  // Helper para resolver la foto de perfil en tiempo real de cualquier usuario / autor
+  const resolveAuthorPhoto = (item) => {
+    if (!item) return '';
+    const authorId = item.authorId || item.userId || '';
+    const authorName = item.authorName || item.userName || '';
+    const explicitPhoto = item.authorAvatar || item.userAvatar || item.photoURL || '';
+    return resolveUserPhoto({
+      id: authorId,
+      authorId,
+      userId: authorId,
+      author: authorName,
+      authorName,
+      name: authorName,
+      profilePicUrl: explicitPhoto,
+      photoURL: explicitPhoto,
+      avatar: explicitPhoto
+    }, userMappings, explicitPhoto);
+  };
   // Filtros de navegación
   const [selectedFormatFilter, setSelectedFormatFilter] = useState('all'); // 'all' | 'long' | 'short'
   const [selectedClassFilter, setSelectedClassFilter] = useState('all'); // 'all' | class name
@@ -205,7 +225,7 @@ export default function VideosModule({
       authorId: myChatId,
       authorName: loggedInName || (role === 'teacher' ? 'Docente' : 'Estudiante'),
       authorRole: role,
-      authorAvatar: user?.photoURL || '',
+      authorAvatar: resolveAuthorPhoto({ authorId: myChatId, authorName: loggedInName, authorRole: role }) || user?.photoURL || '',
       likes: [],
       comments: [],
       createdAt: now,
@@ -307,7 +327,7 @@ export default function VideosModule({
       userId: myChatId,
       userName: loggedInName || (role === 'teacher' ? 'Docente' : 'Estudiante'),
       userRole: role,
-      userAvatar: user?.photoURL || '',
+      userAvatar: resolveAuthorPhoto({ userId: myChatId, userName: loggedInName, userRole: role }) || user?.photoURL || '',
       text: cleanText,
       createdAt: now
     };
@@ -713,6 +733,7 @@ export default function VideosModule({
                   const hasLiked = (video.likes || []).includes(myChatId);
                   const canEdit = role === 'teacher' || video.authorId === myChatId;
                   const canDelete = role === 'teacher' || video.authorId === myChatId;
+                  const authorPhoto = resolveAuthorPhoto(video);
 
                   return (
                     <div
@@ -781,9 +802,23 @@ export default function VideosModule({
                         </h4>
 
                         <div className="flex items-center justify-between text-[10px] text-gray-300">
-                          <span className="truncate max-w-[60%] opacity-90">
-                            {video.authorName}
-                          </span>
+                          <div className="flex items-center gap-1.5 min-w-0 max-w-[62%]">
+                            {authorPhoto ? (
+                              <img
+                                src={authorPhoto}
+                                alt={video.authorName}
+                                className="w-4 h-4 rounded-full object-cover shrink-0 ring-1 ring-white/50"
+                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                              />
+                            ) : (
+                              <div className="w-4 h-4 rounded-full bg-white/20 text-white flex items-center justify-center font-bold text-[8px] shrink-0">
+                                {video.authorName.charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                            <span className="truncate opacity-95 text-[10.5px] text-white font-medium">
+                              {video.authorName}
+                            </span>
+                          </div>
 
                           <div className="flex items-center gap-2">
                             <button
@@ -825,11 +860,12 @@ export default function VideosModule({
               </div>
 
               {/* Grid 16:9 estilo mini-YouTube: miniaturas más grandes en escritorio y metadatos más compactos */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 min-[1400px]:grid-cols-3 gap-6 sm:gap-7">
                 {longVideos.map((video) => {
                   const hasLiked = (video.likes || []).includes(myChatId);
                   const canEdit = role === 'teacher' || video.authorId === myChatId;
                   const canDelete = role === 'teacher' || video.authorId === myChatId;
+                  const authorPhoto = resolveAuthorPhoto(video);
 
                   return (
                     <div
@@ -837,8 +873,8 @@ export default function VideosModule({
                       onClick={() => setActivePlayingVideo(video)}
                       className="group rounded-3xl overflow-hidden border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-850 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer flex flex-col justify-between"
                     >
-                      {/* Portada 16:9 */}
-                      <div className="relative aspect-video bg-gray-900 overflow-hidden">
+                      {/* Portada 16:9 de gran formato */}
+                      <div className="relative aspect-video w-full bg-gray-900 overflow-hidden">
                         {video.thumbnailUrl ? (
                           <img
                             src={video.thumbnailUrl}
@@ -847,28 +883,28 @@ export default function VideosModule({
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-950">
-                            <Film size={36} className="text-gray-600 group-hover:scale-110 transition-transform" />
+                            <Film size={40} className="text-gray-600 group-hover:scale-110 transition-transform" />
                           </div>
                         )}
 
                         {/* Botón flotante central de Play */}
                         <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition-colors">
-                          <div className="w-12 h-12 rounded-full bg-white/90 dark:bg-gray-900/90 text-gray-900 dark:text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                            <Play size={20} className="ml-0.5 fill-current" />
+                          <div className="w-13 h-13 rounded-full bg-white/95 dark:bg-gray-900/95 text-gray-900 dark:text-white flex items-center justify-center shadow-xl group-hover:scale-110 transition-transform">
+                            <Play size={22} className="ml-0.5 fill-current" />
                           </div>
                         </div>
 
                         {/* Etiqueta de la clase flotante (solo cuando está en 'all') */}
                         {selectedClassFilter === 'all' && (
-                          <div className="absolute top-2.5 left-2.5 z-10">
-                            <span className="px-2 py-0.5 rounded-lg bg-black/70 backdrop-blur-md text-[10px] font-bold text-white border border-white/10 shadow-xs">
+                          <div className="absolute top-3 left-3 z-10">
+                            <span className="px-2.5 py-0.5 rounded-lg bg-black/75 backdrop-blur-md text-[10px] font-bold text-white border border-white/10 shadow-xs">
                               {video.className}
                             </span>
                           </div>
                         )}
 
                         {/* Botones de acción flotantes (Editar y Borrar) */}
-                        <div className="absolute top-2.5 right-2.5 z-10 flex items-center gap-1.5">
+                        <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5">
                           {canEdit && (
                             <button
                               type="button"
@@ -893,47 +929,56 @@ export default function VideosModule({
                         </div>
                       </div>
 
-                      {/* Contenido inferior: compacto y equilibrado */}
-                      <div className="p-3 sm:p-3.5 space-y-2 flex-1 flex flex-col justify-between">
-                        <div className="space-y-1">
-                          <h4 className="text-xs sm:text-[13px] font-bold text-gray-900 dark:text-gray-100 line-clamp-2 leading-snug group-hover:text-[#AD3333] transition-colors">
-                            {video.title}
-                          </h4>
-
-                          {video.description && (
-                            <p className="text-[11px] text-gray-500 dark:text-gray-400 line-clamp-1 leading-normal">
-                              {video.description}
-                            </p>
+                      {/* Contenido inferior estilo YouTube: Foto de perfil destacada a la izquierda, título y autor compactos a la derecha */}
+                      <div className="p-3 sm:p-3.5 flex items-start gap-3">
+                        {/* Foto de perfil del autor */}
+                        <div className="shrink-0 mt-0.5">
+                          {authorPhoto ? (
+                            <img
+                              src={authorPhoto}
+                              alt={video.authorName}
+                              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover ring-2 ring-gray-100 dark:ring-gray-750 shadow-xs"
+                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                            />
+                          ) : (
+                            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#AD3333]/10 text-[#AD3333] dark:text-red-400 flex items-center justify-center font-extrabold text-xs ring-2 ring-gray-100 dark:ring-gray-750">
+                              {video.authorName.charAt(0).toUpperCase()}
+                            </div>
                           )}
                         </div>
 
-                        {/* Barra de autor y reacciones */}
-                        <div className="pt-2 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between text-[11px] text-gray-500">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <div className="w-5 h-5 rounded-full bg-[#AD3333]/10 text-[#AD3333] dark:text-red-400 flex items-center justify-center font-bold text-[9px] shrink-0">
-                              {video.authorName.charAt(0).toUpperCase()}
-                            </div>
-                            <span className="truncate font-medium text-gray-600 dark:text-gray-300 max-w-[130px]">
-                              {video.authorName}
-                            </span>
-                          </div>
+                        {/* Info compacta: Título arriba, autor y métricas debajo */}
+                        <div className="flex-1 min-w-0 space-y-0.5">
+                          <h4
+                            className="text-xs sm:text-[13.5px] font-bold text-gray-900 dark:text-gray-100 line-clamp-2 leading-snug group-hover:text-[#AD3333] transition-colors"
+                            title={video.title}
+                          >
+                            {video.title}
+                          </h4>
 
-                          <div className="flex items-center gap-2.5 shrink-0 text-[11px]">
+                          <p className="text-[11px] text-gray-500 dark:text-gray-400 font-medium truncate" title={video.authorName}>
+                            {video.authorName}
+                          </p>
+
+                          <div className="flex items-center gap-3 text-[11px] text-gray-400 dark:text-gray-500 pt-0.5">
                             <button
                               type="button"
                               onClick={(e) => handleToggleLike(video, e)}
                               className={`flex items-center gap-1 font-semibold transition-colors cursor-pointer ${
-                                hasLiked ? 'text-red-500' : 'text-gray-400 hover:text-red-500'
+                                hasLiked ? 'text-red-500' : 'hover:text-red-500'
                               }`}
                             >
-                              <Heart size={13} fill={hasLiked ? '#ef4444' : 'none'} />
+                              <Heart size={12} fill={hasLiked ? '#ef4444' : 'none'} />
                               <span>{(video.likes || []).length}</span>
                             </button>
 
-                            <div className="flex items-center gap-1 font-semibold text-gray-400">
-                              <MessageSquare size={13} />
+                            <div className="flex items-center gap-1 font-semibold">
+                              <MessageSquare size={12} />
                               <span>{(video.comments || []).length}</span>
                             </div>
+
+                            <span>•</span>
+                            <span>{new Date(video.createdAt).toLocaleDateString()}</span>
                           </div>
                         </div>
                       </div>
@@ -1003,12 +1048,21 @@ export default function VideosModule({
                     </h2>
 
                     <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-gray-500">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-[#AD3333]/10 text-[#AD3333] dark:text-red-400 flex items-center justify-center font-bold">
-                          {activePlayingVideo.authorName.charAt(0).toUpperCase()}
-                        </div>
+                      <div className="flex items-center gap-2.5">
+                        {resolveAuthorPhoto(activePlayingVideo) ? (
+                          <img
+                            src={resolveAuthorPhoto(activePlayingVideo)}
+                            alt={activePlayingVideo.authorName}
+                            className="w-9 h-9 rounded-full object-cover ring-2 ring-gray-100 dark:ring-gray-800 shadow-xs shrink-0"
+                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                          />
+                        ) : (
+                          <div className="w-9 h-9 rounded-full bg-[#AD3333]/10 text-[#AD3333] dark:text-red-400 flex items-center justify-center font-extrabold text-xs ring-2 ring-gray-100 dark:ring-gray-800 shrink-0">
+                            {activePlayingVideo.authorName.charAt(0).toUpperCase()}
+                          </div>
+                        )}
                         <div>
-                          <p className="font-bold text-gray-800 dark:text-gray-200">
+                          <p className="font-bold text-gray-800 dark:text-gray-200 text-xs sm:text-sm">
                             {activePlayingVideo.authorName}
                           </p>
                           <p className="text-[10px] text-gray-400">
@@ -1075,21 +1129,36 @@ export default function VideosModule({
                     ) : (
                       (activePlayingVideo.comments || []).map((comm) => {
                         const canDeleteComment = role === 'teacher' || comm.userId === myChatId;
+                        const commPhoto = resolveAuthorPhoto(comm);
                         return (
                           <div
                             key={comm.id}
                             className="p-2.5 rounded-2xl bg-white dark:bg-gray-800/80 border border-gray-100 dark:border-gray-750 text-xs space-y-1 relative group"
                           >
                             <div className="flex items-center justify-between gap-2">
-                              <span className="font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1">
-                                {comm.userName}
-                                {comm.userRole === 'teacher' && (
-                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-[#AD3333] text-white">
-                                    Docente
-                                  </span>
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                {commPhoto ? (
+                                  <img
+                                    src={commPhoto}
+                                    alt={comm.userName}
+                                    className="w-5 h-5 rounded-full object-cover shrink-0 ring-1 ring-gray-200 dark:ring-gray-700"
+                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                  />
+                                ) : (
+                                  <div className="w-5 h-5 rounded-full bg-[#AD3333]/10 text-[#AD3333] dark:text-red-400 flex items-center justify-center font-bold text-[9px] shrink-0">
+                                    {comm.userName.charAt(0).toUpperCase()}
+                                  </div>
                                 )}
-                              </span>
-                              <span className="text-[10px] text-gray-400">
+                                <span className="font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1 truncate">
+                                  {comm.userName}
+                                  {comm.userRole === 'teacher' && (
+                                    <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-[#AD3333] text-white shrink-0">
+                                      Docente
+                                    </span>
+                                  )}
+                                </span>
+                              </div>
+                              <span className="text-[10px] text-gray-400 shrink-0">
                                 {new Date(comm.createdAt).toLocaleDateString([], { hour: '2-digit', minute: '2-digit' })}
                               </span>
                             </div>

@@ -281,7 +281,7 @@ export const DEMO_VIDEOS = [
     classId: 'demo-group-ing-econ-1',
     authorName: 'Gina Marcela Quintana Delgado',
     authorRole: 'teacher',
-    authorAvatar: '',
+    authorAvatar: '/icono.png',
     format: 'long',
     likes: ['demo-student-1', 'demo-student-2', 'demo-student-3'],
     comments: [
@@ -305,7 +305,7 @@ export const DEMO_VIDEOS = [
     classId: 'demo-group-ing-tec-1',
     authorName: 'Gina Marcela Quintana Delgado',
     authorRole: 'teacher',
-    authorAvatar: '',
+    authorAvatar: '/icono.png',
     format: 'short',
     likes: ['demo-student-1', 'demo-student-4', 'demo-student-5', 'demo-student-6'],
     comments: [
@@ -329,7 +329,7 @@ export const DEMO_VIDEOS = [
     classId: 'demo-group-ing-econ-1',
     authorName: 'Gina Marcela Quintana Delgado',
     authorRole: 'teacher',
-    authorAvatar: '',
+    authorAvatar: '/icono.png',
     format: 'long',
     likes: ['demo-student-2', 'demo-student-7'],
     comments: [],

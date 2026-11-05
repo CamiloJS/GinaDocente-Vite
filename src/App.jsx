@@ -7342,6 +7342,7 @@ useEffect(() => {
                 myChatId={myChatId}
                 loggedInName={myDisplayName || loggedInName || (role === 'teacher' ? 'Docente' : 'Estudiante')}
                 user={user}
+                userMappings={userMappings}
                 academicGroups={academicGroups}
                 isDarkMode={isDarkMode}
                 isDemoMode={isDemoMode}
