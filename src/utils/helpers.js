@@ -142,6 +142,7 @@ export const resolveUserDisplayName = (itemOrId, userMappings, fallbackName = ''
   let authorId = '';
   let uid = '';
   let email = '';
+  let isExplicitStudent = false;
 
   if (typeof itemOrId === 'object' && itemOrId !== null) {
     rawAuthor = String(itemOrId.author || itemOrId.authorName || itemOrId.senderName || itemOrId.name || itemOrId.fullName || '').trim();
@@ -149,6 +150,7 @@ export const resolveUserDisplayName = (itemOrId, userMappings, fallbackName = ''
     authorId = String(itemOrId.authorId || itemOrId.userId || itemOrId.senderId || itemOrId.id || '').trim().replace(/^@/, '');
     uid = String(itemOrId.uid || '').trim();
     email = String(itemOrId.email || '').trim().toLowerCase();
+    isExplicitStudent = (itemOrId.authorRole === 'student' || itemOrId.role === 'student' || itemOrId.userRole === 'student');
   } else {
     const str = String(itemOrId).trim();
     rawAuthor = str;
@@ -158,24 +160,27 @@ export const resolveUserDisplayName = (itemOrId, userMappings, fallbackName = ''
 
   const effectiveFallback = fallbackName || rawAuthor || authorUsername || authorId || 'Usuario';
 
-  // Si es alguno de los docentes oficiales, resolver con sus nombres oficiales
-  if (isCamiloTeacher(authorUsername) || isCamiloTeacher(authorId) || isCamiloTeacher(rawAuthor)) {
-    return SECOND_TEACHER_NAME;
-  }
-  const rawAuthorLower = rawAuthor.toLowerCase();
-  if (
-    authorUsername.toLowerCase() === 'teacher' || 
-    authorUsername.toLowerCase() === 'ginadocente' || 
-    authorId.toLowerCase() === 'teacher' || 
-    authorId.toLowerCase() === 'ginadocente' ||
-    rawAuthorLower === 'profesora' || 
-    rawAuthorLower === 'profesor' || 
-    rawAuthorLower === 'la profe' || 
-    rawAuthorLower === 'docente' || 
-    rawAuthorLower === 'docente gina' ||
-    rawAuthorLower.includes('gina marcela')
-  ) {
-    return TEACHER_NAME;
+  // Si es un estudiante explícito, JAMÁS resolver como docente
+  if (!isExplicitStudent) {
+    // Si es alguno de los docentes oficiales, resolver con sus nombres oficiales
+    if (isCamiloTeacher(authorUsername) || isCamiloTeacher(authorId) || isCamiloTeacher(rawAuthor)) {
+      return SECOND_TEACHER_NAME;
+    }
+    const rawAuthorLower = rawAuthor.toLowerCase();
+    if (
+      authorUsername.toLowerCase() === 'teacher' || 
+      authorUsername.toLowerCase() === 'ginadocente' || 
+      authorId.toLowerCase() === 'teacher' || 
+      authorId.toLowerCase() === 'ginadocente' ||
+      rawAuthorLower === 'profesora' || 
+      rawAuthorLower === 'profesor' || 
+      rawAuthorLower === 'la profe' || 
+      rawAuthorLower === 'docente' || 
+      rawAuthorLower === 'docente gina' ||
+      rawAuthorLower.includes('gina marcela')
+    ) {
+      return TEACHER_NAME;
+    }
   }
 
   if (!userMappings || typeof userMappings !== 'object') {
@@ -264,6 +269,7 @@ export const resolveUserPhoto = (itemOrId, userMappings, fallbackPhoto = '') => 
   let uid = '';
   let email = '';
   let explicitPhoto = '';
+  let isExplicitStudent = false;
 
   if (typeof itemOrId === 'object' && itemOrId !== null) {
     rawAuthor = String(itemOrId.author || itemOrId.authorName || itemOrId.senderName || itemOrId.name || itemOrId.fullName || '').trim();
@@ -272,6 +278,7 @@ export const resolveUserPhoto = (itemOrId, userMappings, fallbackPhoto = '') => 
     uid = String(itemOrId.uid || '').trim();
     email = String(itemOrId.email || '').trim().toLowerCase();
     explicitPhoto = String(itemOrId.profilePicUrl || itemOrId.photoURL || itemOrId.authorPhoto || itemOrId.avatar || itemOrId.studentPhoto || '').trim();
+    isExplicitStudent = (itemOrId.authorRole === 'student' || itemOrId.role === 'student' || itemOrId.userRole === 'student');
   } else {
     const str = String(itemOrId).trim();
     rawAuthor = str;
@@ -280,28 +287,31 @@ export const resolveUserPhoto = (itemOrId, userMappings, fallbackPhoto = '') => 
   }
 
   const cleanFallback = fallbackPhoto || explicitPhoto || '';
-
-  // 1. Docentes oficiales
-  if (isCamiloTeacher(authorUsername) || isCamiloTeacher(authorId) || isCamiloTeacher(rawAuthor)) {
-    return userMappings?.[SECOND_TEACHER_ID]?.profilePicUrl || userMappings?.['camilodocente']?.profilePicUrl || FALLBACK_MAP?.[SECOND_TEACHER_ID]?.profilePicUrl || '';
-  }
-
   const rawAuthorLower = rawAuthor.toLowerCase();
   const authorUserLower = authorUsername.toLowerCase();
   const authorIdLower = authorId.toLowerCase();
-  if (
-    authorUserLower === 'teacher' || 
-    authorUserLower === 'ginadocente' || 
-    authorIdLower === 'teacher' || 
-    authorIdLower === 'ginadocente' ||
-    rawAuthorLower === 'profesora' || 
-    rawAuthorLower === 'profesor' || 
-    rawAuthorLower === 'la profe' || 
-    rawAuthorLower === 'docente' || 
-    rawAuthorLower === 'docente gina' ||
-    rawAuthorLower.includes('gina marcela')
-  ) {
-    return userMappings?.['teacher']?.profilePicUrl || userMappings?.['ginadocente']?.profilePicUrl || FALLBACK_MAP?.['teacher']?.profilePicUrl || '/icono.png';
+
+  // Si es un estudiante explícito, JAMÁS resolver fotos docentes oficiales
+  if (!isExplicitStudent) {
+    // 1. Docentes oficiales
+    if (isCamiloTeacher(authorUsername) || isCamiloTeacher(authorId) || isCamiloTeacher(rawAuthor)) {
+      return userMappings?.[SECOND_TEACHER_ID]?.profilePicUrl || userMappings?.['camilodocente']?.profilePicUrl || FALLBACK_MAP?.[SECOND_TEACHER_ID]?.profilePicUrl || '';
+    }
+
+    if (
+      authorUserLower === 'teacher' || 
+      authorUserLower === 'ginadocente' || 
+      authorIdLower === 'teacher' || 
+      authorIdLower === 'ginadocente' ||
+      rawAuthorLower === 'profesora' || 
+      rawAuthorLower === 'profesor' || 
+      rawAuthorLower === 'la profe' || 
+      rawAuthorLower === 'docente' || 
+      rawAuthorLower === 'docente gina' ||
+      rawAuthorLower.includes('gina marcela')
+    ) {
+      return userMappings?.['teacher']?.profilePicUrl || userMappings?.['ginadocente']?.profilePicUrl || FALLBACK_MAP?.['teacher']?.profilePicUrl || '/icono.png';
+    }
   }
 
   if (!userMappings || typeof userMappings !== 'object') {
@@ -370,6 +380,9 @@ export const resolveUserPhoto = (itemOrId, userMappings, fallbackPhoto = '') => 
     }
   }
 
+  if (isExplicitStudent && (cleanFallback === '/icono.png' || cleanFallback === FALLBACK_MAP?.['teacher']?.profilePicUrl)) {
+    return '';
+  }
   return cleanFallback;
 };
 

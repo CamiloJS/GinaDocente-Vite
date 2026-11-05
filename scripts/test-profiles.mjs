@@ -11,6 +11,7 @@ import {
   getCanonicalTeacherId,
   TEACHER_NAME,
   SECOND_TEACHER_NAME,
+  resolveUserDisplayName,
   resolveUserPhoto
 } from '../src/utils/helpers.js';
 
@@ -258,6 +259,76 @@ test('App.jsx y TaskCard.jsx integran resolveUserPhoto para resolver fotos en vi
   assert(taskCardJsx.includes('resolveUserPhoto(task, userMappings'), 'TaskCard debe usar resolveUserPhoto');
   assert(appJsx.includes('resolveUserPhoto'), 'App.jsx debe importar y usar resolveUserPhoto');
   assert(appJsx.includes('updateProfile'), 'App.jsx debe sincronizar la foto en Firebase Auth con updateProfile');
+});
+
+test('Docente viendo perfil de estudiante NUNCA sobreescribe la autoría del estudiante con el nombre o foto de la docente', () => {
+  const isTeacherProfile = false;
+  const isMyProfile = false; // La docente Gina está mirando el perfil ajeno de Angelly
+  const loggedInName = TEACHER_NAME; // "Gina Marcela Quintana Delgado" (30 chars, 4 palabras)
+  const userData = { fullName: 'Angelly Nicolle Pabón Torres', profilePicUrl: '' }; // (28 chars, 4 palabras)
+  const post = {
+    id: 'p_angelly',
+    authorId: 'uid_angelly',
+    authorUsername: 'nicolletorres1607',
+    authorName: 'Angelly Nicolle Pabón Torres',
+    authorRole: 'student'
+  };
+  const userMappings = {
+    nicolletorres1607: {
+      fullName: 'Angelly Nicolle Pabón Torres',
+      profilePicUrl: ''
+    }
+  };
+
+  const authorUser = userMappings[post.authorUsername];
+  const postAuthorKey = post.authorUsername || post.authorId || post.author || '';
+  const profileName = userData?.fullName;
+  const targetUserKey = 'nicolletorres1607';
+
+  // Lógica exacta de candidateNames en App.jsx
+  const candidateNames = isTeacherProfile ? [
+    isCamiloTeacher(postAuthorKey) ? SECOND_TEACHER_NAME : TEACHER_NAME,
+    post.authorName,
+    post.author
+  ] : [
+    (!isTeacherProfile && userData?.fullName && !isTeacherId(userData.fullName)) ? userData.fullName : null,
+    (authorUser?.fullName && !isTeacherId(authorUser.fullName)) ? authorUser.fullName : null,
+    resolveUserDisplayName({ ...post, authorRole: 'student' }, userMappings, ''),
+    (!isTeacherProfile && profileName && profileName !== targetUserKey && !isTeacherId(profileName)) ? profileName : null,
+    (isMyProfile && !isTeacherId(loggedInName)) ? loggedInName : null,
+    (post.authorRole === 'student' || !isTeacherId(post.authorName)) ? post.authorName : null,
+    (post.authorRole === 'student' || !isTeacherId(post.author)) ? post.author : null
+  ].filter(name => typeof name === 'string' && name.trim().length > 0 && !name.trim().startsWith('@') && !isTeacherId(name));
+
+  const authorDisplayName = isTeacherProfile
+    ? TEACHER_NAME
+    : (candidateNames.length > 0
+      ? [...candidateNames].sort((a, b) => {
+        const wordsA = a.trim().split(/\s+/).length;
+        const wordsB = b.trim().split(/\s+/).length;
+        if (wordsB !== wordsA) return wordsB - wordsA;
+        return b.trim().length - a.trim().length;
+      })[0].trim()
+      : userData.fullName);
+
+  assertEqual(authorDisplayName, 'Angelly Nicolle Pabón Torres', 'El autor debe ser la estudiante Angelly, NUNCA la docente');
+
+  const photo = resolveUserPhoto({
+    authorId: post.authorId,
+    authorUsername: post.authorUsername,
+    authorName: authorDisplayName,
+    authorRole: 'student'
+  }, userMappings, '');
+
+  assert(photo !== '/icono.png', 'La foto de la estudiante nunca debe ser /icono.png');
+});
+
+test('resolveUserPhoto para un estudiante explícito no hereda /icono.png por defecto', () => {
+  const photo = resolveUserPhoto({
+    authorName: 'Angelly Nicolle Pabón Torres',
+    authorRole: 'student'
+  }, {}, '/icono.png');
+  assertEqual(photo, '', 'Un estudiante explícito nunca debe heredar /icono.png');
 });
 
 console.log(`\n========================================`);

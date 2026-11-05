@@ -19,7 +19,7 @@ import {
 } from './firebase/config.js'
 import {
   CHAT_GRADIENTS, CHAT_PATTERNS, COMMENT_EMOJIS, FALLBACK_MAP, SLIDE_GRADIENTS,
-  TEACHER_NAME, SECOND_TEACHER_NAME, isCamiloTeacher, isTeacherId, getCanonicalTeacherId,
+  TEACHER_NAME, SECOND_TEACHER_NAME, SECOND_TEACHER_ID, isCamiloTeacher, isTeacherId, getCanonicalTeacherId,
   getTeacherDisplayName, getTeacherUsername, getItemTeacherId, isDemoSessionActive,
   compressImage, containsBadWords, checkBadWordsAsync, formatChatDate, formatTime,
   uploadImageToStorage, uploadRawFileToStorage, deleteFileFromStorage, deleteFilesFromStorage,
@@ -6910,47 +6910,74 @@ useEffect(() => {
                         const cleanPostAuthorKey = String(postAuthorKey).toLowerCase().replace(/^@/, '');
                         const authorUser = userMappings[cleanPostAuthorKey] || userMappings[post.authorUsername] || userMappings[post.authorId];
 
-                        const isPostAuthorTeacher = (
+                        const isPostAuthorTeacher = isTeacherProfile || (
                             post.authorRole === 'teacher' || 
-                            isTeacherId(post.authorUsername) || 
-                            isTeacherId(post.authorId) || 
-                            isTeacherId(post.author) ||
-                            isTeacherId(post.authorName)
+                            (post.authorRole !== 'student' && (
+                                isTeacherId(post.authorUsername) || 
+                                isTeacherId(post.authorId) || 
+                                isTeacherId(post.author) ||
+                                isTeacherId(post.authorName)
+                            ))
                         );
 
                         // Obtener todos los candidatos de nombre posibles y elegir SIEMPRE el NOMBRE COMPLETO más exhaustivo (con todos sus nombres y apellidos)
-                        const candidateNames = [
-                            isPostAuthorTeacher ? (isCamiloTeacher(postAuthorKey) ? SECOND_TEACHER_NAME : TEACHER_NAME) : null,
-                            (!isTeacherProfile && userData?.fullName) ? userData.fullName : null,
-                            authorUser?.fullName,
-                            resolveUserDisplayName(post, userMappings, ''),
-                            (!isTeacherProfile && profileName && profileName !== targetUserKey) ? profileName : null,
-                            loggedInName,
+                        // REGLA FUNDAMENTAL: Si estamos viendo el perfil de un estudiante, NINGÚN nombre de docente (ni la docente que esté mirando, ni loggedInName) puede asociarse a la publicación.
+                        const candidateNames = isTeacherProfile ? [
+                            isCamiloTeacher(postAuthorKey || targetFilterId) ? SECOND_TEACHER_NAME : TEACHER_NAME,
                             post.authorName,
                             post.author
-                        ].filter(name => typeof name === 'string' && name.trim().length > 0 && !name.trim().startsWith('@'));
+                        ] : [
+                            (!isTeacherProfile && userData?.fullName && !isTeacherId(userData.fullName)) ? userData.fullName : null,
+                            (authorUser?.fullName && !isTeacherId(authorUser.fullName)) ? authorUser.fullName : null,
+                            resolveUserDisplayName({ ...post, authorRole: 'student' }, userMappings, ''),
+                            (!isTeacherProfile && profileName && profileName !== targetUserKey && !isTeacherId(profileName)) ? profileName : null,
+                            (isMyProfile && !isTeacherId(loggedInName)) ? loggedInName : null,
+                            (post.authorRole === 'student' || !isTeacherId(post.authorName)) ? post.authorName : null,
+                            (post.authorRole === 'student' || !isTeacherId(post.author)) ? post.author : null
+                        ].filter(name => typeof name === 'string' && name.trim().length > 0 && !name.trim().startsWith('@') && !isTeacherId(name));
 
                         // Ordenar para elegir con prioridad absoluta el nombre con más palabras (y más caracteres si empatan), garantizando el nombre completo de 3, 4 o más palabras
-                        const authorDisplayName = candidateNames.length > 0
-                            ? [...candidateNames].sort((a, b) => {
-                                const wordsA = a.trim().split(/\s+/).length;
-                                const wordsB = b.trim().split(/\s+/).length;
-                                if (wordsB !== wordsA) return wordsB - wordsA;
-                                return b.trim().length - a.trim().length;
-                            })[0].trim()
-                            : (post.authorName || post.author || 'Usuario');
+                        const authorDisplayName = isTeacherProfile
+                            ? (isCamiloTeacher(postAuthorKey || targetFilterId) ? SECOND_TEACHER_NAME : TEACHER_NAME)
+                            : (candidateNames.length > 0
+                                ? [...candidateNames].sort((a, b) => {
+                                    const wordsA = a.trim().split(/\s+/).length;
+                                    const wordsB = b.trim().split(/\s+/).length;
+                                    if (wordsB !== wordsA) return wordsB - wordsA;
+                                    return b.trim().length - a.trim().length;
+                                })[0].trim()
+                                : ((userData?.fullName && !isTeacherId(userData.fullName)) ? userData.fullName : (authorUser?.fullName || (!isTeacherId(profileName) ? profileName : 'Estudiante')))
+                            );
 
-                        const authorPhoto = resolveUserPhoto(
-                            {
-                                authorId: post.authorId,
-                                authorUsername: post.authorUsername || postAuthorKey,
-                                authorName: authorDisplayName,
-                                author: post.author,
-                                uid: post.authorId || post.uid
-                            },
-                            userMappings,
-                            (!isTeacherProfile && userData?.profilePicUrl) || (targetProfilePic && cleanPostAuthorKey === cleanFilterIdLower ? targetProfilePic : '') || post.authorPhoto || ''
-                        );
+                        const rawAuthorPhoto = isTeacherProfile
+                            ? (isCamiloTeacher(postAuthorKey || targetFilterId)
+                                ? (userMappings?.[SECOND_TEACHER_ID]?.profilePicUrl || userMappings?.['camilodocente']?.profilePicUrl || '')
+                                : (userMappings?.['teacher']?.profilePicUrl || userMappings?.['ginadocente']?.profilePicUrl || '/icono.png'))
+                            : (
+                                (!isTeacherProfile && userData?.profilePicUrl && !isTeacherId(userData.profilePicUrl) && userData.profilePicUrl !== '/icono.png' ? userData.profilePicUrl : '') ||
+                                (targetProfilePic && cleanPostAuthorKey === cleanFilterIdLower && targetProfilePic !== '/icono.png' ? targetProfilePic : '') ||
+                                (authorUser?.profilePicUrl && authorUser.profilePicUrl !== '/icono.png' ? authorUser.profilePicUrl : '') ||
+                                (userMappings[cleanPostAuthorKey]?.profilePicUrl && userMappings[cleanPostAuthorKey]?.profilePicUrl !== '/icono.png' ? userMappings[cleanPostAuthorKey]?.profilePicUrl : '') ||
+                                (userMappings[post.authorUsername]?.profilePicUrl && userMappings[post.authorUsername]?.profilePicUrl !== '/icono.png' ? userMappings[post.authorUsername]?.profilePicUrl : '') ||
+                                (userMappings[post.authorId]?.profilePicUrl && userMappings[post.authorId]?.profilePicUrl !== '/icono.png' ? userMappings[post.authorId]?.profilePicUrl : '') ||
+                                (post.authorPhoto && !isTeacherId(post.authorPhoto) && post.authorPhoto !== '/icono.png' ? post.authorPhoto : '') ||
+                                resolveUserPhoto(
+                                    {
+                                        authorId: post.authorId,
+                                        authorUsername: post.authorUsername || postAuthorKey,
+                                        authorName: authorDisplayName,
+                                        author: post.author,
+                                        uid: post.authorId || post.uid,
+                                        authorRole: 'student'
+                                    },
+                                    userMappings,
+                                    ''
+                                )
+                            );
+
+                        const authorPhoto = (!isTeacherProfile && (rawAuthorPhoto === '/icono.png' || rawAuthorPhoto === FALLBACK_MAP?.['teacher']?.profilePicUrl))
+                            ? ''
+                            : rawAuthorPhoto;
 
                         return (
                         <div key={post.id} className={`${glassCard} !p-4 sm:!p-5 flex flex-col gap-3 rounded-2xl group relative w-full min-w-0 overflow-hidden break-words shadow-xs`}>
@@ -7085,7 +7112,7 @@ useEffect(() => {
                                                     type: 'post',
                                                     chatId: null,
                                                     itemId: post.id,
-                                                    authorName: post.authorName || post.author || post.authorUsername || profileName || 'Estudiante',
+                                                    authorName: authorDisplayName || profileName || 'Estudiante',
                                                     previewContent: post.title || post.text || 'Publicación',
                                                     grade: String(post.grade),
                                                     feedback: post.gradeFeedback || ''
@@ -7136,7 +7163,7 @@ useEffect(() => {
                                                     type: 'post',
                                                     chatId: null,
                                                     itemId: post.id,
-                                                    authorName: post.authorName || post.author || post.authorUsername || profileName || 'Estudiante',
+                                                    authorName: authorDisplayName || profileName || 'Estudiante',
                                                     previewContent: post.title || post.text || 'Publicación',
                                                     grade: '',
                                                     feedback: ''
