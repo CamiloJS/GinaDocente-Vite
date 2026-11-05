@@ -3,6 +3,8 @@
 // (Windows 7/10/11, Android, iOS, macOS, Linux).
 
 import { useState, useEffect } from 'react';
+import { ref, getBlob } from 'firebase/storage';
+import { storage } from '../firebase/config.js';
 
 /**
  * Extensiones reconocidas de imágenes convencionales y HEIC
@@ -193,18 +195,45 @@ export const resolveHeicUrlToDisplayable = async (url) => {
 
   const promise = (async () => {
     try {
-      const response = await fetch(url, { mode: 'cors' });
-      if (!response.ok) return url;
-      const blob = await response.blob();
-      const isHeic = isHeicFile(blob) || isHeicUrl(url) || (await isHeicBlobAsync(blob));
+      let blob = null;
 
-      if (!isHeic) {
-        heicConversionCache.set(url, url);
-        return url;
+      // 1. Si es Firebase Storage y estamos en navegador, usar getBlob nativo del SDK (elude bloqueos de Brave / CORS)
+      const lower = url.toLowerCase();
+      const isFirebase = lower.includes('firebasestorage.googleapis.com') || lower.includes('firebasestorage.app');
+      if (isFirebase && storage && typeof window !== 'undefined') {
+        try {
+          const storageRef = ref(storage, url);
+          blob = await getBlob(storageRef);
+        } catch (fbErr) {
+          console.warn('Firebase getBlob en heicConverter falló, intentando fetch:', fbErr);
+        }
       }
 
-      const convertedBlob = await convertHeicToJpeg(blob, 0.88);
-      const objectUrl = URL.createObjectURL(convertedBlob);
+      // 2. Si no es Firebase o getBlob falló, intentar fetch directo
+      if (!blob) {
+        try {
+          const response = await fetch(url, { cache: 'no-store' });
+          if (response.ok) {
+            blob = await response.blob();
+          }
+        } catch (fetchErr) {
+          console.warn('Direct fetch en heicConverter falló:', fetchErr);
+        }
+      }
+
+      if (!blob) return url;
+
+      const isHeic = isHeicFile(blob) || isHeicUrl(url) || (await isHeicBlobAsync(blob));
+
+      if (isHeic) {
+        const convertedBlob = await convertHeicToJpeg(blob, 0.88);
+        const objectUrl = URL.createObjectURL(convertedBlob);
+        heicConversionCache.set(url, objectUrl);
+        return objectUrl;
+      }
+
+      // Si no es HEIC pero obtuvimos el blob con éxito (útil cuando el <img> falló por CORS / Brave shields):
+      const objectUrl = URL.createObjectURL(blob);
       heicConversionCache.set(url, objectUrl);
       return objectUrl;
     } catch (err) {

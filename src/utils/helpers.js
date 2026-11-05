@@ -1,7 +1,7 @@
 // src/utils/helpers.js
 // Constantes globales y funciones de utilidad (migrado del HTML original)
 
-import { ref, uploadString, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
+import { ref, uploadString, uploadBytes, getDownloadURL, deleteObject, getBlob } from 'firebase/storage'
 import { storage, appId } from '../firebase/config.js'
 import { autoOptimizeFile, compressImageSilently } from './fileCompressor.js'
 import { segmentosLocales, narrarSegmentos } from './narracion.js';
@@ -986,47 +986,95 @@ export const handleForceDownload = async (url, fileName = 'documento.pdf') => {
   // Limpiar caracteres problemáticos en nombres de archivo
   safeFileName = safeFileName.replace(/["*/:<>?\\|]/g, '_');
 
-  try {
-    if (url.startsWith('data:') || url.startsWith('blob:')) {
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = safeFileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      return true;
-    }
-
-    const response = await fetch(url, { mode: 'cors' });
-    if (response.ok) {
-      const blob = await response.blob();
-      const blobUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = safeFileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => {
-        try { window.URL.revokeObjectURL(blobUrl); } catch {}
-      }, 10000);
-      return true;
-    }
-  } catch (err) {
-    console.warn('Direct blob download failed, attempting direct download trigger:', err);
-  }
-
-  // Fallback seguro si fetch tiene restricciones de red/CORS
-  try {
+  const triggerBlobDownload = (blob) => {
+    if (!blob) return false;
+    const blobUrl = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
+    a.href = blobUrl;
     a.download = safeFileName;
-    a.setAttribute('download', safeFileName);
-    a.target = '_blank';
-    a.rel = 'noopener noreferrer';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+    setTimeout(() => {
+      try { window.URL.revokeObjectURL(blobUrl); } catch {}
+    }, 15000);
+    return true;
+  };
+
+  // 1. data: o blob: directo
+  if (url.startsWith('data:') || url.startsWith('blob:')) {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = safeFileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    return true;
+  }
+
+  // 2. Firebase Storage URL nativo vía getBlob (elude 100% CORS, redirecciones y bloqueadores Brave)
+  const isFirebaseStorage = lowerUrl.includes('firebasestorage.googleapis.com') || lowerUrl.includes('firebasestorage.app');
+  if (isFirebaseStorage && storage) {
+    try {
+      const storageRef = ref(storage, url);
+      const blob = await getBlob(storageRef);
+      if (blob && triggerBlobDownload(blob)) {
+        return true;
+      }
+    } catch (fbErr) {
+      console.warn('Firebase getBlob download error, intentando fetch/XHR fallback:', fbErr);
+    }
+  }
+
+  // 3. fetch con cache: no-store para evitar desajustes de CORS cacheados
+  try {
+    const response = await fetch(url, { cache: 'no-store' });
+    if (response.ok) {
+      const blob = await response.blob();
+      if (blob && triggerBlobDownload(blob)) {
+        return true;
+      }
+    }
+  } catch (err) {
+    console.warn('Direct fetch download error, intentando XHR:', err);
+  }
+
+  // 4. XMLHttpRequest con responseType blob
+  try {
+    const blob = await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', url, true);
+      xhr.responseType = 'blob';
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(xhr.response);
+        } else {
+          reject(new Error(`XHR status ${xhr.status}`));
+        }
+      };
+      xhr.onerror = () => reject(new Error('XHR error'));
+      xhr.send();
+    });
+    if (blob && triggerBlobDownload(blob)) {
+      return true;
+    }
+  } catch (xhrErr) {
+    console.warn('XHR blob download error:', xhrErr);
+  }
+
+  // 5. Fallback en iframe oculto para NUNCA abrir una pestaña ni redirigir la página del usuario
+  try {
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.width = '1px';
+    iframe.style.height = '1px';
+    iframe.style.opacity = '0.01';
+    iframe.style.left = '-9999px';
+    iframe.src = url;
+    document.body.appendChild(iframe);
+    setTimeout(() => {
+      try { document.body.removeChild(iframe); } catch {}
+    }, 20000);
     return true;
   } catch {
     return false;

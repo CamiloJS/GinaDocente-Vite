@@ -9,6 +9,7 @@ import {
   isImageLikeFile, convertHeicToJpeg, resolveUserDisplayName, resolveUserPhoto, handleForceDownload
 } from '../utils/helpers.js'
 import UniversalImage from './UniversalImage.jsx'
+import { isImageLikeUrl, IMAGE_EXTENSIONS_REGEX } from '../utils/heicConverter.js'
 import { glassCard, glassInput } from '../utils/styles.js'
 import { useClickOutside } from '../utils/hooks.js'
 import ImageCarousel from './ImageCarousel.jsx'
@@ -132,7 +133,9 @@ const TaskCard = React.memo(({
             setPreparandoNarracion(false);
             return;
         }
-        const texto = showTranslated && translatedDescription ? translatedDescription : task.description;
+        const tituloNarrar = (showTranslated && translatedTitle ? translatedTitle : (task.title || '')).trim();
+        const cuerpoNarrar = (showTranslated && translatedDescription ? translatedDescription : (task.description || '')).trim();
+        const texto = [tituloNarrar, cuerpoNarrar].filter(Boolean).join('. ');
         if (!texto) return;
         const ticket = ++solicitudNarracionRef.current;
         setPreparandoNarracion(true);
@@ -264,29 +267,60 @@ const TaskCard = React.memo(({
     const [showCommentImageInput, setShowCommentImageInput] = useState(false);
     const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
     const [translatedDescription, setTranslatedDescription] = useState(null);
+    const [translatedTitle, setTranslatedTitle] = useState(null);
     const [isTranslating, setIsTranslating] = useState(false);
     const [showTranslated, setShowTranslated] = useState(false);
     const [hoverRating, setHoverRating] = useState(0);
 
     useEffect(() => {
         setTranslatedDescription(null);
+        setTranslatedTitle(null);
         setShowTranslated(false);
-    }, [task?.description]);
+    }, [task?.description, task?.title]);
 
-    const handleTranslateText = async (text) => {
-        if (translatedDescription) {
+    const handleTranslatePost = async () => {
+        if (translatedDescription || translatedTitle) {
             setShowTranslated(!showTranslated);
             return;
         }
         setIsTranslating(true);
         try {
-            const result = await callGemini(`Traduce el siguiente texto al español de forma fluida, natural y pedagógica. Devuelve ÚNICAMENTE la traducción directa, sin comillas ni notas adicionales:\n\n${text}`);
-            if (result) {
-                const cleanResult = result.replace(/```json/gi, '').replace(/```/gi, '').trim();
-                setTranslatedDescription(cleanResult);
-                setShowTranslated(true);
-            } else {
-                showMessage("No se pudo traducir el contenido.");
+            const titleToTranslate = (task?.title || '').trim();
+            const descToTranslate = (task?.description || '').trim();
+
+            if (titleToTranslate && descToTranslate) {
+                const prompt = `Traduce el siguiente título y descripción al español de forma fluida, natural y pedagógica. Devuelve ÚNICAMENTE un objeto JSON válido con los campos "title" y "description", sin comillas markdown adicionales ni texto extra:\n\n{"title": ${JSON.stringify(titleToTranslate)}, "description": ${JSON.stringify(descToTranslate)}}`;
+                const result = await callGemini(prompt);
+                if (result) {
+                    try {
+                        const cleanJson = result.replace(/```json/gi, '').replace(/```/gi, '').trim();
+                        const parsed = JSON.parse(cleanJson);
+                        setTranslatedTitle(parsed.title || titleToTranslate);
+                        setTranslatedDescription(parsed.description || cleanJson);
+                    } catch {
+                        const cleanResult = result.replace(/```json/gi, '').replace(/```/gi, '').trim();
+                        setTranslatedDescription(cleanResult);
+                    }
+                    setShowTranslated(true);
+                } else {
+                    showMessage("No se pudo traducir el contenido.");
+                }
+            } else if (titleToTranslate) {
+                const result = await callGemini(`Traduce el siguiente título al español de forma fluida y natural. Devuelve ÚNICAMENTE la traducción directa:\n\n${titleToTranslate}`);
+                if (result) {
+                    setTranslatedTitle(result.replace(/```/g, '').trim());
+                    setShowTranslated(true);
+                } else {
+                    showMessage("No se pudo traducir el título.");
+                }
+            } else if (descToTranslate) {
+                const result = await callGemini(`Traduce el siguiente texto al español de forma fluida, natural y pedagógica. Devuelve ÚNICAMENTE la traducción directa:\n\n${descToTranslate}`);
+                if (result) {
+                    setTranslatedDescription(result.replace(/```/g, '').trim());
+                    setShowTranslated(true);
+                } else {
+                    showMessage("No se pudo traducir la descripción.");
+                }
             }
         } catch (err) {
             showMessage("Error al procesar la traducción.");
@@ -294,6 +328,7 @@ const TaskCard = React.memo(({
             setIsTranslating(false);
         }
     };
+    const handleTranslateText = handleTranslatePost;
     const [isProcessing, setIsProcessing] = useState(false);
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [activeReactionCommentId, setActiveReactionCommentId] = useState(null);
@@ -2406,11 +2441,11 @@ const TaskCard = React.memo(({
             ) : (
                 <div className="flex items-start justify-between gap-3 mb-2 w-full">
                     <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100 leading-snug flex-1">
-                        <LinkifyText text={task.title} isDarkMode={isDarkMode} embedVideos={false} /> {isLocked && <Lock size={16} className="text-red-500 inline shrink-0 ml-1" />}
+                        <LinkifyText text={showTranslated && translatedTitle ? translatedTitle : task.title} isDarkMode={isDarkMode} embedVideos={false} /> {isLocked && <Lock size={16} className="text-red-500 inline shrink-0 ml-1" />}
                     </h3>
 
                     {/* Botón de Traducir y Escuchar arriba del texto (invisible hasta pasar mouse o tocar) */}
-                    {task.description && (
+                    {(task.description || task.title) && (
                         <div className={`flex items-center gap-1 bg-gray-100/95 dark:bg-gray-800/95 backdrop-blur-md rounded-xl p-0.5 border border-gray-200/80 dark:border-gray-700/80 shadow-2xs shrink-0 self-start transition-opacity duration-200 ${
                             showTranslated || isTranslating 
                                 ? 'opacity-100' 
@@ -2418,7 +2453,7 @@ const TaskCard = React.memo(({
                         }`}>
                             <button 
                                 type="button"
-                                onClick={() => handleTranslateText(task.description)} 
+                                onClick={handleTranslatePost} 
                                 disabled={isTranslating}
                                 className={`p-1.5 rounded-lg transition-colors ${showTranslated ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50' : 'text-gray-400 hover:text-blue-500 hover:bg-gray-200 dark:hover:bg-gray-700'}`} 
                                 title={showTranslated ? "Ver texto original" : "Traducir al español"}
@@ -2482,7 +2517,7 @@ const TaskCard = React.memo(({
                 </div>
             ) : (
                 <div className="my-2 w-full">
-                    {showTranslated && translatedDescription ? (
+                    {showTranslated && (translatedDescription || translatedTitle) ? (
                         <div className="space-y-1.5 animate-in fade-in duration-300 w-full">
                             <div className="flex items-center gap-2 text-[11px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50/80 dark:bg-blue-950/40 px-2.5 py-1 rounded-lg w-fit border border-blue-200/60 dark:border-blue-800/40">
                                 <span className="flex items-center gap-1"><Languages size={12} /> Traducido al español</span>
@@ -2495,13 +2530,15 @@ const TaskCard = React.memo(({
                                     Ver original
                                 </button>
                             </div>
-                            <div className={`text-sm leading-relaxed whitespace-pre-wrap w-full ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>
-                                <LinkifyText text={translatedDescription} isDarkMode={isDarkMode} colapsable embedVideos={!isEvaluation && !task.videoUrl && !task.imageUrl && !task.fileUrl && !task.audioUrl} />
-                            </div>
+                            {translatedDescription && (
+                                <div className={`text-sm leading-relaxed whitespace-pre-wrap w-full ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+                                    <LinkifyText text={translatedDescription} isDarkMode={isDarkMode} colapsable embedVideos={!isEvaluation && !task.videoUrl && !task.imageUrl && !task.fileUrl && !task.audioUrl} />
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <div className="space-y-1.5 w-full">
-                            {translatedDescription && !showTranslated && (
+                            {(translatedDescription || translatedTitle) && !showTranslated && (
                                 <button 
                                     type="button"
                                     onClick={() => setShowTranslated(true)} 
@@ -2510,9 +2547,11 @@ const TaskCard = React.memo(({
                                     <Languages size={12} /> Ver traducción al español
                                 </button>
                             )}
-                            <div className={`text-sm leading-relaxed whitespace-pre-wrap w-full ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>
-                                <LinkifyText text={task.description} isDarkMode={isDarkMode} colapsable embedVideos={!isEvaluation && !task.videoUrl && !task.imageUrl && !task.fileUrl && !task.audioUrl} />
-                            </div>
+                            {task.description && (
+                                <div className={`text-sm leading-relaxed whitespace-pre-wrap w-full ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+                                    <LinkifyText text={task.description} isDarkMode={isDarkMode} colapsable embedVideos={!isEvaluation && !task.videoUrl && !task.imageUrl && !task.fileUrl && !task.audioUrl} />
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -4179,7 +4218,7 @@ const TaskCard = React.memo(({
                                     )}
                                 </h3>
                                 <p className={`text-xs font-medium mt-0.5 truncate max-w-[200px] sm:max-w-md ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                                    <LinkifyText text={task.title} isDarkMode={isDarkMode} embedVideos={false} />
+                                    <LinkifyText text={showTranslated && translatedTitle ? translatedTitle : task.title} isDarkMode={isDarkMode} embedVideos={false} />
                                 </p>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
@@ -4308,7 +4347,7 @@ const TaskCard = React.memo(({
                                 </div>
 
                                 <h3 className="text-base sm:text-lg font-black text-gray-900 dark:text-gray-100 leading-snug mb-2.5">
-                                    <LinkifyText text={task.title} isDarkMode={isDarkMode} embedVideos={false} />
+                                    <LinkifyText text={showTranslated && translatedTitle ? translatedTitle : task.title} isDarkMode={isDarkMode} embedVideos={false} />
                                 </h3>
 
                                 {task.description && (
@@ -4640,7 +4679,9 @@ const TaskCard = React.memo(({
                                                 )}
                                                 {c.text && <div className={`text-xs leading-relaxed ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>{<LinkifyText text={c.text} />}</div>}
                                                 {(() => {
-                                                    const imgs = Array.isArray(c.imageUrls) && c.imageUrls.length > 0 ? c.imageUrls : (c.imageUrl ? [c.imageUrl] : []);
+                                                    const rawImgs = Array.isArray(c.imageUrls) && c.imageUrls.length > 0 ? c.imageUrls : (c.imageUrl ? [c.imageUrl] : []);
+                                                    const isFileAnImage = c.fileUrl && (isImageLikeUrl(c.fileUrl) || IMAGE_EXTENSIONS_REGEX.test(c.fileName || ''));
+                                                    const imgs = [...rawImgs, (isFileAnImage && !rawImgs.includes(c.fileUrl) ? c.fileUrl : null)].filter(Boolean);
                                                     if (imgs.length === 0) return null;
                                                     return (
                                                         <div className="flex flex-wrap gap-2">
@@ -4657,7 +4698,7 @@ const TaskCard = React.memo(({
                                                     );
                                                 })()}
                                                 {c.audioUrl && <div className="mt-1"><AudioPlayer src={c.audioUrl} title="" isDarkMode={isDarkMode} compact={true} /></div>}
-                                                {c.fileUrl && (
+                                                {c.fileUrl && !(isImageLikeUrl(c.fileUrl) || IMAGE_EXTENSIONS_REGEX.test(c.fileName || '')) && (
                                                     <div className="flex items-center gap-2 flex-wrap mt-1">
                                                         <button 
                                                             type="button"

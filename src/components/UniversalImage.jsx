@@ -41,15 +41,20 @@ export const UniversalImage = ({
         </span>
         {showDownloadOnFail && (
           <div className="flex items-center gap-1.5 mt-1.5">
-            <a
-              href={src}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 border border-blue-200 dark:border-blue-800/60"
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onClick) {
+                  onClick(e);
+                } else {
+                  window.open(src, '_blank', 'noopener,noreferrer');
+                }
+              }}
+              className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 border border-blue-200 dark:border-blue-800/60 cursor-pointer"
             >
               <ExternalLink size={10} /> Abrir
-            </a>
+            </button>
             <button
               type="button"
               onClick={(e) => {
@@ -79,6 +84,7 @@ export const UniversalImage = ({
         alt={alt}
         loading={loading}
         decoding={decoding}
+        referrerPolicy="no-referrer"
         onError={handleNativeError}
         onClick={onClick}
         className={`${className} ${isConverting ? 'opacity-40' : 'opacity-100 transition-opacity duration-200'}`}
