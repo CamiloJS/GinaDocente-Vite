@@ -16,6 +16,7 @@ import {
   MessageSquare,
   Share2,
   Trash2,
+  Edit3,
   ExternalLink,
   Clapperboard,
   Filter,
@@ -58,6 +59,10 @@ export default function VideosModule({
   // Modales
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [activePlayingVideo, setActivePlayingVideo] = useState(null);
+  const [editingVideo, setEditingVideo] = useState(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   // Formulario de nuevo vídeo
   const [newVideoUrl, setNewVideoUrl] = useState('');
@@ -394,6 +399,63 @@ export default function VideosModule({
     }
   };
 
+  // Manejador: Abrir modal de edición
+  const handleOpenEditModal = (video, e) => {
+    if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+    if (!video) return;
+    setEditingVideo(video);
+    setEditTitle(video.title || '');
+    setEditDescription(video.description || '');
+  };
+
+  // Manejador: Guardar cambios de edición (Título y Descripción)
+  const handleSaveEditVideo = async (e) => {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    if (!editingVideo || isSavingEdit) return;
+
+    const cleanTitle = editTitle.trim();
+    if (!cleanTitle) {
+      showMessage('Por favor escribe un título para el vídeo.');
+      return;
+    }
+
+    setIsSavingEdit(true);
+    const now = Date.now();
+    const updatedVideo = {
+      ...editingVideo,
+      title: cleanTitle,
+      description: editDescription.trim(),
+      updatedAt: now
+    };
+
+    // Actualización optimista en memoria
+    if (typeof setVideos === 'function') {
+      setVideos(prev => (prev || []).map(v => String(v?.id) === String(editingVideo.id) ? updatedVideo : v));
+    }
+    if (activePlayingVideo && String(activePlayingVideo.id) === String(editingVideo.id)) {
+      setActivePlayingVideo(updatedVideo);
+    }
+
+    try {
+      if (isDemoMode || String(editingVideo.id).startsWith('demo_')) {
+        saveDemoSandboxItem('videos', updatedVideo);
+      } else {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'videos', String(editingVideo.id)), {
+          title: cleanTitle,
+          description: editDescription.trim(),
+          updatedAt: now
+        });
+      }
+      showMessage('Vídeo actualizado con éxito.');
+      setEditingVideo(null);
+    } catch (err) {
+      console.error('Error al editar vídeo:', err);
+      showMessage('No se pudieron guardar los cambios del vídeo.');
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
   // Componente de Renderizado del Reproductor embebido
   const renderEmbeddedPlayer = (video, isTheater = false) => {
     if (!video) return null;
@@ -640,6 +702,7 @@ export default function VideosModule({
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
                 {shortVideos.map((video) => {
                   const hasLiked = (video.likes || []).includes(myChatId);
+                  const canEdit = role === 'teacher' || video.authorId === myChatId;
                   const canDelete = role === 'teacher' || video.authorId === myChatId;
 
                   return (
@@ -662,22 +725,37 @@ export default function VideosModule({
                       {/* Overlay con degradado para legibilidad del texto */}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/40 group-hover:via-black/20 transition-all" />
 
-                      {/* Header de la tarjeta vertical: Etiqueta de la clase y acciones */}
+                      {/* Header de la tarjeta vertical: Etiqueta de la clase (solo en 'all') y acciones */}
                       <div className="relative z-10 flex items-start justify-between gap-1">
-                        <span className="px-2 py-0.5 rounded-lg bg-black/60 backdrop-blur-md text-[10px] font-black text-white border border-white/10 truncate max-w-[80%]">
-                          {video.className}
-                        </span>
+                        {selectedClassFilter === 'all' ? (
+                          <span className="px-2 py-0.5 rounded-lg bg-black/60 backdrop-blur-md text-[10px] font-black text-white border border-white/10 truncate max-w-[70%]">
+                            {video.className}
+                          </span>
+                        ) : <div />}
 
-                        {canDelete && (
-                          <button
-                            type="button"
-                            onClick={(e) => handleDeleteVideo(video, e)}
-                            title="Eliminar vídeo"
-                            className="p-1 rounded-md bg-black/50 text-white/70 hover:text-red-400 hover:bg-black/80 transition-colors"
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        )}
+                        <div className="flex items-center gap-1 shrink-0">
+                          {canEdit && (
+                            <button
+                              type="button"
+                              onClick={(e) => handleOpenEditModal(video, e)}
+                              title="Editar vídeo"
+                              className="p-1 rounded-md bg-black/50 text-white/70 hover:text-white hover:bg-black/80 transition-colors cursor-pointer"
+                            >
+                              <Edit3 size={12} />
+                            </button>
+                          )}
+
+                          {canDelete && (
+                            <button
+                              type="button"
+                              onClick={(e) => handleDeleteVideo(video, e)}
+                              title="Eliminar vídeo"
+                              className="p-1 rounded-md bg-black/50 text-white/70 hover:text-red-400 hover:bg-black/80 transition-colors cursor-pointer"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       {/* Botón flotante central de Play al hacer hover */}
@@ -737,10 +815,11 @@ export default function VideosModule({
                 </span>
               </div>
 
-              {/* Grid 16:9 estilo mini-YouTube */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {/* Grid 16:9 estilo mini-YouTube: miniaturas más grandes en escritorio y metadatos más compactos */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-5">
                 {longVideos.map((video) => {
                   const hasLiked = (video.likes || []).includes(myChatId);
+                  const canEdit = role === 'teacher' || video.authorId === myChatId;
                   const canDelete = role === 'teacher' || video.authorId === myChatId;
 
                   return (
@@ -770,65 +849,80 @@ export default function VideosModule({
                           </div>
                         </div>
 
-                        {/* Etiqueta de la clase flotante */}
-                        <div className="absolute top-3 left-3">
-                          <span className="px-2.5 py-1 rounded-xl bg-black/70 backdrop-blur-md text-[11px] font-black text-white border border-white/10 shadow-sm">
-                            {video.className}
-                          </span>
-                        </div>
-
-                        {/* Botón borrar */}
-                        {canDelete && (
-                          <button
-                            type="button"
-                            onClick={(e) => handleDeleteVideo(video, e)}
-                            title="Eliminar vídeo"
-                            className="absolute top-3 right-3 p-1.5 rounded-xl bg-black/60 text-white/70 hover:text-red-400 hover:bg-black/90 transition-colors"
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                        {/* Etiqueta de la clase flotante (solo cuando está en 'all') */}
+                        {selectedClassFilter === 'all' && (
+                          <div className="absolute top-2.5 left-2.5 z-10">
+                            <span className="px-2 py-0.5 rounded-lg bg-black/70 backdrop-blur-md text-[10px] font-bold text-white border border-white/10 shadow-xs">
+                              {video.className}
+                            </span>
+                          </div>
                         )}
+
+                        {/* Botones de acción flotantes (Editar y Borrar) */}
+                        <div className="absolute top-2.5 right-2.5 z-10 flex items-center gap-1.5">
+                          {canEdit && (
+                            <button
+                              type="button"
+                              onClick={(e) => handleOpenEditModal(video, e)}
+                              title="Editar vídeo"
+                              className="p-1.5 rounded-xl bg-black/60 text-white/80 hover:text-white hover:bg-black/90 transition-colors shadow-xs cursor-pointer"
+                            >
+                              <Edit3 size={13} />
+                            </button>
+                          )}
+
+                          {canDelete && (
+                            <button
+                              type="button"
+                              onClick={(e) => handleDeleteVideo(video, e)}
+                              title="Eliminar vídeo"
+                              className="p-1.5 rounded-xl bg-black/60 text-white/70 hover:text-red-400 hover:bg-black/90 transition-colors shadow-xs cursor-pointer"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          )}
+                        </div>
                       </div>
 
-                      {/* Contenido inferior */}
-                      <div className="p-4 space-y-3 flex-1 flex flex-col justify-between">
-                        <div className="space-y-1.5">
-                          <h4 className="text-sm sm:text-base font-extrabold text-gray-900 dark:text-gray-100 line-clamp-2 leading-snug group-hover:text-[#AD3333] transition-colors">
+                      {/* Contenido inferior: compacto y equilibrado */}
+                      <div className="p-3 sm:p-3.5 space-y-2 flex-1 flex flex-col justify-between">
+                        <div className="space-y-1">
+                          <h4 className="text-xs sm:text-[13px] font-bold text-gray-900 dark:text-gray-100 line-clamp-2 leading-snug group-hover:text-[#AD3333] transition-colors">
                             {video.title}
                           </h4>
 
                           {video.description && (
-                            <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+                            <p className="text-[11px] text-gray-500 dark:text-gray-400 line-clamp-1 leading-normal">
                               {video.description}
                             </p>
                           )}
                         </div>
 
                         {/* Barra de autor y reacciones */}
-                        <div className="pt-2 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between text-xs text-gray-500">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div className="w-6 h-6 rounded-full bg-[#AD3333]/10 text-[#AD3333] dark:text-red-400 flex items-center justify-center font-bold text-[10px] shrink-0">
+                        <div className="pt-2 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between text-[11px] text-gray-500">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <div className="w-5 h-5 rounded-full bg-[#AD3333]/10 text-[#AD3333] dark:text-red-400 flex items-center justify-center font-bold text-[9px] shrink-0">
                               {video.authorName.charAt(0).toUpperCase()}
                             </div>
-                            <span className="truncate font-semibold text-gray-700 dark:text-gray-300">
+                            <span className="truncate font-medium text-gray-600 dark:text-gray-300 max-w-[130px]">
                               {video.authorName}
                             </span>
                           </div>
 
-                          <div className="flex items-center gap-3 shrink-0">
+                          <div className="flex items-center gap-2.5 shrink-0 text-[11px]">
                             <button
                               type="button"
                               onClick={(e) => handleToggleLike(video, e)}
-                              className={`flex items-center gap-1 font-bold transition-colors ${
+                              className={`flex items-center gap-1 font-semibold transition-colors cursor-pointer ${
                                 hasLiked ? 'text-red-500' : 'text-gray-400 hover:text-red-500'
                               }`}
                             >
-                              <Heart size={14} fill={hasLiked ? '#ef4444' : 'none'} />
+                              <Heart size={13} fill={hasLiked ? '#ef4444' : 'none'} />
                               <span>{(video.likes || []).length}</span>
                             </button>
 
-                            <div className="flex items-center gap-1 font-bold text-gray-400">
-                              <MessageSquare size={14} />
+                            <div className="flex items-center gap-1 font-semibold text-gray-400">
+                              <MessageSquare size={13} />
                               <span>{(video.comments || []).length}</span>
                             </div>
                           </div>
@@ -840,8 +934,7 @@ export default function VideosModule({
               </div>
             </div>
           )}
-        </div>,
-        document.body
+        </div>
       )}
 
       {/* ================= MODAL DEL REPRODUCTOR INMERSIVO (CINE / THEATER) ================= */}
@@ -917,6 +1010,18 @@ export default function VideosModule({
 
                       {/* Botones de acción */}
                       <div className="flex items-center gap-2">
+                        {(role === 'teacher' || activePlayingVideo.authorId === myChatId) && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditModal(activePlayingVideo)}
+                            className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer"
+                            title="Editar título y descripción"
+                          >
+                            <Edit3 size={13} />
+                            <span>Editar</span>
+                          </button>
+                        )}
+
                         <button
                           type="button"
                           onClick={(e) => handleToggleLike(activePlayingVideo, e)}
@@ -1211,6 +1316,97 @@ export default function VideosModule({
                     </>
                   ) : (
                     <span>Publicar vídeo</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ================= MODAL EDITAR VÍDEO (TÍTULO Y DESCRIPCIÓN) ================= */}
+      {editingVideo && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="w-full max-w-lg bg-white dark:bg-gray-900 rounded-3xl shadow-2xl border border-gray-200 dark:border-gray-800 p-5 sm:p-6 space-y-4 animate-in zoom-in-95 duration-200">
+            {/* Header del Modal */}
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-gray-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-[#AD3333]/10 text-[#AD3333] dark:text-red-400 flex items-center justify-center font-black">
+                  <Edit3 size={16} />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-gray-900 dark:text-gray-100">
+                    Editar vídeo
+                  </h3>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                    Modifica el título o la descripción del vídeo
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setEditingVideo(null)}
+                className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Formulario */}
+            <form onSubmit={handleSaveEditVideo} className="space-y-4">
+              {/* 1. Título */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                  Título del vídeo *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  placeholder="Título del vídeo..."
+                  className="w-full p-2.5 rounded-xl border text-xs outline-none bg-gray-50 dark:bg-gray-800/80 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 focus:border-[#AD3333] transition-colors"
+                />
+              </div>
+
+              {/* 2. Descripción */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                  Descripción (opcional)
+                </label>
+                <textarea
+                  rows={3}
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  placeholder="Explica brevemente los conceptos clave o actividades relacionadas..."
+                  className="w-full p-2.5 rounded-xl border text-xs outline-none bg-gray-50 dark:bg-gray-800/80 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 focus:border-[#AD3333] resize-none"
+                />
+              </div>
+
+              {/* Botones de acción */}
+              <div className="flex items-center justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingVideo(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isSavingEdit || !editTitle.trim()}
+                  className="px-5 py-2 rounded-xl bg-[#AD3333] hover:bg-[#8f2828] text-white text-xs font-bold flex items-center gap-1.5 shadow-md transition-all disabled:opacity-50 cursor-pointer"
+                >
+                  {isSavingEdit ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      <span>Guardando...</span>
+                    </>
+                  ) : (
+                    <span>Guardar cambios</span>
                   )}
                 </button>
               </div>
