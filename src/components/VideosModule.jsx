@@ -108,6 +108,59 @@ export default function VideosModule({
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const commentsEndRef = useRef(null);
 
+  // Copiar al portapapeles con fallback robusto para todos los navegadores
+  const copyToClipboard = async (text) => {
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        showMessage('Enlace copiado al portapapeles.');
+        return;
+      }
+    } catch (e) {}
+    try {
+      const el = document.createElement('textarea');
+      el.value = text;
+      el.style.position = 'fixed';
+      el.style.opacity = '0';
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+      showMessage('Enlace copiado al portapapeles.');
+    } catch (err) {
+      showMessage('No se pudo copiar el enlace.');
+    }
+  };
+
+  // Cerrar modales con la tecla Escape
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (editingVideo) {
+          setEditingVideo(null);
+        } else if (isUploadModalOpen) {
+          setIsUploadModalOpen(false);
+        } else if (activePlayingVideo) {
+          setActivePlayingVideo(null);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [editingVideo, isUploadModalOpen, activePlayingVideo]);
+
+  // Bloqueo de scroll en body al abrir modales para evitar scroll doble en móviles
+  useEffect(() => {
+    const isAnyModalOpen = Boolean(activePlayingVideo || isUploadModalOpen || editingVideo);
+    if (isAnyModalOpen && typeof document !== 'undefined' && document.body) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [activePlayingVideo, isUploadModalOpen, editingVideo]);
+
   // Inicializar clase por defecto
   useEffect(() => {
     if (academicGroups && academicGroups.length > 0 && !newVideoClass) {
@@ -292,9 +345,9 @@ export default function VideosModule({
 
     // Actualización optimista local
     if (typeof setVideos === 'function') {
-      setVideos(prev => (prev || []).map(v => (v.id === video.id ? updatedVideo : v)));
+      setVideos(prev => (prev || []).map(v => (String(v?.id) === String(video.id) ? updatedVideo : v)));
     }
-    if (activePlayingVideo && activePlayingVideo.id === video.id) {
+    if (activePlayingVideo && String(activePlayingVideo.id) === String(video.id)) {
       setActivePlayingVideo(updatedVideo);
     }
 
@@ -344,7 +397,7 @@ export default function VideosModule({
     // Actualización optimista
     setActivePlayingVideo(updatedVideo);
     if (typeof setVideos === 'function') {
-      setVideos(prev => (prev || []).map(v => (v.id === activePlayingVideo.id ? updatedVideo : v)));
+      setVideos(prev => (prev || []).map(v => (String(v?.id) === String(activePlayingVideo.id) ? updatedVideo : v)));
     }
     setCommentInput('');
 
@@ -371,8 +424,9 @@ export default function VideosModule({
   // Manejador: Eliminar comentario
   const handleDeleteComment = async (commentId) => {
     if (!activePlayingVideo || !commentId) return;
+    if (!window.confirm('¿Deseas eliminar este comentario?')) return;
     const currentComments = Array.isArray(activePlayingVideo.comments) ? activePlayingVideo.comments : [];
-    const updatedComments = currentComments.filter(c => c.id !== commentId);
+    const updatedComments = currentComments.filter(c => String(c?.id) !== String(commentId));
 
     const updatedVideo = {
       ...activePlayingVideo,
@@ -382,7 +436,7 @@ export default function VideosModule({
 
     setActivePlayingVideo(updatedVideo);
     if (typeof setVideos === 'function') {
-      setVideos(prev => (prev || []).map(v => (v.id === activePlayingVideo.id ? updatedVideo : v)));
+      setVideos(prev => (prev || []).map(v => (String(v?.id) === String(activePlayingVideo.id) ? updatedVideo : v)));
     }
 
     try {
@@ -489,6 +543,26 @@ export default function VideosModule({
   const renderEmbeddedPlayer = (video, isTheater = false) => {
     if (!video) return null;
     const { playerType, embedUrl, title, url } = video;
+
+    if (!embedUrl) {
+      return (
+        <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center bg-gray-900 text-white rounded-2xl space-y-3">
+          <Film size={36} className="text-gray-400" />
+          <p className="text-xs sm:text-sm font-semibold max-w-sm">Este formato se reproduce mejor en su enlace original.</p>
+          {url && (
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2 rounded-xl bg-[#AD3333] hover:bg-[#8f2828] text-white text-xs font-bold inline-flex items-center gap-2 transition-all cursor-pointer"
+            >
+              <span>Abrir enlace del vídeo</span>
+              <ExternalLink size={14} />
+            </a>
+          )}
+        </div>
+      );
+    }
 
     // 1. YouTube
     if (playerType === 'youtube' && embedUrl) {
@@ -811,18 +885,19 @@ export default function VideosModule({
 
                         <div className="flex items-center justify-between text-[10px] text-gray-300">
                           <div className="flex items-center gap-1.5 min-w-0 max-w-[62%]">
-                            {authorPhoto ? (
-                              <img
-                                src={authorPhoto}
-                                alt={video.authorName}
-                                className="w-4 h-4 rounded-full object-cover shrink-0 ring-1 ring-white/50"
-                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                              />
-                            ) : (
-                              <div className="w-4 h-4 rounded-full bg-white/20 text-white flex items-center justify-center font-bold text-[8px] shrink-0">
-                                {video.authorName.charAt(0).toUpperCase()}
+                            <div className="relative w-4 h-4 rounded-full overflow-hidden shrink-0 ring-1 ring-white/50 bg-white/20">
+                              <div className="w-full h-full text-white flex items-center justify-center font-bold text-[8px]">
+                                {(video.authorName || 'U').charAt(0).toUpperCase()}
                               </div>
-                            )}
+                              {authorPhoto && (
+                                <img
+                                  src={authorPhoto}
+                                  alt={video.authorName}
+                                  className="absolute inset-0 w-full h-full object-cover"
+                                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                />
+                              )}
+                            </div>
                             <span className="truncate opacity-95 text-[10.5px] text-white font-medium">
                               {video.authorName}
                             </span>
@@ -945,24 +1020,21 @@ export default function VideosModule({
                       <div className="p-3 sm:p-3.5 flex items-start gap-3">
                         {/* Foto de perfil del autor */}
                         <div className="shrink-0 mt-0.5">
-                          {authorPhoto ? (
-                            <img
-                              src={authorPhoto}
-                              alt={video.authorName}
-                              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover ring-2 shadow-xs ${
-                                isDarkMode ? 'ring-gray-700' : 'ring-gray-100'
-                              }`}
-                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                            />
-                          ) : (
-                            <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-extrabold text-xs ring-2 ${
-                              isDarkMode
-                                ? 'bg-red-950/40 text-red-400 ring-gray-700'
-                                : 'bg-[#AD3333]/10 text-[#AD3333] ring-gray-100'
-                            }`}>
-                              {video.authorName.charAt(0).toUpperCase()}
+                          <div className={`relative w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden shrink-0 ring-2 shadow-xs ${
+                            isDarkMode ? 'ring-gray-700 bg-red-950/40 text-red-400' : 'ring-gray-100 bg-[#AD3333]/10 text-[#AD3333]'
+                          }`}>
+                            <div className="w-full h-full flex items-center justify-center font-extrabold text-xs">
+                              {(video.authorName || 'U').charAt(0).toUpperCase()}
                             </div>
-                          )}
+                            {authorPhoto && (
+                              <img
+                                src={authorPhoto}
+                                alt={video.authorName}
+                                className="absolute inset-0 w-full h-full object-cover"
+                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                              />
+                            )}
+                          </div>
                         </div>
 
                         {/* Info compacta: Título arriba, autor y métricas debajo */}
@@ -1017,12 +1089,18 @@ export default function VideosModule({
 
       {/* ================= MODAL DEL REPRODUCTOR INMERSIVO (CINE / THEATER) ================= */}
       {activePlayingVideo && renderPortal(
-        <div className={`fixed inset-0 z-[99999] flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200 ${isDarkMode ? 'dark' : ''}`}>
-          <div className={`relative w-full max-w-5xl max-h-[92vh] rounded-3xl shadow-2xl border overflow-hidden flex flex-col ${
-            isDarkMode
-              ? 'bg-gray-900 border-gray-800 text-gray-100'
-              : 'bg-white border-gray-200 text-gray-900'
-          }`}>
+        <div
+          onClick={() => setActivePlayingVideo(null)}
+          className={`fixed inset-0 z-[99999] flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200 cursor-pointer ${isDarkMode ? 'dark' : ''}`}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className={`relative w-full max-w-5xl max-h-[92vh] rounded-3xl shadow-2xl border overflow-hidden flex flex-col cursor-default ${
+              isDarkMode
+                ? 'bg-gray-900 border-gray-800 text-gray-100'
+                : 'bg-white border-gray-200 text-gray-900'
+            }`}
+          >
             {/* Barra superior del modal */}
             <div className={`px-4 py-3 border-b flex items-center justify-between gap-3 ${
               isDarkMode
@@ -1038,10 +1116,7 @@ export default function VideosModule({
               <div className="flex items-center gap-2 shrink-0">
                 <button
                   type="button"
-                  onClick={() => {
-                    navigator.clipboard.writeText(activePlayingVideo.url);
-                    showMessage('Enlace copiado al portapapeles.');
-                  }}
+                  onClick={() => copyToClipboard(activePlayingVideo.url)}
                   title="Copiar enlace del vídeo"
                   className={`p-1.5 rounded-xl transition-colors cursor-pointer ${
                     isDarkMode
@@ -1095,24 +1170,21 @@ export default function VideosModule({
                       isDarkMode ? 'text-gray-400' : 'text-gray-500'
                     }`}>
                       <div className="flex items-center gap-2.5">
-                        {resolveAuthorPhoto(activePlayingVideo) ? (
-                          <img
-                            src={resolveAuthorPhoto(activePlayingVideo)}
-                            alt={activePlayingVideo.authorName}
-                            className={`w-9 h-9 rounded-full object-cover ring-2 shadow-xs shrink-0 ${
-                              isDarkMode ? 'ring-gray-700' : 'ring-gray-100'
-                            }`}
-                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                          />
-                        ) : (
-                          <div className={`w-9 h-9 rounded-full flex items-center justify-center font-extrabold text-xs ring-2 shrink-0 ${
-                            isDarkMode
-                              ? 'bg-red-950/40 text-red-400 ring-gray-700'
-                              : 'bg-[#AD3333]/10 text-[#AD3333] ring-gray-100'
-                          }`}>
-                            {activePlayingVideo.authorName.charAt(0).toUpperCase()}
+                        <div className={`relative w-9 h-9 rounded-full overflow-hidden shrink-0 ring-2 shadow-xs ${
+                          isDarkMode ? 'ring-gray-700 bg-red-950/40 text-red-400' : 'ring-gray-100 bg-[#AD3333]/10 text-[#AD3333]'
+                        }`}>
+                          <div className="w-full h-full flex items-center justify-center font-extrabold text-xs">
+                            {(activePlayingVideo.authorName || 'U').charAt(0).toUpperCase()}
                           </div>
-                        )}
+                          {resolveAuthorPhoto(activePlayingVideo) && (
+                            <img
+                              src={resolveAuthorPhoto(activePlayingVideo)}
+                              alt={activePlayingVideo.authorName}
+                              className="absolute inset-0 w-full h-full object-cover"
+                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                            />
+                          )}
+                        </div>
                         <div>
                           <p className={`font-bold text-xs sm:text-sm ${
                             isDarkMode ? 'text-gray-100' : 'text-gray-800'
@@ -1130,19 +1202,35 @@ export default function VideosModule({
                       {/* Botones de acción */}
                       <div className="flex items-center gap-2">
                         {(role === 'teacher' || activePlayingVideo.authorId === myChatId) && (
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEditModal(activePlayingVideo)}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                              isDarkMode
-                                ? 'bg-gray-800 text-gray-200 hover:bg-gray-700'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                            title="Editar título y descripción"
-                          >
-                            <Edit3 size={13} />
-                            <span>Editar</span>
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditModal(activePlayingVideo)}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                                isDarkMode
+                                  ? 'bg-gray-800 text-gray-200 hover:bg-gray-700'
+                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                              }`}
+                              title="Editar título y descripción"
+                            >
+                              <Edit3 size={13} />
+                              <span>Editar</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={(e) => handleDeleteVideo(activePlayingVideo, e)}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                                isDarkMode
+                                  ? 'bg-gray-800 text-red-400 hover:bg-red-950/40 hover:text-red-300'
+                                  : 'bg-gray-100 text-red-600 hover:bg-red-50 hover:text-red-700'
+                              }`}
+                              title="Eliminar vídeo de la videoteca"
+                            >
+                              <Trash2 size={13} />
+                              <span className="hidden sm:inline">Eliminar</span>
+                            </button>
+                          </>
                         )}
 
                         <button
@@ -1215,22 +1303,21 @@ export default function VideosModule({
                           >
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex items-center gap-1.5 min-w-0">
-                                {commPhoto ? (
-                                  <img
-                                    src={commPhoto}
-                                    alt={comm.userName}
-                                    className={`w-5 h-5 rounded-full object-cover shrink-0 ring-1 ${
-                                      isDarkMode ? 'ring-gray-700' : 'ring-gray-200'
-                                    }`}
-                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                  />
-                                ) : (
-                                  <div className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[9px] shrink-0 ${
-                                    isDarkMode ? 'bg-red-950/40 text-red-400' : 'bg-[#AD3333]/10 text-[#AD3333]'
-                                  }`}>
-                                    {comm.userName.charAt(0).toUpperCase()}
+                                <div className={`relative w-5 h-5 rounded-full overflow-hidden shrink-0 ring-1 ${
+                                  isDarkMode ? 'ring-gray-700 bg-red-950/40 text-red-400' : 'ring-gray-200 bg-[#AD3333]/10 text-[#AD3333]'
+                                }`}>
+                                  <div className="w-full h-full flex items-center justify-center font-bold text-[9px]">
+                                    {(comm.userName || 'U').charAt(0).toUpperCase()}
                                   </div>
-                                )}
+                                  {commPhoto && (
+                                    <img
+                                      src={commPhoto}
+                                      alt={comm.userName}
+                                      className="absolute inset-0 w-full h-full object-cover"
+                                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                    />
+                                  )}
+                                </div>
                                 <span className={`font-bold flex items-center gap-1 truncate ${
                                   isDarkMode ? 'text-gray-100' : 'text-gray-900'
                                 }`}>
@@ -1260,7 +1347,7 @@ export default function VideosModule({
                                 type="button"
                                 onClick={() => handleDeleteComment(comm.id)}
                                 title="Borrar comentario"
-                                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-400 transition-opacity cursor-pointer"
+                                className="absolute top-2 right-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-1 text-gray-400 hover:text-red-400 transition-opacity cursor-pointer"
                               >
                                 <Trash2 size={12} />
                               </button>
@@ -1306,12 +1393,18 @@ export default function VideosModule({
 
       {/* ================= MODAL SUBIR VÍDEO (MINIMALISTA Y MODERNO) ================= */}
       {isUploadModalOpen && renderPortal(
-        <div className={`fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150 ${isDarkMode ? 'dark' : ''}`}>
-          <div className={`w-full max-w-lg rounded-3xl shadow-2xl border p-5 sm:p-6 space-y-5 animate-in zoom-in-95 duration-200 ${
-            isDarkMode
-              ? 'bg-gray-900 border-gray-800 text-gray-100'
-              : 'bg-white border-gray-200 text-gray-900'
-          }`}>
+        <div
+          onClick={() => setIsUploadModalOpen(false)}
+          className={`fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150 cursor-pointer ${isDarkMode ? 'dark' : ''}`}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className={`w-full max-w-lg rounded-3xl shadow-2xl border p-5 sm:p-6 space-y-5 animate-in zoom-in-95 duration-200 cursor-default ${
+              isDarkMode
+                ? 'bg-gray-900 border-gray-800 text-gray-100'
+                : 'bg-white border-gray-200 text-gray-900'
+            }`}
+          >
             {/* Header del Modal */}
             <div className={`flex items-center justify-between pb-3 border-b ${
               isDarkMode ? 'border-gray-800' : 'border-gray-100'
@@ -1545,12 +1638,18 @@ export default function VideosModule({
 
       {/* ================= MODAL EDITAR VÍDEO (TÍTULO Y DESCRIPCIÓN) ================= */}
       {editingVideo && renderPortal(
-        <div className={`fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150 ${isDarkMode ? 'dark' : ''}`}>
-          <div className={`w-full max-w-lg rounded-3xl shadow-2xl border p-5 sm:p-6 space-y-4 animate-in zoom-in-95 duration-200 ${
-            isDarkMode
-              ? 'bg-gray-900 border-gray-800 text-gray-100'
-              : 'bg-white border-gray-200 text-gray-900'
-          }`}>
+        <div
+          onClick={() => setEditingVideo(null)}
+          className={`fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150 cursor-pointer ${isDarkMode ? 'dark' : ''}`}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className={`w-full max-w-lg rounded-3xl shadow-2xl border p-5 sm:p-6 space-y-4 animate-in zoom-in-95 duration-200 cursor-default ${
+              isDarkMode
+                ? 'bg-gray-900 border-gray-800 text-gray-100'
+                : 'bg-white border-gray-200 text-gray-900'
+            }`}
+          >
             {/* Header del Modal */}
             <div className={`flex items-center justify-between pb-3 border-b ${
               isDarkMode ? 'border-gray-800' : 'border-gray-100'
