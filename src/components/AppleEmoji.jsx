@@ -13,7 +13,15 @@ export function getUnifiedHex(emoji) {
     }
     codePoints.push(code.toString(16).toLowerCase());
   }
-  return codePoints.join('-');
+  let hex = codePoints.join('-');
+  // Normalizar variaciones de selección de formato unicode para Apple Emoji datasource
+  if (hex === '2764') hex = '2764-fe0f';
+  if (hex === '26a0') hex = '26a0-fe0f';
+  if (hex === '267f') hex = '267f-fe0f';
+  if (hex === '23f1') hex = '23f1-fe0f';
+  if (hex === '2695') hex = '2695-fe0f';
+  if (hex === '2696') hex = '2696-fe0f';
+  return hex;
 }
 
 export function getAppleEmojiUrl(emoji) {

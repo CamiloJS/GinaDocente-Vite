@@ -13,6 +13,7 @@ import { glassCard, glassInput } from '../utils/styles.js'
 import { useClickOutside } from '../utils/hooks.js'
 import ImageCarousel from './ImageCarousel.jsx'
 import LinkifyText from './LinkifyText.jsx'
+import AppleEmoji from './AppleEmoji.jsx'
 import RichTextToolbar from './RichTextToolbar.jsx'
 import RichVisualEditor from './RichVisualEditor.jsx'
 import { prepararNarracion, narrarSegmentos } from '../utils/narracion.js'
@@ -1789,13 +1790,13 @@ const TaskCard = React.memo(({
                     onClick={() => toggleReaction(key)} 
                     disabled={isLocked} 
                     title={hoverText} 
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition-all border ${
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold transition-all border ${
                       isSelected 
                         ? 'bg-red-50 dark:bg-red-900/30 border-red-400 text-red-600 dark:text-red-300 ring-2 ring-red-500/20 shadow-xs scale-105' 
                         : 'bg-gray-50 dark:bg-gray-800/80 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
-                    } ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    } ${isLocked ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer active:scale-95'}`}
                   >
-                    <span>{emoji}</span>
+                    <AppleEmoji emoji={emoji} size="18px" className="shrink-0" />
                     {counts[key] > 0 && <span className="font-semibold text-[11px]">{counts[key]}</span>}
                   </button>
                 );
@@ -4372,7 +4373,7 @@ const TaskCard = React.memo(({
                                                                 : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-750'
                                                         } ${isLocked ? 'cursor-default' : 'cursor-pointer active:scale-95'}`}
                                                     >
-                                                        <span>{r.emoji}</span>
+                                                        <AppleEmoji emoji={r.emoji} size="14px" className="shrink-0" />
                                                         <span className="text-[9.5px]">{r.count}</span>
                                                     </button>
                                                 ))}
@@ -4395,9 +4396,9 @@ const TaskCard = React.memo(({
                                                                         key={emj}
                                                                         type="button"
                                                                         onClick={() => { toggleCommentReaction(cid, emj); setActiveReactionCommentId(null); }}
-                                                                        className="hover:scale-130 transition-transform p-0.5 text-xs"
+                                                                        className="hover:scale-130 transition-transform p-1 flex items-center justify-center cursor-pointer"
                                                                     >
-                                                                        {emj}
+                                                                        <AppleEmoji emoji={emj} size="18px" />
                                                                     </button>
                                                                 ))}
                                                             </div>
@@ -4509,7 +4510,7 @@ const TaskCard = React.memo(({
                                   {showEmojiPicker && (
                                       <div className="absolute bottom-full left-0 mb-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl rounded-2xl p-2 flex flex-wrap gap-1.5 w-48 z-[99999] animate-in fade-in zoom-in-95">
                                           {COMMENT_EMOJIS.map(emj => (
-                                              <button key={emj} type="button" onClick={() => {setCommentText(prev => prev + emj); setShowEmojiPicker(false);}} className="text-xl hover:scale-125 transition-transform">{emj}</button>
+                                              <button key={emj} type="button" onClick={() => {setCommentText(prev => prev + emj); setShowEmojiPicker(false);}} className="p-1 hover:scale-125 transition-transform flex items-center justify-center cursor-pointer"><AppleEmoji emoji={emj} size="22px" /></button>
                                           ))}
                                       </div>
                                   )}

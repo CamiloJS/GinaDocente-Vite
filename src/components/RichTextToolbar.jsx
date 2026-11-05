@@ -1,5 +1,6 @@
 // src/components/RichTextToolbar.jsx
 import React, { useState, useRef, useEffect } from 'react';
+import AppleEmoji from './AppleEmoji.jsx';
 import {
   Bold, Italic, Underline, Strikethrough, Highlighter,
   Palette, List, Quote, Heading, SmileIcon, ChevronDown
@@ -321,9 +322,9 @@ export const RichTextToolbar = ({
                   insertRawText(' ' + em + ' ');
                   setShowEmojiMenu(false);
                 }}
-                className="text-base p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700/70 hover:scale-125 transition-transform flex items-center justify-center"
+                className="p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700/70 hover:scale-125 transition-transform flex items-center justify-center cursor-pointer"
               >
-                {em}
+                <AppleEmoji emoji={em} size="18px" />
               </button>
             ))}
           </div>

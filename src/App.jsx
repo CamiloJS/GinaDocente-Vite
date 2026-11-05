@@ -7190,7 +7190,7 @@ useEffect(() => {
                                     <div className="relative group/react">
                                         <button className="p-1 rounded-full text-gray-400 hover:text-blue-500 transition-colors" title="Reaccionar"><SmileIcon size={15}/></button>
                                         <div className={`absolute bottom-full left-0 mb-1 hidden group-hover/react:flex gap-1.5 p-1.5 rounded-full shadow-lg border z-30 ${isDarkMode ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-200'}`}>
-                                            {['❤️','👍','👏'].map(emj => (
+                                            {['❤️', '👍', '😂', '😲', '🔥', '👏'].map(emj => (
                                                 <button key={emj} onClick={() => toggleProfilePostReaction(post.id, emj)} className="hover:scale-125 transition-transform p-0.5 flex items-center justify-center">
                                                     <AppleEmoji emoji={emj} size="18px" />
                                                 </button>
@@ -17370,7 +17370,7 @@ Escribe en español con tono pedagógico moderno.`;
                                                   {showChatAppEmojiPicker && (
                                                       <div className={`absolute bottom-full left-0 mb-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl rounded-2xl p-2 flex flex-col gap-1 z-[99999] animate-in fade-in zoom-in-95 duration-150`}>
                                                           {COMMENT_EMOJIS.map(emj => (
-                                                              <button key={emj} type="button" onClick={() => {setChatAppInput(chatAppInput + emj); setShowChatAppEmojiPicker(false);}} className="text-2xl hover:scale-125 transition-transform">{emj}</button>
+                                                              <button key={emj} type="button" onClick={() => {setChatAppInput(chatAppInput + emj); setShowChatAppEmojiPicker(false);}} className="p-1 hover:scale-125 transition-transform flex items-center justify-center cursor-pointer"><AppleEmoji emoji={emj} size="24px" /></button>
                                                           ))}
                                                       </div>
                                                   )}
