@@ -98,10 +98,11 @@ export default function VideosModule({
   const canModifyVideo = (vid) => {
     if (!vid) return false;
     if (role === 'teacher') return true;
-    const cleanAuth = String(vid.authorId || vid.authorUsername || '').toLowerCase().replace(/^@/, '').trim();
+    const cleanAuth = String(vid.authorId || vid.authorUsername || vid.userId || '').toLowerCase().replace(/^@/, '').trim();
     const cleanMyId = String(myChatId || '').toLowerCase().replace(/^@/, '').trim();
     if (cleanAuth && cleanMyId && cleanAuth === cleanMyId) return true;
-    if (user?.uid && (vid.authorId === user.uid || vid.uid === user.uid)) return true;
+    if (user?.uid && (vid.authorId === user.uid || vid.uid === user.uid || vid.userId === user.uid)) return true;
+    if (loggedInName && vid.authorName && vid.authorName.toLowerCase().trim() === loggedInName.toLowerCase().trim()) return true;
     return false;
   };
 
@@ -112,7 +113,8 @@ export default function VideosModule({
     const cleanCommUser = String(comm.userId || comm.authorId || '').toLowerCase().replace(/^@/, '').trim();
     const cleanMyId = String(myChatId || '').toLowerCase().replace(/^@/, '').trim();
     if (cleanCommUser && cleanMyId && cleanCommUser === cleanMyId) return true;
-    if (user?.uid && comm.userId === user.uid) return true;
+    if (user?.uid && (comm.userId === user.uid || comm.authorId === user.uid)) return true;
+    if (loggedInName && comm.userName && comm.userName.toLowerCase().trim() === loggedInName.toLowerCase().trim()) return true;
     return false;
   };
   // Filtros de navegación
@@ -126,6 +128,10 @@ export default function VideosModule({
   const [editingVideo, setEditingVideo] = useState(null);
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
+  const [editClass, setEditClass] = useState('');
+  const [isCustomEditClass, setIsCustomEditClass] = useState(false);
+  const [customEditClassName, setCustomEditClassName] = useState('');
+  const [editFormat, setEditFormat] = useState('long');
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   // Formulario de nuevo vídeo
@@ -525,9 +531,13 @@ export default function VideosModule({
     setEditingVideo(video);
     setEditTitle(video.title || '');
     setEditDescription(video.description || '');
+    setEditClass(video.className || (academicGroups?.[0]?.name || 'Inglés Técnico Económico'));
+    setEditFormat(video.format || 'long');
+    setIsCustomEditClass(false);
+    setCustomEditClassName('');
   };
 
-  // Manejador: Guardar cambios de edición (Título y Descripción)
+  // Manejador: Guardar cambios de edición (Título, Descripción, Clase y Formato)
   const handleSaveEditVideo = async (e) => {
     if (e && typeof e.preventDefault === 'function') e.preventDefault();
     if (!editingVideo || isSavingEdit) return;
@@ -540,10 +550,13 @@ export default function VideosModule({
 
     setIsSavingEdit(true);
     const now = Date.now();
+    const finalClass = isCustomEditClass ? customEditClassName.trim() : editClass.trim();
     const updatedVideo = {
       ...editingVideo,
       title: cleanTitle,
       description: editDescription.trim(),
+      className: finalClass || editingVideo.className || 'Inglés Técnico Económico',
+      format: editFormat || editingVideo.format || 'long',
       updatedAt: now
     };
 
@@ -562,6 +575,8 @@ export default function VideosModule({
         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'videos', String(editingVideo.id)), {
           title: cleanTitle,
           description: editDescription.trim(),
+          className: finalClass || editingVideo.className || 'Inglés Técnico Económico',
+          format: editFormat || editingVideo.format || 'long',
           updatedAt: now
         });
       }
@@ -1019,8 +1034,8 @@ export default function VideosModule({
 
                         {/* Etiqueta de la clase flotante (solo cuando está en 'all') */}
                         {selectedClassFilter === 'all' && (
-                          <div className="absolute top-3 left-3 z-10">
-                            <span className="px-2.5 py-0.5 rounded-lg bg-black/75 backdrop-blur-md text-[10px] font-bold text-white border border-white/10 shadow-xs">
+                          <div className="absolute top-3 left-3 z-10 max-w-[65%] pointer-events-none">
+                            <span className="px-2.5 py-0.5 rounded-lg bg-black/75 backdrop-blur-md text-[10px] font-bold text-white border border-white/10 shadow-xs truncate block">
                               {video.className}
                             </span>
                           </div>
@@ -1758,6 +1773,103 @@ export default function VideosModule({
                       : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400 focus:border-[#AD3333]'
                   }`}
                 />
+              </div>
+
+              {/* 3. Clase a la que pertenece */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className={`text-xs font-bold ${
+                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>
+                    Clase *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setIsCustomEditClass(!isCustomEditClass)}
+                    className="text-[11px] font-bold text-[#AD3333] dark:text-red-400 hover:underline cursor-pointer"
+                  >
+                    {isCustomEditClass ? 'Elegir de la lista' : '+ Otra clase'}
+                  </button>
+                </div>
+
+                {isCustomEditClass ? (
+                  <input
+                    type="text"
+                    required
+                    value={customEditClassName}
+                    onChange={(e) => setCustomEditClassName(e.target.value)}
+                    placeholder="Escribe el nombre de la clase..."
+                    className={`w-full p-2.5 rounded-xl border text-xs outline-none ${
+                      isDarkMode
+                        ? 'bg-gray-800 border-gray-700 text-gray-100 placeholder-gray-500 focus:border-[#AD3333]'
+                        : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400 focus:border-[#AD3333]'
+                    }`}
+                  />
+                ) : (
+                  <select
+                    value={editClass}
+                    onChange={(e) => setEditClass(e.target.value)}
+                    className={`w-full p-2.5 rounded-xl border text-xs font-medium outline-none ${
+                      isDarkMode
+                        ? 'bg-gray-800 border-gray-700 text-gray-100 focus:border-[#AD3333]'
+                        : 'bg-gray-50 border-gray-200 text-gray-900 focus:border-[#AD3333]'
+                    }`}
+                  >
+                    {academicGroups && academicGroups.length > 0 ? (
+                      academicGroups.map((g) => (
+                        <option
+                          key={g.id}
+                          value={g.name}
+                          className={isDarkMode ? 'bg-gray-800 text-gray-100' : 'bg-white text-gray-900'}
+                        >
+                          {g.name}
+                        </option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="Inglés Técnico Económico" className={isDarkMode ? 'bg-gray-800 text-gray-100' : 'bg-white text-gray-900'}>Inglés Técnico Económico</option>
+                        <option value="Inglés Técnico I" className={isDarkMode ? 'bg-gray-800 text-gray-100' : 'bg-white text-gray-900'}>Inglés Técnico I</option>
+                        <option value="Inglés General" className={isDarkMode ? 'bg-gray-800 text-gray-100' : 'bg-white text-gray-900'}>Inglés General</option>
+                      </>
+                    )}
+                  </select>
+                )}
+              </div>
+
+              {/* 4. Formato: Largos o Cortos */}
+              <div className="space-y-1.5">
+                <label className={`text-xs font-bold ${
+                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}>
+                  Formato de visualización
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditFormat('long')}
+                    className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      editFormat === 'long'
+                        ? 'border-[#AD3333] bg-[#AD3333]/10 text-[#AD3333] dark:text-red-400 font-black'
+                        : (isDarkMode ? 'border-gray-700 text-gray-400 hover:border-gray-600' : 'border-gray-200 text-gray-600 hover:border-gray-300')
+                    }`}
+                  >
+                    <SmartphoneHorizontal size={14} />
+                    <span>Largos</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setEditFormat('short')}
+                    className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      editFormat === 'short'
+                        ? 'border-[#AD3333] bg-[#AD3333]/10 text-[#AD3333] dark:text-red-400 font-black'
+                        : (isDarkMode ? 'border-gray-700 text-gray-400 hover:border-gray-600' : 'border-gray-200 text-gray-600 hover:border-gray-300')
+                    }`}
+                  >
+                    <Smartphone size={14} />
+                    <span>Cortos</span>
+                  </button>
+                </div>
               </div>
 
               {/* Botones de acción */}

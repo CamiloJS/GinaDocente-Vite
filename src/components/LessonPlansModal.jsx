@@ -41,8 +41,18 @@ export function LessonPlansModal({
   onDeletePlan,
   isDarkMode = false,
   showMessage,
-  callGemini
+  callGemini,
+  confirmAction
 }) {
+  const askConfirm = (msg, onConfirm) => {
+    if (typeof confirmAction === 'function') {
+      confirmAction(msg, onConfirm);
+    } else if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
+      if (window.confirm(msg)) onConfirm();
+    } else {
+      onConfirm();
+    }
+  };
   const [selectedPlanId, setSelectedPlanId] = useState(null);
   const [editingPlanId, setEditingPlanId] = useState(null);
   const [editForm, setEditForm] = useState(null);
@@ -661,14 +671,14 @@ export function LessonPlansModal({
                     <button
                       type="button"
                       onClick={() => {
-                        if (window.confirm('¿Seguro que deseas eliminar esta planeación de clase?')) {
+                        askConfirm('¿Seguro que deseas eliminar esta planeación de clase?', () => {
                           const deletedId = activePlan.id;
                           onDeletePlan(deletedId, activePlan);
                           if (selectedPlanId === deletedId) {
                             setSelectedPlanId(null);
                           }
                           showMessage?.('Planeación eliminada.');
-                        }
+                        });
                       }}
                       className="px-2.5 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 text-xs font-bold border border-red-500/20 transition-colors cursor-pointer"
                       title="Eliminar planeación"

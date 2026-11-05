@@ -6645,9 +6645,10 @@ useEffect(() => {
 
         const profileName = userData?.fullName || (isMyProfile ? loggedInName : targetUserKey);
         const profileRole = (userData?.role === 'teacher' || isTeacherId(targetUserKey)) ? 'Docente' : (userData?.customLabel || 'Estudiante');
-        const targetProfilePic = userData?.profilePicUrl || (isMyProfile ? (userMappings[myChatId]?.profilePicUrl || '') : '');
         const targetFilterId = targetUserKey;
         const targetUserId = targetUserKey;
+        const cleanFilterIdLower = String(targetFilterId || '').toLowerCase().replace(/^@/, '');
+        const targetProfilePic = userData?.profilePicUrl || userMappings[targetUserKey]?.profilePicUrl || userMappings[cleanFilterIdLower]?.profilePicUrl || resolveUserPhoto(targetUserKey, userMappings, '') || (isMyProfile ? (userMappings[myChatId]?.profilePicUrl || '') : '');
 
         // Estado de presencia en tiempo real (conectado, ausente, ocupado, desconectado)
         const pData = getUserPresenceData(targetUserId, userPresence, userMappings);
@@ -6657,7 +6658,6 @@ useEffect(() => {
             : 0;
 
         const isTeacherProfile = isTeacherId(targetFilterId);
-        const cleanFilterIdLower = String(targetFilterId || '').toLowerCase().replace(/^@/, '');
         const myPosts = userPosts.filter(p => {
             // Determinar con certeza absoluta si la publicación es de un docente o de un estudiante
             const isPostFromTeacher = (
@@ -6733,8 +6733,8 @@ useEffect(() => {
                         {targetProfilePic ? (
                             <img loading="lazy" decoding="async" src={targetProfilePic} className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover shadow-md border-2 ${isDarkMode ? 'border-gray-700' : 'border-gray-100'}`} />
                         ) : (
-                            <div className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center text-blue-600 shadow-md border-2 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-blue-50 border-gray-100'}`}>
-                                <UserIcon size={36} />
+                            <div className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center font-black text-2xl text-white shadow-md border-2 ${isDarkMode ? 'bg-gradient-to-br from-purple-700 to-indigo-800 border-gray-700' : 'bg-gradient-to-br from-purple-600 to-indigo-700 border-gray-100'}`}>
+                                {(profileName || 'E').charAt(0).toUpperCase()}
                             </div>
                         )}
                         
@@ -8851,6 +8851,7 @@ Escribe en español con tono pedagógico moderno.`;
                   isDarkMode={isDarkMode}
                   showMessage={showMessage}
                   callGemini={callGemini}
+                  confirmAction={confirmAction}
                 />
               </div>
             );
