@@ -579,14 +579,16 @@ export default function VideosModule({
         {/* Fila superior: Selector de formato (Todos / Largo / Cortos) + Buscador */}
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
           {/* Segmented Controls de Formato */}
-          <div className="flex items-center p-1 rounded-2xl bg-gray-100 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700/80 shadow-2xs">
+          <div className={`flex items-center p-1 rounded-2xl border shadow-2xs ${
+            isDarkMode ? 'bg-gray-800/90 border-gray-700' : 'bg-gray-100 border-gray-200'
+          }`}>
             <button
               type="button"
               onClick={() => setSelectedFormatFilter('all')}
               className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                 selectedFormatFilter === 'all'
-                  ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-xs'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                  ? (isDarkMode ? 'bg-gray-900 text-gray-100 shadow-xs' : 'bg-white text-gray-900 shadow-xs')
+                  : (isDarkMode ? 'text-gray-400 hover:text-gray-200' : 'text-gray-600 hover:text-gray-900')
               }`}
             >
               <Clapperboard size={14} />
@@ -598,8 +600,8 @@ export default function VideosModule({
               onClick={() => setSelectedFormatFilter('long')}
               className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                 selectedFormatFilter === 'long'
-                  ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-xs'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                  ? (isDarkMode ? 'bg-gray-900 text-gray-100 shadow-xs' : 'bg-white text-gray-900 shadow-xs')
+                  : (isDarkMode ? 'text-gray-400 hover:text-gray-200' : 'text-gray-600 hover:text-gray-900')
               }`}
             >
               <SmartphoneHorizontal size={14} />
@@ -611,8 +613,8 @@ export default function VideosModule({
               onClick={() => setSelectedFormatFilter('short')}
               className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                 selectedFormatFilter === 'short'
-                  ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-xs'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                  ? (isDarkMode ? 'bg-gray-900 text-gray-100 shadow-xs' : 'bg-white text-gray-900 shadow-xs')
+                  : (isDarkMode ? 'text-gray-400 hover:text-gray-200' : 'text-gray-600 hover:text-gray-900')
               }`}
             >
               <Smartphone size={14} />
@@ -630,13 +632,17 @@ export default function VideosModule({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Buscar vídeos por título, autor o clase..."
-              className="w-full pl-9 pr-8 py-2 rounded-2xl border text-xs font-medium outline-none transition-all bg-white dark:bg-gray-800/90 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 focus:border-[#AD3333] dark:focus:border-red-500 shadow-2xs"
+              className={`w-full pl-9 pr-8 py-2 rounded-2xl border text-xs font-medium outline-none transition-all shadow-2xs ${
+                isDarkMode
+                  ? 'bg-gray-800/90 border-gray-700 text-gray-100 placeholder-gray-500 focus:border-[#AD3333]'
+                  : 'bg-white border-gray-200 text-gray-900 placeholder-gray-400 focus:border-[#AD3333]'
+              }`}
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer"
               >
                 <X size={14} />
               </button>
@@ -658,7 +664,7 @@ export default function VideosModule({
               className={`px-3 py-1 rounded-full text-xs font-bold transition-all shrink-0 cursor-pointer ${
                 selectedClassFilter === 'all'
                   ? 'bg-[#AD3333] text-white shadow-xs'
-                  : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                  : (isDarkMode ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
               }`}
             >
               Todas las clases
@@ -672,7 +678,7 @@ export default function VideosModule({
                 className={`px-3 py-1 rounded-full text-xs font-bold transition-all shrink-0 cursor-pointer ${
                   selectedClassFilter === clsName
                     ? 'bg-[#AD3333] text-white shadow-xs'
-                    : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                    : (isDarkMode ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
                 }`}
               >
                 {clsName}
@@ -684,12 +690,14 @@ export default function VideosModule({
 
       {/* ================= CONTENIDO DE VÍDEOS ================= */}
       {filteredVideos.length === 0 ? (
-        <div className="py-16 text-center border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-3xl p-8 space-y-4">
+        <div className={`py-16 text-center border-2 border-dashed rounded-3xl p-8 space-y-4 ${
+          isDarkMode ? 'border-gray-800' : 'border-gray-200'
+        }`}>
           <div className="w-16 h-16 mx-auto rounded-3xl bg-red-500/10 text-[#AD3333] dark:text-red-400 flex items-center justify-center">
             <Video size={32} />
           </div>
           <div className="space-y-1">
-            <h3 className="text-base font-bold text-gray-800 dark:text-gray-200">
+            <h3 className={`text-base font-bold ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>
               No hay vídeos disponibles
             </h3>
             <p className="text-xs text-gray-500 max-w-md mx-auto">
@@ -871,7 +879,11 @@ export default function VideosModule({
                     <div
                       key={video.id}
                       onClick={() => setActivePlayingVideo(video)}
-                      className="group rounded-3xl overflow-hidden border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-850 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer flex flex-col justify-between"
+                      className={`group rounded-3xl overflow-hidden border shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer flex flex-col justify-between ${
+                        isDarkMode
+                          ? 'bg-gray-800 border-gray-700'
+                          : 'bg-white border-gray-200'
+                      }`}
                     >
                       {/* Portada 16:9 de gran formato */}
                       <div className="relative aspect-video w-full bg-gray-900 overflow-hidden">
@@ -937,11 +949,17 @@ export default function VideosModule({
                             <img
                               src={authorPhoto}
                               alt={video.authorName}
-                              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover ring-2 ring-gray-100 dark:ring-gray-750 shadow-xs"
+                              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover ring-2 shadow-xs ${
+                                isDarkMode ? 'ring-gray-700' : 'ring-gray-100'
+                              }`}
                               onError={(e) => { e.currentTarget.style.display = 'none'; }}
                             />
                           ) : (
-                            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#AD3333]/10 text-[#AD3333] dark:text-red-400 flex items-center justify-center font-extrabold text-xs ring-2 ring-gray-100 dark:ring-gray-750">
+                            <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-extrabold text-xs ring-2 ${
+                              isDarkMode
+                                ? 'bg-red-950/40 text-red-400 ring-gray-700'
+                                : 'bg-[#AD3333]/10 text-[#AD3333] ring-gray-100'
+                            }`}>
                               {video.authorName.charAt(0).toUpperCase()}
                             </div>
                           )}
@@ -950,17 +968,23 @@ export default function VideosModule({
                         {/* Info compacta: Título arriba, autor y métricas debajo */}
                         <div className="flex-1 min-w-0 space-y-0.5">
                           <h4
-                            className="text-xs sm:text-[13.5px] font-bold text-gray-900 dark:text-gray-100 line-clamp-2 leading-snug group-hover:text-[#AD3333] transition-colors"
+                            className={`text-xs sm:text-[13.5px] font-bold line-clamp-2 leading-snug group-hover:text-[#AD3333] transition-colors ${
+                              isDarkMode ? 'text-gray-100' : 'text-gray-900'
+                            }`}
                             title={video.title}
                           >
                             {video.title}
                           </h4>
 
-                          <p className="text-[11px] text-gray-500 dark:text-gray-400 font-medium truncate" title={video.authorName}>
+                          <p className={`text-[11px] font-medium truncate ${
+                            isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                          }`} title={video.authorName}>
                             {video.authorName}
                           </p>
 
-                          <div className="flex items-center gap-3 text-[11px] text-gray-400 dark:text-gray-500 pt-0.5">
+                          <div className={`flex items-center gap-3 text-[11px] pt-0.5 ${
+                            isDarkMode ? 'text-gray-400' : 'text-gray-400'
+                          }`}>
                             <button
                               type="button"
                               onClick={(e) => handleToggleLike(video, e)}
@@ -993,10 +1017,18 @@ export default function VideosModule({
 
       {/* ================= MODAL DEL REPRODUCTOR INMERSIVO (CINE / THEATER) ================= */}
       {activePlayingVideo && renderPortal(
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="relative w-full max-w-5xl max-h-[92vh] bg-white dark:bg-gray-900 rounded-3xl shadow-2xl border border-gray-200 dark:border-gray-800 overflow-hidden flex flex-col">
+        <div className={`fixed inset-0 z-[99999] flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200 ${isDarkMode ? 'dark' : ''}`}>
+          <div className={`relative w-full max-w-5xl max-h-[92vh] rounded-3xl shadow-2xl border overflow-hidden flex flex-col ${
+            isDarkMode
+              ? 'bg-gray-900 border-gray-800 text-gray-100'
+              : 'bg-white border-gray-200 text-gray-900'
+          }`}>
             {/* Barra superior del modal */}
-            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between gap-3 bg-gray-50 dark:bg-gray-850">
+            <div className={`px-4 py-3 border-b flex items-center justify-between gap-3 ${
+              isDarkMode
+                ? 'bg-gray-800 border-gray-700'
+                : 'bg-gray-50 border-gray-200'
+            }`}>
               <div className="flex items-center gap-2 min-w-0">
                 <span className="px-2.5 py-1 rounded-xl bg-[#AD3333] text-white text-xs font-black shrink-0">
                   {activePlayingVideo.className}
@@ -1011,7 +1043,11 @@ export default function VideosModule({
                     showMessage('Enlace copiado al portapapeles.');
                   }}
                   title="Copiar enlace del vídeo"
-                  className="p-1.5 rounded-xl text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors"
+                  className={`p-1.5 rounded-xl transition-colors cursor-pointer ${
+                    isDarkMode
+                      ? 'text-gray-300 hover:text-white hover:bg-gray-700'
+                      : 'text-gray-500 hover:text-gray-800 hover:bg-gray-200'
+                  }`}
                 >
                   <Share2 size={16} />
                 </button>
@@ -1020,7 +1056,11 @@ export default function VideosModule({
                   type="button"
                   onClick={() => setActivePlayingVideo(null)}
                   title="Cerrar reproductor"
-                  className="p-1.5 rounded-xl text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                  className={`p-1.5 rounded-xl transition-colors cursor-pointer ${
+                    isDarkMode
+                      ? 'text-gray-300 hover:text-white hover:bg-gray-700'
+                      : 'text-gray-500 hover:text-gray-800 hover:bg-gray-200'
+                  }`}
                 >
                   <X size={18} />
                 </button>
@@ -1030,7 +1070,9 @@ export default function VideosModule({
             {/* Cuerpo del modal: Reproductor + Panel de Comentarios */}
             <div className="flex-1 overflow-y-auto grid grid-cols-1 lg:grid-cols-3 gap-0">
               {/* Columna izquierda / principal: Reproductor y detalles */}
-              <div className="lg:col-span-2 p-3 sm:p-5 space-y-4 border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-gray-800 flex flex-col justify-between">
+              <div className={`lg:col-span-2 p-3 sm:p-5 space-y-4 border-b lg:border-b-0 lg:border-r flex flex-col justify-between ${
+                isDarkMode ? 'border-gray-800 bg-gray-900' : 'border-gray-200 bg-white'
+              }`}>
                 <div className="space-y-4">
                   {/* Área del reproductor */}
                   <div className={`w-full overflow-hidden rounded-2xl bg-black ${
@@ -1043,29 +1085,43 @@ export default function VideosModule({
 
                   {/* Título y metadatos */}
                   <div className="space-y-2">
-                    <h2 className="text-lg sm:text-xl font-black text-gray-900 dark:text-gray-100 leading-tight">
+                    <h2 className={`text-lg sm:text-xl font-black leading-tight ${
+                      isDarkMode ? 'text-gray-100' : 'text-gray-900'
+                    }`}>
                       {activePlayingVideo.title}
                     </h2>
 
-                    <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-gray-500">
+                    <div className={`flex flex-wrap items-center justify-between gap-3 text-xs ${
+                      isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                    }`}>
                       <div className="flex items-center gap-2.5">
                         {resolveAuthorPhoto(activePlayingVideo) ? (
                           <img
                             src={resolveAuthorPhoto(activePlayingVideo)}
                             alt={activePlayingVideo.authorName}
-                            className="w-9 h-9 rounded-full object-cover ring-2 ring-gray-100 dark:ring-gray-800 shadow-xs shrink-0"
+                            className={`w-9 h-9 rounded-full object-cover ring-2 shadow-xs shrink-0 ${
+                              isDarkMode ? 'ring-gray-700' : 'ring-gray-100'
+                            }`}
                             onError={(e) => { e.currentTarget.style.display = 'none'; }}
                           />
                         ) : (
-                          <div className="w-9 h-9 rounded-full bg-[#AD3333]/10 text-[#AD3333] dark:text-red-400 flex items-center justify-center font-extrabold text-xs ring-2 ring-gray-100 dark:ring-gray-800 shrink-0">
+                          <div className={`w-9 h-9 rounded-full flex items-center justify-center font-extrabold text-xs ring-2 shrink-0 ${
+                            isDarkMode
+                              ? 'bg-red-950/40 text-red-400 ring-gray-700'
+                              : 'bg-[#AD3333]/10 text-[#AD3333] ring-gray-100'
+                          }`}>
                             {activePlayingVideo.authorName.charAt(0).toUpperCase()}
                           </div>
                         )}
                         <div>
-                          <p className="font-bold text-gray-800 dark:text-gray-200 text-xs sm:text-sm">
+                          <p className={`font-bold text-xs sm:text-sm ${
+                            isDarkMode ? 'text-gray-100' : 'text-gray-800'
+                          }`}>
                             {activePlayingVideo.authorName}
                           </p>
-                          <p className="text-[10px] text-gray-400">
+                          <p className={`text-[10px] ${
+                            isDarkMode ? 'text-gray-400' : 'text-gray-400'
+                          }`}>
                             {activePlayingVideo.authorRole === 'teacher' ? 'Docente' : 'Estudiante'} • {new Date(activePlayingVideo.createdAt).toLocaleDateString()}
                           </p>
                         </div>
@@ -1077,7 +1133,11 @@ export default function VideosModule({
                           <button
                             type="button"
                             onClick={() => handleOpenEditModal(activePlayingVideo)}
-                            className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer"
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                              isDarkMode
+                                ? 'bg-gray-800 text-gray-200 hover:bg-gray-700'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
                             title="Editar título y descripción"
                           >
                             <Edit3 size={13} />
@@ -1091,7 +1151,7 @@ export default function VideosModule({
                           className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                             (activePlayingVideo.likes || []).includes(myChatId)
                               ? 'bg-red-500 text-white shadow-xs'
-                              : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                              : (isDarkMode ? 'bg-gray-800 text-gray-200 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
                           }`}
                         >
                           <Heart size={14} fill={(activePlayingVideo.likes || []).includes(myChatId) ? '#ffffff' : 'none'} />
@@ -1103,7 +1163,11 @@ export default function VideosModule({
 
                   {/* Descripción */}
                   {activePlayingVideo.description && (
-                    <div className="p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800 text-xs text-gray-700 dark:text-gray-300 whitespace-pre-line leading-relaxed">
+                    <div className={`p-3.5 rounded-2xl border text-xs whitespace-pre-line leading-relaxed ${
+                      isDarkMode
+                        ? 'bg-gray-800 border-gray-700 text-gray-300'
+                        : 'bg-gray-50 border-gray-100 text-gray-700'
+                    }`}>
                       {activePlayingVideo.description}
                     </div>
                   )}
@@ -1111,10 +1175,18 @@ export default function VideosModule({
               </div>
 
               {/* Columna derecha: Comentarios interactivos */}
-              <div className="lg:col-span-1 p-3 sm:p-4 flex flex-col justify-between max-h-[500px] lg:max-h-none overflow-hidden bg-gray-50/50 dark:bg-gray-900/50">
+              <div className={`lg:col-span-1 p-3 sm:p-4 flex flex-col justify-between max-h-[500px] lg:max-h-none overflow-hidden ${
+                isDarkMode
+                  ? 'bg-gray-900 border-gray-800'
+                  : 'bg-gray-50/50 border-gray-200'
+              }`}>
                 <div className="space-y-3 flex-1 flex flex-col min-h-0">
-                  <div className="flex items-center justify-between pb-2 border-b border-gray-200 dark:border-gray-800 shrink-0">
-                    <h4 className="text-xs font-black uppercase tracking-wider text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                  <div className={`flex items-center justify-between pb-2 border-b shrink-0 ${
+                    isDarkMode ? 'border-gray-800' : 'border-gray-200'
+                  }`}>
+                    <h4 className={`text-xs font-black uppercase tracking-wider flex items-center gap-1.5 ${
+                      isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                    }`}>
                       <MessageSquare size={14} className="text-[#AD3333]" />
                       <span>Comentarios ({ (activePlayingVideo.comments || []).length })</span>
                     </h4>
@@ -1123,7 +1195,9 @@ export default function VideosModule({
                   {/* Lista de comentarios con scroll */}
                   <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
                     {(activePlayingVideo.comments || []).length === 0 ? (
-                      <div className="py-8 text-center text-xs text-gray-400">
+                      <div className={`py-8 text-center text-xs ${
+                        isDarkMode ? 'text-gray-400' : 'text-gray-400'
+                      }`}>
                         Aún no hay comentarios. ¡Sé el primero en opinar!
                       </div>
                     ) : (
@@ -1133,7 +1207,11 @@ export default function VideosModule({
                         return (
                           <div
                             key={comm.id}
-                            className="p-2.5 rounded-2xl bg-white dark:bg-gray-800/80 border border-gray-100 dark:border-gray-750 text-xs space-y-1 relative group"
+                            className={`p-2.5 rounded-2xl border text-xs space-y-1 relative group ${
+                              isDarkMode
+                                ? 'bg-gray-800 border-gray-700 text-gray-200'
+                                : 'bg-white border-gray-100 text-gray-800'
+                            }`}
                           >
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex items-center gap-1.5 min-w-0">
@@ -1141,15 +1219,21 @@ export default function VideosModule({
                                   <img
                                     src={commPhoto}
                                     alt={comm.userName}
-                                    className="w-5 h-5 rounded-full object-cover shrink-0 ring-1 ring-gray-200 dark:ring-gray-700"
+                                    className={`w-5 h-5 rounded-full object-cover shrink-0 ring-1 ${
+                                      isDarkMode ? 'ring-gray-700' : 'ring-gray-200'
+                                    }`}
                                     onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                   />
                                 ) : (
-                                  <div className="w-5 h-5 rounded-full bg-[#AD3333]/10 text-[#AD3333] dark:text-red-400 flex items-center justify-center font-bold text-[9px] shrink-0">
+                                  <div className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[9px] shrink-0 ${
+                                    isDarkMode ? 'bg-red-950/40 text-red-400' : 'bg-[#AD3333]/10 text-[#AD3333]'
+                                  }`}>
                                     {comm.userName.charAt(0).toUpperCase()}
                                   </div>
                                 )}
-                                <span className="font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1 truncate">
+                                <span className={`font-bold flex items-center gap-1 truncate ${
+                                  isDarkMode ? 'text-gray-100' : 'text-gray-900'
+                                }`}>
                                   {comm.userName}
                                   {comm.userRole === 'teacher' && (
                                     <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-[#AD3333] text-white shrink-0">
@@ -1158,12 +1242,16 @@ export default function VideosModule({
                                   )}
                                 </span>
                               </div>
-                              <span className="text-[10px] text-gray-400 shrink-0">
+                              <span className={`text-[10px] shrink-0 ${
+                                isDarkMode ? 'text-gray-400' : 'text-gray-400'
+                              }`}>
                                 {new Date(comm.createdAt).toLocaleDateString([], { hour: '2-digit', minute: '2-digit' })}
                               </span>
                             </div>
 
-                            <p className="text-gray-700 dark:text-gray-300 leading-relaxed font-normal">
+                            <p className={`leading-relaxed font-normal ${
+                              isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                            }`}>
                               {comm.text}
                             </p>
 
@@ -1172,7 +1260,7 @@ export default function VideosModule({
                                 type="button"
                                 onClick={() => handleDeleteComment(comm.id)}
                                 title="Borrar comentario"
-                                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-400 transition-opacity"
+                                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-400 transition-opacity cursor-pointer"
                               >
                                 <Trash2 size={12} />
                               </button>
@@ -1186,14 +1274,20 @@ export default function VideosModule({
                 </div>
 
                 {/* Formulario para agregar nuevo comentario */}
-                <form onSubmit={handleAddComment} className="pt-3 border-t border-gray-200 dark:border-gray-800 mt-2 shrink-0">
+                <form onSubmit={handleAddComment} className={`pt-3 border-t mt-2 shrink-0 ${
+                  isDarkMode ? 'border-gray-800' : 'border-gray-200'
+                }`}>
                   <div className="flex items-center gap-2">
                     <input
                       type="text"
                       value={commentInput}
                       onChange={(e) => setCommentInput(e.target.value)}
                       placeholder="Escribe un comentario o pregunta..."
-                      className="flex-1 px-3 py-2 rounded-xl border text-xs outline-none bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 focus:border-[#AD3333]"
+                      className={`flex-1 px-3 py-2 rounded-xl border text-xs outline-none ${
+                        isDarkMode
+                          ? 'bg-gray-800 border-gray-700 text-gray-100 placeholder-gray-500 focus:border-[#AD3333]'
+                          : 'bg-white border-gray-200 text-gray-900 placeholder-gray-400 focus:border-[#AD3333]'
+                      }`}
                     />
                     <button
                       type="submit"
@@ -1212,16 +1306,24 @@ export default function VideosModule({
 
       {/* ================= MODAL SUBIR VÍDEO (MINIMALISTA Y MODERNO) ================= */}
       {isUploadModalOpen && renderPortal(
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="w-full max-w-lg bg-white dark:bg-gray-900 rounded-3xl shadow-2xl border border-gray-200 dark:border-gray-800 p-5 sm:p-6 space-y-5 animate-in zoom-in-95 duration-200">
+        <div className={`fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150 ${isDarkMode ? 'dark' : ''}`}>
+          <div className={`w-full max-w-lg rounded-3xl shadow-2xl border p-5 sm:p-6 space-y-5 animate-in zoom-in-95 duration-200 ${
+            isDarkMode
+              ? 'bg-gray-900 border-gray-800 text-gray-100'
+              : 'bg-white border-gray-200 text-gray-900'
+          }`}>
             {/* Header del Modal */}
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-gray-800">
+            <div className={`flex items-center justify-between pb-3 border-b ${
+              isDarkMode ? 'border-gray-800' : 'border-gray-100'
+            }`}>
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-xl bg-red-500/10 text-[#AD3333] dark:text-red-400 flex items-center justify-center font-black">
                   <Video size={16} />
                 </div>
                 <div>
-                  <h3 className="text-base font-extrabold text-gray-900 dark:text-gray-100">
+                  <h3 className={`text-base font-extrabold ${
+                    isDarkMode ? 'text-gray-100' : 'text-gray-900'
+                  }`}>
                     Subir vídeo
                   </h3>
                   <p className="text-[11px] text-gray-500">
@@ -1232,7 +1334,9 @@ export default function VideosModule({
               <button
                 type="button"
                 onClick={() => setIsUploadModalOpen(false)}
-                className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                className={`p-1 rounded-lg transition-colors cursor-pointer ${
+                  isDarkMode ? 'text-gray-400 hover:text-gray-200' : 'text-gray-400 hover:text-gray-600'
+                }`}
               >
                 <X size={18} />
               </button>
@@ -1242,7 +1346,9 @@ export default function VideosModule({
             <form onSubmit={handleUploadVideo} className="space-y-4">
               {/* 1. Enlace del vídeo */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                <label className={`text-xs font-bold ${
+                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}>
                   Enlace del vídeo *
                 </label>
                 <input
@@ -1251,7 +1357,11 @@ export default function VideosModule({
                   value={newVideoUrl}
                   onChange={(e) => setNewVideoUrl(e.target.value)}
                   placeholder="https://..."
-                  className="w-full p-2.5 rounded-xl border text-xs outline-none bg-gray-50 dark:bg-gray-800/80 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 focus:border-[#AD3333] transition-colors"
+                  className={`w-full p-2.5 rounded-xl border text-xs outline-none transition-colors ${
+                    isDarkMode
+                      ? 'bg-gray-800 border-gray-700 text-gray-100 placeholder-gray-500 focus:border-[#AD3333]'
+                      : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400 focus:border-[#AD3333]'
+                  }`}
                 />
                 {parsedPreview.isValid && (
                   <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
@@ -1263,7 +1373,9 @@ export default function VideosModule({
 
               {/* 2. Título del vídeo */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                <label className={`text-xs font-bold ${
+                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}>
                   Título del vídeo *
                 </label>
                 <input
@@ -1272,14 +1384,20 @@ export default function VideosModule({
                   value={newVideoTitle}
                   onChange={(e) => setNewVideoTitle(e.target.value)}
                   placeholder="Ej: Pronunciación técnica en ingeniería o finanzas"
-                  className="w-full p-2.5 rounded-xl border text-xs outline-none bg-gray-50 dark:bg-gray-800/80 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 focus:border-[#AD3333] transition-colors"
+                  className={`w-full p-2.5 rounded-xl border text-xs outline-none transition-colors ${
+                    isDarkMode
+                      ? 'bg-gray-800 border-gray-700 text-gray-100 placeholder-gray-500 focus:border-[#AD3333]'
+                      : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400 focus:border-[#AD3333]'
+                  }`}
                 />
               </div>
 
               {/* 3. Clase a la que pertenece */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                  <label className={`text-xs font-bold ${
+                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>
                     Clase *
                   </label>
                   <button
@@ -1298,25 +1416,37 @@ export default function VideosModule({
                     value={customClassName}
                     onChange={(e) => setCustomClassName(e.target.value)}
                     placeholder="Escribe el nombre de la clase..."
-                    className="w-full p-2.5 rounded-xl border text-xs outline-none bg-gray-50 dark:bg-gray-800/80 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 focus:border-[#AD3333]"
+                    className={`w-full p-2.5 rounded-xl border text-xs outline-none ${
+                      isDarkMode
+                        ? 'bg-gray-800 border-gray-700 text-gray-100 placeholder-gray-500 focus:border-[#AD3333]'
+                        : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400 focus:border-[#AD3333]'
+                    }`}
                   />
                 ) : (
                   <select
                     value={newVideoClass}
                     onChange={(e) => setNewVideoClass(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border text-xs font-medium outline-none bg-gray-50 dark:bg-gray-800/80 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 focus:border-[#AD3333]"
+                    className={`w-full p-2.5 rounded-xl border text-xs font-medium outline-none ${
+                      isDarkMode
+                        ? 'bg-gray-800 border-gray-700 text-gray-100 focus:border-[#AD3333]'
+                        : 'bg-gray-50 border-gray-200 text-gray-900 focus:border-[#AD3333]'
+                    }`}
                   >
                     {academicGroups && academicGroups.length > 0 ? (
                       academicGroups.map((g) => (
-                        <option key={g.id} value={g.name}>
+                        <option
+                          key={g.id}
+                          value={g.name}
+                          className={isDarkMode ? 'bg-gray-800 text-gray-100' : 'bg-white text-gray-900'}
+                        >
                           {g.name}
                         </option>
                       ))
                     ) : (
                       <>
-                        <option value="Inglés Técnico Económico">Inglés Técnico Económico</option>
-                        <option value="Inglés Técnico I">Inglés Técnico I</option>
-                        <option value="Inglés General">Inglés General</option>
+                        <option value="Inglés Técnico Económico" className={isDarkMode ? 'bg-gray-800 text-gray-100' : 'bg-white text-gray-900'}>Inglés Técnico Económico</option>
+                        <option value="Inglés Técnico I" className={isDarkMode ? 'bg-gray-800 text-gray-100' : 'bg-white text-gray-900'}>Inglés Técnico I</option>
+                        <option value="Inglés General" className={isDarkMode ? 'bg-gray-800 text-gray-100' : 'bg-white text-gray-900'}>Inglés General</option>
                       </>
                     )}
                   </select>
@@ -1325,7 +1455,9 @@ export default function VideosModule({
 
               {/* 4. Formato: Largos o Cortos */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                <label className={`text-xs font-bold ${
+                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}>
                   Formato de visualización
                 </label>
                 <div className="grid grid-cols-2 gap-2">
@@ -1335,7 +1467,7 @@ export default function VideosModule({
                     className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                       newVideoFormat === 'long'
                         ? 'border-[#AD3333] bg-[#AD3333]/10 text-[#AD3333] dark:text-red-400 font-black'
-                        : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400'
+                        : (isDarkMode ? 'border-gray-700 text-gray-400 hover:border-gray-600' : 'border-gray-200 text-gray-600 hover:border-gray-300')
                     }`}
                   >
                     <SmartphoneHorizontal size={14} />
@@ -1348,7 +1480,7 @@ export default function VideosModule({
                     className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                       newVideoFormat === 'short'
                         ? 'border-[#AD3333] bg-[#AD3333]/10 text-[#AD3333] dark:text-red-400 font-black'
-                        : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400'
+                        : (isDarkMode ? 'border-gray-700 text-gray-400 hover:border-gray-600' : 'border-gray-200 text-gray-600 hover:border-gray-300')
                     }`}
                   >
                     <Smartphone size={14} />
@@ -1359,7 +1491,9 @@ export default function VideosModule({
 
               {/* 5. Descripción opcional */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                <label className={`text-xs font-bold ${
+                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}>
                   Descripción (opcional)
                 </label>
                 <textarea
@@ -1367,7 +1501,11 @@ export default function VideosModule({
                   value={newVideoDescription}
                   onChange={(e) => setNewVideoDescription(e.target.value)}
                   placeholder="Explica brevemente los conceptos clave o actividades relacionadas..."
-                  className="w-full p-2.5 rounded-xl border text-xs outline-none bg-gray-50 dark:bg-gray-800/80 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 focus:border-[#AD3333] resize-none"
+                  className={`w-full p-2.5 rounded-xl border text-xs outline-none resize-none ${
+                    isDarkMode
+                      ? 'bg-gray-800 border-gray-700 text-gray-100 placeholder-gray-500 focus:border-[#AD3333]'
+                      : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400 focus:border-[#AD3333]'
+                  }`}
                 />
               </div>
 
@@ -1376,7 +1514,11 @@ export default function VideosModule({
                 <button
                   type="button"
                   onClick={() => setIsUploadModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                    isDarkMode
+                      ? 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-800'
+                  }`}
                 >
                   Cancelar
                 </button>
@@ -1403,19 +1545,27 @@ export default function VideosModule({
 
       {/* ================= MODAL EDITAR VÍDEO (TÍTULO Y DESCRIPCIÓN) ================= */}
       {editingVideo && renderPortal(
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="w-full max-w-lg bg-white dark:bg-gray-900 rounded-3xl shadow-2xl border border-gray-200 dark:border-gray-800 p-5 sm:p-6 space-y-4 animate-in zoom-in-95 duration-200">
+        <div className={`fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150 ${isDarkMode ? 'dark' : ''}`}>
+          <div className={`w-full max-w-lg rounded-3xl shadow-2xl border p-5 sm:p-6 space-y-4 animate-in zoom-in-95 duration-200 ${
+            isDarkMode
+              ? 'bg-gray-900 border-gray-800 text-gray-100'
+              : 'bg-white border-gray-200 text-gray-900'
+          }`}>
             {/* Header del Modal */}
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-gray-800">
+            <div className={`flex items-center justify-between pb-3 border-b ${
+              isDarkMode ? 'border-gray-800' : 'border-gray-100'
+            }`}>
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-xl bg-[#AD3333]/10 text-[#AD3333] dark:text-red-400 flex items-center justify-center font-black">
                   <Edit3 size={16} />
                 </div>
                 <div>
-                  <h3 className="text-base font-extrabold text-gray-900 dark:text-gray-100">
+                  <h3 className={`text-base font-extrabold ${
+                    isDarkMode ? 'text-gray-100' : 'text-gray-900'
+                  }`}>
                     Editar vídeo
                   </h3>
-                  <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                  <p className="text-[11px] text-gray-500">
                     Modifica el título o la descripción del vídeo
                   </p>
                 </div>
@@ -1424,7 +1574,9 @@ export default function VideosModule({
               <button
                 type="button"
                 onClick={() => setEditingVideo(null)}
-                className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer"
+                className={`p-1 rounded-lg transition-colors cursor-pointer ${
+                  isDarkMode ? 'text-gray-400 hover:text-gray-200' : 'text-gray-400 hover:text-gray-600'
+                }`}
               >
                 <X size={18} />
               </button>
@@ -1434,7 +1586,9 @@ export default function VideosModule({
             <form onSubmit={handleSaveEditVideo} className="space-y-4">
               {/* 1. Título */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                <label className={`text-xs font-bold ${
+                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}>
                   Título del vídeo *
                 </label>
                 <input
@@ -1443,13 +1597,19 @@ export default function VideosModule({
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
                   placeholder="Título del vídeo..."
-                  className="w-full p-2.5 rounded-xl border text-xs outline-none bg-gray-50 dark:bg-gray-800/80 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 focus:border-[#AD3333] transition-colors"
+                  className={`w-full p-2.5 rounded-xl border text-xs outline-none transition-colors ${
+                    isDarkMode
+                      ? 'bg-gray-800 border-gray-700 text-gray-100 placeholder-gray-500 focus:border-[#AD3333]'
+                      : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400 focus:border-[#AD3333]'
+                  }`}
                 />
               </div>
 
               {/* 2. Descripción */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                <label className={`text-xs font-bold ${
+                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}>
                   Descripción (opcional)
                 </label>
                 <textarea
@@ -1457,7 +1617,11 @@ export default function VideosModule({
                   value={editDescription}
                   onChange={(e) => setEditDescription(e.target.value)}
                   placeholder="Explica brevemente los conceptos clave o actividades relacionadas..."
-                  className="w-full p-2.5 rounded-xl border text-xs outline-none bg-gray-50 dark:bg-gray-800/80 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 focus:border-[#AD3333] resize-none"
+                  className={`w-full p-2.5 rounded-xl border text-xs outline-none resize-none ${
+                    isDarkMode
+                      ? 'bg-gray-800 border-gray-700 text-gray-100 placeholder-gray-500 focus:border-[#AD3333]'
+                      : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400 focus:border-[#AD3333]'
+                  }`}
                 />
               </div>
 
@@ -1466,7 +1630,11 @@ export default function VideosModule({
                 <button
                   type="button"
                   onClick={() => setEditingVideo(null)}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                    isDarkMode
+                      ? 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-800'
+                  }`}
                 >
                   Cancelar
                 </button>
