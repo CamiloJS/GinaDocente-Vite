@@ -3,7 +3,7 @@
 // Todo el contenido gira en torno a la materia demostrativa "Inglés Tecnico economico".
 
 import { buildBookPagesFromOutline } from './flipbookEngine.js';
-import { DEMO_VIDEOS } from './videoEngine.js';
+import { DEMO_VIDEOS, deduplicateVideos } from './videoEngine.js';
 
 export const DEMO_SUBJECT_ID = 'demo_ing_tec_econ';
 export const DEMO_SUBJECT_NAME = 'Inglés Tecnico economico';
@@ -2142,7 +2142,7 @@ export const DEMO_SANDBOX_CATEGORIES = [
   'alerts'
 ];
 
-export { DEMO_VIDEOS };
+export { DEMO_VIDEOS, deduplicateVideos };
 
 /**
  * Carga el sandbox local del Modo Demo desde localStorage y purga automáticamente

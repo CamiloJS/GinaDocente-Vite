@@ -24,7 +24,7 @@ import {
   Loader2,
   User
 } from './Icons.jsx';
-import { parseVideoUrl, normalizeVideoItem } from '../utils/videoEngine.js';
+import { parseVideoUrl, normalizeVideoItem, deduplicateVideos } from '../utils/videoEngine.js';
 import {
   db as defaultDb,
   appId as defaultAppId,
@@ -93,6 +93,11 @@ export default function VideosModule({
     }
   }, [parsedPreview]);
 
+  // Deduplicación defensiva y unificación estricta de la lista de vídeos recibida
+  const deduplicatedVideos = useMemo(() => {
+    return deduplicateVideos(videos);
+  }, [videos]);
+
   // Lista única de clases presentes en los vídeos para los filtros
   const availableClasses = useMemo(() => {
     const set = new Set();
@@ -101,15 +106,15 @@ export default function VideosModule({
       if (g.name) set.add(g.name.trim());
     });
     // Clases presentes en los vídeos
-    (videos || []).forEach(v => {
+    (deduplicatedVideos || []).forEach(v => {
       if (v.className) set.add(v.className.trim());
     });
     return Array.from(set).filter(Boolean);
-  }, [academicGroups, videos]);
+  }, [academicGroups, deduplicatedVideos]);
 
   // Filtrado de vídeos
   const filteredVideos = useMemo(() => {
-    return (videos || []).filter(v => {
+    return (deduplicatedVideos || []).filter(v => {
       // Filtro por formato
       if (selectedFormatFilter === 'long' && v.format !== 'long') return false;
       if (selectedFormatFilter === 'short' && v.format !== 'short') return false;
@@ -128,7 +133,7 @@ export default function VideosModule({
 
       return true;
     });
-  }, [videos, selectedFormatFilter, selectedClassFilter, searchQuery]);
+  }, [deduplicatedVideos, selectedFormatFilter, selectedClassFilter, searchQuery]);
 
   // Separar en formato largo y corto para la vista combinada ('all')
   const longVideos = useMemo(() => {
@@ -142,16 +147,18 @@ export default function VideosModule({
   // Actualizar el video activo en reproducción si cambia la lista (e.g. nuevos comentarios o likes)
   useEffect(() => {
     if (activePlayingVideo) {
-      const updated = videos.find(v => v.id === activePlayingVideo.id);
+      const updated = deduplicatedVideos.find(v => String(v.id) === String(activePlayingVideo.id));
       if (updated) {
         setActivePlayingVideo(updated);
       }
     }
-  }, [videos]);
+  }, [deduplicatedVideos]);
 
   // Manejador: Subir vídeo
   const handleUploadVideo = async (e) => {
-    e.preventDefault();
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    if (isSubmitting) return;
+
     const cleanUrl = newVideoUrl.trim();
     const cleanTitle = newVideoTitle.trim();
     const finalClass = isCustomClass ? customClassName.trim() : newVideoClass.trim();
@@ -195,12 +202,24 @@ export default function VideosModule({
       if (isDemoMode) {
         saveDemoSandboxItem('videos', videoItem);
         if (typeof setVideos === 'function') {
-          setVideos(prev => [videoItem, ...(prev || [])]);
+          setVideos(prev => {
+            const list = Array.isArray(prev) ? prev : [];
+            const exists = list.some(v => String(v?.id) === String(videoItem.id));
+            return exists
+              ? list.map(v => (String(v?.id) === String(videoItem.id) ? videoItem : v))
+              : [videoItem, ...list.filter(v => String(v?.id) !== String(videoItem.id))];
+          });
         }
       } else {
         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'videos', videoItem.id), videoItem);
         if (typeof setVideos === 'function') {
-          setVideos(prev => [videoItem, ...(prev || [])]);
+          setVideos(prev => {
+            const list = Array.isArray(prev) ? prev : [];
+            const exists = list.some(v => String(v?.id) === String(videoItem.id));
+            return exists
+              ? list.map(v => (String(v?.id) === String(videoItem.id) ? videoItem : v))
+              : [videoItem, ...list.filter(v => String(v?.id) !== String(videoItem.id))];
+          });
         }
       }
 
@@ -260,7 +279,9 @@ export default function VideosModule({
 
   // Manejador: Enviar comentario
   const handleAddComment = async (e) => {
-    e?.preventDefault();
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    if (isSubmittingComment) return;
+
     const cleanText = commentInput.trim();
     if (!cleanText || !activePlayingVideo) return;
 
@@ -345,23 +366,25 @@ export default function VideosModule({
 
   // Manejador: Eliminar vídeo
   const handleDeleteVideo = async (video, e) => {
-    if (e) e.stopPropagation();
+    if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
     if (!video || !video.id) return;
     if (!window.confirm(`¿Estás seguro de eliminar el vídeo "${video.title}"?`)) return;
 
-    if (activePlayingVideo && activePlayingVideo.id === video.id) {
+    const targetId = String(video.id);
+
+    if (activePlayingVideo && String(activePlayingVideo.id) === targetId) {
       setActivePlayingVideo(null);
     }
 
     if (typeof setVideos === 'function') {
-      setVideos(prev => (prev || []).filter(v => v.id !== video.id));
+      setVideos(prev => (prev || []).filter(v => String(v?.id) !== targetId));
     }
 
     try {
-      if (isDemoMode || String(video.id).startsWith('demo_')) {
-        deleteDemoSandboxItem('videos', video.id);
+      if (isDemoMode || targetId.startsWith('demo_')) {
+        deleteDemoSandboxItem('videos', targetId);
       } else {
-        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'videos', video.id));
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'videos', targetId));
       }
       showMessage('Vídeo eliminado de la videoteca.');
     } catch (err) {

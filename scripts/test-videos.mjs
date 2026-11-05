@@ -1,7 +1,7 @@
 // scripts/test-videos.mjs
 // Suite de pruebas unitarias para el motor de vídeos y compatibilidad de plataformas
 
-import { parseVideoUrl, normalizeVideoItem, DEMO_VIDEOS } from '../src/utils/videoEngine.js';
+import { parseVideoUrl, normalizeVideoItem, deduplicateVideos, DEMO_VIDEOS } from '../src/utils/videoEngine.js';
 
 let passed = 0;
 let failed = 0;
@@ -71,6 +71,19 @@ assert(Array.isArray(DEMO_VIDEOS) && DEMO_VIDEOS.length >= 4, 'DEMO_VIDEOS conti
 assert(DEMO_VIDEOS.some(v => v.format === 'long'), 'Contiene vídeos en formato largo');
 assert(DEMO_VIDEOS.some(v => v.format === 'short'), 'Contiene vídeos en formato corto tipo TikTok');
 assert(DEMO_VIDEOS.every(v => v.className && v.title && v.authorName), 'Todos los vídeos demo tienen etiqueta de clase, título y autor');
+
+console.log('== 6. Deduplicación Estricta de Vídeos (Prevención de Duplicados en Subida/Borrado) ==');
+const duplicateList = [
+  { id: 'vid_123', title: 'Video Original', createdAt: 1000 },
+  { id: 'vid_123', title: 'Video Duplicado con Update', createdAt: 1000, updatedAt: 2000 },
+  { id: 'vid_456', title: 'Otro Video', createdAt: 1500 }
+];
+const deduped = deduplicateVideos(duplicateList);
+assert(deduped.length === 2, 'Colapsa elementos con id idéntico a un único registro');
+assert(deduped[0].id === 'vid_123' && deduped[0].updatedAt === 2000, 'Conserva la versión más reciente en caso de colisión');
+assert(deduped[1].id === 'vid_456', 'Conserva los demás elementos sin alterarlos');
+assert(deduplicateVideos([]).length === 0, 'Maneja arrays vacíos sin romper');
+assert(deduplicateVideos(null).length === 0, 'Maneja null sin romper');
 
 console.log('\n========================================');
 console.log(`Total pruebas Vídeos: ${passed + failed} | OK: ${passed} | FAIL: ${failed}`);

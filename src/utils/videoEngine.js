@@ -243,6 +243,31 @@ export function normalizeVideoItem(raw = {}) {
 }
 
 /**
+ * Deduplica un array de vídeos por su identificador único (id),
+ * conservando la versión más reciente si hay colisión y preservando el orden.
+ */
+export function deduplicateVideos(videosList = []) {
+  if (!Array.isArray(videosList)) return [];
+  const map = new Map();
+  for (const v of videosList) {
+    if (!v) continue;
+    const key = String(v.id || '').trim();
+    if (!key) continue;
+    if (!map.has(key)) {
+      map.set(key, v);
+    } else {
+      const existing = map.get(key);
+      const existingTs = Number(existing.updatedAt || existing.createdAt || 0);
+      const currentTs = Number(v.updatedAt || v.createdAt || 0);
+      if (currentTs >= existingTs) {
+        map.set(key, { ...existing, ...v });
+      }
+    }
+  }
+  return Array.from(map.values());
+}
+
+/**
  * Lista inicial de vídeos de demostración de alta calidad para English TECH.
  * Incluye tanto videos en formato largo (16:9) como formatos cortos tipo TikTok / Shorts.
  */

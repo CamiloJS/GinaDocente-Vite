@@ -101,6 +101,7 @@ import {
   DEMO_BOOKS,
   DEMO_NOTES,
   DEMO_VIDEOS,
+  deduplicateVideos,
   DEMO_ACADEMIC_GROUPS,
   DEMO_USER_MAPPINGS,
   DEMO_USER_PRESENCE,
@@ -1217,7 +1218,7 @@ function App() {
   }, [rawNotes, isDemoMode, role, myChatId, currentTeacherId, studentEnrolledGroups, matchesStudentTeacher]);
 
   const videos = useMemo(() => {
-    return rawVideos || [];
+    return deduplicateVideos(rawVideos || []);
   }, [rawVideos]);
 
   const removeStudentFromGroupHelper = async (groupId, studentKey) => {
@@ -4112,7 +4113,10 @@ const needsVideosSubscription = activeTab === 'videos';
 useEffect(() => {
     if (!hasEntered || !myChatId || isDemoMode || !needsVideosSubscription) return;
     const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'videos'), orderBy('createdAt', 'desc'), limit(100));
-    const uVideos = onSnapshot(q, s => setRawVideos(s.docs.map(d => ({ id: d.id, ...d.data() }))), err => console.error(err));
+    const uVideos = onSnapshot(q, s => {
+      const incoming = s.docs.map(d => ({ id: d.id, ...d.data() }));
+      setRawVideos(deduplicateVideos(incoming));
+    }, err => console.error(err));
     return () => uVideos();
 }, [hasEntered, myChatId, needsVideosSubscription, isDemoMode]);
 
