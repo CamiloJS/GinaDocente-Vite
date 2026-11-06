@@ -150,9 +150,21 @@ export const DocumentPreviewModal = ({
     if (isDownloading) return;
 
     setIsDownloading(true);
-    const suggestedFileName = documentTitle 
-      ? (isPdf && !documentTitle.toLowerCase().endsWith('.pdf') ? `${documentTitle}.pdf` : documentTitle)
-      : (isImage ? 'imagen.jpg' : (isPdf ? 'documento.pdf' : 'documento'));
+    let suggestedFileName = 'documento';
+    if (documentTitle) {
+      const cleanTitle = String(documentTitle).trim();
+      if (isPdf) {
+        const cleanBase = cleanTitle.replace(/(\.pdf)+$/i, '').trim();
+        suggestedFileName = cleanBase ? `${cleanBase}.pdf` : 'documento.pdf';
+      } else if (isImage) {
+        const cleanBase = cleanTitle.replace(/(\.(jpe?g|png|webp|gif|heic))+$/i, '').trim();
+        suggestedFileName = cleanBase ? `${cleanBase}.jpg` : 'imagen.jpg';
+      } else {
+        suggestedFileName = cleanTitle;
+      }
+    } else {
+      suggestedFileName = isImage ? 'imagen.jpg' : (isPdf ? 'documento.pdf' : 'documento');
+    }
 
     try {
       await handleForceDownload(documentUrl, suggestedFileName);

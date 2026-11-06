@@ -388,8 +388,10 @@ const TaskCard = React.memo(({
     useEffect(() => {
         if (activePostModalId && String(activePostModalId) === String(task.id)) {
             setShowCommentModal(true);
+        } else if (activePostModalId === null && showCommentModal) {
+            setShowCommentModal(false);
         }
-    }, [activePostModalId, task.id]);
+    }, [activePostModalId, task.id, showCommentModal]);
 
     useEffect(() => {
         try {
@@ -466,13 +468,15 @@ const TaskCard = React.memo(({
         const addGroupItem = (rawId, rawName) => {
             if (!rawId && !rawName) return;
             const cleanName = String(rawName || rawId || 'Grupo').trim();
-            const normName = cleanName.toLowerCase().replace(/^grupo:\s*/i, '');
+            const displayGroupName = cleanName.replace(/^grupo:\s*/i, '').trim();
+            const normName = displayGroupName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
             const cleanId = String(rawId || normName).trim();
             if (seenGroupNames.has(normName) || seenGroupIds.has(cleanId)) return;
             seenGroupNames.add(normName);
             seenGroupIds.add(cleanId);
-            if (!shareSearchTerm || normName.includes(shareSearchTerm.toLowerCase()) || cleanName.toLowerCase().includes(shareSearchTerm.toLowerCase())) {
-                list.push({ id: rawId || `grp_${normName}`, name: `Grupo: ${cleanName}`, role: 'group', isGroup: true });
+            const searchTarget = shareSearchTerm ? shareSearchTerm.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim() : '';
+            if (!searchTarget || normName.includes(searchTarget) || cleanName.toLowerCase().includes(searchTarget)) {
+                list.push({ id: rawId || `grp_${normName}`, name: `Grupo: ${displayGroupName}`, role: 'group', isGroup: true });
             }
         };
 

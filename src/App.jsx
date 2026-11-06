@@ -2391,8 +2391,10 @@ function App() {
               try { sessionStorage.removeItem('englishTech_viewingProfileId'); } catch(e) {}
             }
           } else if (mainTab && ['tasks', 'reviews', 'books', 'notes', 'videos', 'syllabus', 'evaluations', 'directory', 'groups', 'inbox', 'profile', 'settings', 'tools'].includes(mainTab)) {
+            setActivePostModalId(null);
             setActiveTab(mainTab);
           } else if (!hash) {
+            setActivePostModalId(null);
             setActiveTab('tasks');
           }
         }
@@ -11086,12 +11088,12 @@ Escribe en español con tono pedagógico moderno.`;
                                       {q.imageUrl && (
                                           <div className="pl-8 pt-1">
                                               <div className="rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-gray-900/60 max-w-md">
-                                                  <img loading="lazy" decoding="async"
-                                                      src={q.imageUrl}
-                                                      alt={`Imagen de la pregunta ${qIndex + 1}`}
-                                                      onClick={() => setFullScreenImage(q.imageUrl)}
-                                                      className="w-full max-h-64 object-contain cursor-pointer hover:opacity-95 transition-opacity"
-                                                  />
+                                                  <UniversalImage
+                                                       src={q.imageUrl}
+                                                       alt={`Imagen de la pregunta ${qIndex + 1}`}
+                                                       onClick={() => setFullScreenImage(q.imageUrl)}
+                                                       className="w-full max-h-64 object-contain cursor-pointer hover:opacity-95 transition-opacity"
+                                                   />
                                               </div>
                                           </div>
                                       )}
@@ -12170,12 +12172,12 @@ Escribe en español con tono pedagógico moderno.`;
                                                       {q.imageUrl && (
                                                           <div className="pl-8 mb-3">
                                                               <div className="rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-gray-900/60 max-w-sm">
-                                                                  <img loading="lazy" decoding="async"
-                                                                      src={q.imageUrl}
-                                                                      alt={`Imagen de la pregunta ${qIdx + 1}`}
-                                                                      onClick={() => setFullScreenImage(q.imageUrl)}
-                                                                      className="w-full max-h-52 object-contain cursor-zoom-in"
-                                                                  />
+                                                                  <UniversalImage
+                                                                       src={q.imageUrl}
+                                                                       alt={`Imagen de la pregunta ${qIdx + 1}`}
+                                                                       onClick={() => setFullScreenImage(q.imageUrl)}
+                                                                       className="w-full max-h-52 object-contain cursor-zoom-in"
+                                                                   />
                                                               </div>
                                                           </div>
                                                       )}
@@ -12481,12 +12483,12 @@ Escribe en español con tono pedagógico moderno.`;
                                                       {q.imageUrl && (
                                                           <div className="pl-8 pt-1">
                                                               <div className="rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-gray-900/60 max-w-sm">
-                                                                  <img loading="lazy" decoding="async"
-                                                                      src={q.imageUrl}
-                                                                      alt={`Imagen de la pregunta ${qIdx + 1}`}
-                                                                      onClick={() => setFullScreenImage(q.imageUrl)}
-                                                                      className="w-full max-h-52 object-contain cursor-zoom-in"
-                                                                  />
+                                                                  <UniversalImage
+                                                                       src={q.imageUrl}
+                                                                       alt={`Imagen de la pregunta ${qIdx + 1}`}
+                                                                       onClick={() => setFullScreenImage(q.imageUrl)}
+                                                                       className="w-full max-h-52 object-contain cursor-zoom-in"
+                                                                   />
                                                               </div>
                                                           </div>
                                                       )}
@@ -13020,12 +13022,12 @@ Escribe en español con tono pedagógico moderno.`;
 
                                           {q.imageUrl && (
                                               <div className="rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-gray-900/60 max-w-sm">
-                                                  <img loading="lazy" decoding="async"
-                                                      src={q.imageUrl}
-                                                      alt={`Vista previa pregunta ${qIndex + 1}`}
-                                                      onClick={() => setFullScreenImage(q.imageUrl)}
-                                                      className="w-full max-h-52 object-contain cursor-pointer hover:opacity-95 transition-opacity"
-                                                  />
+                                                  <UniversalImage
+                                                       src={q.imageUrl}
+                                                       alt={`Vista previa pregunta ${qIndex + 1}`}
+                                                       onClick={() => setFullScreenImage(q.imageUrl)}
+                                                       className="w-full max-h-52 object-contain cursor-pointer hover:opacity-95 transition-opacity"
+                                                   />
                                               </div>
                                           )}
 
@@ -17186,7 +17188,7 @@ Escribe en español con tono pedagógico moderno.`;
                                                                                       </div>
                                                                                   )}
 
-                                                                                  {m.imageUrl && <img src={m.imageUrl} loading="lazy" decoding="async" alt="Adjunto" onLoad={(e) => { const container = e.target.closest('.overflow-y-auto'); if (container && container.scrollHeight - container.scrollTop - container.clientHeight < 300) chatMessagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }} onClick={() => setFullScreenImage(m.imageUrl)} className={isImageOnly ? "rounded-2xl max-h-60 object-contain cursor-pointer hover:opacity-90 transition-opacity drop-shadow-md" : "mt-1.5 rounded-xl max-h-48 object-contain cursor-pointer hover:opacity-90 transition-opacity bg-black/10 border border-white/20"} />}
+                                                                                  {m.imageUrl && <UniversalImage src={m.imageUrl} alt="Adjunto" onClick={() => setFullScreenImage(m.imageUrl)} className={isImageOnly ? "rounded-2xl max-h-60 object-contain cursor-pointer hover:opacity-90 transition-opacity drop-shadow-md" : "mt-1.5 rounded-xl max-h-48 object-contain cursor-pointer hover:opacity-90 transition-opacity bg-black/10 border border-white/20"} />}
                                                                                   
                                                                                   {m.fileUrl && (
                                                                                       <div className="flex items-center gap-1 mt-1">
@@ -17544,7 +17546,7 @@ Escribe en español con tono pedagógico moderno.`;
                                           )}
                                           {chatAppImageUrl && (
                                               <div className="relative w-fit mt-1.5">
-                                                  <img loading="lazy" decoding="async" src={chatAppImageUrl} alt="Preview" className={`h-16 w-16 object-cover rounded-xl border shadow-xs ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`} onError={(e) => e.target.style.display = 'none'} />
+                                                  <UniversalImage src={chatAppImageUrl} alt="Preview" className={`h-16 w-16 object-cover rounded-xl border shadow-xs ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`} />
                                                   <button type="button" onClick={() => {
                                                       if (!isDemoMode && chatAppImageUrl) {
                                                           deleteFileFromStorage(chatAppImageUrl).catch(() => {});
@@ -17694,7 +17696,17 @@ Escribe en español con tono pedagógico moderno.`;
               {/* MODAL IMAGEN PANTALLA COMPLETA (APP) */}
               {fullScreenImage && ReactDOM.createPortal(
                   <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setFullScreenImage(null)}>
-                       <button onClick={() => setFullScreenImage(null)} className="absolute top-4 md:top-8 right-4 md:right-8 text-white/70 hover:text-white bg-black/50 hover:bg-red-600 p-2 rounded-full transition-all shadow-lg"><X size={28}/></button>
+                       <div className="absolute top-4 md:top-8 right-4 md:right-8 flex items-center gap-2">
+                           <button 
+                               type="button" 
+                               onClick={(e) => { e.stopPropagation(); handleForceDownload(fullScreenImage, 'foto.jpg'); }} 
+                               className="text-white/80 hover:text-white bg-black/50 hover:bg-black/70 p-2 rounded-full transition-all shadow-lg cursor-pointer"
+                               title="Descargar foto"
+                           >
+                               <Download size={22} />
+                           </button>
+                           <button onClick={() => setFullScreenImage(null)} className="text-white/70 hover:text-white bg-black/50 hover:bg-red-600 p-2 rounded-full transition-all shadow-lg cursor-pointer" title="Cerrar"><X size={28}/></button>
+                       </div>
 <UniversalImage src={fullScreenImage} className="w-auto h-auto max-w-[95vw] max-h-[90vh] object-contain rounded-lg shadow-2xl" onClick={e => e.stopPropagation()} />
                   </div>
               , document.body)}
