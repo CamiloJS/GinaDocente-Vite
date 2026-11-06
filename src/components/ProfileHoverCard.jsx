@@ -18,6 +18,9 @@ import {
   getLastConnectionTime
 } from '../utils/chatPresence.js';
 
+// Variable en módulo para asegurar que solo una tarjeta de perfil esté abierta a la vez
+let activeHoverCardCloseFn = null;
+
 export const ProfileHoverCard = ({
   userId,
   userObj = null,
@@ -40,6 +43,12 @@ export const ProfileHoverCard = ({
   const cardRef = useRef(null);
   const openTimerRef = useRef(null);
   const closeTimerRef = useRef(null);
+
+  const closeSelf = useCallback(() => {
+    if (openTimerRef.current) clearTimeout(openTimerRef.current);
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    setIsOpen(false);
+  }, []);
 
   // Detección estricta de dispositivo de escritorio con soporte de puntero de precisión (ratón)
   useEffect(() => {
@@ -134,6 +143,38 @@ export const ProfileHoverCard = ({
       setIsOpen(false);
     }, 300); // 300ms margen para mover el ratón hacia la tarjeta
   };
+
+  // Cerrar al scrollear cualquier contenedor o presionar Escape, y asegurar tarjeta única activa
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (activeHoverCardCloseFn && activeHoverCardCloseFn !== closeSelf) {
+      activeHoverCardCloseFn();
+    }
+    activeHoverCardCloseFn = closeSelf;
+
+    const handleScrollOrKey = (e) => {
+      if (e.type === 'keydown' && e.key !== 'Escape') return;
+      closeSelf();
+    };
+
+    window.addEventListener('scroll', handleScrollOrKey, { capture: true, passive: true });
+    window.addEventListener('keydown', handleScrollOrKey);
+    return () => {
+      window.removeEventListener('scroll', handleScrollOrKey, { capture: true });
+      window.removeEventListener('keydown', handleScrollOrKey);
+      if (activeHoverCardCloseFn === closeSelf) {
+        activeHoverCardCloseFn = null;
+      }
+    };
+  }, [isOpen, closeSelf]);
+
+  // Recalcular posición cuando monta para ajustar con su altura real
+  useEffect(() => {
+    if (isOpen) {
+      calculatePosition();
+    }
+  }, [isOpen, calculatePosition]);
 
   useEffect(() => {
     return () => {

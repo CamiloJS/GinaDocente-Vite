@@ -5,10 +5,10 @@ import { SpotifyIcon, ExternalLink } from './Icons.jsx';
 export const SpotifyEqualizer = ({ isPlaying = true, className = '' }) => {
   return (
     <div className={`flex items-end gap-[2px] h-3.5 select-none ${className}`} title={isPlaying ? "Reproduciendo ahora" : "En pausa"}>
-      <span className={`w-[3px] bg-[#1DB954] rounded-full transition-all ${isPlaying ? 'animate-[bounce_0.8s_infinite_ease-in-out_alternate] h-3' : 'h-1 opacity-50'}`} style={{ animationDelay: '0.1s' }} />
-      <span className={`w-[3px] bg-[#1DB954] rounded-full transition-all ${isPlaying ? 'animate-[bounce_0.6s_infinite_ease-in-out_alternate] h-3.5' : 'h-1.5 opacity-50'}`} style={{ animationDelay: '0.3s' }} />
-      <span className={`w-[3px] bg-[#1DB954] rounded-full transition-all ${isPlaying ? 'animate-[bounce_0.9s_infinite_ease-in-out_alternate] h-2.5' : 'h-1 opacity-50'}`} style={{ animationDelay: '0.2s' }} />
-      <span className={`w-[3px] bg-[#1DB954] rounded-full transition-all ${isPlaying ? 'animate-[bounce_0.7s_infinite_ease-in-out_alternate] h-3' : 'h-2 opacity-50'}`} style={{ animationDelay: '0.4s' }} />
+      <span className={`w-[3px] bg-[#1DB954] rounded-full transition-all ${isPlaying ? 'spotify-bar-1 h-3' : 'h-1 opacity-50'}`} />
+      <span className={`w-[3px] bg-[#1DB954] rounded-full transition-all ${isPlaying ? 'spotify-bar-2 h-3.5' : 'h-1.5 opacity-50'}`} />
+      <span className={`w-[3px] bg-[#1DB954] rounded-full transition-all ${isPlaying ? 'spotify-bar-3 h-2.5' : 'h-1 opacity-50'}`} />
+      <span className={`w-[3px] bg-[#1DB954] rounded-full transition-all ${isPlaying ? 'spotify-bar-4 h-3' : 'h-2 opacity-50'}`} />
     </div>
   );
 };

@@ -255,7 +255,14 @@ export const fetchCurrentlyPlaying = async () => {
 // Extraer metadatos públicos de un enlace de Spotify vía OEmbed (no requiere API key ni token)
 export const fetchSpotifyTrackOembed = async (url) => {
   if (!url || typeof url !== 'string') return null;
-  const cleanUrl = url.trim();
+  let cleanUrl = url.trim();
+
+  // Si el usuario ingresa un URI tipo spotify:track:xxxx, convertirlo a URL web
+  if (cleanUrl.startsWith('spotify:track:')) {
+    const trackId = cleanUrl.replace('spotify:track:', '').split('?')[0];
+    cleanUrl = `https://open.spotify.com/track/${trackId}`;
+  }
+
   if (!cleanUrl.includes('spotify.com')) return null;
 
   try {
@@ -264,10 +271,10 @@ export const fetchSpotifyTrackOembed = async (url) => {
     if (!res.ok) return null;
     const data = await res.json();
 
-    // Data.title típicamente es "Nombre de la Canción" o "Artista - Canción"
+    // Data.title típicamente es "Nombre de la Canción" o "Artista - Canción", y author_name trae el artista
     let trackName = data.title || 'Canción de Spotify';
-    let artistName = '';
-    if (trackName.includes(' - ')) {
+    let artistName = data.author_name || '';
+    if (!artistName && trackName.includes(' - ')) {
       const parts = trackName.split(' - ');
       artistName = parts[0].trim();
       trackName = parts.slice(1).join(' - ').trim();

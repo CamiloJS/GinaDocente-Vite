@@ -6483,11 +6483,11 @@ useEffect(() => {
     // Sincronización periódica en vivo de Spotify (cada 25s) mientras el usuario está en la app
     useEffect(() => {
         if (!hasEntered || !myChatId) return;
-        const auth = getStoredSpotifyAuth();
-        if (!auth?.accessToken) return;
 
         let isMounted = true;
         const syncCurrentPlaying = async () => {
+            const auth = getStoredSpotifyAuth();
+            if (!auth?.accessToken) return;
             if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
             try {
                 const playing = await fetchCurrentlyPlaying();
@@ -6500,11 +6500,19 @@ useEffect(() => {
 
         syncCurrentPlaying();
         const interval = setInterval(syncCurrentPlaying, 25000);
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                syncCurrentPlaying();
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
         return () => {
             isMounted = false;
             clearInterval(interval);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [hasEntered, myChatId]);
+    }, [hasEntered, myChatId, showSpotifyModal]);
 
     // --- LÓGICA DE PUBLICACIONES DE PERFIL ---
     const handleProfileImageUpload = async (e) => {
