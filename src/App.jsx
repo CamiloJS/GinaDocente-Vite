@@ -43,8 +43,17 @@ import {
   ChevronDown, ChevronUp, Minus, HelpCircle, Lightbulb, GraduationCap, Laptop, PenTool,
   Compass, Atom, Award, Star, Bookmark, Terminal, Folder, Globe, Target, Layers, RotateCcw,
   Archive, ShieldAlert, Unlock, Menu, UserPlus, Camera, Upload, Phone, PhoneOff, Share2,
-  Lock, Key, ClipboardList, BarChart3, Music, Video, Film, Timer, Coins, Calculator
+  Lock, Key, ClipboardList, BarChart3, Music, Video, Film, Timer, Coins, Calculator, SpotifyIcon
 } from './components/Icons.jsx'
+import ProfileHoverCard from './components/ProfileHoverCard.jsx'
+import SpotifyWidget from './components/SpotifyWidget.jsx'
+import SpotifyConnectModal from './components/SpotifyConnectModal.jsx'
+import { 
+  exchangeSpotifyCode, 
+  fetchCurrentlyPlaying, 
+  getStoredSpotifyAuth, 
+  clearStoredSpotifyAuth 
+} from './utils/spotify.js'
 import FloatingToolsOverlay from './components/FloatingToolsOverlay.jsx'
 import {
   parseAiResponse,
@@ -408,6 +417,7 @@ function App() {
   const [editingProfilePostId, setEditingProfilePostId] = useState(null);
   const [editProfilePostData, setEditProfilePostData] = useState({ title: "", text: "" });
   const [showAvatarUploadModal, setShowAvatarUploadModal] = useState(false);
+  const [showSpotifyModal, setShowSpotifyModal] = useState(false);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState("");
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [appPreviewDoc, setAppPreviewDoc] = useState(null);
@@ -6408,6 +6418,94 @@ useEffect(() => {
         setIsUploadingAvatar(false);
     };
 
+    // --- INTEGRACIÓN SPOTIFY: Guardado y Sincronización en Tiempo Real ---
+    const handleSaveSpotifyStatus = async (spotifyStatus) => {
+        if (!myChatId) return;
+        const cleanKey = String(myChatId || '').toLowerCase().replace(/^@/, '');
+        
+        setUserMappings(prev => ({
+            ...prev,
+            [myChatId]: { ...(prev[myChatId] || {}), spotifyStatus },
+            ...(cleanKey ? { [cleanKey]: { ...(prev[cleanKey] || {}), spotifyStatus } } : {})
+        }));
+        userMappingsRef.current = {
+            ...userMappingsRef.current,
+            [myChatId]: { ...(userMappingsRef.current[myChatId] || {}), spotifyStatus },
+            ...(cleanKey ? { [cleanKey]: { ...(userMappingsRef.current[cleanKey] || {}), spotifyStatus } } : {})
+        };
+
+        if (isDemoMode) {
+            saveDemoSandboxItem('userMappings', { id: myChatId, ...(userMappings[myChatId] || {}), spotifyStatus });
+            return;
+        }
+
+        try {
+            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userMappings', myChatId), { spotifyStatus }, { merge: true });
+        } catch (e) {
+            console.warn('Error al guardar estado de Spotify en Firestore:', e);
+        }
+    };
+
+    // Detección de retorno de Spotify OAuth (?code=...)
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const urlParams = new URLSearchParams(window.location.search);
+        const spotifyCode = urlParams.get('code');
+        const spotifyError = urlParams.get('error');
+
+        if (spotifyCode) {
+            exchangeSpotifyCode(spotifyCode)
+                .then((auth) => {
+                    if (auth?.accessToken) {
+                        showMessage("🎵 ¡Cuenta de Spotify vinculada exitosamente!");
+                        fetchCurrentlyPlaying().then((playing) => {
+                            if (playing && myChatId) {
+                                handleSaveSpotifyStatus(playing);
+                            }
+                        });
+                    }
+                })
+                .catch((err) => {
+                    console.warn('Error al vincular con Spotify:', err);
+                    showMessage(`No se pudo completar la conexión con Spotify: ${err.message || err}`);
+                })
+                .finally(() => {
+                    const cleanUrl = window.location.pathname + window.location.hash;
+                    window.history.replaceState(null, '', cleanUrl);
+                });
+        } else if (spotifyError) {
+            console.warn('Spotify auth error:', spotifyError);
+            const cleanUrl = window.location.pathname + window.location.hash;
+            window.history.replaceState(null, '', cleanUrl);
+        }
+    }, [myChatId]);
+
+    // Sincronización periódica en vivo de Spotify (cada 25s) mientras el usuario está en la app
+    useEffect(() => {
+        if (!hasEntered || !myChatId) return;
+        const auth = getStoredSpotifyAuth();
+        if (!auth?.accessToken) return;
+
+        let isMounted = true;
+        const syncCurrentPlaying = async () => {
+            if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+            try {
+                const playing = await fetchCurrentlyPlaying();
+                if (!isMounted) return;
+                if (playing) {
+                    handleSaveSpotifyStatus(playing);
+                }
+            } catch {}
+        };
+
+        syncCurrentPlaying();
+        const interval = setInterval(syncCurrentPlaying, 25000);
+        return () => {
+            isMounted = false;
+            clearInterval(interval);
+        };
+    }, [hasEntered, myChatId]);
+
     // --- LÓGICA DE PUBLICACIONES DE PERFIL ---
     const handleProfileImageUpload = async (e) => {
         const rawFile = e.target.files?.[0];
@@ -6875,7 +6973,29 @@ useEffect(() => {
                                     <span>Enviar mensaje</span>
                                 </button>
                             )}
+                            {isMyProfile && (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowSpotifyModal(true)}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-[#1DB954]/15 hover:bg-[#1DB954]/25 text-[#1DB954] border border-[#1DB954]/30 shadow-2xs transition-all cursor-pointer active:scale-95"
+                                    title="Vincular cuenta de Spotify o canción favorita"
+                                >
+                                    <SpotifyIcon size={14} />
+                                    <span>{userData?.spotifyStatus?.track ? 'Música en Spotify' : 'Vincular Spotify'}</span>
+                                </button>
+                            )}
                         </div>
+
+                        {/* Widget de Spotify si el usuario tiene música activa */}
+                        {userData?.spotifyStatus && (
+                            <div className="mt-3 max-w-sm">
+                                <SpotifyWidget 
+                                    spotifyStatus={userData.spotifyStatus} 
+                                    isOwn={isMyProfile}
+                                    onManage={() => setShowSpotifyModal(true)}
+                                />
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -15823,7 +15943,23 @@ Escribe en español con tono pedagógico moderno.`;
                                                       const photo = resolveUserPhoto(u, userMappings, u.profilePicUrl || '');
 
                                                       return (
-                                                          <div
+                                                          <ProfileHoverCard
+                                                              key={u.id}
+                                                              userId={u.id}
+                                                              userObj={u}
+                                                              userMappings={userMappings}
+                                                              userPresence={userPresence}
+                                                              myChatId={myChatId}
+                                                              role={role}
+                                                              isDarkMode={isDarkMode}
+                                                              onOpenProfile={(uid) => { setViewingProfileId(uid); changeTab('profile', uid); }}
+                                                              onOpenChat={(uid, uName, isT) => {
+                                                                  handleOpenChat({ id: `dm_${[myChatId, uid].sort().join('_')}`, name: uName, type: 'dm', role: isT ? 'teacher' : 'student', otherUserId: uid, targetUserId: uid });
+                                                                  setIsChatMinimized(false);
+                                                              }}
+                                                              className="block w-full"
+                                                          >
+<div
                                                               key={u.id}
                                                               onClick={() => { handleOpenChat({ id: chatId, name: u.name, type: 'dm', role: u.role, otherUserId: u.id, targetUserId: u.id }); setIsChatMinimized(false); }}
                                                               role="button"
@@ -15883,6 +16019,7 @@ Escribe en español con tono pedagógico moderno.`;
                                                                   <span className="w-2 h-2 bg-red-500 rounded-full shrink-0" title="Mensaje sin responder"></span>
                                                               ) : null}
                                                           </div>
+                                                          </ProfileHoverCard>
                                                       );
                                                   })}
                                               </div>
@@ -16893,7 +17030,21 @@ Escribe en español con tono pedagógico moderno.`;
                                                            if (!showTeacherCard) return null;
                                                            const teacherPhoto = userMappings[groupOwnerId]?.profilePicUrl || (role === 'teacher' && myChatId === groupOwnerId ? auth.currentUser?.photoURL : null);
                                                            return (
-                                                               <div className={`p-2.5 flex items-center justify-between transition-colors ${
+                                                               <ProfileHoverCard
+                                                                    userId={groupOwnerId}
+                                                                    userMappings={userMappings}
+                                                                    userPresence={userPresence}
+                                                                    myChatId={myChatId}
+                                                                    role={role}
+                                                                    isDarkMode={isDarkMode}
+                                                                    onOpenProfile={(uid) => { setShowGroupInfo(false); setViewingProfileId(uid); changeTab('profile', uid); }}
+                                                                    onOpenChat={(uid, uName, isT) => {
+                                                                        setShowGroupInfo(false);
+                                                                        handleOpenChat({ id: `dm_${[myChatId, uid].sort().join('_')}`, name: uName, type: 'dm', role: isT ? 'teacher' : 'student', otherUserId: uid, targetUserId: uid });
+                                                                    }}
+                                                                    className="block w-full"
+                                                                >
+<div className={`p-2.5 flex items-center justify-between transition-colors ${
                                                                    isDarkMode ? 'hover:bg-gray-800/60' : 'hover:bg-gray-50'
                                                                }`}>
                                                                    <div className="flex items-center gap-2.5 min-w-0">
@@ -16922,6 +17073,7 @@ Escribe en español con tono pedagógico moderno.`;
                                                                        </button>
                                                                    )}
                                                                </div>
+                                                                </ProfileHoverCard>
                                                            );
                                                        })()}
 
@@ -16935,7 +17087,22 @@ Escribe en español con tono pedagógico moderno.`;
                                                                : (uData.fullName || (uk.includes('@') ? uk.split('@')[0] : uk) || 'Estudiante');
 
                                                            return (
-                                                               <div key={uk} className={`p-2.5 flex items-center justify-between transition-colors ${isDarkMode ? 'hover:bg-gray-800/60' : 'hover:bg-gray-50'}`}>
+                                                               <ProfileHoverCard
+                                                                    key={uk}
+                                                                    userId={uk}
+                                                                    userMappings={userMappings}
+                                                                    userPresence={userPresence}
+                                                                    myChatId={myChatId}
+                                                                    role={role}
+                                                                    isDarkMode={isDarkMode}
+                                                                    onOpenProfile={(uid) => { setShowGroupInfo(false); setViewingProfileId(uid); changeTab('profile', uid); }}
+                                                                    onOpenChat={(uid, uName, isT) => {
+                                                                        setShowGroupInfo(false);
+                                                                        handleOpenChat({ id: `dm_${[myChatId, uid].sort().join('_')}`, name: uName, type: 'dm', role: isT ? 'teacher' : 'student', otherUserId: uid, targetUserId: uid });
+                                                                    }}
+                                                                    className="block w-full"
+                                                                >
+<div key={uk} className={`p-2.5 flex items-center justify-between transition-colors ${isDarkMode ? 'hover:bg-gray-800/60' : 'hover:bg-gray-50'}`}>
                                                                    <div className="flex items-center gap-2.5 min-w-0">
                                                                        <div className="relative shrink-0">
                                                                            <div className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-2xs border border-white dark:border-gray-700">
@@ -16984,6 +17151,7 @@ Escribe en español con tono pedagógico moderno.`;
                                                                        )}
                                                                    </div>
                                                                </div>
+                                                                </ProfileHoverCard>
                                                            );
                                                        })}
                                                    </div>
@@ -17108,7 +17276,24 @@ Escribe en español con tono pedagógico moderno.`;
                                                       )}
                                                       <div id={`msg-${m.id}`} className={`flex flex-col w-full group relative transition-all duration-200 animate-in fade-in slide-in-from-bottom-1 ${isMe ? 'items-end' : 'items-start'} ${isLastInGroup ? 'mb-2.5' : 'mb-[2px]'}`}>
                                                           
-                                                          {!isMe && activeChat.type === 'group' && isFirstInGroup && <span className={`text-[10px] font-bold mb-0.5 px-1 ${isTeacher ? 'text-[#AD3333] dark:text-[#ff6b6b]' : (currentPrefs.gradient ? 'text-white' : (isDarkMode ? 'text-gray-300' : 'text-gray-600'))}`}>{m.author}</span>}
+                                                          {!isMe && activeChat.type === 'group' && isFirstInGroup && (
+                                                               <ProfileHoverCard
+                                                                   userId={m.authorId}
+                                                                   userMappings={userMappings}
+                                                                   userPresence={userPresence}
+                                                                   myChatId={myChatId}
+                                                                   role={role}
+                                                                   isDarkMode={isDarkMode}
+                                                                   onOpenProfile={(uid) => { setViewingProfileId(uid); changeTab('profile', uid); }}
+                                                                   onOpenChat={(uid, uName, isT) => {
+                                                                       handleOpenChat({ id: `dm_${[myChatId, uid].sort().join('_')}`, name: uName, type: 'dm', role: isT ? 'teacher' : 'student', otherUserId: uid, targetUserId: uid });
+                                                                   }}
+                                                               >
+                                                                   <span className={`text-[10px] font-bold mb-0.5 px-1 cursor-pointer hover:underline inline-block ${isTeacher ? 'text-[#AD3333] dark:text-[#ff6b6b]' : (currentPrefs.gradient ? 'text-white' : (isDarkMode ? 'text-gray-300' : 'text-gray-600'))}`}>
+                                                                       {m.author}
+                                                                   </span>
+                                                               </ProfileHoverCard>
+                                                           )}
                                                           
                                                           <div className={`relative max-w-[90%] sm:max-w-[85%] flex items-center ${isMe ? 'justify-end' : 'justify-start'}`}>
                                                               
@@ -17746,6 +17931,16 @@ Escribe en español con tono pedagógico moderno.`;
                       isDarkMode={isDarkMode}
                   />
               )}
+
+              {/* MODAL DE VINCULACIÓN DE SPOTIFY */}
+              <SpotifyConnectModal
+                  isOpen={showSpotifyModal}
+                  onClose={() => setShowSpotifyModal(false)}
+                  isDarkMode={isDarkMode}
+                  currentStatus={userMappings[myChatId]?.spotifyStatus || null}
+                  onSaveStatus={handleSaveSpotifyStatus}
+                  showMessage={showMessage}
+              />
 
               {/* ONBOARDING PRIMERA VEZ */}
               {showOnboarding && hasEntered && !isDemoMode && (
