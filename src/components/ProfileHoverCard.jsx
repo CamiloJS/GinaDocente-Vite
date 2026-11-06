@@ -27,12 +27,13 @@ export const ProfileHoverCard = ({
   role = 'student',
   onOpenProfile,
   onOpenChat,
+  preferredPlacement = 'left',
   isDarkMode = false,
   className = '',
   children
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [coords, setCoords] = useState({ top: 0, left: 0, placement: 'bottom' });
+  const [coords, setCoords] = useState({ top: 0, left: 0, placement: 'left' });
   const [isDesktopHover, setIsDesktopHover] = useState(false);
 
   const targetRef = useRef(null);
@@ -58,38 +59,72 @@ export const ProfileHoverCard = ({
     if (!targetRef.current || typeof window === 'undefined') return;
     const rect = targetRef.current.getBoundingClientRect();
     const cardWidth = 280;
-    const estimatedHeight = 310;
-    const margin = 8;
+    const estimatedHeight = cardRef.current?.offsetHeight || 310;
+    const margin = 10;
 
-    let left = rect.left + (rect.width / 2) - (cardWidth / 2);
-    // Evitar desbordamiento horizontal
-    if (left < 12) left = 12;
-    if (left + cardWidth > window.innerWidth - 12) {
-      left = window.innerWidth - cardWidth - 12;
-    }
+    let left = 0;
+    let top = 0;
+    let placement = preferredPlacement;
 
-    let top = rect.bottom + margin;
-    let placement = 'bottom';
+    if (preferredPlacement === 'left') {
+      // Prioridad requerida: A la izquierda del chat/elemento
+      left = rect.left - cardWidth - margin;
+      placement = 'left';
 
-    // Si no cabe abajo, abrir arriba del elemento
-    if (rect.bottom + estimatedHeight > window.innerHeight - 12) {
-      top = rect.top - estimatedHeight - margin;
-      placement = 'top';
-      if (top < 12) {
-        top = 12;
+      // Si no cabe a la izquierda (menos de 12px del margen izquierdo de la pantalla)
+      if (left < 12) {
+        // Si hay espacio suficiente a la derecha, ubicar a la derecha
+        if (rect.right + cardWidth + margin <= window.innerWidth - 12) {
+          left = rect.right + margin;
+          placement = 'right';
+        } else {
+          // Ajustar dentro del límite izquierdo visible
+          left = 12;
+        }
+      }
+
+      // Alinear verticalmente centrado con el elemento señalado
+      top = rect.top + (rect.height / 2) - (estimatedHeight / 2);
+    } else if (preferredPlacement === 'right') {
+      left = rect.right + margin;
+      placement = 'right';
+      if (left + cardWidth > window.innerWidth - 12) {
+        left = Math.max(12, rect.left - cardWidth - margin);
+        placement = 'left';
+      }
+      top = rect.top + (rect.height / 2) - (estimatedHeight / 2);
+    } else {
+      left = rect.left + (rect.width / 2) - (cardWidth / 2);
+      if (left < 12) left = 12;
+      if (left + cardWidth > window.innerWidth - 12) {
+        left = window.innerWidth - cardWidth - 12;
+      }
+      top = rect.bottom + margin;
+      placement = 'bottom';
+      if (rect.bottom + estimatedHeight > window.innerHeight - 12) {
+        top = rect.top - estimatedHeight - margin;
+        placement = 'top';
       }
     }
 
+    // Prevenir desbordamiento vertical de la pantalla
+    if (top < 12) {
+      top = 12;
+    } else if (top + estimatedHeight > window.innerHeight - 12) {
+      top = Math.max(12, window.innerHeight - estimatedHeight - 12);
+    }
+
     setCoords({ top, left, placement });
-  }, []);
+  }, [preferredPlacement]);
 
   const handleMouseEnter = () => {
     if (!isDesktopHover || !userId) return;
     if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    if (isOpen) return;
     openTimerRef.current = setTimeout(() => {
       calculatePosition();
       setIsOpen(true);
-    }, 220); // 220ms debounce
+    }, 180); // 180ms debounce
   };
 
   const handleMouseLeave = () => {
@@ -97,7 +132,7 @@ export const ProfileHoverCard = ({
     if (openTimerRef.current) clearTimeout(openTimerRef.current);
     closeTimerRef.current = setTimeout(() => {
       setIsOpen(false);
-    }, 250); // 250ms margen para mover el ratón hacia la tarjeta
+    }, 300); // 300ms margen para mover el ratón hacia la tarjeta
   };
 
   useEffect(() => {
@@ -161,6 +196,14 @@ export const ProfileHoverCard = ({
           }`}
           onClick={(e) => e.stopPropagation()}
         >
+          {/* Puente invisible para transición suave del cursor entre el chat y la tarjeta */}
+          {coords.placement === 'left' && (
+            <div className="absolute top-0 -right-3 w-3 h-full pointer-events-auto" />
+          )}
+          {coords.placement === 'right' && (
+            <div className="absolute top-0 -left-3 w-3 h-full pointer-events-auto" />
+          )}
+
           {/* Banner de Cabecera con degradado temático */}
           <div className={`h-14 relative p-2 flex items-start justify-end ${
             isTeacher 
