@@ -84,7 +84,6 @@ export const UniversalImage = ({
         alt={alt}
         loading={loading}
         decoding={decoding}
-        referrerPolicy="no-referrer"
         onError={handleNativeError}
         onClick={onClick}
         className={`${className} ${isConverting ? 'opacity-40' : 'opacity-100 transition-opacity duration-200'}`}

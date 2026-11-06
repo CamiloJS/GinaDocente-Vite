@@ -1433,13 +1433,44 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                         setPrevTaskTitle(taskTitle); setPrevTaskDesc(taskDesc); setIsAiLoading(true);
                                         try {
                                             const cleanText = (str) => (str || '').replace(/\*\*/g, '').replace(/\*/g, '').trim();
-                                            const result = await callGemini(`Corrige la ortografía y gramática manteniendo el idioma original. REGLA ESTRICTA: NO uses asteriscos (* o **). Devuelve SÓLO el texto corregido en texto limpio:\n\n${taskDesc || taskTitle}`);
-                                            if (!result) { 
-                                                setIsAiLoading(false); 
-                                                return showMessage("No se pudo corregir con IA."); 
+                                            if (taskTitle && taskDesc) {
+                                                const prompt = `Corrige la ortografía y gramática manteniendo el idioma original del siguiente título y descripción.
+REGLA ESTRICTA: NO uses asteriscos (* o **) ni markdown. Devuelve texto limpio.
+
+Devuelve ÚNICAMENTE en este formato exacto:
+TITULO: [Título corregido]
+DESCRIPCION: [Descripción corregida]
+
+Título original: ${taskTitle}
+Descripción original: ${taskDesc}`;
+                                                const result = await callGemini(prompt);
+                                                if (!result) { 
+                                                    setIsAiLoading(false); 
+                                                    return showMessage("No se pudo corregir con IA."); 
+                                                }
+                                                const titleMatch = result.match(/(?:T[IÍ]TULO|TITLE)\s*[:\-]?\s*\*?\*?\s*(.*)/i);
+                                                const descMatch = result.match(/(?:DESCRIPCI[OÓ]N|DESCRIPTION)\s*[:\-]?\s*\*?\*?\s*([\s\S]*)/i);
+                                                if (titleMatch && descMatch && titleMatch[1].trim()) {
+                                                    setTaskTitle(cleanText(titleMatch[1]));
+                                                    setTaskDesc(cleanText(descMatch[1]));
+                                                } else {
+                                                    setTaskDesc(cleanText(result));
+                                                }
+                                            } else if (taskTitle) {
+                                                const result = await callGemini(`Corrige la ortografía y gramática del siguiente título manteniendo el idioma original. REGLA ESTRICTA: NO uses asteriscos (* o **). Devuelve SÓLO el texto corregido en texto limpio:\n\n${taskTitle}`);
+                                                if (!result) { 
+                                                    setIsAiLoading(false); 
+                                                    return showMessage("No se pudo corregir con IA."); 
+                                                }
+                                                setTaskTitle(cleanText(result));
+                                            } else {
+                                                const result = await callGemini(`Corrige la ortografía y gramática del siguiente texto manteniendo el idioma original. REGLA ESTRICTA: NO uses asteriscos (* o **). Devuelve SÓLO el texto corregido en texto limpio:\n\n${taskDesc}`);
+                                                if (!result) { 
+                                                    setIsAiLoading(false); 
+                                                    return showMessage("No se pudo corregir con IA."); 
+                                                }
+                                                setTaskDesc(cleanText(result));
                                             }
-                                            if (taskDesc) setTaskDesc(cleanText(result));
-                                            else setTaskTitle(cleanText(result));
                                             setHasAiModified(true);
                                             showMessage("Ortografía y gramática corregidas.");
                                         } catch (err) {

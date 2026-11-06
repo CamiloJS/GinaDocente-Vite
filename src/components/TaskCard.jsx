@@ -17,7 +17,7 @@ import LinkifyText from './LinkifyText.jsx'
 import AppleEmoji from './AppleEmoji.jsx'
 import RichTextToolbar from './RichTextToolbar.jsx'
 import RichVisualEditor from './RichVisualEditor.jsx'
-import { prepararNarracion, narrarSegmentos } from '../utils/narracion.js'
+import { prepararNarracion, narrarSegmentos, limpiarParaNarrar, partirPorIdioma, detectarIdioma } from '../utils/narracion.js'
 import DocumentPreviewModal from './DocumentPreviewModal.jsx'
 import CustomVideoPlayer, { isDirectVideoUrl } from './CustomVideoPlayer.jsx'
 import GeniallyEmbedPlayer, { extractGeniallyUrl } from './GeniallyEmbedPlayer.jsx'
@@ -135,12 +135,30 @@ const TaskCard = React.memo(({
         }
         const tituloNarrar = (showTranslated && translatedTitle ? translatedTitle : (task.title || '')).trim();
         const cuerpoNarrar = (showTranslated && translatedDescription ? translatedDescription : (task.description || '')).trim();
-        const texto = [tituloNarrar, cuerpoNarrar].filter(Boolean).join('. ');
-        if (!texto) return;
+        if (!tituloNarrar && !cuerpoNarrar) return;
+
         const ticket = ++solicitudNarracionRef.current;
         setPreparandoNarracion(true);
         try {
-            const fragmentos = await prepararNarracion(texto, callGemini);
+            let fragmentos = [];
+            // 1. Asegurar SIEMPRE que el título se lea primero en su idioma detectado
+            if (tituloNarrar) {
+                const tituloLimpio = limpiarParaNarrar(tituloNarrar);
+                if (tituloLimpio) {
+                    const idiomaTitulo = detectarIdioma(tituloLimpio);
+                    const segsTitulo = partirPorIdioma(tituloLimpio, idiomaTitulo);
+                    if (Array.isArray(segsTitulo) && segsTitulo.length > 0) {
+                        fragmentos.push(...segsTitulo);
+                    }
+                }
+            }
+            // 2. Preparar el cuerpo de la publicación con la IA o el motor local
+            if (cuerpoNarrar) {
+                const segsCuerpo = await prepararNarracion(cuerpoNarrar, callGemini);
+                if (Array.isArray(segsCuerpo) && segsCuerpo.length > 0) {
+                    fragmentos.push(...segsCuerpo);
+                }
+            }
             // si mientras preparaba el usuario volvio a tocar, no arrancamos (evita voces encimadas)
             if (ticket !== solicitudNarracionRef.current || !fragmentos || !fragmentos.length) return;
             setNarrando(true);
@@ -356,6 +374,11 @@ const TaskCard = React.memo(({
 
     const [showReactionDock, setShowReactionDock] = useState(false);
     const reactionDockTimerRef = useRef(null);
+    const reactionTouchTimerRef = useRef(null);
+    const reactionDockRef = useRef(null);
+    useClickOutside(reactionDockRef, () => {
+        if (showReactionDock) setShowReactionDock(false);
+    });
     const [showShareModal, setShowShareModal] = useState(false);
     const [shareComment, setShareComment] = useState("");
     const [shareSearchTerm, setShareSearchTerm] = useState("");
@@ -438,17 +461,26 @@ const TaskCard = React.memo(({
                 }
             });
         }
-        (academicGroups || []).forEach(g => {
-            const grpName = g.name || 'Grupo';
-            if (!shareSearchTerm || grpName.toLowerCase().includes(shareSearchTerm.toLowerCase())) {
-                list.push({ id: `acad_${g.id}`, name: `Grupo: ${grpName}`, role: 'group', isGroup: true });
+        const seenGroupNames = new Set();
+        const seenGroupIds = new Set();
+        const addGroupItem = (rawId, rawName) => {
+            if (!rawId && !rawName) return;
+            const cleanName = String(rawName || rawId || 'Grupo').trim();
+            const normName = cleanName.toLowerCase().replace(/^grupo:\s*/i, '');
+            const cleanId = String(rawId || normName).trim();
+            if (seenGroupNames.has(normName) || seenGroupIds.has(cleanId)) return;
+            seenGroupNames.add(normName);
+            seenGroupIds.add(cleanId);
+            if (!shareSearchTerm || normName.includes(shareSearchTerm.toLowerCase()) || cleanName.toLowerCase().includes(shareSearchTerm.toLowerCase())) {
+                list.push({ id: rawId || `grp_${normName}`, name: `Grupo: ${cleanName}`, role: 'group', isGroup: true });
             }
+        };
+
+        (academicGroups || []).forEach(g => {
+            addGroupItem(g.id, g.name || g.groupName);
         });
         (chatGroups || []).forEach(g => {
-            const grpName = g.name || 'Grupo';
-            if (!shareSearchTerm || grpName.toLowerCase().includes(shareSearchTerm.toLowerCase())) {
-                list.push({ id: g.id, name: `Grupo: ${grpName}`, role: 'group', isGroup: true });
-            }
+            addGroupItem(g.id, g.name || g.title);
         });
         return list.slice(0, 25);
     }, [userMappings, students, academicGroups, chatGroups, myChatId, role, shareSearchTerm]);
@@ -1842,9 +1874,9 @@ const TaskCard = React.memo(({
 
             const newComment = { 
                 id: Date.now().toString() + Math.random().toString(36).substr(2, 5), 
-                author: role === 'teacher' ? (loggedInName || getTeacherDisplayName(activeTeacherId)) : resolveUserDisplayName(loggedInName, userMappings, loggedInName), 
-                authorUsername: role === 'teacher' ? (activeTeacherId || 'teacher') : (currentUser?.email ? currentUser.email.split('@')[0] : (currentUserId || '')),
-                authorId: role === 'teacher' ? (activeTeacherId || 'teacher') : (currentUserId || currentUser?.uid || ''),
+                author: role === 'teacher' ? (loggedInName || getTeacherDisplayName(activeTeacherId)) : resolveUserDisplayName({ author: loggedInName, authorUsername: myChatId, authorId: myChatId || currentUser?.uid, authorRole: 'student' }, userMappings, loggedInName), 
+                authorUsername: role === 'teacher' ? (activeTeacherId || 'teacher') : (myChatId || (currentUser?.email ? currentUser.email.split('@')[0] : (currentUserId || ''))),
+                authorId: role === 'teacher' ? (activeTeacherId || 'teacher') : (myChatId || currentUser?.uid || currentUserId || ''),
                 authorRole: role,
                 createdAt: Date.now(),
                 title: isForum ? (commentTitle || '').trim().toUpperCase() : '',
@@ -2074,6 +2106,7 @@ const TaskCard = React.memo(({
             {/* Dock flotante de reacciones estilo Facebook con Apple Emojis sin bordes individuales */}
             {showReactionDock && !isLocked && (
               <div 
+                ref={reactionDockRef}
                 className="absolute bottom-full left-0 mb-2 z-50 flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-full shadow-2xl bg-white dark:bg-gray-800 border border-gray-200/90 dark:border-gray-700 backdrop-blur-md animate-in fade-in zoom-in-95 duration-150"
                 onMouseEnter={() => {
                   if (reactionDockTimerRef.current) clearTimeout(reactionDockTimerRef.current);
@@ -2129,6 +2162,15 @@ const TaskCard = React.memo(({
                       } else {
                         toggleReaction('like');
                       }
+                    }}
+                    onTouchStart={() => {
+                      if (reactionTouchTimerRef.current) clearTimeout(reactionTouchTimerRef.current);
+                      reactionTouchTimerRef.current = setTimeout(() => {
+                        setShowReactionDock(true);
+                      }, 350);
+                    }}
+                    onTouchEnd={() => {
+                      if (reactionTouchTimerRef.current) clearTimeout(reactionTouchTimerRef.current);
                     }}
                     disabled={isLocked}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
@@ -4346,9 +4388,33 @@ const TaskCard = React.memo(({
                                     </div>
                                 </div>
 
-                                <h3 className="text-base sm:text-lg font-black text-gray-900 dark:text-gray-100 leading-snug mb-2.5">
-                                    <LinkifyText text={showTranslated && translatedTitle ? translatedTitle : task.title} isDarkMode={isDarkMode} embedVideos={false} />
-                                </h3>
+                                <div className="flex items-start justify-between gap-3 mb-2.5 w-full">
+                                    <h3 className="text-base sm:text-lg font-black text-gray-900 dark:text-gray-100 leading-snug flex-1">
+                                        <LinkifyText text={showTranslated && translatedTitle ? translatedTitle : task.title} isDarkMode={isDarkMode} embedVideos={false} />
+                                    </h3>
+                                    {(task.description || task.title) && (
+                                        <div className="flex items-center gap-1 bg-gray-100/95 dark:bg-gray-800/95 backdrop-blur-md rounded-xl p-0.5 border border-gray-200/80 dark:border-gray-700/80 shadow-2xs shrink-0 self-start">
+                                            <button 
+                                                type="button"
+                                                onClick={handleTranslatePost} 
+                                                disabled={isTranslating}
+                                                className={`p-1.5 rounded-lg transition-colors ${showTranslated ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50' : 'text-gray-400 hover:text-blue-500 hover:bg-gray-200 dark:hover:bg-gray-700'}`} 
+                                                title={showTranslated ? "Ver texto original" : "Traducir al español"}
+                                            >
+                                                <Languages size={14} />
+                                            </button>
+                                            <button 
+                                                type="button"
+                                                onClick={alternarNarracion}
+                                                disabled={preparandoNarracion} 
+                                                className="p-1.5 rounded-lg text-gray-400 hover:text-blue-500 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" 
+                                                title="Escuchar pronunciación"
+                                            >
+                                                {narrando ? <VolumeX size={14} /> : <Volume2 size={14} />}
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
 
                                 {task.description && (
                                     <div className="mb-3 space-y-2">

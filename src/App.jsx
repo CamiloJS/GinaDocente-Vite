@@ -932,11 +932,10 @@ function App() {
         return;
       }
 
-      // 5. Si está en otra pestaña que no sea el muro/feed, volver al feed
+      // 5. Si el estado del historial especifica pestaña o perfil, restaurarlo
       if (event.state?.tab) {
         setActiveTab(event.state.tab);
-      } else if (activeTabRef.current !== 'feed' && activeTabRef.current !== 'tasks') {
-        setActiveTab('tasks');
+        if (event.state.profileId) setViewingProfileId(event.state.profileId);
       }
     };
 
@@ -1700,7 +1699,13 @@ function App() {
       setSelectedGroupForFeed(null);
       setPostTargetGroup("all");
     }
-    try { window.history.pushState(null, '', `#${targetHash}`); } catch(e) { window.location.hash = targetHash; } 
+    try { 
+      window.history.pushState(
+        { tab, profileId: (tab === 'profile' ? (profileId !== undefined ? profileId : viewingProfileId) : null) }, 
+        '', 
+        `#${targetHash}`
+      ); 
+    } catch(e) { window.location.hash = targetHash; } 
     setActiveTab(tab); 
   };
 
@@ -7123,7 +7128,7 @@ useEffect(() => {
                             ) : (
                                 <div className="space-y-2 min-w-0 w-full">
                                     {post.title && <h4 className={`font-black text-base sm:text-lg leading-tight break-words ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}><LinkifyText text={post.title} isDarkMode={isDarkMode} embedVideos={false} /></h4>}
-                                    {post.imageUrl && <img src={post.imageUrl} loading="lazy" onClick={() => setFullScreenImage(post.imageUrl)} alt="Post" className={`w-full max-h-96 object-cover rounded-xl cursor-pointer shadow-xs border ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`} />}
+                                    {post.imageUrl && <UniversalImage src={post.imageUrl} onClick={() => setFullScreenImage(post.imageUrl)} alt={post.title || "Post"} className={`w-full max-h-96 object-cover rounded-xl cursor-pointer shadow-xs border ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`} />}
                                     {post.text && <div className={`text-xs sm:text-sm leading-relaxed break-words whitespace-pre-line ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}><LinkifyText text={post.text} colapsable /></div>}
                                     {post.sharedPost && (
                                         <div 
@@ -7155,7 +7160,7 @@ useEffect(() => {
                                                 </p>
                                             )}
                                             {post.sharedPost.imageUrl && (
-                                                <img src={post.sharedPost.imageUrl} alt="Shared preview" className="mt-2 h-32 w-full object-cover rounded-xl border border-gray-200 dark:border-gray-700" onError={(e) => e.target.style.display = 'none'} />
+                                                <UniversalImage src={post.sharedPost.imageUrl} alt="Shared preview" className="mt-2 h-32 w-full object-cover rounded-xl border border-gray-200 dark:border-gray-700" />
                                             )}
                                             <div className="mt-2.5 flex items-center gap-1.5 text-xs font-bold text-blue-600 dark:text-blue-400 group-hover/shared:underline">
                                                 <span>Ver publicación completa</span>
@@ -7294,7 +7299,7 @@ useEffect(() => {
                                             <div className="flex justify-between items-start gap-1 group/pcomm">
                                                 <div className="min-w-0 flex-1 break-words">
                                                     <button onClick={() => handleOpenProfileByName(commentAuthorName, c.authorUsername || c.authorId)} className="font-bold text-blue-500 mb-0.5 hover:underline text-left block truncate">{commentAuthorName}</button>
-                                                    <p className="break-words leading-relaxed">{c.text}</p>
+                                                    <div className="break-words leading-relaxed"><LinkifyText text={c.text} isDarkMode={isDarkMode} /></div>
                                                 </div>
                                                 <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover/pcomm:opacity-100 transition-opacity">
                                                     <button type="button" onClick={() => setProfileReplyingTo({...profileReplyingTo, [post.id]: c})} className="text-gray-400 hover:text-blue-500 p-1 rounded-md" title="Responder"><ReplyIcon size={12}/></button>
