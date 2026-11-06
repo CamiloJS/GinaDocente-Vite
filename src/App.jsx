@@ -2279,6 +2279,10 @@ function App() {
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === 'Escape') {
+        setFullScreenImage(null);
+        setAppPreviewDoc(null);
+        setShowSpotifyModal(false);
+        setShowSugModal(false);
         setGlobalGifCallback(null);
         setShowChatSettings(false);
         setShowGroupInfo(false);

@@ -323,6 +323,17 @@ export const getLastConnectionTime = (
  */
 export const formatTimeAMPM = (dateOrTs) => {
   if (!dateOrTs && dateOrTs !== 0) return '';
+  if (typeof dateOrTs === 'string') {
+    const timeMatch = dateOrTs.trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+    if (timeMatch) {
+      let h = parseInt(timeMatch[1], 10);
+      const m = timeMatch[2];
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12;
+      h = h ? h : 12;
+      return `${h}:${m} ${ampm}`;
+    }
+  }
   const ts = toTimestampMs(dateOrTs);
   if (!ts) return '';
   const d = new Date(ts);

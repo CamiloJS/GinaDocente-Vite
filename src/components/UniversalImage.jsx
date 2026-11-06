@@ -76,6 +76,10 @@ export const UniversalImage = ({
   }
 
   const isFullWidth = /(?:^|\s)w-full(?:\s|$)/.test(className);
+  const hasCursorPointer = /(?:^|\s)cursor-pointer(?:\s|$)/.test(className) || Boolean(onClick);
+  const roundedMatch = className.match(/(?:^|\s)(rounded(?:-[a-z0-9]+)?)(?:\s|$)/);
+  const roundedClass = roundedMatch ? roundedMatch[1] : '';
+
   const isFixedDimension = (
     (/(?:^|\s)size-\d+/.test(className)) ||
     (/(?:^|\s)w-\d+/.test(className) && /(?:^|\s)h-\d+/.test(className))
@@ -83,7 +87,7 @@ export const UniversalImage = ({
 
   return (
     <div 
-      className={`relative ${isFullWidth ? 'w-full block' : 'inline-block'} overflow-hidden ${isFixedDimension ? className : ''} ${isConverting ? 'bg-gray-100 dark:bg-gray-800/60' : ''}`} 
+      className={`relative ${isFullWidth ? 'w-full block' : 'inline-block'} overflow-hidden ${roundedClass} ${hasCursorPointer ? 'cursor-pointer' : ''} ${isFixedDimension ? className : ''} ${isConverting ? 'bg-gray-100 dark:bg-gray-800/60' : ''}`} 
       style={style}
       onClick={onClick}
     >
