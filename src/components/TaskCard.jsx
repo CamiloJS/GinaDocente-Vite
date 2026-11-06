@@ -9,7 +9,7 @@ import {
   isImageLikeFile, convertHeicToJpeg, resolveUserDisplayName, resolveUserPhoto, handleForceDownload
 } from '../utils/helpers.js'
 import UniversalImage from './UniversalImage.jsx'
-import { isImageLikeUrl, IMAGE_EXTENSIONS_REGEX } from '../utils/heicConverter.js'
+import { isImageLikeUrl, IMAGE_EXTENSIONS_REGEX, getKnownConvertedUrl } from '../utils/heicConverter.js'
 import { glassCard, glassInput } from '../utils/styles.js'
 import { useClickOutside } from '../utils/hooks.js'
 import ImageCarousel from './ImageCarousel.jsx'
@@ -4756,7 +4756,7 @@ const TaskCard = React.memo(({
                                                                     key={imgIdx} 
                                                                     src={imgSrc} 
                                                                     alt={`Adjunto ${imgIdx + 1}`} 
-                                                                    onClick={() => setLocalFullScreenImage(imgSrc)} 
+                                                                    onClick={() => setLocalFullScreenImage(getKnownConvertedUrl(imgSrc) || imgSrc)} 
                                                                     className="w-24 h-24 rounded-xl border object-cover shadow-xs cursor-pointer hover:opacity-80 transition-opacity" 
                                                                 />
                                                             ))}
@@ -5320,29 +5320,32 @@ const TaskCard = React.memo(({
             , document.body)}
 
             {/* FULLSCREEN IMAGE MODAL */}
-            {localFullScreenImage && ReactDOM.createPortal(
-                <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setLocalFullScreenImage(null)}>
-                    <div className="absolute top-4 md:top-8 right-4 md:right-8 flex items-center gap-2">
-                        <button 
-                            type="button" 
-                            onClick={(e) => { e.stopPropagation(); handleForceDownload(localFullScreenImage, 'foto.jpg'); }} 
-                            className="text-white/80 hover:text-white bg-black/50 hover:bg-black/70 p-2 rounded-full transition-all shadow-lg cursor-pointer"
-                            title="Descargar foto"
-                        >
-                            <Download size={22} />
-                        </button>
-                        <button 
-                            type="button" 
-                            onClick={() => setLocalFullScreenImage(null)} 
-                            className="text-white/70 hover:text-white bg-black/50 hover:bg-red-600 p-2 rounded-full transition-all shadow-lg cursor-pointer"
-                            title="Cerrar"
-                        >
-                            <X size={28} />
-                        </button>
+            {localFullScreenImage && (() => {
+                const effectiveImageSrc = getKnownConvertedUrl(localFullScreenImage) || localFullScreenImage;
+                return ReactDOM.createPortal(
+                    <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setLocalFullScreenImage(null)}>
+                        <div className="absolute top-4 md:top-8 right-4 md:right-8 flex items-center gap-2">
+                            <button 
+                                type="button" 
+                                onClick={(e) => { e.stopPropagation(); handleForceDownload(effectiveImageSrc, 'foto.jpg'); }} 
+                                className="text-white/80 hover:text-white bg-black/50 hover:bg-black/70 p-2 rounded-full transition-all shadow-lg cursor-pointer"
+                                title="Descargar foto"
+                            >
+                                <Download size={22} />
+                            </button>
+                            <button 
+                                type="button" 
+                                onClick={() => setLocalFullScreenImage(null)} 
+                                className="text-white/70 hover:text-white bg-black/50 hover:bg-red-600 p-2 rounded-full transition-all shadow-lg cursor-pointer"
+                                title="Cerrar"
+                            >
+                                <X size={28} />
+                            </button>
+                        </div>
+                        <UniversalImage src={effectiveImageSrc} className="w-auto h-auto max-w-[95vw] max-h-[90vh] object-contain rounded-2xl shadow-2xl" onClick={e => e.stopPropagation()} />
                     </div>
-                    <UniversalImage src={localFullScreenImage} className="w-auto h-auto max-w-[95vw] max-h-[90vh] object-contain rounded-2xl shadow-2xl" onClick={e => e.stopPropagation()} />
-                </div>
-            , document.body)}
+                , document.body);
+            })()}
 
             {/* VISTA PREVIA INTEGRADA DE DOCUMENTOS (GOOGLE DRIVE STYLE) */}
             {previewDoc && (

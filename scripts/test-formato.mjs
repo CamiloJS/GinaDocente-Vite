@@ -1,6 +1,6 @@
 import { normalizarMarcado, textoPlano } from "../src/utils/textFormat.js";
 import { URL_REGEX, extraerUrls, esPublicacionLarga } from "../src/utils/postLinks.js";
-import { isHeicFile, isHeicUrl, isImageLikeFile, isImageLikeUrl } from "../src/utils/heicConverter.js";
+import { isHeicFile, isHeicUrl, isImageLikeFile, isImageLikeUrl, getKnownConvertedUrl } from "../src/utils/heicConverter.js";
 
 let ok = 0, fallos = 0;
 const chequear = (nombre, cond, extra = "") => {
@@ -574,6 +574,66 @@ chequear(
   "Comentario de usuario no registrado preserva su nombre de autor original",
   resolvedUnknown === "Invitado Externo",
   resolvedUnknown
+);
+
+console.log("\n== Detección y conversión universal de imágenes HEIC/iOS ==");
+const jimenaOriginalUrl = "https://firebasestorage.googleapis.com/v0/b/ginadocente-unipamplona.firebasestorage.app/o/unipamplona-english-app%2Fcomments%2F1790548582402_27hc3q.jpg?alt=media&token=198bab87-6be9-4c64-927d-229d2d0dd743";
+const jimenaConvertedUrl = "https://firebasestorage.googleapis.com/v0/b/ginadocente-unipamplona.firebasestorage.app/o/unipamplona-english-app%2Fcomments%2F1790548582402_27hc3q_converted.jpg?alt=media&token=68037f53-aeb2-4455-a3fa-43a438075a5f";
+const regularJpgUrl = "https://firebasestorage.googleapis.com/v0/b/ginadocente-unipamplona.firebasestorage.app/o/tasks%2F1728000000000_regular.jpg?alt=media&token=abc";
+const directHeicUrl = "https://firebasestorage.googleapis.com/v0/b/ginadocente-unipamplona.firebasestorage.app/o/tasks%2Fphoto.heic?alt=media";
+
+chequear(
+  "getKnownConvertedUrl mapea la URL HEIC histórica de Jimena a su JPEG de alta fidelidad",
+  getKnownConvertedUrl(jimenaOriginalUrl) === jimenaConvertedUrl,
+  getKnownConvertedUrl(jimenaOriginalUrl)
+);
+
+chequear(
+  "getKnownConvertedUrl devuelve null para URLs ya convertidas (evita bucles)",
+  getKnownConvertedUrl(jimenaConvertedUrl) === null,
+  getKnownConvertedUrl(jimenaConvertedUrl)
+);
+
+chequear(
+  "getKnownConvertedUrl devuelve null para imágenes estándar no mapeadas",
+  getKnownConvertedUrl(regularJpgUrl) === null,
+  getKnownConvertedUrl(regularJpgUrl)
+);
+
+chequear(
+  "getKnownConvertedUrl devuelve null con valores nulos o no string",
+  getKnownConvertedUrl(null) === null && getKnownConvertedUrl(undefined) === null && getKnownConvertedUrl(123) === null
+);
+
+chequear(
+  "isHeicUrl detecta URLs con extensión .heic directa y query params",
+  isHeicUrl(directHeicUrl) === true && isHeicUrl("https://example.com/photo.heic?token=xyz") === true
+);
+
+chequear(
+  "isHeicUrl detecta URLs con extension .heif",
+  isHeicUrl("https://example.com/image.HEIF") === true
+);
+
+chequear(
+  "isHeicUrl devuelve false para URLs comunes (.jpg, .png, .webp)",
+  isHeicUrl("https://example.com/pic.jpg") === false && isHeicUrl("https://example.com/pic.png") === false
+);
+
+chequear(
+  "isImageLikeUrl reconoce imágenes estándar y formatos HEIC",
+  isImageLikeUrl("https://example.com/test.jpg") === true &&
+  isImageLikeUrl("https://example.com/test.jpeg") === true &&
+  isImageLikeUrl("https://example.com/test.png") === true &&
+  isImageLikeUrl("https://example.com/test.webp") === true &&
+  isImageLikeUrl(directHeicUrl) === true
+);
+
+chequear(
+  "isImageLikeUrl rechaza documentos PDF y URLs vacías",
+  isImageLikeUrl("https://example.com/tarea.pdf") === false &&
+  isImageLikeUrl("") === false &&
+  isImageLikeUrl(null) === false
 );
 
 console.log(`\nRESULTADO: ${ok} OK, ${fallos} fallos\n`);

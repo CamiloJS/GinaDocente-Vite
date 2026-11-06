@@ -3,7 +3,7 @@
 // en Windows 7, 10, 11, Android y cualquier navegador moderno o antiguo.
 import React from 'react';
 import { Loader2, ImageIcon, ExternalLink, Download } from './Icons.jsx';
-import { useUniversalImageUrl } from '../utils/heicConverter.js';
+import { useUniversalImageUrl, getKnownConvertedUrl } from '../utils/heicConverter.js';
 import { handleForceDownload } from '../utils/helpers.js';
 
 export { useUniversalImageUrl };
@@ -28,6 +28,8 @@ export const UniversalImage = ({
 
   if (!src) return null;
 
+  const targetDirectUrl = getKnownConvertedUrl(src) || src;
+
   if (hasError) {
     return (
       <div
@@ -48,7 +50,7 @@ export const UniversalImage = ({
                 if (onClick) {
                   onClick(e);
                 } else {
-                  window.open(src, '_blank', 'noopener,noreferrer');
+                  window.open(targetDirectUrl, '_blank', 'noopener,noreferrer');
                 }
               }}
               className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 border border-blue-200 dark:border-blue-800/60 cursor-pointer"
@@ -60,7 +62,7 @@ export const UniversalImage = ({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                handleForceDownload(src, 'foto.jpg');
+                handleForceDownload(targetDirectUrl, 'foto.jpg');
               }}
               className="p-1 rounded-md text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer"
               title="Descargar imagen"
@@ -73,8 +75,18 @@ export const UniversalImage = ({
     );
   }
 
+  const isFullWidth = /(?:^|\s)w-full(?:\s|$)/.test(className);
+  const isFixedDimension = (
+    (/(?:^|\s)size-\d+/.test(className)) ||
+    (/(?:^|\s)w-\d+/.test(className) && /(?:^|\s)h-\d+/.test(className))
+  ) && !className.includes('w-auto') && !isFullWidth;
+
   return (
-    <div className={`relative inline-block overflow-hidden ${isConverting ? 'bg-gray-100 dark:bg-gray-800/60' : ''}`} style={style}>
+    <div 
+      className={`relative ${isFullWidth ? 'w-full block' : 'inline-block'} overflow-hidden ${isFixedDimension ? className : ''} ${isConverting ? 'bg-gray-100 dark:bg-gray-800/60' : ''}`} 
+      style={style}
+      onClick={onClick}
+    >
       {isConverting && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-gray-100/90 dark:bg-gray-800/90 backdrop-blur-xs p-1 text-center pointer-events-none">
           <Loader2 size={18} className="animate-spin text-blue-600 mb-0.5" />
@@ -82,13 +94,12 @@ export const UniversalImage = ({
         </div>
       )}
       <img
-        src={displaySrc}
+        src={displaySrc || undefined}
         alt={alt}
         loading={loading}
         decoding={decoding}
         onError={handleNativeError}
-        onClick={onClick}
-        className={`${className} ${isConverting ? 'opacity-30' : 'opacity-100 transition-opacity duration-200'}`}
+        className={`${isFixedDimension ? 'w-full h-full object-cover' : className} ${isConverting ? 'opacity-20' : 'opacity-100 transition-opacity duration-200'}`}
         {...props}
       />
     </div>
