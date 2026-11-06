@@ -44,8 +44,9 @@ export const isHeicUrl = (url) => {
   const clean = url.split('#')[0].toLowerCase();
   const pathPart = clean.split('?')[0];
   if (HEIC_EXTENSIONS_REGEX.test(pathPart)) return true;
-  if (clean.includes('.heic?') || clean.includes('.heif?')) return true;
+  if (clean.includes('.heic') || clean.includes('.heif')) return true;
   if (clean.includes('/heic') || clean.includes('image%2fheic')) return true;
+  if (clean.includes('/heif') || clean.includes('image%2fheif')) return true;
   return false;
 };
 
@@ -71,6 +72,7 @@ export const isImageLikeUrl = (url) => {
   if (clean.startsWith('blob:')) return true;
   const pathPart = clean.split('?')[0];
   if (IMAGE_EXTENSIONS_REGEX.test(pathPart)) return true;
+  if (isHeicUrl(url)) return true;
   return false;
 };
 
@@ -146,7 +148,7 @@ export const convertHeicToJpeg = async (fileOrBlob, quality = 0.85) => {
   const isHeic = isHeicFile(fileOrBlob) || (await isHeicBlobAsync(fileOrBlob));
   if (!isHeic) return fileOrBlob;
 
-  // 1. Intentar conversión con la librería heic2any con timeout estricto de 4 segundos
+  // 1. Intentar conversión con la librería heic2any con timeout generoso de 45s (fotos de 12MP toman ~25-30s en WASM)
   try {
     const heic2anyModule = await import('heic2any');
     const heic2any = heic2anyModule.default || heic2anyModule;
@@ -156,7 +158,7 @@ export const convertHeicToJpeg = async (fileOrBlob, quality = 0.85) => {
       quality: Math.min(0.95, Math.max(0.6, Number(quality) || 0.85))
     });
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('heic2any timeout')), 4000)
+      setTimeout(() => reject(new Error('heic2any timeout')), 45000)
     );
     const result = await Promise.race([conversionPromise, timeoutPromise]);
     const jpegBlob = Array.isArray(result) ? result[0] : result;
@@ -233,12 +235,45 @@ export const convertHeicToJpeg = async (fileOrBlob, quality = 0.85) => {
     console.warn('Fallback nativo de canvas no pudo decodificar el HEIC:', nativeErr);
   }
 
-  return fileOrBlob;
+  // Si falló toda conversión, retornar null para que el llamador active fallback UI sin usar blob roto
+  return null;
 };
 
-// Caché en memoria para evitar reconversión de las mismas URLs remotas
+// Caché en memoria y CacheStorage para no reconvertir
 const heicConversionCache = new Map();
 const pendingRemoteConversions = new Map();
+const CACHE_NAME = 'heic-converted-v1';
+
+const getCachedConvertedBlob = async (url) => {
+  if (typeof window === 'undefined' || !('caches' in window)) return null;
+  try {
+    const cache = await window.caches.open(CACHE_NAME);
+    const match = await cache.match(url);
+    if (match) {
+      const b = await match.blob();
+      if (b && b.size > 0) return b;
+    }
+  } catch {
+    // Silently ignore CacheStorage errors
+  }
+  return null;
+};
+
+const storeConvertedBlobInCache = async (url, blob) => {
+  if (typeof window === 'undefined' || !('caches' in window) || !blob) return;
+  try {
+    const cache = await window.caches.open(CACHE_NAME);
+    const response = new Response(blob, {
+      headers: {
+        'Content-Type': 'image/jpeg',
+        'Content-Length': String(blob.size)
+      }
+    });
+    await cache.put(url, response);
+  } catch {
+    // Silently ignore CacheStorage errors
+  }
+};
 
 /**
  * Resuelve una URL (incluso remota o de Firebase Storage) que apunte a un HEIC existente,
@@ -250,6 +285,16 @@ export const resolveHeicUrlToDisplayable = async (url) => {
   if (heicConversionCache.has(url)) {
     return heicConversionCache.get(url);
   }
+
+  // 0. Revisar CacheStorage persistente antes de descargar
+  try {
+    const cachedBlob = await getCachedConvertedBlob(url);
+    if (cachedBlob) {
+      const objUrl = URL.createObjectURL(cachedBlob);
+      heicConversionCache.set(url, objUrl);
+      return objUrl;
+    }
+  } catch {}
 
   if (pendingRemoteConversions.has(url)) {
     return await pendingRemoteConversions.get(url);
@@ -267,7 +312,7 @@ export const resolveHeicUrlToDisplayable = async (url) => {
 
       let blob = null;
 
-      // 1. Si es Firebase Storage y estamos en navegador, usar getBlob con timeout (elude bloqueos de Brave / CORS)
+      // 1. Si es Firebase Storage y estamos en navegador, usar getBlob con timeout
       const lower = url.toLowerCase();
       const isFirebase = lower.includes('firebasestorage.googleapis.com') || lower.includes('firebasestorage.app');
       if (isFirebase && storage && typeof window !== 'undefined') {
@@ -276,7 +321,7 @@ export const resolveHeicUrlToDisplayable = async (url) => {
           const storageRef = path ? ref(storage, path) : ref(storage, url);
           const fbPromise = getBlob(storageRef);
           const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Firebase getBlob timeout')), 6000)
+            setTimeout(() => reject(new Error('Firebase getBlob timeout')), 10000)
           );
           blob = await Promise.race([fbPromise, timeoutPromise]);
         } catch (fbErr) {
@@ -288,7 +333,7 @@ export const resolveHeicUrlToDisplayable = async (url) => {
       if (!blob) {
         try {
           const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-          const fetchTimeout = controller ? setTimeout(() => controller.abort(), 6000) : null;
+          const fetchTimeout = controller ? setTimeout(() => controller.abort(), 10000) : null;
           const response = await fetch(url, { 
             cache: 'no-store',
             signal: controller?.signal
@@ -302,14 +347,14 @@ export const resolveHeicUrlToDisplayable = async (url) => {
         }
       }
 
-      // 3. Fallback con XMLHttpRequest si fetch fue interceptado por Brave Shields / extensiones
+      // 3. Fallback con XMLHttpRequest si fetch fue interceptado por extensiones
       if (!blob && typeof XMLHttpRequest !== 'undefined') {
         try {
           blob = await new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();
             xhr.open('GET', url, true);
             xhr.responseType = 'blob';
-            xhr.timeout = 7000;
+            xhr.timeout = 10000;
             xhr.onload = () => {
               if (xhr.status >= 200 && xhr.status < 300 && xhr.response) {
                 resolve(xhr.response);
@@ -332,9 +377,13 @@ export const resolveHeicUrlToDisplayable = async (url) => {
 
       if (isHeic) {
         const convertedBlob = await convertHeicToJpeg(blob, 0.88);
-        const objectUrl = URL.createObjectURL(convertedBlob);
-        heicConversionCache.set(url, objectUrl);
-        return objectUrl;
+        if (convertedBlob && convertedBlob.size > 0) {
+          storeConvertedBlobInCache(url, convertedBlob).catch(() => {});
+          const objectUrl = URL.createObjectURL(convertedBlob);
+          heicConversionCache.set(url, objectUrl);
+          return objectUrl;
+        }
+        return null;
       }
 
       // Si no es HEIC pero obtuvimos el blob con éxito:
@@ -366,12 +415,13 @@ export const useUniversalImageUrl = (src) => {
   const [isConverting, setIsConverting] = useState(false);
   const [hasError, setHasError] = useState(false);
 
-  // Safety timer: NUNCA permitir que isConverting se quede pegado por más de 5.5s
+  // Safety timer: máximo 50s de conversión antes de liberar UI hacia fallback
   useEffect(() => {
     if (isConverting) {
       const timer = setTimeout(() => {
         setIsConverting(false);
-      }, 5500);
+        setHasError(true);
+      }, 50000);
       return () => clearTimeout(timer);
     }
   }, [isConverting]);
@@ -392,14 +442,31 @@ export const useUniversalImageUrl = (src) => {
       return;
     }
 
+    // Revisar CacheStorage asíncrono si está disponible
+    getCachedConvertedBlob(src).then((cached) => {
+      if (!isMounted) return;
+      if (cached) {
+        const obj = URL.createObjectURL(cached);
+        heicConversionCache.set(src, obj);
+        setDisplaySrc(obj);
+        setIsConverting(false);
+        setHasError(false);
+      }
+    }).catch(() => {});
+
     if (isHeicUrl(src)) {
       setIsConverting(true);
       resolveHeicUrlToDisplayable(src)
         .then((resolved) => {
           if (isMounted) {
-            setDisplaySrc(resolved);
-            setIsConverting(false);
-            setHasError(false);
+            if (resolved && resolved.startsWith('blob:')) {
+              setDisplaySrc(resolved);
+              setIsConverting(false);
+              setHasError(false);
+            } else {
+              setIsConverting(false);
+              setHasError(true);
+            }
           }
         })
         .catch(() => {
@@ -422,23 +489,30 @@ export const useUniversalImageUrl = (src) => {
   const handleNativeError = async () => {
     if (!src || hasError) return;
 
-    // Si falló y aún no habíamos intentado convertirlo, intentamos conversión forzada
-    if (!displaySrc?.startsWith('blob:')) {
-      setIsConverting(true);
+    // Si falló un blob local roto, invalidar y mostrar fallback
+    if (displaySrc?.startsWith('blob:')) {
       try {
-        const resolved = await resolveHeicUrlToDisplayable(src);
-        if (resolved && resolved !== src) {
-          setDisplaySrc(resolved);
-          setIsConverting(false);
-          setHasError(false);
-          return;
-        }
-      } catch {
-        // Falló la conversión
-      }
+        URL.revokeObjectURL(displaySrc);
+      } catch {}
       setIsConverting(false);
+      setHasError(true);
+      return;
     }
 
+    // Si falló la URL remota nativa (p. ej. foto HEIC guardada con extensión .jpg), convertir
+    setIsConverting(true);
+    try {
+      const resolved = await resolveHeicUrlToDisplayable(src);
+      if (resolved && resolved !== src && resolved.startsWith('blob:')) {
+        setDisplaySrc(resolved);
+        setIsConverting(false);
+        setHasError(false);
+        return;
+      }
+    } catch {
+      // Falló la conversión
+    }
+    setIsConverting(false);
     setHasError(true);
   };
 

@@ -31,16 +31,16 @@ export const UniversalImage = ({
   if (hasError) {
     return (
       <div
-        className={`flex flex-col items-center justify-center p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/80 text-gray-500 dark:text-gray-400 text-center select-none ${className}`}
+        className={`flex flex-col items-center justify-center p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/95 dark:bg-gray-800/95 text-gray-500 dark:text-gray-400 text-center select-none shadow-xs ${className}`}
         style={style}
         onClick={onClick}
       >
-        <ImageIcon size={22} className="text-gray-400 mb-1" />
-        <span className="text-[11px] font-bold truncate max-w-[140px] text-gray-700 dark:text-gray-200">
-          {fallbackTitle || 'Imagen adjunta'}
+        <ImageIcon size={20} className="text-gray-400 dark:text-gray-500 mb-1 shrink-0" />
+        <span className="text-[10px] font-bold truncate max-w-[120px] text-gray-700 dark:text-gray-200">
+          {fallbackTitle || alt || 'Imagen adjunta'}
         </span>
         {showDownloadOnFail && (
-          <div className="flex items-center gap-1.5 mt-1.5">
+          <div className="flex items-center gap-1.5 mt-1.5" onClick={(e) => e.stopPropagation()}>
             <button
               type="button"
               onClick={(e) => {
@@ -52,6 +52,7 @@ export const UniversalImage = ({
                 }
               }}
               className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 border border-blue-200 dark:border-blue-800/60 cursor-pointer"
+              title="Abrir imagen"
             >
               <ExternalLink size={10} /> Abrir
             </button>
@@ -73,10 +74,11 @@ export const UniversalImage = ({
   }
 
   return (
-    <div className="relative inline-block overflow-hidden" style={style}>
+    <div className={`relative inline-block overflow-hidden ${isConverting ? 'bg-gray-100 dark:bg-gray-800/60' : ''}`} style={style}>
       {isConverting && (
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-gray-100/80 dark:bg-gray-800/80 backdrop-blur-xs">
-          <Loader2 size={18} className="animate-spin text-blue-600" />
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-gray-100/90 dark:bg-gray-800/90 backdrop-blur-xs p-1 text-center pointer-events-none">
+          <Loader2 size={18} className="animate-spin text-blue-600 mb-0.5" />
+          <span className="text-[9px] font-black text-blue-600 dark:text-blue-400 leading-tight">Cargando...</span>
         </div>
       )}
       <img
@@ -86,7 +88,7 @@ export const UniversalImage = ({
         decoding={decoding}
         onError={handleNativeError}
         onClick={onClick}
-        className={`${className} ${isConverting ? 'opacity-40' : 'opacity-100 transition-opacity duration-200'}`}
+        className={`${className} ${isConverting ? 'opacity-30' : 'opacity-100 transition-opacity duration-200'}`}
         {...props}
       />
     </div>
