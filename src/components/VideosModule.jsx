@@ -164,28 +164,84 @@ export default function VideosModule({
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const commentsEndRef = useRef(null);
 
-  // Copiar al portapapeles con fallback robusto para todos los navegadores
+  // Estado de sincronización inicial para evitar parpadeo en móviles
+  const [isInitialSync, setIsInitialSync] = useState(() => (!videos || videos.length === 0));
+  useEffect(() => {
+    if (videos && videos.length > 0) {
+      setIsInitialSync(false);
+    } else {
+      const timer = setTimeout(() => setIsInitialSync(false), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [videos]);
+
+  // Copiar al portapapeles con fallback robusto para todos los navegadores móviles y de escritorio
   const copyToClipboard = async (text) => {
     try {
       if (navigator?.clipboard?.writeText) {
         await navigator.clipboard.writeText(text);
-        showMessage('Enlace copiado al portapapeles.');
+        showMessage('✅ ¡Enlace del vídeo copiado al portapapeles!');
         return;
       }
     } catch (e) {}
+
+    // Fallback compatible con iOS Safari y webviews móviles
     try {
       const el = document.createElement('textarea');
       el.value = text;
-      el.style.position = 'fixed';
-      el.style.opacity = '0';
+      el.setAttribute('readonly', '');
+      el.style.position = 'absolute';
+      el.style.left = '-9999px';
+      el.style.fontSize = '16px'; // Evita zoom automático en iOS
       document.body.appendChild(el);
       el.select();
-      document.execCommand('copy');
+      el.setSelectionRange(0, 99999); // Requerido para iOS
+      const successful = document.execCommand('copy');
       document.body.removeChild(el);
-      showMessage('Enlace copiado al portapapeles.');
-    } catch (err) {
-      showMessage('No se pudo copiar el enlace.');
+      if (successful) {
+        showMessage('✅ ¡Enlace del vídeo copiado al portapapeles!');
+        return;
+      }
+    } catch (err) {}
+
+    // Fallback final interactivo
+    try {
+      window.prompt('Copia este enlace para compartir el vídeo:', text);
+    } catch (e) {
+      showMessage('Enlace: ' + text);
     }
+  };
+
+  // Compartir vídeo con la API nativa de Android/iOS (WhatsApp, Telegram, etc.)
+  const handleShareVideo = async (video, e) => {
+    if (e?.preventDefault) e.preventDefault();
+    if (e?.stopPropagation) e.stopPropagation();
+    if (!video) return;
+
+    const shareUrl = video.url || window.location.href;
+    const shareTitle = video.title || 'Vídeo de clase';
+    const shareText = `Mira este vídeo de inglés: "${shareTitle}"`;
+
+    // 1. Probar Web Share API nativa en móviles
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({
+          title: shareTitle,
+          text: shareText,
+          url: shareUrl
+        });
+        return;
+      } catch (err) {
+        // Si el usuario canceló la hoja nativa de compartir, no mostramos error
+        if (err && (err.name === 'AbortError' || String(err).includes('AbortError'))) {
+          return;
+        }
+        console.warn('Fallback tras error en navigator.share:', err);
+      }
+    }
+
+    // 2. Si no hay Web Share o falló, copiar enlace directamente con notificación
+    await copyToClipboard(shareUrl);
   };
 
   // Cerrar modales con la tecla Escape
@@ -636,6 +692,7 @@ export default function VideosModule({
         <iframe
           src={embedUrl}
           title={title}
+          loading="lazy"
           className="w-full h-full rounded-2xl border-0 shadow-lg"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           allowFullScreen
@@ -650,6 +707,7 @@ export default function VideosModule({
           <iframe
             src={embedUrl}
             title={title}
+            loading="lazy"
             className="w-full h-full rounded-2xl border-0"
             allow="accelerometer; autoplay; encrypted-media; picture-in-picture"
             allowFullScreen
@@ -830,36 +888,61 @@ export default function VideosModule({
 
       {/* ================= CONTENIDO DE VÍDEOS ================= */}
       {filteredVideos.length === 0 ? (
-        <div className={`py-16 text-center border-2 border-dashed rounded-3xl p-8 space-y-4 ${
-          isDarkMode ? 'border-gray-800' : 'border-gray-200'
-        }`}>
-          <div className="w-16 h-16 mx-auto rounded-3xl bg-red-500/10 text-[#AD3333] dark:text-red-400 flex items-center justify-center">
-            <Video size={32} />
+        isInitialSync && !searchQuery && selectedClassFilter === 'all' && selectedFormatFilter === 'all' ? (
+          <div className="space-y-6 animate-pulse select-none">
+            <div className="space-y-2">
+              <div className="h-4 w-28 rounded-lg bg-gray-200 dark:bg-gray-800" />
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="aspect-[9/16] rounded-2xl bg-gray-200 dark:bg-gray-800/60" />
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2 pt-2">
+              <div className="h-4 w-36 rounded-lg bg-gray-200 dark:bg-gray-800" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-800/40 p-3 space-y-3">
+                    <div className="aspect-video rounded-2xl bg-gray-200 dark:bg-gray-700/60" />
+                    <div className="h-4 w-3/4 rounded bg-gray-200 dark:bg-gray-700/60" />
+                    <div className="h-3 w-1/2 rounded bg-gray-200 dark:bg-gray-700/40" />
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
-          <div className="space-y-1">
-            <h3 className={`text-base font-bold ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>
-              No hay vídeos disponibles
-            </h3>
-            <p className="text-xs text-gray-500 max-w-md mx-auto">
-              {searchQuery || selectedClassFilter !== 'all' || selectedFormatFilter !== 'all'
-                ? 'No encontramos vídeos que coincidan con tus filtros actuales. Intenta limpiar la búsqueda.'
-                : 'Sé el primero en compartir un vídeo'}
-            </p>
+        ) : (
+          <div className={`py-16 text-center border-2 border-dashed rounded-3xl p-8 space-y-4 ${
+            isDarkMode ? 'border-gray-800' : 'border-gray-200'
+          }`}>
+            <div className="w-16 h-16 mx-auto rounded-3xl bg-red-500/10 text-[#AD3333] dark:text-red-400 flex items-center justify-center">
+              <Video size={32} />
+            </div>
+            <div className="space-y-1">
+              <h3 className={`text-base font-bold ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>
+                No hay vídeos disponibles
+              </h3>
+              <p className="text-xs text-gray-500 max-w-md mx-auto">
+                {searchQuery || selectedClassFilter !== 'all' || selectedFormatFilter !== 'all'
+                  ? 'No encontramos vídeos que coincidan con tus filtros actuales. Intenta limpiar la búsqueda.'
+                  : 'Sé el primero en compartir un vídeo'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery('');
+                setSelectedClassFilter('all');
+                setSelectedFormatFilter('all');
+                setIsUploadModalOpen(true);
+              }}
+              className="px-4 py-2 rounded-2xl bg-[#AD3333] text-white text-xs font-bold inline-flex items-center gap-1.5 shadow-sm hover:scale-[1.02] transition-transform cursor-pointer"
+            >
+              <Plus size={14} />
+              <span>Subir el primer vídeo</span>
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              setSearchQuery('');
-              setSelectedClassFilter('all');
-              setSelectedFormatFilter('all');
-              setIsUploadModalOpen(true);
-            }}
-            className="px-4 py-2 rounded-2xl bg-[#AD3333] text-white text-xs font-bold inline-flex items-center gap-1.5 shadow-sm hover:scale-[1.02] transition-transform cursor-pointer"
-          >
-            <Plus size={14} />
-            <span>Subir el primer vídeo</span>
-          </button>
-        </div>
+        )
       ) : (
         <div className="space-y-8">
           {/* 1. SECCIÓN DE CORTOS (Se muestra en 'all' o en 'short') */}
@@ -894,6 +977,13 @@ export default function VideosModule({
                         <img
                           src={video.thumbnailUrl}
                           alt={video.title}
+                          loading="lazy"
+                          decoding="async"
+                          onError={(e) => {
+                            if (e.currentTarget.src.includes('hqdefault.jpg')) {
+                              e.currentTarget.src = e.currentTarget.src.replace('hqdefault.jpg', 'mqdefault.jpg');
+                            }
+                          }}
                           className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         />
                       ) : (
@@ -912,6 +1002,15 @@ export default function VideosModule({
                         ) : <div />}
 
                         <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={(e) => handleShareVideo(video, e)}
+                            title="Compartir vídeo"
+                            className="p-1 rounded-md bg-black/50 text-white/70 hover:text-white hover:bg-black/80 transition-colors cursor-pointer"
+                          >
+                            <Share2 size={12} />
+                          </button>
+
                           {canEdit && (
                             <button
                               type="button"
@@ -1032,6 +1131,13 @@ export default function VideosModule({
                           <img
                             src={video.thumbnailUrl}
                             alt={video.title}
+                            loading="lazy"
+                            decoding="async"
+                            onError={(e) => {
+                              if (e.currentTarget.src.includes('hqdefault.jpg')) {
+                                e.currentTarget.src = e.currentTarget.src.replace('hqdefault.jpg', 'mqdefault.jpg');
+                              }
+                            }}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                           />
                         ) : (
@@ -1056,8 +1162,17 @@ export default function VideosModule({
                           </div>
                         )}
 
-                        {/* Botones de acción flotantes (Editar y Borrar) */}
+                        {/* Botones de acción flotantes (Compartir, Editar y Borrar) */}
                         <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={(e) => handleShareVideo(video, e)}
+                            title="Compartir vídeo"
+                            className="p-1.5 rounded-xl bg-black/60 text-white/80 hover:text-white hover:bg-black/90 transition-colors shadow-xs cursor-pointer"
+                          >
+                            <Share2 size={13} />
+                          </button>
+
                           {canEdit && (
                             <button
                               type="button"
@@ -1139,6 +1254,16 @@ export default function VideosModule({
                               <span>{(video.comments || []).length}</span>
                             </div>
 
+                            <button
+                              type="button"
+                              onClick={(e) => handleShareVideo(video, e)}
+                              title="Compartir vídeo"
+                              className="flex items-center gap-1 font-semibold hover:text-blue-500 transition-colors cursor-pointer"
+                            >
+                              <Share2 size={12} />
+                              <span className="hidden sm:inline">Compartir</span>
+                            </button>
+
                             <span>•</span>
                             <span>{formatVideoDate(video.createdAt)}</span>
                           </div>
@@ -1182,15 +1307,16 @@ export default function VideosModule({
               <div className="flex items-center gap-2 shrink-0">
                 <button
                   type="button"
-                  onClick={() => copyToClipboard(activePlayingVideo.url)}
-                  title="Copiar enlace del vídeo"
-                  className={`p-1.5 rounded-xl transition-colors cursor-pointer ${
+                  onClick={(e) => handleShareVideo(activePlayingVideo, e)}
+                  title="Compartir vídeo"
+                  className={`p-1.5 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 ${
                     isDarkMode
                       ? 'text-gray-300 hover:text-white hover:bg-gray-700'
                       : 'text-gray-500 hover:text-gray-800 hover:bg-gray-200'
                   }`}
                 >
                   <Share2 size={16} />
+                  <span className="text-xs font-bold hidden sm:inline">Compartir</span>
                 </button>
 
                 <button

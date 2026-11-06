@@ -310,15 +310,22 @@ const TaskCard = React.memo(({
                 const prompt = `Traduce el siguiente título y descripción al español de forma fluida, natural y pedagógica. Devuelve ÚNICAMENTE un objeto JSON válido con los campos "title" y "description", sin comillas markdown adicionales ni texto extra:\n\n{"title": ${JSON.stringify(titleToTranslate)}, "description": ${JSON.stringify(descToTranslate)}}`;
                 const result = await callGemini(prompt);
                 if (result) {
+                    let parsedTitle = null;
+                    let parsedDesc = null;
                     try {
-                        const cleanJson = result.replace(/```json/gi, '').replace(/```/gi, '').trim();
+                        const jsonMatch = result.match(/\{[\s\S]*\}/);
+                        const cleanJson = jsonMatch ? jsonMatch[0] : result.replace(/```json/gi, '').replace(/```/gi, '').trim();
                         const parsed = JSON.parse(cleanJson);
-                        setTranslatedTitle(parsed.title || titleToTranslate);
-                        setTranslatedDescription(parsed.description || cleanJson);
+                        parsedTitle = parsed.title;
+                        parsedDesc = parsed.description;
                     } catch {
-                        const cleanResult = result.replace(/```json/gi, '').replace(/```/gi, '').trim();
-                        setTranslatedDescription(cleanResult);
+                        const titleMatch = result.match(/"title"\s*:\s*"([^"]+)"/i);
+                        const descMatch = result.match(/"description"\s*:\s*"([^"]+)"/i);
+                        if (titleMatch) parsedTitle = titleMatch[1];
+                        if (descMatch) parsedDesc = descMatch[1];
                     }
+                    setTranslatedTitle(parsedTitle || titleToTranslate);
+                    setTranslatedDescription(parsedDesc || result.replace(/```json/gi, '').replace(/```/gi, '').trim());
                     setShowTranslated(true);
                 } else {
                     showMessage("No se pudo traducir el contenido.");
@@ -385,10 +392,15 @@ const TaskCard = React.memo(({
     const [isSharing, setIsSharing] = useState(false);
 
     // Detección de enlace directo a esta publicación (#post/<id> o #task/<id>)
+    const prevActivePostModalIdRef = useRef(activePostModalId);
     useEffect(() => {
-        if (activePostModalId && String(activePostModalId) === String(task.id)) {
+        const wasActive = String(prevActivePostModalIdRef.current || '') === String(task.id);
+        const isActive = String(activePostModalId || '') === String(task.id);
+        prevActivePostModalIdRef.current = activePostModalId;
+
+        if (isActive && !showCommentModal) {
             setShowCommentModal(true);
-        } else if (activePostModalId === null && showCommentModal) {
+        } else if (wasActive && !isActive && showCommentModal) {
             setShowCommentModal(false);
         }
     }, [activePostModalId, task.id, showCommentModal]);
@@ -402,11 +414,16 @@ const TaskCard = React.memo(({
         } catch (e) {}
     }, [task.id]);
 
-    const handleOpenCommentModal = () => {
+    const handleOpenCommentModal = (e) => {
+        if (e?.preventDefault) e.preventDefault();
+        if (e?.stopPropagation) e.stopPropagation();
         setShowCommentModal(true);
+        if (typeof setActivePostModalId === 'function') {
+            setActivePostModalId(task.id);
+        }
         try {
             window.history.replaceState(null, '', `#post/${task.id}`);
-        } catch (e) {
+        } catch (err) {
             window.location.hash = `post/${task.id}`;
         }
     };
@@ -2225,14 +2242,14 @@ const TaskCard = React.memo(({
                     className="flex items-center gap-1.5 cursor-pointer px-1 py-0.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800/60 transition-colors"
                     title={tooltipVoterText}
                   >
-                    <div className="flex items-center -space-x-1.5 py-0.5">
+                    <div className="flex items-center -space-x-1 py-0.5 select-none">
                       {topReactions.slice(0, 3).map((r, i) => (
                         <div
                           key={r.key}
-                          className="w-5 h-5 rounded-full flex items-center justify-center bg-white dark:bg-gray-800 border border-white dark:border-gray-900 shadow-2xs shrink-0 select-none"
+                          className="inline-flex items-center justify-center shrink-0"
                           style={{ zIndex: 10 - i }}
                         >
-                          <AppleEmoji emoji={r.emoji} size="13px" />
+                          <AppleEmoji emoji={r.emoji} size="18px" />
                         </div>
                       ))}
                     </div>
@@ -4153,7 +4170,7 @@ const TaskCard = React.memo(({
                     ) : (
                         <button 
                             type="button"
-                            onClick={() => setShowCommentModal(true)}
+                            onClick={handleOpenCommentModal}
                             className="w-full py-2.5 px-4 rounded-xl bg-[#AD3333] hover:bg-[#932828] text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2"
                         >
                             <Upload size={14} className="text-white" />
@@ -4166,7 +4183,8 @@ const TaskCard = React.memo(({
             {/* Botón de Comentarios / Respuestas / Foros y Botón de Excel */}
             <div className="mt-3 pt-2.5 border-t border-gray-100 dark:border-gray-700/60 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                 <button 
-                    onClick={() => setShowCommentModal(true)} 
+                    type="button"
+                    onClick={handleOpenCommentModal} 
                     className={`flex-1 py-2 px-3 bg-gray-50 dark:bg-gray-900/60 hover:bg-gray-100 dark:hover:bg-gray-750 border border-gray-200 dark:border-gray-700/70 shadow-xs rounded-xl text-xs font-bold transition-all flex justify-between items-center gap-2 text-gray-700 dark:text-gray-300`}
                 >
                     <div className="flex items-center gap-2 flex-wrap min-w-0">
@@ -4228,8 +4246,13 @@ const TaskCard = React.memo(({
 
             {/* MODAL DE COMENTARIOS / ENTREGAS / FOROS */}
             {showCommentModal && ReactDOM.createPortal(
-                <div className={`fixed inset-0 z-[9999] flex justify-center items-end md:items-center bg-black/60 backdrop-blur-sm ${isModalExpanded ? 'p-0' : 'p-0 md:p-4'} transition-all ${isDarkMode ? 'dark' : ''}`}>
-                    <div className={`w-full ${
+                <div 
+                    onClick={handleCloseCommentModal}
+                    className={`fixed inset-0 z-[9999] flex justify-center items-end md:items-center bg-black/60 backdrop-blur-sm ${isModalExpanded ? 'p-0' : 'p-0 md:p-4'} transition-all cursor-pointer ${isDarkMode ? 'dark' : ''}`}
+                >
+                    <div 
+                        onClick={(e) => e.stopPropagation()}
+                        className={`w-full cursor-default ${
                         isModalExpanded 
                             ? 'fixed inset-0 z-[9999] w-screen h-screen max-w-none rounded-none m-0 p-4 md:p-8' 
                             : 'max-w-2xl h-[90vh] md:h-[80vh] rounded-t-[2rem] md:rounded-3xl p-4 md:p-6'
@@ -5624,20 +5647,6 @@ const TaskCard = React.memo(({
                                     )}
                                 </div>
                             </div>
-
-                            {/* 3. Copiar enlace único */}
-                            <button
-                                type="button"
-                                onClick={handleCopyPostLink}
-                                className={`w-full py-2.5 px-3 rounded-xl border font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                                    isDarkMode 
-                                        ? 'bg-gray-800 hover:bg-gray-750 text-gray-200 border-gray-700' 
-                                        : 'bg-white hover:bg-gray-100 text-gray-700 border-gray-300 shadow-2xs'
-                                }`}
-                            >
-                                <Link2 size={14} className="text-blue-500" />
-                                <span>Copiar enlace directo de esta publicación</span>
-                            </button>
                         </div>
                     </div>
                 </div>

@@ -143,13 +143,18 @@ export const KNOWN_CONVERTED_URLS = new Map([
   [
     '1790548582402_27hc3q.jpg',
     'https://firebasestorage.googleapis.com/v0/b/ginadocente-unipamplona.firebasestorage.app/o/unipamplona-english-app%2Fcomments%2F1790548582402_27hc3q_converted.jpg?alt=media&token=68037f53-aeb2-4455-a3fa-43a438075a5f'
+  ],
+  [
+    '1790548582402_27hc3q',
+    'https://firebasestorage.googleapis.com/v0/b/ginadocente-unipamplona.firebasestorage.app/o/unipamplona-english-app%2Fcomments%2F1790548582402_27hc3q_converted.jpg?alt=media&token=68037f53-aeb2-4455-a3fa-43a438075a5f'
   ]
 ]);
 
 export const getKnownConvertedUrl = (url) => {
   if (!url || typeof url !== 'string') return null;
+  if (url.includes('_converted.')) return null;
   for (const [key, convertedUrl] of KNOWN_CONVERTED_URLS.entries()) {
-    if (url.includes(key) && !url.includes('_converted.')) {
+    if (url.includes(key)) {
       return convertedUrl;
     }
   }
@@ -215,7 +220,7 @@ export const convertHeicToJpeg = async (fileOrBlob, quality = 0.85) => {
       quality: Math.min(0.95, Math.max(0.6, Number(quality) || 0.85))
     });
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('heic2any timeout')), 35000)
+      setTimeout(() => reject(new Error('heic2any timeout')), 8000)
     );
     const result = await Promise.race([conversionPromise, timeoutPromise]);
     const jpegBlob = Array.isArray(result) ? result[0] : result;
@@ -455,13 +460,13 @@ export const useUniversalImageUrl = (src) => {
 
   const [hasError, setHasError] = useState(false);
 
-  // Safety timer: máximo 12s de conversión antes de liberar UI hacia fallback
+  // Safety timer: máximo 6s de conversión antes de liberar UI hacia fallback
   useEffect(() => {
     if (isConverting) {
       const timer = setTimeout(() => {
         setIsConverting(false);
         setHasError(true);
-      }, 12000);
+      }, 6000);
       return () => clearTimeout(timer);
     }
   }, [isConverting]);

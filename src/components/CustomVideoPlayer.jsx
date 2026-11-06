@@ -180,6 +180,7 @@ const CustomVideoPlayer = ({ src, url, videoId: propVideoId, title = "Video de l
           <iframe
             src={`https://www.youtube-nocookie.com/embed/${ytId}?enablejsapi=1&rel=0&modestbranding=1&iv_load_policy=3&playsinline=1&controls=1${autoPlay ? '&autoplay=1' : ''}`}
             title={title || "Video"}
+            loading="lazy"
             className="w-full h-full border-0"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             allowFullScreen

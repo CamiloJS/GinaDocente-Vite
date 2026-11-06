@@ -835,7 +835,19 @@ function App() {
   const [rawReviews, setReviews] = useState(() => initialIsDemo ? DEMO_REVIEWS : []);
   const [rawBooks, setRawBooks] = useState(() => initialIsDemo ? DEMO_BOOKS : []);
   const [rawNotes, setRawNotes] = useState(() => initialIsDemo ? DEMO_NOTES : []);
-  const [rawVideos, setRawVideos] = useState(() => initialIsDemo ? DEMO_VIDEOS : []);
+  const [rawVideos, setRawVideos] = useState(() => {
+    if (initialIsDemo) return DEMO_VIDEOS;
+    try {
+      const cached = localStorage.getItem('englishTech_cached_videos');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return deduplicateVideos(parsed);
+        }
+      }
+    } catch (e) {}
+    return [];
+  });
   const [inboxTab, setInboxTab] = useState('suggestions');
   const [inboxFilter, setInboxFilter] = useState('all');
   const [inboxSearch, setInboxSearch] = useState('');
@@ -4152,17 +4164,31 @@ useEffect(() => {
     return () => uNotes();
 }, [hasEntered, myChatId, needsNotesSubscription, isDemoMode]);
 
-// 4d. PESTAÑA: VÍDEOS (Videoteca académica de clase)
-const needsVideosSubscription = activeTab === 'videos';
+// 4d. PESTAÑA: VÍDEOS (Videoteca académica de clase - pre-suscripción activa y caché veloz)
+const needsVideosSubscription = activeTab === 'videos' || activeTab === 'tasks' || activeTab === 'groups';
 useEffect(() => {
     if (!hasEntered || !myChatId || isDemoMode || !needsVideosSubscription) return;
     const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'videos'), orderBy('createdAt', 'desc'), limit(100));
     const uVideos = onSnapshot(q, s => {
       const incoming = s.docs.map(d => ({ id: d.id, ...d.data() }));
-      setRawVideos(deduplicateVideos(incoming));
+      const deduped = deduplicateVideos(incoming);
+      setRawVideos(deduped);
+      try {
+        localStorage.setItem('englishTech_cached_videos', JSON.stringify(deduped.slice(0, 50)));
+      } catch (e) {}
     }, err => console.error(err));
     return () => uVideos();
 }, [hasEntered, myChatId, needsVideosSubscription, isDemoMode]);
+
+// Pre-cargar el componente VideosModule en reposo (idle) para que abra en 0ms al tocar la pestaña
+useEffect(() => {
+    if (hasEntered) {
+        const timer = setTimeout(() => {
+            import('./components/VideosModule.jsx').catch(() => {});
+        }, 1500);
+        return () => clearTimeout(timer);
+    }
+}, [hasEntered]);
 
 // 5. PESTAÑA: SYLLABUS Y PLANES DE CLASE
 useEffect(() => {
