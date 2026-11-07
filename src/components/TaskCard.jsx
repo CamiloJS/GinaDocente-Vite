@@ -6,7 +6,7 @@ import {
 } from './Icons.jsx'
 import {
   compressImage, containsBadWords, checkBadWordsAsync, uploadImageToStorage, uploadRawFileToStorage, deleteFileFromStorage, deleteAllStorageFilesInObject, deleteReplacedStorageFiles, TEACHER_NAME, SECOND_TEACHER_NAME, SECOND_TEACHER_ID, isCamiloTeacher, isTeacherId, getCanonicalTeacherId, getTeacherDisplayName, getItemTeacherId, COMMENT_EMOJIS, REACTION_EMOJIS, FACEBOOK_REACTIONS, splitNameFirstAndLast, FALLBACK_MAP, format12HourTime, formatDateTime12H,
-  isImageLikeFile, convertHeicToJpeg, resolveUserDisplayName, resolveUserPhoto, handleForceDownload, copyTextToClipboard
+  isImageLikeFile, convertHeicToJpeg, resolveUserDisplayName, resolveUserPhoto, handleForceDownload, copyTextToClipboard, sanitizeFirestoreData
 } from '../utils/helpers.js'
 import UniversalImage from './UniversalImage.jsx'
 import { isImageLikeUrl, IMAGE_EXTENSIONS_REGEX, getKnownConvertedUrl } from '../utils/heicConverter.js'
@@ -480,28 +480,45 @@ const TaskCard = React.memo(({
                 }
             });
         }
+        const seenChatIds = new Set();
         const seenGroupNames = new Set();
-        const seenGroupIds = new Set();
-        const addGroupItem = (rawId, rawName) => {
-            if (!rawId && !rawName) return;
-            const cleanName = String(rawName || rawId || 'Grupo').trim();
+        const addGroupItem = (chatId, rawName) => {
+            if (!chatId && !rawName) return;
+            const normalizedChatId = String(chatId).startsWith('group_') ? String(chatId) : `group_${chatId}`;
+            const cleanName = String(rawName || 'Grupo').trim();
             const displayGroupName = cleanName.replace(/^grupo:\s*/i, '').trim();
             const normName = displayGroupName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
-            const cleanId = String(rawId || normName).trim();
-            if (seenGroupNames.has(normName) || seenGroupIds.has(cleanId)) return;
+            if (seenChatIds.has(normalizedChatId) || seenGroupNames.has(normName)) return;
+            seenChatIds.add(normalizedChatId);
             seenGroupNames.add(normName);
-            seenGroupIds.add(cleanId);
             const searchTarget = shareSearchTerm ? shareSearchTerm.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim() : '';
             if (!searchTarget || normName.includes(searchTarget) || cleanName.toLowerCase().includes(searchTarget)) {
-                list.push({ id: rawId || `grp_${normName}`, name: `Grupo: ${displayGroupName}`, role: 'group', isGroup: true });
+                list.push({ id: normalizedChatId, chatId: normalizedChatId, name: `Grupo: ${displayGroupName}`, role: 'group', isGroup: true });
             }
         };
 
-        (academicGroups || []).forEach(g => {
-            addGroupItem(g.id, g.name || g.groupName);
-        });
+        // 1. Canales y grupos de chat existentes (incluye los creados por docente y materias en chatGroups)
         (chatGroups || []).forEach(g => {
+            if (!g?.id) return;
+            const isMember = role === 'teacher' || (
+                g.members && (Array.isArray(g.members) ? g.members.includes(myChatId) : Boolean(g.members[myChatId]))
+            );
+            if (!isMember) return;
             addGroupItem(g.id, g.name || g.title);
+        });
+
+        // 2. Materias o grupos académicos asignados
+        (academicGroups || []).forEach(g => {
+            if (!g?.id) return;
+            const matchingCg = (chatGroups || []).find(cg => 
+                cg.academicGroupId === g.id || 
+                cg.id === g.id || 
+                cg.id === `acad_${g.id}` || 
+                `group_${cg.id}` === `group_acad_${g.id}` || 
+                (cg.name && g.name && cg.name.trim().toLowerCase() === g.name.trim().toLowerCase())
+            );
+            const targetDocId = matchingCg ? matchingCg.id : `acad_${g.id}`;
+            addGroupItem(targetDocId, g.name || g.groupName);
         });
         return list.slice(0, 25);
     }, [userMappings, students, academicGroups, chatGroups, myChatId, role, shareSearchTerm]);
@@ -564,50 +581,101 @@ const TaskCard = React.memo(({
         try {
             const authorName = role === 'teacher' ? (isCamiloTeacher(myChatId) ? SECOND_TEACHER_NAME : TEACHER_NAME) : loggedInName;
             const targetChatId = recipient.isGroup 
-                ? (recipient.id) 
+                ? (recipient.chatId || (String(recipient.id).startsWith('group_') ? recipient.id : `group_${recipient.id}`)) 
                 : `dm_${[myChatId, recipient.id].sort().join('_')}`;
             
             const shareUrl = `${window.location.origin}${window.location.pathname}#post/${task.id}`;
             const messageText = `📌 *${task.title}*\n${shareUrl}`;
 
+            const itemType = task.type || 'post';
+            const typeLabel = 
+                itemType === 'forum' ? 'Foro' :
+                itemType === 'task' ? 'Tarea' :
+                itemType === 'evaluation' ? 'Evaluación' :
+                itemType === 'poll' ? 'Encuesta' :
+                itemType === 'slides' ? 'Presentación' :
+                itemType === 'book3d' ? 'Libro' : 'Publicación';
+
+            const actionLabel = 
+                itemType === 'forum' ? 'Ir al foro' :
+                itemType === 'task' ? 'Ir a la tarea' :
+                itemType === 'evaluation' ? 'Ir a la evaluación' :
+                itemType === 'poll' ? 'Ir a la encuesta' :
+                itemType === 'slides' ? 'Ir a la presentación' :
+                itemType === 'book3d' ? 'Abrir libro' : 'Ir a la publicación';
+
+            const sharedItem = {
+                id: String(task.id),
+                type: itemType,
+                typeLabel,
+                actionLabel,
+                title: task.title || 'Publicación compartida',
+                description: task.description || '',
+                author: task.author || task.authorName || authorName || '',
+                authorRole: task.authorRole || role || 'teacher',
+                groupName: task.targetGroupName || task.groupName || '',
+                url: shareUrl,
+                imageUrl: task.imageUrl || (Array.isArray(task.attachments) && task.attachments[0]?.url) || '',
+                dueDate: task.dueDate || null,
+                dueTime: task.dueTime || null,
+                createdAt: task.createdAt || Date.now(),
+                isPinned: Boolean(task.isPinned),
+                commentsCount: Array.isArray(task.comments) ? task.comments.length : (task.comments && typeof task.comments === 'object' ? Object.keys(task.comments).length : 0),
+                rating: typeof task.rating === 'number' ? task.rating : 5.0
+            };
+
             const nowTs = Date.now();
+            const newMsgPayload = {
+                id: isDemoMode ? `demo_msg_${nowTs}` : undefined,
+                text: messageText,
+                sharedItem,
+                author: authorName,
+                authorId: myChatId,
+                authorRole: role,
+                senderId: myChatId,
+                senderName: authorName,
+                uid: currentUser?.uid || myChatId || '',
+                createdAt: nowTs,
+                timestamp: nowTs,
+                status: isDemoMode ? 'read' : 'sent',
+                reactions: {}
+            };
+
+            const lastMessagePayload = {
+                text: `Compartió ${typeLabel.toLowerCase()}: ${task.title}`,
+                author: authorName,
+                authorId: myChatId,
+                authorRole: role,
+                senderId: myChatId,
+                senderName: authorName,
+                createdAt: nowTs,
+                timestamp: nowTs
+            };
+
             if (isDemoMode) {
-                const newDemoMsg = {
-                    id: `demo_msg_${nowTs}`,
-                    text: messageText,
-                    author: authorName,
-                    authorId: myChatId,
-                    authorRole: role,
-                    senderId: myChatId,
-                    senderName: authorName,
-                    uid: myChatId,
-                    status: 'read',
-                    reactions: {},
-                    createdAt: nowTs,
-                    timestamp: nowTs
-                };
                 const existing = loadDemoChatMessages(targetChatId);
-                saveDemoChatMessages(targetChatId, [...existing, newDemoMsg]);
+                const nextMsgs = [...existing, newMsgPayload];
+                saveDemoChatMessages(targetChatId, nextMsgs);
+                saveDemoSandboxItem('lastMessages', { ...lastMessagePayload, id: targetChatId });
             } else {
-                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'chats', targetChatId, 'messages'), {
-                    text: messageText,
-                    author: authorName,
-                    authorId: myChatId,
-                    uid: currentUser?.uid || myChatId || '',
-                    createdAt: nowTs,
-                    timestamp: nowTs,
-                    status: 'sent'
-                });
-                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'lastMessages', targetChatId), {
-                    text: `Compartió: ${task.title}`,
-                    author: authorName,
-                    authorId: myChatId,
-                    authorRole: role,
-                    createdAt: nowTs,
-                    timestamp: nowTs
-                }, { merge: true }).catch(() => {});
+                const cleanPayload = sanitizeFirestoreData ? sanitizeFirestoreData(newMsgPayload) : newMsgPayload;
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'chats', targetChatId, 'messages'), cleanPayload);
+                const cleanLast = sanitizeFirestoreData ? sanitizeFirestoreData(lastMessagePayload) : lastMessagePayload;
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'lastMessages', targetChatId), cleanLast, { merge: true }).catch(() => {});
             }
-            showMessage(`✅ Publicación enviada a ${recipient.name}.`);
+
+            // Notificar en tiempo real si el chat está activo en pantalla
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('englishtech:chat_message_sent', {
+                    detail: {
+                        chatId: targetChatId,
+                        message: newMsgPayload,
+                        lastMessage: lastMessagePayload
+                    }
+                }));
+            }
+
+            showMessage(`✅ ${typeLabel} enviado/a a ${recipient.name}.`);
             setShowShareModal(false);
         } catch (err) {
             console.error("Error al compartir por mensaje:", err);

@@ -83,6 +83,7 @@ import CommandPaletteModal from './components/CommandPaletteModal.jsx'
 import FeedbackIAEvaluacion from './components/FeedbackIAEvaluacion.jsx';
 import SimulacroEvaluacion from './components/SimulacroEvaluacion.jsx';
 import TargetStudentsModal from './components/TargetStudentsModal.jsx';
+import SharedPostCard, { parseSharedPost } from './components/SharedPostCard.jsx';
 import FillBlanksQuestion from './components/FillBlanksQuestion.jsx';
 import MatchingLinesQuestion, { MATCHING_LINE_COLORS } from './components/MatchingLinesQuestion.jsx';
 import { extractTextFromPDF } from './utils/pdfExtractor.js'
@@ -4735,6 +4736,28 @@ useEffect(() => {
               }
           }, [chatMessages.length, isChatMinimized, isChatAppOpen, activeChat?.id]);
             
+          // Sincronización en vivo de mensajes compartidos emitidos desde TaskCard u otros componentes
+          useEffect(() => {
+              const handleChatMessageSent = (e) => {
+                  const { chatId, message, lastMessage } = e.detail || {};
+                  if (!chatId) return;
+                  if (lastMessage) {
+                      setLastMessages(prev => ({ ...prev, [chatId]: lastMessage }));
+                  }
+                  if (activeChat && (activeChat.id === chatId || `group_${activeChat.id}` === chatId || activeChat.id === `group_${chatId}`)) {
+                      if (message) {
+                          setChatMessages(prev => {
+                              if (prev.some(m => m.id === message.id)) return prev;
+                              return [...prev, message];
+                          });
+                          setTimeout(() => scrollToChatBottom('smooth'), 50);
+                      }
+                  }
+              };
+              window.addEventListener('englishtech:chat_message_sent', handleChatMessageSent);
+              return () => window.removeEventListener('englishtech:chat_message_sent', handleChatMessageSent);
+          }, [activeChat]);
+
 // NUEVO: Efecto para compartir en qué chat estamos actualmente
 useEffect(() => {
     if (!myChatId || isDemoMode) return;
@@ -4812,6 +4835,20 @@ useEffect(() => {
     const parts = raw.split('_');
     return parts.find(p => p && p.toLowerCase() !== myId.toLowerCase()) || raw;
   };
+
+  const handleNavigateToSharedPost = useCallback((postId) => {
+    if (!postId) return;
+    try {
+      window.history.pushState(null, '', `#post/${postId}`);
+    } catch(e) {
+      window.location.hash = `post/${postId}`;
+    }
+    setActivePostModalId(postId);
+    setActiveTab('tasks');
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setIsChatMinimized(true);
+    }
+  }, []);
 
   const handleOpenChat = (chat) => {
               if (activeTakingEval?.strictAntiCheat) {
@@ -17400,30 +17437,57 @@ Escribe en español con tono pedagógico moderno.`;
                                                                                       </div>
                                                                                   )}
 
-                                                                                  {m.text && (
-                                                                                      <div>
-                                                                                          {chatTranslations[m.id] ? (
-                                                                                              <div className="space-y-1">
-                                                                                                  <div className="flex items-center gap-1 text-[10px] font-bold opacity-90 text-blue-200">
-                                                                                                      <button type="button" onClick={() => handleTranslateMessage(m.id, m.text)} className="underline hover:opacity-75 flex items-center gap-1">
-                                                                                                          <Languages size={10} /> Ver original
-                                                                                                      </button>
-                                                                                                  </div>
-                                                                                                  <div className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap pr-6">
-                                                                                                      <LinkifyText text={chatTranslations[m.id]} />
-                                                                                                  </div>
+                                                                                  {(() => {
+                                                                                      const sharedItem = parseSharedPost(m, tasks);
+                                                                                      if (sharedItem) {
+                                                                                          const cleanIntro = (m.text || '')
+                                                                                              .replace(/📌\s*\*([^\*]+)\*/g, '')
+                                                                                              .replace(/https?:\/\/[^\s]+#(?:post|task)\/(?:[a-zA-Z0-9_-]+)/g, '')
+                                                                                              .trim();
+                                                                                          return (
+                                                                                              <div>
+                                                                                                  {cleanIntro && (
+                                                                                                      <div className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap mb-2">
+                                                                                                          <LinkifyText text={cleanIntro} />
+                                                                                                      </div>
+                                                                                                  )}
+                                                                                                  <SharedPostCard
+                                                                                                      sharedItem={sharedItem}
+                                                                                                      isMe={isMe}
+                                                                                                      isDarkMode={isDarkMode}
+                                                                                                      onNavigate={(postId) => handleNavigateToSharedPost(postId)}
+                                                                                                  />
                                                                                               </div>
-                                                                                          ) : (
-                                                                                              <div className={isEmojiOnly ? "text-4xl drop-shadow-md leading-none py-1" : "text-xs sm:text-sm leading-relaxed whitespace-pre-wrap pr-6"}>
-                                                                                                  <LinkifyText text={m.text} />
-                                                                                              </div>
-                                                                                          )}
-                                                                                          {translatingMsgIds[m.id] && (
-                                                                                              <span className="text-[10px] italic opacity-80 animate-pulse block mt-0.5">Traduciendo...</span>
-                                                                                          )}
-                                                                                      </div>
-                                                                                  )}
-                                                                                  
+                                                                                          );
+                                                                                      }
+
+                                                                                      if (!m.text) return null;
+
+                                                                                      return (
+                                                                                          <div>
+                                                                                              {chatTranslations[m.id] ? (
+                                                                                                  <div className="space-y-1">
+                                                                                                      <div className="flex items-center gap-1 text-[10px] font-bold opacity-90 text-blue-200">
+                                                                                                          <button type="button" onClick={() => handleTranslateMessage(m.id, m.text)} className="underline hover:opacity-75 flex items-center gap-1">
+                                                                                                              <Languages size={10} /> Ver original
+                                                                                                          </button>
+                                                                                                      </div>
+                                                                                                      <div className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap pr-6">
+                                                                                                          <LinkifyText text={chatTranslations[m.id]} />
+                                                                                                      </div>
+                                                                                                  </div>
+                                                                                              ) : (
+                                                                                                  <div className={isEmojiOnly ? "text-4xl drop-shadow-md leading-none py-1" : "text-xs sm:text-sm leading-relaxed whitespace-pre-wrap pr-6"}>
+                                                                                                      <LinkifyText text={m.text} />
+                                                                                                  </div>
+                                                                                              )}
+                                                                                              {translatingMsgIds[m.id] && (
+                                                                                                  <span className="text-[10px] italic opacity-80 animate-pulse block mt-0.5">Traduciendo...</span>
+                                                                                              )}
+                                                                                          </div>
+                                                                                      );
+                                                                                  })()}
+
                                                                                   {/* Reproductor de Nota de Voz estilo WhatsApp */}
                                                                                   {m.audioUrl && (
                                                                                       <div className={isAudioOnly ? "relative flex flex-col" : "mt-1.5"}>
