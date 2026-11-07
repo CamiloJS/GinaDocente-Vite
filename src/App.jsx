@@ -84,6 +84,7 @@ import FeedbackIAEvaluacion from './components/FeedbackIAEvaluacion.jsx';
 import SimulacroEvaluacion from './components/SimulacroEvaluacion.jsx';
 import TargetStudentsModal from './components/TargetStudentsModal.jsx';
 import SharedPostCard, { parseSharedPost } from './components/SharedPostCard.jsx';
+import { dispatchStudentEmailNotification } from './utils/studentNotificationService.js';
 import FillBlanksQuestion from './components/FillBlanksQuestion.jsx';
 import MatchingLinesQuestion, { MATCHING_LINE_COLORS } from './components/MatchingLinesQuestion.jsx';
 import { extractTextFromPDF } from './utils/pdfExtractor.js'
@@ -5794,6 +5795,32 @@ useEffect(() => {
                       await setDoc(alertRef, { hasUnread: true, timestamp: Date.now(), chats: { [activeChat.id]: true }, previewSender: previewName, previewText: msgPreviewText }).catch(() => {});
                   }
               }
+          }
+
+          // Notificar automáticamente por correo Google si el remitente es la docente
+          if (role === 'teacher' && targetIds.length > 0) {
+              dispatchStudentEmailNotification({
+                  type: 'chat_message',
+                  message: {
+                      id: messageData.id,
+                      text: msgPreviewText || messageData.text,
+                      chatName: activeChat.name,
+                      isGroup: activeChat.type === 'group'
+                  },
+                  recipientUserKeys: targetIds,
+                  senderName: previewName || authorName || TEACHER_NAME,
+                  userMappings,
+                  academicGroups,
+                  chatGroups,
+                  appId,
+                  db,
+                  isDemoMode,
+                  saveDemoSandboxItem,
+                  addDocFn: addDoc,
+                  collectionFn: collection
+              }).catch(errNotif => {
+                  console.warn('Aviso en notificación de chat por correo:', errNotif);
+              });
           }
       } catch (err) {
           console.error("Error enviando mensaje de chat:", err);
@@ -14651,6 +14678,95 @@ Escribe en español con tono pedagógico moderno.`;
                             )}
                         </button>
                     </div>
+                </div>
+
+                {/* Tarjeta: Notificaciones por Correo Google */}
+                <div className={`${glassCard} !p-4 sm:!p-5 space-y-3`}>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-xs ${isDarkMode ? 'bg-blue-950/70 text-blue-300 border border-blue-800/40' : 'bg-blue-50 text-blue-600 border border-blue-100'}`}>
+                                <Mail size={18} />
+                            </div>
+                            <div>
+                                <h4 className={`text-xs font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                                    {role === 'teacher' ? 'Notificaciones por Correo a Estudiantes (Google)' : 'Notificaciones en mi correo Google'}
+                                </h4>
+                                <p className="text-[11px] text-gray-500">
+                                    {role === 'teacher' 
+                                        ? 'Avisos automáticos a las cuentas Google de los estudiantes al publicar en el muro o enviar mensajes de chat.'
+                                        : 'Avisos a tu cuenta Google cuando la docente publique tareas, foros o te envíe mensajes.'}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {role === 'teacher' ? (
+                        <div className="pt-2 border-t border-gray-200/50 dark:border-gray-800/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                            <div className="flex items-center gap-2">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-green-500/10 text-green-700 dark:text-green-300 border border-green-500/20">
+                                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                                    {Object.values(userMappings || {}).filter(u => u && u.role !== 'teacher' && (u.email || u.googleEmail)).length} estudiantes con correo Google
+                                </span>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={async () => {
+                                    const teacherEmail = user?.email || userMappings?.[myChatId]?.email || 'ginamarcelaquintana19@gmail.com';
+                                    showMessage("Enviando correo de prueba a " + teacherEmail + "...");
+                                    try {
+                                        const res = await dispatchStudentEmailNotification({
+                                            type: 'wall_post',
+                                            post: {
+                                                id: 'test_notification',
+                                                type: 'task',
+                                                title: 'Prueba de Notificaciones por Correo',
+                                                description: '¡El sistema de notificaciones por correo de English Tech está activo y funcionando correctamente!',
+                                                dueDate: '2026-12-31',
+                                                dueTime: '23:59',
+                                                targetGroupName: 'Inglés Técnico Económico'
+                                            },
+                                            senderName: loggedInName || TEACHER_NAME,
+                                            recipientUserKeys: [myChatId],
+                                            userMappings: {
+                                                [myChatId]: {
+                                                    fullName: loggedInName || TEACHER_NAME,
+                                                    email: teacherEmail,
+                                                    role: 'student'
+                                                }
+                                            },
+                                            appId,
+                                            db,
+                                            isDemoMode,
+                                            addDocFn: addDoc,
+                                            collectionFn: collection
+                                        });
+                                        if (res?.success) {
+                                            showMessage(`✅ Correo de prueba enviado a ${teacherEmail}.`);
+                                        } else {
+                                            showMessage("❌ No se pudo despachar el correo de prueba.");
+                                        }
+                                    } catch (e) {
+                                        showMessage("❌ Error al enviar prueba.");
+                                    }
+                                }}
+                                className="w-full sm:w-auto py-1.5 px-3.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 border bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:border-blue-700/50 dark:text-blue-300 cursor-pointer shadow-2xs"
+                            >
+                                <Mail size={13} /> Enviar correo de prueba
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="pt-2 border-t border-gray-200/50 dark:border-gray-800/60 flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-2">
+                                <span className="font-bold text-[11px] text-gray-500">Cuenta Google:</span>
+                                <span className="font-bold text-gray-800 dark:text-gray-200 text-xs">
+                                    {userMappings?.[myChatId]?.googleEmail || userMappings?.[myChatId]?.email || user?.email || 'Registrado con Google'}
+                                </span>
+                            </div>
+                            <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/50 px-2.5 py-1 rounded-full">
+                                Notificaciones activas
+                            </span>
+                        </div>
+                    )}
                 </div>
 
                 {/* Tarjeta 3: Estado de Disponibilidad */}

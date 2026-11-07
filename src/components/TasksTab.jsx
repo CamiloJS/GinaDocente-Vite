@@ -21,6 +21,7 @@ import { BOOK_THEMES, renderPdfToBookPages, uploadBookPagesToStorage, sanitizeBo
 import Flipbook3DModal from './Flipbook3DModal.jsx'
 import BookWordEditor from './BookWordEditor.jsx'
 import UniversalImage from './UniversalImage.jsx'
+import { dispatchStudentEmailNotification } from '../utils/studentNotificationService.js'
 
 const TasksTab = React.memo(({
     role, glassCard, glassInput, redButton, postType, setPostType, taskTitle, setTaskTitle,
@@ -2545,17 +2546,20 @@ Descripción original: ${taskDesc}`;
                                             }
                                         });
 
+                                        let createdPostId = null;
                                         if (isDemoMode) {
                                             const demoCreatedTask = saveDemoSandboxItem('tasks', {
                                                 id: `demo-task-${Date.now()}`,
                                                 ...payload
                                             });
+                                            createdPostId = demoCreatedTask.id;
                                             if (typeof setTasks === 'function') {
                                                 setTasks(prev => [demoCreatedTask, ...(prev || []).filter(t => String(t.id) !== String(demoCreatedTask.id))]);
                                             }
                                         } else {
                                             try {
-                                                await withTimeout(addDoc(collection(effectiveDb, 'artifacts', effectiveAppId, 'public', 'data', 'tasks'), sanitizeFirestoreData(payload)));
+                                                const docRef = await withTimeout(addDoc(collection(effectiveDb, 'artifacts', effectiveAppId, 'public', 'data', 'tasks'), sanitizeFirestoreData(payload)));
+                                                createdPostId = docRef?.id || null;
                                             } catch (primaryErr) {
                                                 console.warn("Retrying task creation with basic schema:", primaryErr);
                                                 const basicPayload = {
@@ -2582,9 +2586,42 @@ Descripción original: ${taskDesc}`;
                                                 if (postGeniallyUrl && postGeniallyUrl.trim()) basicPayload.geniallyUrl = extractGeniallyUrl(postGeniallyUrl.trim());
                                                 if (validPoll) basicPayload.poll = validPoll;
                                                 if (validKahoot) basicPayload.kahoot = validKahoot;
-                                                await withTimeout(addDoc(collection(effectiveDb, 'artifacts', effectiveAppId, 'public', 'data', 'tasks'), sanitizeFirestoreData(basicPayload)), 10000);
+                                                const docRef2 = await withTimeout(addDoc(collection(effectiveDb, 'artifacts', effectiveAppId, 'public', 'data', 'tasks'), sanitizeFirestoreData(basicPayload)), 10000);
+                                                createdPostId = docRef2?.id || null;
                                             }
                                         }
+
+                                        // Despachar notificación automática por correo Google a los estudiantes del grupo
+                                        dispatchStudentEmailNotification({
+                                            type: 'wall_post',
+                                            post: {
+                                                id: createdPostId,
+                                                type: currentPostType,
+                                                title: resolvedPostTitle,
+                                                description: cleanDesc,
+                                                dueDate: isTimed && taskDate ? String(taskDate) : null,
+                                                dueTime: isTimed && taskTime ? String(taskTime) : null,
+                                                targetGroupId: resolvedTargetGroupId,
+                                                targetGroupName: targetGroupName || 'Inglés Técnico Económico'
+                                            },
+                                            senderName: loggedInName || 'Profesora',
+                                            targetGroupId: resolvedTargetGroupId,
+                                            academicGroups,
+                                            chatGroups,
+                                            userMappings,
+                                            appId: effectiveAppId,
+                                            db: effectiveDb,
+                                            isDemoMode,
+                                            saveDemoSandboxItem,
+                                            addDocFn: addDoc,
+                                            collectionFn: collection
+                                        }).then(notifRes => {
+                                            if (notifRes?.count > 0 && typeof showMessage === 'function') {
+                                                showMessage(`📧 Notificación enviada a ${notifRes.count} estudiante(s) por correo Google.`);
+                                            }
+                                        }).catch(errNotif => {
+                                            console.warn('Error en notificación por correo:', errNotif);
+                                        });
 
                                         if (typeof setTaskTitle === 'function') setTaskTitle("");
                                         if (typeof setTaskDesc === 'function') setTaskDesc("");
