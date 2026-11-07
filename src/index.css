@@ -58,6 +58,20 @@ html {
   transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* Utilidades de área segura para dispositivos móviles (iOS y Android con notch o gestos) */
+.pb-safe {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+}
+.pt-safe {
+  padding-top: max(0.5rem, env(safe-area-inset-top, 0px));
+}
+.mb-safe {
+  margin-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+}
+.mt-safe {
+  margin-top: max(0.5rem, env(safe-area-inset-top, 0px));
+}
+
 /* ===== Estilos globales minimalistas ===== */
 
 /* Pestaña de navegación activa: corporativa, sin resplandor */

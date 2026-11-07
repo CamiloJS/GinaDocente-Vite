@@ -2190,6 +2190,9 @@ const TaskCard = React.memo(({
                         setShowReactionDock(true);
                       }, 350);
                     }}
+                    onTouchMove={() => {
+                      if (reactionTouchTimerRef.current) clearTimeout(reactionTouchTimerRef.current);
+                    }}
                     onTouchEnd={() => {
                       if (reactionTouchTimerRef.current) clearTimeout(reactionTouchTimerRef.current);
                     }}
@@ -4255,7 +4258,7 @@ const TaskCard = React.memo(({
                         className={`w-full cursor-default ${
                         isModalExpanded 
                             ? 'fixed inset-0 z-[9999] w-screen h-screen max-w-none rounded-none m-0 p-4 md:p-8' 
-                            : 'max-w-2xl h-[90vh] md:h-[80vh] rounded-t-[2rem] md:rounded-3xl p-4 md:p-6'
+                            : 'max-w-2xl h-[90vh] md:h-[80vh] rounded-t-[2rem] md:rounded-3xl p-4 md:p-6 pb-safe'
                     } flex flex-col shadow-2xl transition-all duration-200 animate-in slide-in-from-bottom-6 fade-in overflow-hidden ${
                         isDarkMode ? 'bg-gray-900 border border-gray-700' : 'bg-white border border-gray-200'
                     }`}>
@@ -5351,7 +5354,7 @@ const TaskCard = React.memo(({
                 const effectiveImageSrc = getKnownConvertedUrl(localFullScreenImage) || localFullScreenImage;
                 return ReactDOM.createPortal(
                     <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setLocalFullScreenImage(null)}>
-                        <div className="absolute top-4 md:top-8 right-4 md:right-8 flex items-center gap-2">
+                        <div className="absolute top-4 md:top-8 right-4 md:right-8 pt-safe md:pt-0 flex items-center gap-2">
                             <button 
                                 type="button" 
                                 onClick={(e) => { e.stopPropagation(); handleForceDownload(effectiveImageSrc, 'foto.jpg'); }} 
@@ -5535,7 +5538,7 @@ const TaskCard = React.memo(({
                     onClick={() => setShowShareModal(false)}
                 >
                     <div 
-                        className={`max-w-md w-full rounded-3xl shadow-2xl p-5 sm:p-6 flex flex-col gap-4 border relative animate-in zoom-in-95 duration-200 ${
+                        className={`max-w-md w-full max-h-[90vh] overflow-y-auto rounded-3xl shadow-2xl p-5 sm:p-6 flex flex-col gap-4 border relative animate-in zoom-in-95 duration-200 ${
                             isDarkMode ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'
                         }`}
                         onClick={e => e.stopPropagation()}

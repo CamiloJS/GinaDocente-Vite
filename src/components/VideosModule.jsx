@@ -218,11 +218,16 @@ export default function VideosModule({
     if (e?.stopPropagation) e.stopPropagation();
     if (!video) return;
 
-    const shareUrl = video.url || window.location.href;
+    let shareUrl = video.url || window.location.href;
+    try {
+      shareUrl = new URL(shareUrl, window.location.origin).href;
+    } catch (err) {
+      shareUrl = window.location.href;
+    }
     const shareTitle = video.title || 'Vídeo de clase';
     const shareText = `Mira este vídeo de inglés: "${shareTitle}"`;
 
-    // 1. Probar Web Share API nativa en móviles
+    // 1. Probar Web Share API nativa en móviles con fallback progresivo
     if (typeof navigator !== 'undefined' && navigator.share) {
       try {
         await navigator.share({
@@ -232,9 +237,31 @@ export default function VideosModule({
         });
         return;
       } catch (err) {
-        // Si el usuario canceló la hoja nativa de compartir, no mostramos error
         if (err && (err.name === 'AbortError' || String(err).includes('AbortError'))) {
+          return; // Cancelado por el usuario
+        }
+        // Fallback 1a: Intentar solo con url y title (requerido por Samsung Browser y Xiaomi que fallan al combinar text y url)
+        try {
+          await navigator.share({
+            title: shareTitle,
+            url: shareUrl
+          });
           return;
+        } catch (err2) {
+          if (err2 && (err2.name === 'AbortError' || String(err2).includes('AbortError'))) {
+            return;
+          }
+          // Fallback 1b: Intentar texto unificado
+          try {
+            await navigator.share({
+              text: `${shareText} ${shareUrl}`
+            });
+            return;
+          } catch (err3) {
+            if (err3 && (err3.name === 'AbortError' || String(err3).includes('AbortError'))) {
+              return;
+            }
+          }
         }
         console.warn('Fallback tras error en navigator.share:', err);
       }
@@ -1006,9 +1033,9 @@ export default function VideosModule({
                             type="button"
                             onClick={(e) => handleShareVideo(video, e)}
                             title="Compartir vídeo"
-                            className="p-1 rounded-md bg-black/50 text-white/70 hover:text-white hover:bg-black/80 transition-colors cursor-pointer"
+                            className="p-1.5 sm:p-1 rounded-lg sm:rounded-md bg-black/60 text-white/80 hover:text-white hover:bg-black/80 transition-colors cursor-pointer touch-manipulation"
                           >
-                            <Share2 size={12} />
+                            <Share2 size={13} />
                           </button>
 
                           {canEdit && (
@@ -1168,9 +1195,9 @@ export default function VideosModule({
                             type="button"
                             onClick={(e) => handleShareVideo(video, e)}
                             title="Compartir vídeo"
-                            className="p-1.5 rounded-xl bg-black/60 text-white/80 hover:text-white hover:bg-black/90 transition-colors shadow-xs cursor-pointer"
+                            className="p-2 sm:p-1.5 rounded-xl bg-black/60 text-white/80 hover:text-white hover:bg-black/90 transition-colors shadow-xs cursor-pointer touch-manipulation"
                           >
-                            <Share2 size={13} />
+                            <Share2 size={14} className="sm:size-[13px]" />
                           </button>
 
                           {canEdit && (
@@ -1286,7 +1313,7 @@ export default function VideosModule({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className={`relative w-full max-w-5xl max-h-[92vh] rounded-3xl shadow-2xl border overflow-hidden flex flex-col cursor-default ${
+            className={`relative w-full max-w-5xl h-[94dvh] sm:h-auto max-h-[94dvh] sm:max-h-[92vh] rounded-2xl sm:rounded-3xl shadow-2xl border overflow-hidden flex flex-col cursor-default pb-safe ${
               isDarkMode
                 ? 'bg-gray-900 border-gray-800 text-gray-100'
                 : 'bg-white border-gray-200 text-gray-900'

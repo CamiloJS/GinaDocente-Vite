@@ -11210,7 +11210,7 @@ Escribe en español con tono pedagógico moderno.`;
                           )}
 
                           {/* Temporizador pequeño flotante en esquina inferior (sin título, sin tapar preguntas ni clics) */}
-                          <div className={`fixed bottom-[74px] ${activeChat ? 'md:bottom-16' : 'md:bottom-5'} right-3 md:right-5 z-[130] pointer-events-none`}>
+                          <div className={`fixed bottom-[calc(76px+env(safe-area-inset-bottom,0px))] md:bottom-5 right-3 md:right-5 z-[130] pointer-events-none`}>
                               <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border border-red-500/35 text-[#AD3333] dark:text-red-400 px-2.5 py-1 rounded-full font-black font-mono text-xs flex items-center gap-1.5 shadow-md">
                                   <Clock size={12} className="animate-pulse" />
                                   <span>{formatTime(timeRemaining)}</span>
@@ -16121,7 +16121,7 @@ Escribe en español con tono pedagógico moderno.`;
 
               {/* MODAL / POPUP DEL BOT DE LA PROFESORA (Abierto desde el panel derecho) */}
               {role === 'teacher' && hasEntered && isTeacherBotOpen && (
-                  <div className="fixed bottom-6 right-6 z-[150] flex flex-col items-end">
+                  <div className="fixed bottom-20 sm:bottom-6 right-3 sm:right-6 z-[150] flex flex-col items-end max-w-[calc(100vw-24px)]">
                       <div key={themeMode} className={`w-[92vw] sm:w-[420px] md:w-[480px] h-[520px] md:h-[600px] max-h-[80vh] flex flex-col p-4 animate-in slide-in-from-bottom-10 fade-in shadow-2xl rounded-2xl border transition-colors ${isDarkMode ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'}`}>
                           <div className={`flex justify-between items-center mb-3 border-b pb-3 ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
                               <div className="flex items-center gap-2.5">
@@ -16626,7 +16626,7 @@ Escribe en español con tono pedagógico moderno.`;
                                   isDarkMode ? 'bg-gray-900 border-gray-700 shadow-black/70' : 'bg-white border-gray-200 shadow-2xl'
                               }`}>
                                   {/* Encabezado del Chat */}
-                                  <div className={`px-4 py-3.5 sm:py-4 min-h-[64px] border-b shadow-xs flex items-center justify-between shrink-0 relative z-30 ${
+                                  <div className={`px-4 py-3.5 sm:py-4 pt-safe sm:pt-4 min-h-[64px] border-b shadow-xs flex items-center justify-between shrink-0 relative z-30 ${
                                       isDarkMode ? 'bg-gray-800/95 border-gray-700 backdrop-blur-md' : 'bg-white/95 border-gray-200 backdrop-blur-md'
                                   }`}>
                                       <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1 overflow-hidden pr-2">
@@ -17919,7 +17919,7 @@ Escribe en español con tono pedagógico moderno.`;
               {/* MODAL IMAGEN PANTALLA COMPLETA (APP) */}
               {fullScreenImage && ReactDOM.createPortal(
                   <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setFullScreenImage(null)}>
-                       <div className="absolute top-4 md:top-8 right-4 md:right-8 flex items-center gap-2">
+                       <div className="absolute top-4 md:top-8 right-4 md:right-8 pt-safe md:pt-0 flex items-center gap-2">
                            <button 
                                type="button" 
                                onClick={(e) => { e.stopPropagation(); handleForceDownload(fullScreenImage, 'foto.jpg'); }} 
@@ -18111,7 +18111,7 @@ Escribe en español con tono pedagógico moderno.`;
                       onClick={() => setIsMobileMenuOpen(false)}
                   >
                       <div 
-                          className={`w-full max-h-[85vh] rounded-t-3xl border-t shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300 ${
+                          className={`w-full max-h-[88dvh] rounded-t-3xl border-t shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300 gpu-layer ${
                               isDarkMode ? 'bg-gray-900 border-gray-800 text-white' : 'bg-gray-50 border-gray-200 text-gray-900'
                           }`}
                           onClick={e => e.stopPropagation()}
@@ -18150,7 +18150,7 @@ Escribe en español con tono pedagógico moderno.`;
                           </div>
 
                           {/* Contenido del Menú Deslizante */}
-                          <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-12">
+                          <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-16 pb-safe">
                               {/* Buscador Rápido en Móvil */}
                               <button
                                   type="button"

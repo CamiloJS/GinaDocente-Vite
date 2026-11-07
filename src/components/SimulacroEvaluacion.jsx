@@ -35,7 +35,7 @@ export default function SimulacroEvaluacion({ evaluacion = {}, isDarkMode = fals
 
   return createPortal((
     <div className="fixed inset-0 z-[999] bg-black/60 backdrop-blur-sm overflow-y-auto">
-      <div className="max-w-3xl mx-auto p-3 sm:p-6 pb-16">
+      <div className="max-w-3xl mx-auto p-3 sm:p-6 pb-16 pb-safe">
 
         {/* Banner de simulacro */}
         <div className="bg-amber-500/15 border border-amber-500/40 text-amber-800 dark:text-amber-200 rounded-2xl p-3.5 flex items-start gap-3 mb-3 shadow-sm">
