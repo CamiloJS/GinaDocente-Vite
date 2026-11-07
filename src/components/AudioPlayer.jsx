@@ -3,6 +3,9 @@ import React, { useState, useRef, useEffect } from 'react'
 import { Play, Pause, Square, Trash2, X, Mic } from './Icons.jsx'
 import { formatTime } from '../utils/helpers.js'
 
+// Singleton para pausar cualquier otro reproductor de audio activo cuando uno nuevo empieza
+let activeGlobalAudio = null;
+
 export const AudioPlayer = ({ 
   src, 
   title = "", 
@@ -55,12 +58,27 @@ export const AudioPlayer = ({
     }
 
     const handleEnded = () => {
+      if (activeGlobalAudio === audio) {
+        activeGlobalAudio = null;
+      }
       setIsPlaying(false)
       setCurrentTime(0)
     }
 
-    const handlePause = () => setIsPlaying(false)
-    const handlePlay = () => setIsPlaying(true)
+    const handlePause = () => {
+      if (activeGlobalAudio === audio) {
+        activeGlobalAudio = null;
+      }
+      setIsPlaying(false)
+    }
+
+    const handlePlay = () => {
+      if (activeGlobalAudio && activeGlobalAudio !== audio) {
+        try { activeGlobalAudio.pause(); } catch(e) {}
+      }
+      activeGlobalAudio = audio;
+      setIsPlaying(true)
+    }
 
     audio.addEventListener('loadedmetadata', handleLoadedMetadata)
     audio.addEventListener('durationchange', handleDurationChange)
@@ -70,6 +88,9 @@ export const AudioPlayer = ({
     audio.addEventListener('play', handlePlay)
 
     return () => {
+      if (activeGlobalAudio === audio) {
+        activeGlobalAudio = null;
+      }
       try { audio.pause() } catch(e) {}
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata)
       audio.removeEventListener('durationchange', handleDurationChange)

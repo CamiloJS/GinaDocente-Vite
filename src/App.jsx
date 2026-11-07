@@ -2288,6 +2288,11 @@ function App() {
         setShowGroupInfo(false);
         setShowChatAppEmojiPicker(false);
         setShowChatAppAttachmentMenu(false);
+        setIsMobileMenuOpen(false);
+        setIsTeacherBotOpen(false);
+        setShowJoinGroupModal(false);
+        setIsCreatingGroup(false);
+        setShowAddMembersModal(false);
       }
     };
     window.addEventListener('keydown', onKey);

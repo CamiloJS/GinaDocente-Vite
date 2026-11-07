@@ -128,18 +128,50 @@ const CustomVideoPlayer = ({ src, url, videoId: propVideoId, title = "Video de l
     }
   };
 
+  const isCurrentlyFullscreen = () => {
+    return Boolean(
+      document.fullscreenElement ||
+      document.webkitFullscreenElement ||
+      document.mozFullScreenElement ||
+      document.msFullscreenElement
+    );
+  };
+
   const toggleFullscreen = async () => {
-    if (!containerRef.current) return;
-    if (!document.fullscreenElement) {
+    const container = containerRef.current;
+    const video = videoRef.current;
+    if (!container && !video) return;
+
+    if (!isCurrentlyFullscreen()) {
       try {
-        await containerRef.current.requestFullscreen?.();
-        setIsFullscreen(true);
+        if (container?.requestFullscreen) {
+          await container.requestFullscreen();
+          setIsFullscreen(true);
+        } else if (container?.webkitRequestFullscreen) {
+          container.webkitRequestFullscreen();
+          setIsFullscreen(true);
+        } else if (video?.webkitEnterFullscreen) {
+          video.webkitEnterFullscreen();
+          setIsFullscreen(true);
+        }
       } catch (err) {
         console.error(err);
+        if (video?.webkitEnterFullscreen) {
+          try {
+            video.webkitEnterFullscreen();
+            setIsFullscreen(true);
+          } catch (e) {
+            console.error(e);
+          }
+        }
       }
     } else {
       try {
-        await document.exitFullscreen?.();
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+          document.webkitExitFullscreen();
+        }
         setIsFullscreen(false);
       } catch (err) {
         console.error(err);
@@ -157,11 +189,26 @@ const CustomVideoPlayer = ({ src, url, videoId: propVideoId, title = "Video de l
 
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      setIsFullscreen(isCurrentlyFullscreen());
     };
+    const video = videoRef.current;
+    const onWebKitBegin = () => setIsFullscreen(true);
+    const onWebKitEnd = () => setIsFullscreen(false);
+
     document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    if (video) {
+      video.addEventListener('webkitbeginfullscreen', onWebKitBegin);
+      video.addEventListener('webkitendfullscreen', onWebKitEnd);
+    }
+
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      if (video) {
+        video.removeEventListener('webkitbeginfullscreen', onWebKitBegin);
+        video.removeEventListener('webkitendfullscreen', onWebKitEnd);
+      }
       if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
       if (videoRef.current) {
         try { videoRef.current.pause(); } catch(e) {}

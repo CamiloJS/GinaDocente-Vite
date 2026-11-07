@@ -628,16 +628,35 @@ const TaskCard = React.memo(({
     useClickOutside(emojiPickerRef, () => setShowEmojiPicker(false));
     useClickOutside(attachmentMenuRef, () => setShowAttachmentMenu(false));
     React.useEffect(() => {
-        if (!showEmojiPicker && !showAttachmentMenu) return;
+        if (!showEmojiPicker && !showAttachmentMenu && !localFullScreenImage && !showShareModal && !showCommentModal && !showReactionDock) return;
         const onKey = (e) => {
             if (e.key === 'Escape') {
-                setShowEmojiPicker(false);
-                setShowAttachmentMenu(false);
+                if (localFullScreenImage) {
+                    setLocalFullScreenImage(null);
+                    return;
+                }
+                if (showReactionDock) {
+                    setShowReactionDock(false);
+                    return;
+                }
+                if (showEmojiPicker || showAttachmentMenu) {
+                    setShowEmojiPicker(false);
+                    setShowAttachmentMenu(false);
+                    return;
+                }
+                if (showShareModal) {
+                    setShowShareModal(false);
+                    return;
+                }
+                if (showCommentModal) {
+                    setShowCommentModal(false);
+                    return;
+                }
             }
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
-    }, [showEmojiPicker, showAttachmentMenu]);
+    }, [showEmojiPicker, showAttachmentMenu, localFullScreenImage, showShareModal, showCommentModal, showReactionDock]);
 
     const isTask = task?.type === 'task';
     const isForum = task?.type === 'forum';
