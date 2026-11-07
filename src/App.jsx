@@ -5357,27 +5357,32 @@ useEffect(() => {
 
             const handleDeleteEntireChat = async () => {
               if (!activeChat) return;
-              if (isDemoMode) {
-                  setChatMessages([]);
-                  saveDemoChatMessages(activeChat.id, []);
-                  setLastMessages(prev => { const next = { ...prev }; delete next[activeChat.id]; return next; });
-                  setActiveChat(null);
-                  showMessage("Historial de chat eliminado (Modo Demo).");
-                  return;
+              try {
+                if (isDemoMode) {
+                    setChatMessages([]);
+                    saveDemoChatMessages(activeChat.id, []);
+                    setLastMessages(prev => { const next = { ...prev }; delete next[activeChat.id]; return next; });
+                    setActiveChat(null);
+                    showMessage("Historial de chat eliminado (Modo Demo).");
+                    return;
+                }
+                const msgsSnapshot = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'chats', activeChat.id, 'messages'));
+
+                // Eliminar todos los archivos e imágenes/audios adjuntos en Storage de este chat
+                await Promise.all(msgsSnapshot.docs.map(d => deleteAllStorageFilesInObject(d.data())));
+
+                // Esperar a que todos los mensajes se borren correctamente
+                const deletePromises = msgsSnapshot.docs.map(d => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chats', activeChat.id, 'messages', d.id)));
+                await Promise.all(deletePromises);
+
+                setLastMessages(prev => { const next = { ...prev }; delete next[activeChat.id]; return next; });
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'lastMessages', activeChat.id)).catch(() => {});
+                setActiveChat(null);
+                showMessage("Historial de chat eliminado.");
+              } catch (err) {
+                console.error("Error al eliminar historial de chat:", err);
+                showMessage("Error al eliminar el historial. Verifica tu conexión.");
               }
-              const msgsSnapshot = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'chats', activeChat.id, 'messages'));
-
-              // Eliminar todos los archivos e imágenes/audios adjuntos en Storage de este chat
-              await Promise.all(msgsSnapshot.docs.map(d => deleteAllStorageFilesInObject(d.data())));
-
-              // Esperar a que todos los mensajes se borren correctamente
-              const deletePromises = msgsSnapshot.docs.map(d => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chats', activeChat.id, 'messages', d.id)));
-              await Promise.all(deletePromises);
-
-              setLastMessages(prev => { const next = { ...prev }; delete next[activeChat.id]; return next; });
-              await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'lastMessages', activeChat.id)).catch(() => {});
-              setActiveChat(null);
-              showMessage("Historial de chat eliminado.");
           };
             
           const handleUpdateGroupPhoto = async (e) => {
@@ -7084,13 +7089,13 @@ useEffect(() => {
                 {showAvatarUploadModal && ReactDOM.createPortal(
                     <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in"
                          onMouseMove={(e) => {
-                             if(!isDraggingCrop) return;
+                             if(!isDraggingCrop || !cropDragStart.current) return;
                              setCropOffset({ x: e.clientX - cropDragStart.current.x, y: e.clientY - cropDragStart.current.y });
                          }}
                          onMouseUp={() => setIsDraggingCrop(false)}
                          onMouseLeave={() => setIsDraggingCrop(false)}
                          onTouchMove={(e) => {
-                             if(!isDraggingCrop) return;
+                             if(!isDraggingCrop || !cropDragStart.current || !e.touches || !e.touches[0]) return;
                              setCropOffset({ x: e.touches[0].clientX - cropDragStart.current.x, y: e.touches[0].clientY - cropDragStart.current.y });
                          }}
                          onTouchEnd={() => setIsDraggingCrop(false)}
@@ -7320,14 +7325,20 @@ useEffect(() => {
                                         <button 
                                             type="button"
                                             onClick={() => confirmAction("¿Eliminar publicación de tu perfil?", async () => {
-                                                if (isDemoMode) {
-                                                    setUserPosts(prev => prev.filter(p => p.id !== post.id));
-                                                    removeDemoSandboxItem('userPosts', post.id);
-                                                    showMessage("Publicación eliminada (Modo Demo).");
-                                                    return;
+                                                try {
+                                                    if (isDemoMode) {
+                                                        setUserPosts(prev => prev.filter(p => p.id !== post.id));
+                                                        removeDemoSandboxItem('userPosts', post.id);
+                                                        showMessage("Publicación eliminada (Modo Demo).");
+                                                        return;
+                                                    }
+                                                    await deleteAllStorageFilesInObject(post);
+                                                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userPosts', post.id));
+                                                    showMessage("Publicación eliminada.");
+                                                } catch (err) {
+                                                    console.error("Error al eliminar publicación:", err);
+                                                    showMessage("Error al eliminar la publicación.");
                                                 }
-                                                await deleteAllStorageFilesInObject(post);
-                                                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userPosts', post.id));
                                             })} 
                                             className="p-1.5 rounded-lg text-red-600 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/50 transition-colors" 
                                             title="Eliminar publicación"
@@ -7652,7 +7663,8 @@ useEffect(() => {
 
               setRawNotes(prev => [noteWithTeacher, ...(prev || []).filter(n => String(n.id) !== String(noteWithTeacher.id))]);
               try {
-                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notes', String(noteWithTeacher.id)), noteWithTeacher, { merge: true });
+                const cleanNote = sanitizeFirestoreData ? sanitizeFirestoreData(noteWithTeacher) : noteWithTeacher;
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notes', String(noteWithTeacher.id)), cleanNote, { merge: true });
               } catch (err) {
                 console.error('Error guardando nota:', err);
                 showMessage('No se pudo sincronizar la nota con la nube.');
@@ -14307,7 +14319,12 @@ Escribe en español con tono pedagógico moderno.`;
                                                                   showMessage("Sugerencia eliminada (Modo Demo).");
                                                                   return;
                                                               }
-                                                              return deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'suggestions', s.id));
+                                                              return deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'suggestions', s.id))
+                                                                      .then(() => showMessage("Sugerencia eliminada."))
+                                                                      .catch((err) => {
+                                                                          console.error("Error al eliminar sugerencia:", err);
+                                                                          showMessage("Error al eliminar sugerencia.");
+                                                                      });
                                                           })}
                                                           className="p-2 rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
                                                           title="Eliminar sugerencia"
@@ -14405,7 +14422,12 @@ Escribe en español con tono pedagógico moderno.`;
                                                              showMessage("Alerta eliminada (Modo Demo).");
                                                              return;
                                                          }
-                                                         return deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'alerts', a.id));
+                                                         return deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'alerts', a.id))
+                                                                      .then(() => showMessage("Alerta eliminada."))
+                                                                      .catch((err) => {
+                                                                          console.error("Error al eliminar alerta:", err);
+                                                                          showMessage("Error al eliminar alerta.");
+                                                                      });
                                                      })}
                                                       className="p-2 rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-100 dark:hover:bg-red-950/60 transition-colors"
                                                       title="Eliminar alerta"

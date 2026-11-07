@@ -1029,7 +1029,8 @@ export const FloatingWindow = ({
   const handleTouchStart = (e) => {
     if (e.target.closest('button')) return;
     onBringToFront?.();
-    const touch = e.touches[0];
+    const touch = e.touches?.[0];
+    if (!touch) return;
     setIsDragging(true);
     dragRef.current = {
       startX: touch.clientX,
@@ -1041,7 +1042,7 @@ export const FloatingWindow = ({
 
   useEffect(() => {
     const handleMouseMove = (e) => {
-      if (!isDragging) return;
+      if (!isDragging || !dragRef.current) return;
       const deltaX = e.clientX - dragRef.current.startX;
       const deltaY = e.clientY - dragRef.current.startY;
       
@@ -1056,8 +1057,9 @@ export const FloatingWindow = ({
     };
 
     const handleTouchMove = (e) => {
-      if (!isDragging) return;
-      const touch = e.touches[0];
+      if (!isDragging || !dragRef.current) return;
+      const touch = e.touches?.[0];
+      if (!touch) return;
       const deltaX = touch.clientX - dragRef.current.startX;
       const deltaY = touch.clientY - dragRef.current.startY;
       

@@ -26,7 +26,8 @@ import {
   deleteReplacedStorageFiles,
   cleanTextForTTS,
   detectLanguage,
-  selectBestFemaleVoice
+  selectBestFemaleVoice,
+  sanitizeFirestoreData
 } from '../utils/helpers.js'
 import EmptyState from './EmptyState.jsx'
 import { auth, signInAnonymously, doc, addDoc, setDoc, collection, deleteDoc, updateDoc } from '../firebase/config.js'
@@ -8128,7 +8129,8 @@ export const ReviewsModule = ({
       if (isDemoMode) {
         saveDemoSandboxItem('tasks', wallTask);
       } else {
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', wallTaskId), wallTask);
+        const sanitizedWallTask = sanitizeFirestoreData ? sanitizeFirestoreData(wallTask) : wallTask;
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', wallTaskId), sanitizedWallTask);
       }
       if (typeof setTasks === 'function') {
         setTasks(prev => [wallTask, ...(prev || []).filter(t => String(t.id) !== String(wallTask.id) && String(t.reviewId) !== String(newDoc.id))]);
@@ -8297,10 +8299,12 @@ export const ReviewsModule = ({
         if (auth && !auth.currentUser) {
           await signInAnonymously(auth).catch(() => {});
         }
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reviews', updatedPres.id), {
-          ...updates,
-          slides: firestoreSlides
-        });
+        const cleanReviewUpdates = sanitizeFirestoreData ? sanitizeFirestoreData({ ...updates, slides: firestoreSlides }) : { ...updates, slides: firestoreSlides };
+        try {
+          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reviews', updatedPres.id), cleanReviewUpdates);
+        } catch {
+          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reviews', updatedPres.id), cleanReviewUpdates, { merge: true });
+        }
         if (typeof setReviews === 'function') {
           setReviews(prev => (prev || []).map(r => String(r.id) === String(updatedPres.id) ? { ...r, ...updates } : r));
         }
