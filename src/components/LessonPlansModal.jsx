@@ -31,6 +31,7 @@ import {
   buildGenerateMaterialPrompt,
   generateDefaultDidacticMaterials
 } from '../utils/lessonPlanEngine.js';
+import { copyTextToClipboard } from '../utils/helpers.js';
 import { DidacticMaterialSheet } from './DidacticMaterialSheet.jsx';
 
 export function LessonPlansModal({
@@ -120,17 +121,25 @@ export function LessonPlansModal({
     showMessage?.('Planeación y materiales didácticos actualizados con éxito.');
   };
 
-  const handleCopyMarkdown = (plan) => {
+  const handleCopyMarkdown = async (plan) => {
     const text = formatLessonPlanAsMarkdown(plan);
-    navigator.clipboard.writeText(text);
-    showMessage?.('Planeación completa con materiales copiada al portapapeles.');
+    const ok = await copyTextToClipboard(text);
+    if (ok) {
+      showMessage?.('Planeación completa con materiales copiada al portapapeles.');
+    } else {
+      showMessage?.('No se pudo copiar automáticamente. Por favor selecciónalo manualmente.');
+    }
   };
 
-  const handleCopyMaterial = (mat) => {
+  const handleCopyMaterial = async (mat) => {
     if (!mat) return;
     const header = `UNIVERSIDAD DE PAMPLONA\nMATERIAL DIDÁCTICO: ${mat.title}\nTipo: ${mat.type} | Fase: ${mat.phase}\nDescripción: ${mat.description}\n\n`;
-    navigator.clipboard.writeText(header + (mat.content || ''));
-    showMessage?.(`Material "${mat.title}" copiado al portapapeles.`);
+    const ok = await copyTextToClipboard(header + (mat.content || ''));
+    if (ok) {
+      showMessage?.(`Material "${mat.title}" copiado al portapapeles.`);
+    } else {
+      showMessage?.('No se pudo copiar automáticamente. Por favor selecciónalo manualmente.');
+    }
   };
 
   const handlePrint = () => {

@@ -1081,4 +1081,53 @@ export const handleForceDownload = async (url, fileName = 'documento.pdf') => {
   }
 };
 
+/**
+ * Copia texto al portapapeles de forma universal y resiliente, con soporte para
+ * móviles (iOS Safari, Android Chrome, WebViews) y fallback con execCommand('copy')
+ * y control total contra excepciones de permisos denegados o ventanas sin foco.
+ */
+export async function copyTextToClipboard(text) {
+  const content = String(text ?? '');
+  if (typeof window === 'undefined') return false;
+
+  // 1. Intentar con API moderna Clipboard si está disponible
+  if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+    try {
+      await navigator.clipboard.writeText(content);
+      return true;
+    } catch (e) {
+      // Continuar con fallback compatible
+    }
+  }
+
+  // 2. Fallback universal con textarea temporal y parámetros específicos de iOS
+  try {
+    const el = document.createElement('textarea');
+    el.value = content;
+    el.setAttribute('readonly', '');
+    el.style.position = 'absolute';
+    el.style.left = '-9999px';
+    el.style.fontSize = '16px'; // Prevenir zoom automático en iOS
+    document.body.appendChild(el);
+    el.select();
+    el.setSelectionRange(0, 99999); // Requerido para iOS WebKit
+    const successful = document.execCommand('copy');
+    document.body.removeChild(el);
+    if (successful) return true;
+  } catch (err) {
+    // Continuar con fallback interactivo
+  }
+
+  // 3. Fallback interactivo si el portapapeles está completamente bloqueado por el navegador
+  try {
+    if (typeof window.prompt === 'function') {
+      window.prompt('Copia este texto manualmente:', content);
+      return true;
+    }
+  } catch {}
+
+  return false;
+}
+
+
 

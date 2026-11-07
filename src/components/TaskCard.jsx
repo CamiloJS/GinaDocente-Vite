@@ -6,7 +6,7 @@ import {
 } from './Icons.jsx'
 import {
   compressImage, containsBadWords, checkBadWordsAsync, uploadImageToStorage, uploadRawFileToStorage, deleteFileFromStorage, deleteAllStorageFilesInObject, deleteReplacedStorageFiles, TEACHER_NAME, SECOND_TEACHER_NAME, SECOND_TEACHER_ID, isCamiloTeacher, isTeacherId, getCanonicalTeacherId, getTeacherDisplayName, getItemTeacherId, COMMENT_EMOJIS, REACTION_EMOJIS, FACEBOOK_REACTIONS, splitNameFirstAndLast, FALLBACK_MAP, format12HourTime, formatDateTime12H,
-  isImageLikeFile, convertHeicToJpeg, resolveUserDisplayName, resolveUserPhoto, handleForceDownload
+  isImageLikeFile, convertHeicToJpeg, resolveUserDisplayName, resolveUserPhoto, handleForceDownload, copyTextToClipboard
 } from '../utils/helpers.js'
 import UniversalImage from './UniversalImage.jsx'
 import { isImageLikeUrl, IMAGE_EXTENSIONS_REGEX, getKnownConvertedUrl } from '../utils/heicConverter.js'
@@ -441,14 +441,14 @@ const TaskCard = React.memo(({
         } catch (e) {}
     };
 
-    const handleCopyPostLink = (e) => {
+    const handleCopyPostLink = async (e) => {
         if (e) e.stopPropagation();
-        try {
-            const url = `${window.location.origin}${window.location.pathname}#post/${task.id}`;
-            navigator.clipboard.writeText(url);
+        const url = `${window.location.origin}${window.location.pathname}#post/${task.id}`;
+        const ok = await copyTextToClipboard(url);
+        if (ok) {
             showMessage("✅ ¡Enlace de la publicación copiado al portapapeles!");
-        } catch (err) {
-            showMessage("Enlace: " + window.location.origin + window.location.pathname + '#post/' + task.id);
+        } else {
+            showMessage("Enlace: " + url);
         }
     };
 

@@ -25,7 +25,7 @@ import {
   uploadImageToStorage, uploadRawFileToStorage, deleteFileFromStorage, deleteFilesFromStorage,
   deleteAllStorageFilesInObject, deleteReplacedStorageFiles,
   speakText, splitNameFirstAndLast, format12HourTime, formatDateTime12H,
-  isImageLikeFile, isHeicFile, convertHeicToJpeg, resolveUserDisplayName, resolveUserPhoto, handleForceDownload
+  isImageLikeFile, isHeicFile, convertHeicToJpeg, resolveUserDisplayName, resolveUserPhoto, handleForceDownload, copyTextToClipboard
 } from './utils/helpers.js'
 import UniversalImage from './components/UniversalImage.jsx'
 import {
@@ -1816,27 +1816,11 @@ function App() {
   };
 
   const handleCopy = async (text) => {
-    try {
-      if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text || '');
-        showMessage("Copiado al portapapeles");
-        return;
-      }
-      throw new Error("Clipboard API not available");
-    } catch (err) {
-      try {
-        const textarea = document.createElement('textarea');
-        textarea.value = text || '';
-        textarea.style.position = 'fixed';
-        textarea.style.opacity = '0';
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-        showMessage("Copiado al portapapeles");
-      } catch (e) {
-        showMessage("No se pudo copiar. Selecciona el texto manualmente.");
-      }
+    const ok = await copyTextToClipboard(text);
+    if (ok) {
+      showMessage("Copiado al portapapeles");
+    } else {
+      showMessage("No se pudo copiar. Selecciona el texto manualmente.");
     }
   };
 
@@ -8801,9 +8785,9 @@ Escribe en español con tono pedagógico moderno.`;
                                         <div className="pt-1 flex items-center justify-between">
                                           <button
                                             type="button"
-                                            onClick={() => {
-                                              navigator.clipboard.writeText(mat.content || '');
-                                              showMessage('Contenido del material copiado.');
+                                            onClick={async () => {
+                                              const ok = await copyTextToClipboard(mat.content || '');
+                                              showMessage(ok ? 'Contenido del material copiado.' : 'No se pudo copiar automáticamente.');
                                             }}
                                             className="text-[11px] font-bold text-purple-700 hover:underline flex items-center gap-1 cursor-pointer"
                                           >
@@ -8879,9 +8863,9 @@ Escribe en español con tono pedagógico moderno.`;
 
                             <button
                               type="button"
-                              onClick={() => {
-                                navigator.clipboard.writeText(syllabusAssistantModal.content);
-                                showMessage("Contenido copiado al portapapeles.");
+                              onClick={async () => {
+                                const ok = await copyTextToClipboard(syllabusAssistantModal.content);
+                                showMessage(ok ? "Contenido copiado al portapapeles." : "No se pudo copiar automáticamente.");
                               }}
                               className="px-3.5 py-2 rounded-xl bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-bold text-xs flex items-center gap-1.5 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors shadow-2xs"
                             >
@@ -14674,14 +14658,10 @@ Escribe en español con tono pedagógico moderno.`;
                                 </div>
                                 <button
                                     type="button"
-                                    onClick={() => {
+                                    onClick={async () => {
                                         const demoUrl = `${window.location.origin}${window.location.pathname}#demo`;
-                                        try {
-                                            navigator.clipboard.writeText(demoUrl);
-                                            showMessage("Enlace copiado.");
-                                        } catch (e) {
-                                            showMessage("Enlace: " + demoUrl);
-                                        }
+                                        const ok = await copyTextToClipboard(demoUrl);
+                                        showMessage(ok ? "Enlace copiado." : "Enlace: " + demoUrl);
                                     }}
                                     className="py-2 px-3.5 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white shadow-sm transition-transform active:scale-95 flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
                                 >
@@ -14719,14 +14699,10 @@ Escribe en español con tono pedagógico moderno.`;
                                 </div>
                                 <button
                                     type="button"
-                                    onClick={() => {
+                                    onClick={async () => {
                                         const demoTeacherUrl = `${window.location.origin}${window.location.pathname}#demo-docente`;
-                                        try {
-                                            navigator.clipboard.writeText(demoTeacherUrl);
-                                            showMessage("Enlace copiado.");
-                                        } catch (e) {
-                                            showMessage("Enlace: " + demoTeacherUrl);
-                                        }
+                                        const ok = await copyTextToClipboard(demoTeacherUrl);
+                                        showMessage(ok ? "Enlace copiado." : "Enlace: " + demoTeacherUrl);
                                     }}
                                     className="py-2 px-3.5 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-sm transition-transform active:scale-95 flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
                                 >

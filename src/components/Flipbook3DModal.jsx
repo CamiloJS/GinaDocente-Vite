@@ -579,20 +579,28 @@ export default function Flipbook3DModal({
     // Sync fullscreen state with browser fullscreenchange event
     useEffect(() => {
         const onFsChange = () => {
-            setIsFullscreen(Boolean(document.fullscreenElement));
+            setIsFullscreen(Boolean(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement));
         };
         document.addEventListener('fullscreenchange', onFsChange);
-        return () => document.removeEventListener('fullscreenchange', onFsChange);
+        document.addEventListener('webkitfullscreenchange', onFsChange);
+        return () => {
+            document.removeEventListener('fullscreenchange', onFsChange);
+            document.removeEventListener('webkitfullscreenchange', onFsChange);
+        };
     }, []);
 
     // Fullscreen toggle
     const toggleFullscreen = async () => {
+        const el = modalRootRef.current;
+        const isFs = Boolean(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
         try {
-            if (!document.fullscreenElement && modalRootRef.current) {
-                await modalRootRef.current.requestFullscreen();
+            if (!isFs && el) {
+                const req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+                await req?.call(el);
                 setIsFullscreen(true);
-            } else if (document.fullscreenElement) {
-                await document.exitFullscreen();
+            } else if (isFs) {
+                const exit = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+                await exit?.call(document);
                 setIsFullscreen(false);
             }
         } catch {

@@ -197,6 +197,11 @@ const TasksTab = React.memo(({
             readingAmbientPlayer.stop({ fadeOutDuration: 0.5 });
             setBook3dPreviewingAmbient(false);
         }
+        return () => {
+            if (book3dPreviewingAmbient) {
+                readingAmbientPlayer.stop({ fadeOutDuration: 0.5 });
+            }
+        };
     }, [isFormExpanded, postType, book3dPreviewingAmbient]);
 
     const handleSwitchBook3dMode = (nextMode) => {

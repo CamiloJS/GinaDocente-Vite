@@ -32,7 +32,7 @@ export const GeniallyEmbedPlayer = ({
 
   React.useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(Boolean(document.fullscreenElement));
+      setIsFullscreen(Boolean(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement));
     };
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
@@ -52,12 +52,22 @@ export const GeniallyEmbedPlayer = ({
 
   if (!cleanUrl) return null;
 
-  const toggleFullscreen = () => {
-    if (!containerRef.current) return;
-    if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen?.().then(() => setIsFullscreen(true)).catch(() => {});
-    } else {
-      document.exitFullscreen?.().then(() => setIsFullscreen(false)).catch(() => {});
+  const toggleFullscreen = async () => {
+    const el = containerRef.current;
+    if (!el) return;
+    const isFs = Boolean(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
+    try {
+      if (!isFs) {
+        const req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+        await req?.call(el);
+        setIsFullscreen(true);
+      } else {
+        const exit = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+        await exit?.call(document);
+        setIsFullscreen(false);
+      }
+    } catch (e) {
+      setIsFullscreen(v => !v);
     }
   };
 

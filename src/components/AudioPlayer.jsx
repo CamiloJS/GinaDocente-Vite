@@ -80,12 +80,20 @@ export const AudioPlayer = ({
       setIsPlaying(true)
     }
 
+    const handleError = () => {
+      if (activeGlobalAudio === audio) {
+        activeGlobalAudio = null;
+      }
+      setIsPlaying(false);
+    };
+
     audio.addEventListener('loadedmetadata', handleLoadedMetadata)
     audio.addEventListener('durationchange', handleDurationChange)
     audio.addEventListener('timeupdate', handleTimeUpdate)
     audio.addEventListener('ended', handleEnded)
     audio.addEventListener('pause', handlePause)
     audio.addEventListener('play', handlePlay)
+    audio.addEventListener('error', handleError)
 
     return () => {
       if (activeGlobalAudio === audio) {
@@ -98,6 +106,7 @@ export const AudioPlayer = ({
       audio.removeEventListener('ended', handleEnded)
       audio.removeEventListener('pause', handlePause)
       audio.removeEventListener('play', handlePlay)
+      audio.removeEventListener('error', handleError)
     }
   }, [src])
 

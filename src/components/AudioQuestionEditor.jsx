@@ -18,7 +18,7 @@ const AudioQuestionEditor = ({ audioUrl = '', onChange, isDarkMode = false, fold
       if (audioUrl) deleteFileFromStorage(audioUrl).catch(() => {})
       onChange(grabadora.audioUrl)
     }
-  }, [grabadora.audioUrl])
+  }, [grabadora.audioUrl, audioUrl, onChange])
 
   const subirArchivo = async (file) => {
     if (!file) return
