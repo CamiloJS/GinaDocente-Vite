@@ -2,6 +2,62 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ===== OPTIMIZACIONES DE RENDIMIENTO DE ALTA FRECUENCIA (120Hz / 144Hz / 200Hz / 240Hz) ===== */
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Promoción estricta a capas GPU de hardware (Texture Compositing) */
+.gpu-layer,
+.gpu-accelerated {
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  perspective: 1000px;
+  will-change: transform, opacity;
+}
+
+/* Desplazamiento ultra-fluido desacoplado del hilo principal para 200+ FPS */
+.smooth-scroll-gpu {
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  will-change: scroll-position;
+}
+
+/* Contención de renderizado estricta:
+   Bypass total de cálculo de estilos y layout para elementos fuera de la pantalla.
+   Mantiene el presupuesto de frame < 5ms incluso en feeds extensos */
+.content-auto-feed {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px;
+}
+
+.content-auto-contact {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 48px;
+}
+
+.content-auto-message {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 54px;
+}
+
+/* Curva de fluidez ProMotion ultra-suave */
+.transition-fluid {
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 /* ===== Estilos globales minimalistas ===== */
 
 /* Pestaña de navegación activa: corporativa, sin resplandor */

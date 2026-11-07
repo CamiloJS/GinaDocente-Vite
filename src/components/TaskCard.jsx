@@ -2280,7 +2280,7 @@ const TaskCard = React.memo(({
     };
 
     return (
-        <div ref={cardRef} className={`rounded-3xl border transition-all duration-300 p-4 sm:p-5 mb-4 shadow-xs hover:shadow-md relative overflow-hidden group ${
+        <div ref={cardRef} className={`rounded-3xl border transition-all duration-300 p-4 sm:p-5 mb-4 shadow-xs hover:shadow-md relative overflow-hidden group gpu-layer ${
             isDarkMode 
                 ? 'bg-gray-850 border-gray-700/80 text-gray-100' 
                 : 'bg-white border-gray-200/90 text-gray-800'
@@ -4370,7 +4370,7 @@ const TaskCard = React.memo(({
                         )}
 
                         {/* Contenedor desplazable que integra la Publicación Completa y los Comentarios */}
-                        <div className="flex-1 overflow-y-auto space-y-4 pr-1.5 mb-3 scroll-smooth">
+                        <div className="flex-1 overflow-y-auto space-y-4 pr-1.5 mb-3 scroll-smooth smooth-scroll-gpu">
                             {/* Tarjeta de Publicación Completa */}
                             <div className={`p-4 sm:p-5 rounded-2xl border shadow-xs ${
                                 isDarkMode 
@@ -4649,7 +4649,7 @@ const TaskCard = React.memo(({
                                     const subText = isLateC ? "Entregado tarde" : "Entregado a tiempo";
 
                                     return (
-                                        <div key={cid} className={`p-3 rounded-2xl text-xs border shadow-xs transition-all ${
+                                        <div key={cid} className={`p-3 rounded-2xl text-xs border shadow-xs transition-all content-auto-message ${
                                             isDarkMode ? 'bg-gray-800/60 border-gray-700/70' : 'bg-gray-50/80 border-gray-200/80'
                                         }`}>
                                             <div className="flex items-center justify-between">
@@ -4678,7 +4678,7 @@ const TaskCard = React.memo(({
 
                                 // Vista completa para la docente, foros públicos y autor de la entrega
                                 return (
-                                    <div key={cid} className={`rounded-2xl text-xs border shadow-2xs group/comment transition-all ${
+                                    <div key={cid} className={`rounded-2xl text-xs border shadow-2xs group/comment transition-all content-auto-message ${
                                         isReply 
                                             ? (isDarkMode ? 'p-2.5 sm:p-3 bg-gray-800/90 border-gray-700/70 hover:border-gray-600' : 'p-2.5 sm:p-3 bg-gray-50/90 border-gray-200/80 hover:bg-gray-100/70') 
                                             : (isDarkMode ? 'p-3.5 bg-gray-800/80 border-gray-700/80 hover:bg-gray-800' : 'p-3.5 bg-white border-gray-200/90 hover:bg-gray-50/70')

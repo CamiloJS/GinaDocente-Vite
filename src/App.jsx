@@ -15876,7 +15876,7 @@ Escribe en español con tono pedagógico moderno.`;
                       )}
 
                       {/* Sección de Grupos y Contactos con Scroll Independiente Fluido */}
-                      <div className="flex-1 overflow-y-auto overflow-x-hidden space-y-3.5 pr-1 min-h-0">
+                      <div className="flex-1 overflow-y-auto overflow-x-hidden space-y-3.5 pr-1 min-h-0 smooth-scroll-gpu">
                           {(() => {
                               const filteredGroups = myGroups?.filter(g => g.name?.toLowerCase().includes(chatSearchQuery.toLowerCase())) || [];
                               const filteredUsers = sortUsersByPresence(allChatUsers?.filter(u => u.name?.toLowerCase().includes(chatSearchQuery.toLowerCase())) || []);
@@ -15912,7 +15912,7 @@ Escribe en español con tono pedagógico moderno.`;
                                                       const chatId = `group_${g.id}`;
                                                       const isUnread = unreadChats[chatId];
                                                       return (
-                                                          <button key={g.id} onClick={() => { handleOpenChat({ id: chatId, name: g.name, type: 'group' }); setIsChatMinimized(false); }} className={`w-full flex items-center gap-2.5 p-1.5 rounded-xl transition-colors ${isDarkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}>
+                                                          <button key={g.id} onClick={() => { handleOpenChat({ id: chatId, name: g.name, type: 'group' }); setIsChatMinimized(false); }} className={`w-full flex items-center gap-2.5 p-1.5 rounded-xl transition-colors content-auto-contact ${isDarkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}>
                                                               <div className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white shrink-0 shadow-2xs">
                                                               {g.avatarUrl ? (
                                                                   <img loading="lazy" decoding="async" src={g.avatarUrl} alt={g.name} className="w-full h-full object-cover" />
@@ -15969,7 +15969,7 @@ Escribe en español con tono pedagógico moderno.`;
                                                                   handleOpenChat({ id: `dm_${[myChatId, uid].sort().join('_')}`, name: uName, type: 'dm', role: isT ? 'teacher' : 'student', otherUserId: uid, targetUserId: uid });
                                                                   setIsChatMinimized(false);
                                                               }}
-                                                              className="block w-full"
+                                                              className="block w-full content-auto-contact"
                                                           >
 <div
                                                               key={u.id}
@@ -17199,7 +17199,7 @@ Escribe en español con tono pedagógico moderno.`;
                                       <div className={`absolute inset-0 z-0 transition-colors duration-500 ${currentPrefs.gradient ? 'bg-gradient-to-br ' + currentPrefs.gradient : (isDarkMode ? 'bg-gray-900' : 'bg-gray-50')}`} />
                                       <div className="absolute inset-0 z-0 pointer-events-none mix-blend-overlay" style={{ ...activePattern, color: isDarkMode ? '#ffffff' : '#000000', opacity: 0.06 }} />
 
-                                      <div id="chat-messages-scroll-container" className="relative z-10 flex-1 overflow-y-auto p-3 sm:p-4 space-y-2">
+                                      <div id="chat-messages-scroll-container" className="relative z-10 flex-1 overflow-y-auto p-3 sm:p-4 space-y-2 smooth-scroll-gpu">
                                           {chatMessages.length === 0 && (
                                               <div className="flex flex-col items-center justify-center h-full text-center py-10 opacity-60">
                                                   <MessageCircle size={36} className="text-gray-400 mb-2"/>
@@ -17286,7 +17286,7 @@ Escribe en español con tono pedagógico moderno.`;
                                                               </span>
                                                           </div>
                                                       )}
-                                                      <div id={`msg-${m.id}`} className={`flex flex-col w-full group relative transition-all duration-200 animate-in fade-in slide-in-from-bottom-1 ${isMe ? 'items-end' : 'items-start'} ${isLastInGroup ? 'mb-2.5' : 'mb-[2px]'}`}>
+                                                      <div id={`msg-${m.id}`} className={`flex flex-col w-full group relative transition-all duration-200 animate-in fade-in slide-in-from-bottom-1 content-auto-message ${isMe ? 'items-end' : 'items-start'} ${isLastInGroup ? 'mb-2.5' : 'mb-[2px]'}`}>
                                                           
                                                           {!isMe && activeChat.type === 'group' && isFirstInGroup && (
                                                                <ProfileHoverCard

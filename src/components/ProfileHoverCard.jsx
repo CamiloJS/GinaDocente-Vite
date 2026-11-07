@@ -230,7 +230,7 @@ export const ProfileHoverCard = ({
             width: '280px',
             zIndex: 100050
           }}
-          className={`rounded-2xl border shadow-2xl overflow-hidden backdrop-blur-md animate-in fade-in zoom-in-95 duration-150 select-none text-left ${
+          className={`rounded-2xl border shadow-2xl overflow-hidden backdrop-blur-md animate-in fade-in zoom-in-95 duration-150 select-none text-left gpu-layer ${
             isDarkMode 
               ? 'bg-gray-900/95 border-gray-700 text-gray-100 shadow-black/80' 
               : 'bg-white/95 border-gray-200 text-gray-900 shadow-xl'

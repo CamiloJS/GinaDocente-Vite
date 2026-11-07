@@ -2669,7 +2669,7 @@ Descripción original: ${taskDesc}`;
             {filteredPinnedTasks.length > 0 && (
                 <div className="space-y-4 mb-5 transition-all duration-500 ease-out">
                     {filteredPinnedTasks.map(task => (
-                        <div key={'pinned-' + task.id} className="transition-all duration-500 ease-out transform animate-in fade-in slide-in-from-top-4">
+                        <div key={'pinned-' + task.id} className="transition-all duration-500 ease-out transform animate-in fade-in slide-in-from-top-4 content-auto-feed">
                             <TaskCard 
                                 task={{...task, type: task.type || 'task', isPinned: true}} 
                                 role={role} 
@@ -2716,7 +2716,7 @@ Descripción original: ${taskDesc}`;
             {/* Publicaciones y tareas regulares */}
             <div className="space-y-4 transition-all duration-300">
                 {regularTasksToRender.map(task => (
-                    <div key={task.id} className="transition-all duration-300 ease-out">
+                    <div key={task.id} className="transition-all duration-300 ease-out content-auto-feed">
                         <TaskCard 
                             task={{...task, type: task.type || 'task'}} 
                             role={role} 
