@@ -1989,7 +1989,7 @@ const TaskCard = React.memo(({
             }
 
             const newComment = { 
-                id: Date.now().toString() + Math.random().toString(36).substr(2, 5), 
+                id: Date.now().toString() + Math.random().toString(36).substring(2, 7), 
                 author: role === 'teacher' ? (loggedInName || getTeacherDisplayName(activeTeacherId)) : resolveUserDisplayName({ author: loggedInName, authorUsername: myChatId, authorId: myChatId || currentUser?.uid, authorRole: 'student' }, userMappings, loggedInName), 
                 authorUsername: role === 'teacher' ? (activeTeacherId || 'teacher') : (myChatId || (currentUser?.email ? currentUser.email.split('@')[0] : (currentUserId || ''))),
                 authorId: role === 'teacher' ? (activeTeacherId || 'teacher') : (myChatId || currentUser?.uid || currentUserId || ''),

@@ -778,7 +778,7 @@ export async function executeTeacherAssistantAction(parsed, context) {
       });
 
       const atRisk = Object.entries(studentMap)
-        .map(([name, scores]) => ({ name, avg: scores.reduce((a, b) => a + b, 0) / scores.length }))
+        .map(([name, scores]) => ({ name, avg: scores.length > 0 ? (scores.reduce((a, b) => a + b, 0) / scores.length) : 0 }))
         .filter(s => s.avg < 3.0)
         .sort((a, b) => a.avg - b.avg);
 
@@ -827,7 +827,7 @@ export async function executeTeacherAssistantAction(parsed, context) {
       });
 
       const top = Object.entries(studentMap)
-        .map(([name, scores]) => ({ name, avg: scores.reduce((a, b) => a + b, 0) / scores.length }))
+        .map(([name, scores]) => ({ name, avg: scores.length > 0 ? (scores.reduce((a, b) => a + b, 0) / scores.length) : 0 }))
         .sort((a, b) => b.avg - a.avg)
         .slice(0, 5);
 

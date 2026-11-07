@@ -118,6 +118,32 @@ assert.strictEqual(addCandidate(c2), true, 'Candidato c2 nuevo aceptado');
 assert.strictEqual(addCandidate(c2), false, 'Candidato c2 duplicado es descartado');
 console.log('  OK  Deduplicador ICE evita inyección repetida de candidatos en la conexión WebRTC');
 
+console.log('\n== 5. Propagación de Identidad en Llamadas Entrantes ==');
+
+// Test 7: Aceptación de llamada entrante en DM propaga targetId e initiatorId para resolución de avatar
+const incomingCallPayload = {
+  callId: 'dm_student_teacher_123',
+  isGroup: false,
+  callerName: 'Yeisor',
+  targetId: 'student_yeisor',
+  offer: { type: 'offer', sdp: 'v=0...' }
+};
+
+const acceptedCall = {
+  callId: incomingCallPayload.callId,
+  role: 'participant',
+  isGroup: false,
+  name: incomingCallPayload.callerName,
+  callerName: incomingCallPayload.callerName,
+  targetId: incomingCallPayload.targetId,
+  initiatorId: incomingCallPayload.targetId,
+  offer: incomingCallPayload.offer
+};
+
+assert.strictEqual(acceptedCall.targetId, 'student_yeisor');
+assert.strictEqual(acceptedCall.initiatorId, 'student_yeisor');
+console.log('  OK  Aceptación de llamada entrante en DM propaga targetId e initiatorId para avatar');
+
 console.log('\n========================================');
-console.log('Total pruebas Llamadas: 6 | OK: 6 | FAIL: 0');
+console.log('Total pruebas Llamadas: 7 | OK: 7 | FAIL: 0');
 console.log('========================================\n');

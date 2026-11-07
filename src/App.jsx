@@ -4519,6 +4519,8 @@ useEffect(() => {
                       isGroup: false,
                       name: call.callerName,
                       callerName: call.callerName,
+                      targetId: call.targetId,
+                      initiatorId: call.targetId,
                       offer: call.offer
                   })
               }
