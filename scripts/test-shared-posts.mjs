@@ -164,7 +164,19 @@ console.log('\n== 2. Parseo y Extracción de Publicaciones Compartidas (parseSha
   console.log('  OK  Mensajes con #task/ se asocian al tipo Tarea y acción "Ir a la tarea"');
 }
 
-// Prueba 2.4: Mensaje regular sin publicación compartida devuelve null
+// Prueba 2.4: Mensaje sin asteriscos extrae el título correctamente
+{
+  const noAsteriskMsg = {
+    text: '📌 MOVIE FORUM #3\nhttps://englishtech.vercel.app/#post/rjPM1hpWrjbhCVU5cZLX'
+  };
+  const parsed = parseSharedPost(noAsteriskMsg);
+  assert.ok(parsed);
+  assert.equal(parsed.id, 'rjPM1hpWrjbhCVU5cZLX');
+  assert.equal(parsed.title, 'MOVIE FORUM #3');
+  console.log('  OK  Mensajes sin asteriscos (📌 Título) extraen el título correctamente');
+}
+
+// Prueba 2.5: Mensaje regular sin publicación compartida devuelve null
 {
   const normalMsg = { text: 'Hola profe, ¿a qué hora es la clase de mañana?' };
   const parsed = parseSharedPost(normalMsg);
@@ -246,5 +258,5 @@ console.log('\n== 3. Prevención de Estado de Edición Erróneo y Sincronizació
 }
 
 console.log('\n========================================');
-console.log('Total pruebas Compartir en Chat: 12 | OK: 12 | FAIL: 0');
+console.log('Total pruebas Compartir en Chat: 13 | OK: 13 | FAIL: 0');
 console.log('========================================\n');

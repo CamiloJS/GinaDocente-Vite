@@ -8,7 +8,7 @@ import {
 import goldenRatioTemplate from '../templates/goldenRatioOva.json';
 import { db, appId, collection, doc, setDoc, getDocs, deleteDoc, query, orderBy, limit } from '../firebase/config.js';
 import { DEMO_TTL_MS, isDemoItemExpired } from '../utils/demoData.js';
-import { getCanonicalTeacherId, getTeacherDisplayName, getTeacherUsername, getItemTeacherId, deleteAllStorageFilesInObject } from '../utils/helpers.js';
+import { getCanonicalTeacherId, getTeacherDisplayName, getTeacherUsername, getItemTeacherId, deleteAllStorageFilesInObject, copyToClipboard } from '../utils/helpers.js';
 
 export default function OvaStudioTool({
   isDarkMode = false,
@@ -453,15 +453,15 @@ export default function OvaStudioTool({
     const base = window.location.origin + window.location.pathname;
     const shareUrl = `${base}#ova?id=${encodeURIComponent(targetId)}`;
 
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(shareUrl).then(() => {
+    copyToClipboard(shareUrl).then(ok => {
+      if (ok) {
         showMessage('Enlace público copiado: ¡los estudiantes pueden verlo sin cuenta!');
-      }).catch(() => {
+      } else {
         prompt('Copia este enlace para compartir el OVA:', shareUrl);
-      });
-    } else {
+      }
+    }).catch(() => {
       prompt('Copia este enlace para compartir el OVA:', shareUrl);
-    }
+    });
   };
 
   // Save new 4-digit PIN

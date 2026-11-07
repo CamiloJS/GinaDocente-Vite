@@ -1111,8 +1111,11 @@ const TaskCard = React.memo(({
 
     const updateTaskDoc = async (updates) => {
         const { isSynthesizedFeedItem, ...cleanBase } = task;
+        const sanitizedUpdates = sanitizeFirestoreData ? sanitizeFirestoreData(updates) : updates;
+        const sanitizedFullDoc = sanitizeFirestoreData ? sanitizeFirestoreData({ ...cleanBase, ...updates }) : { ...cleanBase, ...updates };
+
         if (isDemoTask) {
-            const nextTask = { ...cleanBase, ...updates };
+            const nextTask = { ...cleanBase, ...sanitizedUpdates };
             if (typeof setTasks === 'function') {
                 setTasks(prev => {
                     const list = prev || [];
@@ -1129,12 +1132,12 @@ const TaskCard = React.memo(({
             try { await signInAnonymously(auth); } catch { /* continuar */ }
         }
         if (isSynthesizedFeedItem) {
-            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), { ...cleanBase, ...updates }, { merge: true });
+            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), sanitizedFullDoc, { merge: true });
         } else {
             try {
-                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), updates);
+                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), sanitizedUpdates);
             } catch {
-                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), { ...cleanBase, ...updates }, { merge: true });
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), sanitizedFullDoc, { merge: true });
             }
         }
         if (typeof setTasks === 'function') {
@@ -1142,8 +1145,8 @@ const TaskCard = React.memo(({
                 const list = prev || [];
                 const exists = list.some(t => String(t.id) === String(task.id));
                 return exists
-                    ? list.map(t => String(t.id) === String(task.id) ? { ...cleanBase, ...updates } : t)
-                    : [{ ...cleanBase, ...updates }, ...list];
+                    ? list.map(t => String(t.id) === String(task.id) ? { ...cleanBase, ...sanitizedUpdates } : t)
+                    : [{ ...cleanBase, ...sanitizedUpdates }, ...list];
             });
         }
     };
@@ -1690,9 +1693,8 @@ const TaskCard = React.memo(({
     };
 
     const togglePin = async () => {
+        const nextPinned = !task.isPinned;
         try {
-            const nextPinned = !task.isPinned;
-            
             // Si vamos a fijar la tarjeta, reproducimos la animación física de despegue y vuelo hacia la cima
             if (nextPinned && cardRef.current) {
                 try { pinAnimCleanupRef.current?.(); } catch (e) { /* nada */ }
@@ -1759,9 +1761,10 @@ const TaskCard = React.memo(({
             showMessage(nextPinned ? "Publicación fijada al inicio del muro" : "Publicación desfijada");
         } catch (err) {
             if (!isDemoTask) {
-                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), { ...task, isPinned: !task.isPinned }, { merge: true });
+                const pinUpdates = sanitizeFirestoreData ? sanitizeFirestoreData({ isPinned: nextPinned }) : { isPinned: nextPinned };
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), pinUpdates, { merge: true });
             }
-            showMessage(task.isPinned ? "Publicación desfijada" : "Publicación fijada al inicio del muro");
+            showMessage(nextPinned ? "Publicación fijada al inicio del muro" : "Publicación desfijada");
         }
     };
 

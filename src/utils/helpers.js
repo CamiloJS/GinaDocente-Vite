@@ -450,7 +450,7 @@ export const isDemoSessionActive = () => {
     // ignore storage access errors
   }
   return false;
-};
+}
 
 export const uploadImageToStorage = async (fileOrBase64, folderName) => {
   if (!fileOrBase64) return '';
@@ -1128,6 +1128,8 @@ export async function copyTextToClipboard(text) {
 
   return false;
 }
+
+export const copyToClipboard = copyTextToClipboard;
 
 /**
  * Sanea recursivamente cualquier estructura de datos para su almacenamiento seguro en Firestore.

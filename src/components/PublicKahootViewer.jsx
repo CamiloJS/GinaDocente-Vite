@@ -21,7 +21,7 @@ import {
   buildKahootLeaderboard,
   buildPublicKahootUrl,
 } from '../utils/kahootEngine.js';
-import { containsBadWords, checkBadWordsAsync } from '../utils/helpers.js';
+import { containsBadWords, checkBadWordsAsync, copyToClipboard } from '../utils/helpers.js';
 import {
   auth,
   signInAnonymously,
@@ -443,8 +443,12 @@ const PublicKahootViewer = ({
             onClick={async () => {
               const shareUrl = buildPublicKahootUrl(pinInput);
               try {
-                await navigator.clipboard.writeText(shareUrl);
-                showMessage(`🔗 Enlace copiado: ${shareUrl}`);
+                const ok = await copyToClipboard(shareUrl);
+                if (ok) {
+                  showMessage(`🔗 Enlace copiado: ${shareUrl}`);
+                } else {
+                  showMessage(`🔗 Enlace: ${shareUrl}`);
+                }
               } catch {
                 showMessage(`🔗 Enlace: ${shareUrl}`);
               }

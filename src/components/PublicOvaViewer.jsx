@@ -7,6 +7,7 @@ import {
 import goldenRatioTemplate from '../templates/goldenRatioOva.json';
 import { db, appId, auth, signInAnonymously, doc, getDoc, setDoc } from '../firebase/config.js';
 import { isDemoItemExpired } from '../utils/demoData.js';
+import { copyToClipboard } from '../utils/helpers.js';
 
 export default function PublicOvaViewer({
   ovaId = null,
@@ -226,15 +227,15 @@ export default function PublicOvaViewer({
         const base = window.location.origin + window.location.pathname;
         const targetId = id || ovaData?.id || ovaId || 'ova-golden-ratio-01';
         const shareUrl = `${base}#ova?id=${encodeURIComponent(targetId)}`;
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(shareUrl).then(() => {
+        copyToClipboard(shareUrl).then(ok => {
+          if (ok) {
             showToast('¡Enlace público copiado! Los estudiantes pueden verlo sin cuenta.');
-          }).catch(() => {
+          } else {
             prompt('Copia este enlace para compartir el OVA:', shareUrl);
-          });
-        } else {
+          }
+        }).catch(() => {
           prompt('Copia este enlace para compartir el OVA:', shareUrl);
-        }
+        });
       } else if (type === 'OVA_SAVED' && project && isUnlocked) {
         const updatedProject = { ...project, updatedAt: Date.now() };
         // Save locally

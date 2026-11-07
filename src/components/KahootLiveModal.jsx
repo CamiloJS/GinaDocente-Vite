@@ -60,7 +60,7 @@ import {
   playRevealResultSound,
   playPodiumFanfare,
 } from '../utils/kahootAudio.js';
-import { containsBadWords, checkBadWordsAsync } from '../utils/helpers.js';
+import { containsBadWords, checkBadWordsAsync, copyToClipboard } from '../utils/helpers.js';
 import { auth, signInAnonymously, doc, onSnapshot, updateDoc } from '../firebase/config.js';
 import { saveDemoSandboxItem } from '../utils/demoData.js';
 
@@ -1609,8 +1609,12 @@ const KahootLiveModal = ({
   const handleCopyPublicLink = async () => {
     const url = buildPublicKahootUrl(kahoot.pin || '482915');
     try {
-      await navigator.clipboard.writeText(url);
-      showMessage?.(`🔗 Enlace público copiado: ${url}`);
+      const ok = await copyToClipboard(url);
+      if (ok) {
+        showMessage?.(`🔗 Enlace público copiado: ${url}`);
+      } else {
+        showMessage?.(`🔗 Enlace público: ${url}`);
+      }
     } catch {
       showMessage?.(`🔗 Enlace público: ${url}`);
     }

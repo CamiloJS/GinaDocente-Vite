@@ -1,7 +1,7 @@
 // src/components/TeacherToolsTab.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import confetti from 'canvas-confetti';
-import { speakText, isTeacherId } from '../utils/helpers.js';
+import { speakText, isTeacherId, copyToClipboard } from '../utils/helpers.js';
 import {
   Timer, Dices, Coins, Shuffle, Play, Pause, RotateCcw, Plus, Minus,
   UsersGroupIcon, Users, CheckCheck, Copy, Volume2, VolumeX, Sparkles,
@@ -477,7 +477,7 @@ export default function TeacherToolsTab({
       });
       text += `\n`;
     });
-    if (navigator.clipboard?.writeText) { navigator.clipboard.writeText(text).catch(() => {}); }
+    copyToClipboard(text).catch(() => {});
     showMessage('Lista de grupos copiada al portapapeles.');
   };
 

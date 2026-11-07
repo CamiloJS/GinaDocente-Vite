@@ -196,11 +196,17 @@ export const fetchCurrentlyPlaying = async () => {
   if (!auth?.accessToken) return null;
 
   // Si el token está por expirar (dentro de los próximos 60s), refrescarlo
-  if (auth.expiresAt && Date.now() > auth.expiresAt - 60000 && auth.refreshToken) {
-    const refreshed = await refreshSpotifyToken(auth.refreshToken);
-    if (refreshed) {
-      auth = refreshed;
+  if (auth.expiresAt && Date.now() > auth.expiresAt - 60000) {
+    if (auth.refreshToken) {
+      const refreshed = await refreshSpotifyToken(auth.refreshToken);
+      if (refreshed) {
+        auth = refreshed;
+      } else {
+        clearStoredSpotifyAuth();
+        return null;
+      }
     } else {
+      clearStoredSpotifyAuth();
       return null;
     }
   }
@@ -239,11 +245,15 @@ export const fetchCurrentlyPlaying = async () => {
       };
     }
 
-    if (response.status === 401 && auth.refreshToken) {
-      const refreshed = await refreshSpotifyToken(auth.refreshToken);
-      if (refreshed) {
-        return fetchCurrentlyPlaying();
+    if (response.status === 401) {
+      if (auth.refreshToken) {
+        const refreshed = await refreshSpotifyToken(auth.refreshToken);
+        if (refreshed) {
+          return fetchCurrentlyPlaying();
+        }
       }
+      clearStoredSpotifyAuth();
+      return null;
     }
   } catch (err) {
     console.warn('Error al consultar Spotify currently playing:', err);

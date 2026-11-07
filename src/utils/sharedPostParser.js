@@ -32,8 +32,8 @@ export const parseSharedPost = (message, tasks = []) => {
 
   const foundTask = Array.isArray(tasks) ? tasks.find(t => String(t.id) === String(postId)) : null;
 
-  // Extraer título si venía en formato `📌 *Título*`
-  const titleMatch = text.match(/📌\s*\*([^*]+)\*/);
+  // Extraer título si venía en formato `📌 *Título*` o `📌 Título`
+  const titleMatch = text.match(/📌\s*\*?([^*\n\r]+?)\*?(?:\n|\r|$)/);
   const extractedTitle = titleMatch ? titleMatch[1].trim() : (foundTask?.title || 'Publicación');
 
   const itemType = foundTask?.type || 'post';

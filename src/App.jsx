@@ -17443,7 +17443,7 @@ Escribe en español con tono pedagógico moderno.`;
                                                                                       const sharedItem = parseSharedPost(m, tasks);
                                                                                       if (sharedItem) {
                                                                                           const cleanIntro = (m.text || '')
-                                                                                              .replace(/📌\s*\*([^\*]+)\*/g, '')
+                                                                                              .replace(/📌\s*\*?([^\*\n\r]+?)\*?(?:\n|\r|$)/g, '')
                                                                                               .replace(/https?:\/\/[^\s]+#(?:post|task)\/(?:[a-zA-Z0-9_-]+)/g, '')
                                                                                               .trim();
                                                                                           return (
