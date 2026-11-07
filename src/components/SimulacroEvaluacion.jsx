@@ -2,7 +2,7 @@
 // Simulacro (vista previa) de una evaluacion: muestra COMO LA VERA EL ESTUDIANTE
 // antes de publicarla. Es opcional, no guarda nada y no califica.
 // Extra util: un interruptor para que la docente vea las respuestas correctas.
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { glassCard, glassInput } from '../utils/styles.js';
 import { desordenarPalabras } from '../utils/palabras.js';
@@ -30,6 +30,25 @@ export default function SimulacroEvaluacion({ evaluacion = {}, isDarkMode = fals
   const cambiar = (i, valor) => setRespuestas((prev) => ({ ...prev, [i]: valor }));
   const tiempoLimite = evaluacion.timeLimit || 30;
   const fechaEntrega = evaluacion.dueDate ? `${evaluacion.dueDate}${evaluacion.dueTime ? ` · ${evaluacion.dueTime}` : ''}` : 'Sin fecha límite';
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && onClose) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    const originalOverflow = typeof document !== 'undefined' ? document.body.style.overflow : '';
+    if (typeof document !== 'undefined') {
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      if (typeof document !== 'undefined') {
+        document.body.style.overflow = originalOverflow;
+      }
+    };
+  }, [onClose]);
 
   if (typeof document === 'undefined') return null;
 

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
     Plus,
     Trash2,
@@ -38,6 +38,25 @@ export default function BookWordEditor({
     const [uploadingPageIdx, setUploadingPageIdx] = useState(null);
     const fileInputRef = useRef(null);
     const pendingUploadPageRef = useRef(0);
+
+    // Cerrar modales internos con Escape
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                if (urlInputPageIdx !== null) {
+                    setUrlInputPageIdx(null);
+                    setTempImageUrl('');
+                    return;
+                }
+                if (viewAllPages) {
+                    setViewAllPages(false);
+                    return;
+                }
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [urlInputPageIdx, viewAllPages]);
 
     if (!Array.isArray(outline) || outline.length === 0) {
         return null;

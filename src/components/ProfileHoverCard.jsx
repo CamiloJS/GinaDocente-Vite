@@ -87,8 +87,16 @@ export const ProfileHoverCard = ({
           left = rect.right + margin;
           placement = 'right';
         } else {
-          // Ajustar dentro del límite izquierdo visible
-          left = 12;
+          // Si no cabe holgadamente en ninguno, ubicar en el lado con mayor espacio disponible
+          const spaceLeft = rect.left - 12;
+          const spaceRight = window.innerWidth - 12 - rect.right;
+          if (spaceRight >= spaceLeft) {
+            left = Math.min(rect.right + margin, window.innerWidth - cardWidth - 12);
+            placement = 'right';
+          } else {
+            left = Math.max(12, rect.left - cardWidth - margin);
+            placement = 'left';
+          }
         }
       }
 
@@ -230,7 +238,7 @@ export const ProfileHoverCard = ({
             width: '280px',
             zIndex: 100050
           }}
-          className={`rounded-2xl border shadow-2xl overflow-hidden backdrop-blur-md animate-in fade-in zoom-in-95 duration-150 select-none text-left gpu-layer ${
+          className={`rounded-2xl border shadow-2xl max-h-[calc(100vh-24px)] overflow-y-auto custom-scrollbar backdrop-blur-md animate-in fade-in zoom-in-95 duration-150 select-none text-left gpu-layer ${
             isDarkMode 
               ? 'bg-gray-900/95 border-gray-700 text-gray-100 shadow-black/80' 
               : 'bg-white/95 border-gray-200 text-gray-900 shadow-xl'
@@ -239,10 +247,10 @@ export const ProfileHoverCard = ({
         >
           {/* Puente invisible para transición suave del cursor entre el chat y la tarjeta */}
           {coords.placement === 'left' && (
-            <div className="absolute top-0 -right-3 w-3 h-full pointer-events-auto" />
+            <div className="absolute top-0 -right-4 w-4 h-full pointer-events-auto" />
           )}
           {coords.placement === 'right' && (
-            <div className="absolute top-0 -left-3 w-3 h-full pointer-events-auto" />
+            <div className="absolute top-0 -left-4 w-4 h-full pointer-events-auto" />
           )}
 
           {/* Banner de Cabecera con degradado temático */}
@@ -295,7 +303,7 @@ export const ProfileHoverCard = ({
                 {onOpenProfile && (
                   <button
                     type="button"
-                    onClick={() => { setIsOpen(false); onOpenProfile(userId); }}
+                    onClick={() => { closeSelf(); onOpenProfile(userId); }}
                     className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all shadow-2xs cursor-pointer border ${
                       isDarkMode 
                         ? 'bg-gray-800 hover:bg-gray-750 text-blue-400 border-gray-700' 
@@ -309,7 +317,7 @@ export const ProfileHoverCard = ({
                 {!isMe && onOpenChat && (
                   <button
                     type="button"
-                    onClick={() => { setIsOpen(false); onOpenChat(userId, fullName, isTeacher); }}
+                    onClick={() => { closeSelf(); onOpenChat(userId, fullName, isTeacher); }}
                     className="p-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-2xs transition-all cursor-pointer"
                     title="Enviar mensaje privado"
                   >

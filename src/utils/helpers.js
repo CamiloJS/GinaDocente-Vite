@@ -1129,5 +1129,36 @@ export async function copyTextToClipboard(text) {
   return false;
 }
 
+/**
+ * Sanea recursivamente cualquier estructura de datos para su almacenamiento seguro en Firestore.
+ * Firestore rechaza estrictamente cualquier objeto o array que contenga valores 'undefined'.
+ * Esta funcion convierte 'undefined' a 'null', omite funciones y protege contra referencias circulares.
+ */
+export function sanitizeFirestoreData(data, seen = new WeakSet()) {
+  if (data === undefined) return null;
+  if (data === null) return null;
+  if (typeof data !== 'object') {
+    if (typeof data === 'function') return null;
+    return data;
+  }
+  if (data instanceof Date) return data;
+  if (typeof data.toDate === 'function' || typeof data.toMillis === 'function') return data;
+  if (data._methodName) return data;
+  if (seen.has(data)) return null;
+  seen.add(data);
 
+  if (Array.isArray(data)) {
+    return data.map(item => item === undefined ? null : sanitizeFirestoreData(item, seen));
+  }
 
+  const clean = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (typeof value === 'function') continue;
+    if (value === undefined) {
+      clean[key] = null;
+    } else {
+      clean[key] = sanitizeFirestoreData(value, seen);
+    }
+  }
+  return clean;
+}

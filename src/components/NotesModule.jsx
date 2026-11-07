@@ -179,6 +179,56 @@ export default function NotesModule({
     }
   }, [academicGroups, targetGroupId]);
 
+  // Manejo accesible de tecla Escape y bloqueo de scroll para modales de notas
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key !== 'Escape') return;
+      if (notePendingDelete) {
+        setNotePendingDelete(null);
+        return;
+      }
+      if (showColorMenu || showHighlightMenu || showLinkInput) {
+        setShowColorMenu(false);
+        setShowHighlightMenu(false);
+        setShowLinkInput(false);
+        return;
+      }
+      if (isAuditModalOpen) {
+        setIsAuditModalOpen(false);
+        return;
+      }
+      if (activeSheetNoteId) {
+        setActiveSheetNoteId(null);
+        return;
+      }
+      if (isComposerOpen) {
+        setIsComposerOpen(false);
+        setEditingNote(null);
+        return;
+      }
+      if (expandedThreadNoteId) {
+        setExpandedThreadNoteId(null);
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    let originalOverflow = '';
+    const shouldLock = Boolean(isComposerOpen || isAuditModalOpen || activeSheetNoteId || notePendingDelete);
+    if (shouldLock && typeof document !== 'undefined') {
+      originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+    }
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      if (shouldLock && typeof document !== 'undefined') {
+        document.body.style.overflow = originalOverflow || '';
+      }
+    };
+  }, [notePendingDelete, showColorMenu, showHighlightMenu, showLinkInput, isAuditModalOpen, activeSheetNoteId, isComposerOpen, expandedThreadNoteId]);
+
   const currentUserObj = useMemo(() => ({
     role,
     userId: normalizedUserId,

@@ -25,7 +25,7 @@ import {
   uploadImageToStorage, uploadRawFileToStorage, deleteFileFromStorage, deleteFilesFromStorage,
   deleteAllStorageFilesInObject, deleteReplacedStorageFiles,
   speakText, splitNameFirstAndLast, format12HourTime, formatDateTime12H,
-  isImageLikeFile, isHeicFile, convertHeicToJpeg, resolveUserDisplayName, resolveUserPhoto, handleForceDownload, copyTextToClipboard
+  isImageLikeFile, isHeicFile, convertHeicToJpeg, resolveUserDisplayName, resolveUserPhoto, handleForceDownload, copyTextToClipboard, sanitizeFirestoreData
 } from './utils/helpers.js'
 import UniversalImage from './components/UniversalImage.jsx'
 import {
@@ -1878,6 +1878,8 @@ function App() {
   // Grabadora para las respuestas de speaking (se califican a mano)
   const grabadoraExamen = useVoiceRecorder('chat_audios', showMessage);
   const [grabandoParaPregunta, setGrabandoParaPregunta] = useState(null);
+  const isRecordingAnswerRef = useRef(false);
+  isRecordingAnswerRef.current = Boolean(grabadoraExamen?.isRecording || grabadoraExamen?.isUploading || grabandoParaPregunta !== null);
   useEffect(() => {
       if (grabadoraExamen.audioUrl && grabandoParaPregunta !== null) {
           const idxPreg = grabandoParaPregunta;
@@ -1930,8 +1932,9 @@ function App() {
         submittedAt: now,
         createdAt: now
       };
-      const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'grades'), cancelData);
-      setGrades(prev => [{ id: docRef.id, ...cancelData }, ...prev.filter(g => g.id !== docRef.id)]);
+      const cleanCancelData = sanitizeFirestoreData(cancelData);
+      const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'grades'), cleanCancelData);
+      setGrades(prev => [{ id: docRef.id, ...cleanCancelData }, ...prev.filter(g => g.id !== docRef.id)]);
       setActiveTakingEval(null);
       setStudentAnswers({});
       showMessage("Examen cancelado: Se detectó cambio de pestaña o salida de la aplicación con el modo anti-trampas activo. Tu nota ha sido registrada como 0.0.");
@@ -1973,16 +1976,18 @@ function App() {
       }
     };
 
-    // 3. blur en computadores de escritorio: si la ventana pierde el foco por más de 1.2s (e.g. pantalla dividida o ventana externa)
+    // 3. blur en computadores de escritorio: si la ventana pierde el foco por más de 2.5s (e.g. pantalla dividida o ventana externa)
     let blurTimeout = null;
     const handleWindowBlur = () => {
       if (isMobileDevice) return;
+      // Prevenir falsa cancelación si el estudiante está activando el micrófono o grabando respuesta de voz
+      if (isRecordingAnswerRef.current) return;
       if (blurTimeout) clearTimeout(blurTimeout);
       blurTimeout = setTimeout(() => {
-        if (!document.hasFocus() && !submittingEvalRef.current) {
+        if (!document.hasFocus() && !submittingEvalRef.current && !isRecordingAnswerRef.current) {
           triggerCancellation();
         }
-      }, 1200);
+      }, 2500);
     };
     const handleWindowFocus = () => {
       if (blurTimeout) {
@@ -2110,8 +2115,9 @@ function App() {
         submittedAt: now,
         createdAt: now
       };
-      const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'grades'), gradeData);
-      const savedGrade = { id: docRef.id, ...gradeData };
+      const cleanGradeData = sanitizeFirestoreData(gradeData);
+      const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'grades'), cleanGradeData);
+      const savedGrade = { id: docRef.id, ...cleanGradeData };
       setGrades(prev => [savedGrade, ...prev.filter(g => g.id !== docRef.id)]);
       setActiveTakingEval(null);
       setStudentAnswers({});
@@ -6463,12 +6469,22 @@ useEffect(() => {
                     showMessage(`No se pudo completar la conexión con Spotify: ${err.message || err}`);
                 })
                 .finally(() => {
-                    const cleanUrl = window.location.pathname + window.location.hash;
+                    const newParams = new URLSearchParams(window.location.search);
+                    newParams.delete('code');
+                    newParams.delete('state');
+                    newParams.delete('error');
+                    const searchStr = newParams.toString();
+                    const cleanUrl = window.location.pathname + (searchStr ? `?${searchStr}` : '') + window.location.hash;
                     window.history.replaceState(null, '', cleanUrl);
                 });
         } else if (spotifyError) {
             console.warn('Spotify auth error:', spotifyError);
-            const cleanUrl = window.location.pathname + window.location.hash;
+            const newParams = new URLSearchParams(window.location.search);
+            newParams.delete('code');
+            newParams.delete('state');
+            newParams.delete('error');
+            const searchStr = newParams.toString();
+            const cleanUrl = window.location.pathname + (searchStr ? `?${searchStr}` : '') + window.location.hash;
             window.history.replaceState(null, '', cleanUrl);
         }
     }, [myChatId]);

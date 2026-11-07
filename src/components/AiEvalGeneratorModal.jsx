@@ -1,7 +1,7 @@
 // src/components/AiEvalGeneratorModal.jsx
 // Genera una evaluacion completa (preguntas + respuestas) con IA y la muestra
 // para que la docente la revise antes de usarla.
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Sparkles, Loader2, AlertTriangle, Undo2, CheckCircle2 } from './Icons.jsx'
 import {
@@ -34,6 +34,26 @@ const AiEvalGeneratorModal = ({ isOpen, onClose, callGemini, onInsert, isDarkMod
   const [generando, setGenerando] = useState(false)
   const [resultado, setResultado] = useState(null)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && !generando && onClose) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    const originalOverflow = typeof document !== 'undefined' ? document.body.style.overflow : '';
+    if (typeof document !== 'undefined') {
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      if (typeof document !== 'undefined') {
+        document.body.style.overflow = originalOverflow;
+      }
+    };
+  }, [isOpen, generando, onClose]);
 
   if (!isOpen) return null
 
