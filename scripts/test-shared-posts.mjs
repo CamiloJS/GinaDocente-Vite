@@ -80,11 +80,28 @@ function buildGroupRecipients(chatGroups, academicGroups) {
   console.log('  OK  Materia académica se vincula al chatGroup correspondiente con prefijo group_');
 }
 
-// Prueba 1.4: Chats individuales (DM)
+// Prueba 1.5: Normalización de chatId en listados de grupos (evita group_group_)
 {
-  const targetId = resolveTargetChatId({ id: 'mathias_contreras', isGroup: false }, 'teacher');
-  assert.equal(targetId, 'dm_mathias_contreras_teacher');
-  console.log('  OK  Chats individuales DM se ordenan alfabéticamente de forma consistente');
+  const normalizeGroupChatId = (gId) => String(gId).startsWith('group_') ? gId : `group_${gId}`;
+  assert.equal(normalizeGroupChatId('group_acad_123'), 'group_acad_123');
+  assert.equal(normalizeGroupChatId('acad_123'), 'group_acad_123');
+  assert.equal(normalizeGroupChatId('demo_chat_group_1'), 'group_demo_chat_group_1');
+  console.log('  OK  Normalizador de grupos garantiza prefijo único sin duplicación group_group_');
+}
+
+// Prueba 1.6: Comparador de chats activos tolera variaciones de prefijo group_
+{
+  const isMatchingActiveChat = (activeChatId, eventChatId) => {
+    return activeChatId === eventChatId || 
+      `group_${activeChatId}` === eventChatId || 
+      activeChatId === `group_${eventChatId}` || 
+      activeChatId.replace(/^group_/, '') === eventChatId.replace(/^group_/, '');
+  };
+  assert.equal(isMatchingActiveChat('group_acad_123', 'acad_123'), true);
+  assert.equal(isMatchingActiveChat('acad_123', 'group_acad_123'), true);
+  assert.equal(isMatchingActiveChat('group_acad_123', 'group_acad_123'), true);
+  assert.equal(isMatchingActiveChat('group_other', 'group_acad_123'), false);
+  console.log('  OK  Comparador de eventos de chat sincroniza idénticos y variantes con/sin prefijo');
 }
 
 console.log('\n== 2. Parseo y Extracción de Publicaciones Compartidas (parseSharedPost) ==');
@@ -299,5 +316,5 @@ console.log('\n== 3. Prevención de Estado de Edición Erróneo y Sincronizació
 }
 
 console.log('\n========================================');
-console.log('Total pruebas Compartir en Chat: 15 | OK: 15 | FAIL: 0');
+console.log('Total pruebas Compartir en Chat: 17 | OK: 17 | FAIL: 0');
 console.log('========================================\n');

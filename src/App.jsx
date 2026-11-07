@@ -4746,7 +4746,7 @@ useEffect(() => {
                   if (lastMessage) {
                       setLastMessages(prev => ({ ...prev, [chatId]: lastMessage }));
                   }
-                  if (activeChat && (activeChat.id === chatId || `group_${activeChat.id}` === chatId || activeChat.id === `group_${chatId}`)) {
+                  if (activeChat && (activeChat.id === chatId || `group_${activeChat.id}` === chatId || activeChat.id === `group_${chatId}` || activeChat.id.replace(/^group_/, '') === chatId.replace(/^group_/, ''))) {
                       if (message && message.id) {
                           setChatMessages(prev => {
                               if (prev.some(m => m.id === message.id)) return prev;
@@ -15994,7 +15994,7 @@ Escribe en español con tono pedagógico moderno.`;
                                           {filteredGroups.length > 0 ? (
                                               <div className="space-y-0.5">
                                                   {filteredGroups.map(g => {
-                                                      const chatId = `group_${g.id}`;
+                                                      const chatId = String(g.id).startsWith('group_') ? g.id : `group_${g.id}`;
                                                       const isUnread = unreadChats[chatId];
                                                       return (
                                                           <button key={g.id} onClick={() => { handleOpenChat({ id: chatId, name: g.name, type: 'group' }); setIsChatMinimized(false); }} className={`w-full flex items-center gap-2.5 p-1.5 rounded-xl transition-colors content-auto-contact ${isDarkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}>
@@ -16537,7 +16537,7 @@ Escribe en español con tono pedagógico moderno.`;
                               <div className="space-y-1.5">
                                   {filteredGroups.length === 0 && <p className="text-xs italic text-gray-400 px-1">No hay grupos.</p>}
                                   {filteredGroups.map(g => (
-                                      <button key={g.id} onClick={() => { handleOpenChat({ id: `group_${g.id}`, name: g.name, type: 'group' }); setIsChatMinimized(false); }} className={`w-full flex items-center gap-3 p-3 rounded-2xl border transition-all text-left ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200 shadow-xs'}`}>
+                                      <button key={g.id} onClick={() => { handleOpenChat({ id: String(g.id).startsWith('group_') ? g.id : `group_${g.id}`, name: g.name, type: 'group' }); setIsChatMinimized(false); }} className={`w-full flex items-center gap-3 p-3 rounded-2xl border transition-all text-left ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200 shadow-xs'}`}>
                                           <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white shrink-0 overflow-hidden shadow-xs">
                                                {g.avatarUrl ? (
                                                    <img loading="lazy" decoding="async" src={g.avatarUrl} alt={g.name} className="w-full h-full object-cover" />

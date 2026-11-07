@@ -636,6 +636,57 @@ chequear(
   isImageLikeUrl(null) === false
 );
 
+console.log("\n== Calificación en Foros y Privacidad Estricta de Notas ==");
+
+// Helper de visibilidad de nota: solo docente y estudiante dueño pueden verla
+const canViewGrade = (postType, role, isOwner, commentGrade) => {
+  const isGradable = postType === 'task' || postType === 'forum';
+  const hasGrade = commentGrade !== undefined && commentGrade !== null && commentGrade !== '';
+  return isGradable && (role === 'teacher' || isOwner) && hasGrade;
+};
+
+// Helper de permiso para calificar: solo docente en tareas y foros para comentarios de estudiantes
+const canGradeComment = (postType, role, isStudentAuthor) => {
+  return role === 'teacher' && (postType === 'task' || postType === 'forum') && isStudentAuthor;
+};
+
+chequear(
+  "Docente puede ver la nota en tareas y foros",
+  canViewGrade('task', 'teacher', false, 4.5) === true &&
+  canViewGrade('forum', 'teacher', false, 5.0) === true
+);
+
+chequear(
+  "Estudiante calificado puede ver su propia nota en tareas y foros",
+  canViewGrade('task', 'student', true, 4.0) === true &&
+  canViewGrade('forum', 'student', true, 4.8) === true
+);
+
+chequear(
+  "Otros estudiantes NUNCA pueden ver la nota de un compañero en foros ni tareas",
+  canViewGrade('forum', 'student', false, 5.0) === false &&
+  canViewGrade('task', 'student', false, 4.5) === false
+);
+
+chequear(
+  "Docente tiene botón para calificar aportes de estudiantes en foros y entregas en tareas",
+  canGradeComment('forum', 'teacher', true) === true &&
+  canGradeComment('task', 'teacher', true) === true
+);
+
+chequear(
+  "Docente no califica sus propios comentarios ni publicaciones ajenas a tareas/foros",
+  canGradeComment('forum', 'teacher', false) === false &&
+  canGradeComment('poll', 'teacher', true) === false &&
+  canGradeComment('book3d', 'teacher', true) === false
+);
+
+chequear(
+  "Estudiante nunca tiene habilitado el botón de calificar comentarios",
+  canGradeComment('forum', 'student', true) === false &&
+  canGradeComment('task', 'student', true) === false
+);
+
 console.log(`\nRESULTADO: ${ok} OK, ${fallos} fallos\n`);
 process.exit(fallos ? 1 : 0);
 

@@ -564,7 +564,8 @@ const TaskCard = React.memo(({
                     setUserPosts(prev => [demoPost, ...prev]);
                 }
             } else {
-                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'userPosts'), sharePayload);
+                const cleanShare = sanitizeFirestoreData ? sanitizeFirestoreData(sharePayload) : sharePayload;
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'userPosts'), cleanShare);
             }
             showMessage("✅ ¡Publicación compartida en tu perfil con éxito!");
             setShowShareModal(false);
@@ -1029,29 +1030,31 @@ const TaskCard = React.memo(({
 
     const [filterOnlyUngraded, setFilterOnlyUngraded] = useState(false);
 
-    // Identificación de la entrega del estudiante actual
+    // Identificación del aporte o entrega del estudiante actual
     const myDelivery = React.useMemo(() => {
-        if (!task || !isTask || role === 'teacher') return null;
+        if (!task || (!isTask && !isForum) || role === 'teacher') return null;
         const myName = (loggedInName || '').trim().toLowerCase();
         const myUid = (currentUser?.uid || '').trim().toLowerCase();
         const myUserKey = (currentUserId || '').trim().toLowerCase();
         const myEmailPrefix = (currentUser?.email ? currentUser.email.split('@')[0] : '').trim().toLowerCase();
+        const myChatClean = (myChatId || '').trim().toLowerCase().replace('@', '');
 
         const myComments = (task.comments || []).filter(c => {
             if (c.isDeleted) return false;
             const authorLower = (c.author || '').trim().toLowerCase();
             const authorDisplayName = resolveUserDisplayName(c, userMappings, c.author).trim().toLowerCase();
-            const authorIdLower = (c.authorId || '').trim().toLowerCase();
-            const authorUsernameLower = (c.authorUsername || '').trim().toLowerCase();
+            const authorIdLower = (c.authorId || '').trim().toLowerCase().replace('@', '');
+            const authorUsernameLower = (c.authorUsername || '').trim().toLowerCase().replace('@', '');
             const cUidLower = (c.uid || '').trim().toLowerCase();
 
             return (myName && (authorLower === myName || authorDisplayName === myName)) ||
                    (myUid && (authorIdLower === myUid || cUidLower === myUid)) ||
                    (myUserKey && (authorIdLower === myUserKey || authorUsernameLower === myUserKey)) ||
+                   (myChatClean && (authorIdLower === myChatClean || authorUsernameLower === myChatClean)) ||
                    (myEmailPrefix && (authorUsernameLower === myEmailPrefix || authorLower === myEmailPrefix));
         });
         return myComments.slice().reverse().find(c => c.grade !== undefined && c.grade !== null && c.grade !== '') || myComments[myComments.length - 1] || null;
-    }, [task, isTask, role, loggedInName, currentUserId, currentUser, userMappings]);
+    }, [task, isTask, isForum, role, loggedInName, currentUserId, currentUser, myChatId, userMappings]);
 
     const myDeliveryIsLate = React.useMemo(() => {
         if (!myDelivery || !task?.dueDate) return false;
@@ -1060,9 +1063,9 @@ const TaskCard = React.memo(({
         return new Date(myDelivery.createdAt) > parsedDue;
     }, [myDelivery, task?.dueDate, task?.dueTime]);
 
-    // Contador de entregas y pendientes por calificar para la docente
+    // Contador de entregas y pendientes por calificar para la docente (Tareas y Foros)
     const teacherDeliveryStats = React.useMemo(() => {
-        if (!task || !isTask || role !== 'teacher') return { totalReceived: 0, pendingToGrade: 0 };
+        if (!task || (!isTask && !isForum) || role !== 'teacher') return { totalReceived: 0, pendingToGrade: 0 };
         const studentComments = (task.comments || []).filter(c => {
             if (c.isDeleted) return false;
             const authorLower = (c.author || '').trim().toLowerCase();
@@ -1086,7 +1089,7 @@ const TaskCard = React.memo(({
         const totalReceived = studentMap.size;
         const pendingToGrade = Array.from(studentMap.values()).filter(c => c.grade === undefined || c.grade === null || c.grade === '').length;
         return { totalReceived, pendingToGrade };
-    }, [task, isTask, role]);
+    }, [task, isTask, isForum, role]);
 
     const [isVoting, setIsVoting] = useState(false);
     const [activeVotersOptionId, setActiveVotersOptionId] = useState(null);
@@ -4278,6 +4281,21 @@ const TaskCard = React.memo(({
                 </div>
             )}
 
+            {/* Indicador de Calificación en Foro para Estudiante */}
+            {role !== 'teacher' && isForum && myDelivery?.grade !== undefined && myDelivery?.grade !== null && myDelivery?.grade !== '' && (
+                <div className="mt-3">
+                    <div className="px-3.5 py-2 rounded-xl flex items-center justify-between text-xs border bg-amber-500/10 border-amber-500/25 text-amber-800 dark:text-amber-300">
+                        <div className="flex items-center gap-2 font-medium">
+                            <Star size={14} className="text-amber-500 shrink-0" />
+                            <span className="font-bold">Tu calificación en este foro:</span>
+                        </div>
+                        <span className="font-black text-xs px-2.5 py-0.5 rounded-lg bg-amber-500/20 text-amber-700 dark:text-amber-300">
+                            Nota: {!isNaN(Number(String(myDelivery.grade).replace(',', '.'))) ? Number(String(myDelivery.grade).replace(',', '.')).toFixed(1) : myDelivery.grade} / 5.0
+                        </span>
+                    </div>
+                </div>
+            )}
+
             {/* Botón de Comentarios / Respuestas / Foros y Botón de Excel */}
             <div className="mt-3 pt-2.5 border-t border-gray-100 dark:border-gray-700/60 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                 <button 
@@ -4314,12 +4332,12 @@ const TaskCard = React.memo(({
                             }
                         </span>
 
-                        {role === 'teacher' && isTask && teacherDeliveryStats.pendingToGrade > 0 && (
+                        {role === 'teacher' && (isTask || isForum) && teacherDeliveryStats.pendingToGrade > 0 && (
                             <>
                                 <span className="h-3.5 w-px bg-gray-300 dark:bg-gray-600 self-center shrink-0" aria-hidden="true" />
                                 <span 
                                     className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100/90 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/60 leading-none shrink-0"
-                                    title={`${teacherDeliveryStats.pendingToGrade} ${teacherDeliveryStats.pendingToGrade === 1 ? 'entrega pendiente' : 'entregas pendientes'} por calificar`}
+                                    title={`${teacherDeliveryStats.pendingToGrade} ${teacherDeliveryStats.pendingToGrade === 1 ? (isForum ? 'aporte pendiente' : 'entrega pendiente') : (isForum ? 'aportes pendientes' : 'entregas pendientes')} por calificar`}
                                 >
                                     {teacherDeliveryStats.pendingToGrade === 1 ? 'pendiente por calificar' : 'pendientes por calificar'}
                                 </span>
@@ -4329,7 +4347,7 @@ const TaskCard = React.memo(({
                     <span className="text-[11px] text-blue-500 font-semibold hover:underline shrink-0">Ver conversación ▾</span>
                 </button>
 
-                {role === 'teacher' && isTask && (
+                {role === 'teacher' && (isTask || isForum) && (
                     <button 
                         type="button"
                         onClick={() => { exportTaskToExcel().catch((errExcel) => console.error('Error al exportar a Excel:', errExcel)); }}
@@ -4439,15 +4457,15 @@ const TaskCard = React.memo(({
                             </div>
                         </div>
 
-                        {/* Resumen de entregas y filtro para la docente dentro del modal */}
-                        {role === 'teacher' && isTask && (
+                        {/* Resumen de entregas/aportes y filtro para la docente dentro del modal */}
+                        {role === 'teacher' && (isTask || isForum) && (
                             <div className="mb-3 px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-2 text-xs">
                                 <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-medium">
                                     <FileText size={14} className="text-slate-500 shrink-0" />
                                     <span>
                                         {teacherDeliveryStats.totalReceived === 0
-                                            ? "0 entregas recibidas"
-                                            : `${teacherDeliveryStats.totalReceived} ${teacherDeliveryStats.totalReceived === 1 ? 'entrega recibida' : 'entregas recibidas'} • ${teacherDeliveryStats.pendingToGrade} ${teacherDeliveryStats.pendingToGrade === 1 ? 'pendiente' : 'pendientes'} de calificar`
+                                            ? (isForum ? "0 aportes recibidos" : "0 entregas recibidas")
+                                            : `${teacherDeliveryStats.totalReceived} ${teacherDeliveryStats.totalReceived === 1 ? (isForum ? 'aporte recibido' : 'entrega recibida') : (isForum ? 'aportes recibidos' : 'entregas recibidas')} • ${teacherDeliveryStats.pendingToGrade} ${teacherDeliveryStats.pendingToGrade === 1 ? 'pendiente' : 'pendientes'} de calificar`
                                         }
                                     </span>
                                 </div>
@@ -4461,7 +4479,7 @@ const TaskCard = React.memo(({
                                                 : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800'
                                         }`}
                                     >
-                                        {filterOnlyUngraded ? "Mostrar todas" : "Ver solo pendientes"}
+                                        {filterOnlyUngraded ? (isForum ? "Mostrar todos los aportes" : "Mostrar todas") : (isForum ? "Ver solo aportes pendientes" : "Ver solo pendientes")}
                                     </button>
                                 )}
                             </div>
@@ -4648,13 +4666,17 @@ const TaskCard = React.memo(({
                                 const authorDisplayNameLower = authorDisplayName.trim().toLowerCase();
                                 const authorNameLower = (c.author || '').trim().toLowerCase();
                                 const loggedInNameLower = (loggedInName || '').trim().toLowerCase();
-                                const authorIdLower = (c.authorId || c.authorUsername || '').trim().toLowerCase();
-                                const currentUserIdLower = (currentUserId || currentUser?.uid || '').trim().toLowerCase();
+                                const authorIdLower = (c.authorId || c.authorUsername || '').trim().toLowerCase().replace('@', '');
+                                const currentUserIdLower = (currentUserId || currentUser?.uid || '').trim().toLowerCase().replace('@', '');
+                                const myChatClean = (myChatId || '').trim().toLowerCase().replace('@', '');
+                                const myEmailPrefix = (currentUser?.email ? currentUser.email.split('@')[0] : '').trim().toLowerCase();
                                 const isTeacherAuthor = c.authorRole === 'teacher' || c.role === 'teacher' || isTeacherId(authorIdLower) || authorIdLower === 'teacher_gina' || authorIdLower === 'teacher_camilo' || (c.author && (c.author.trim() === TEACHER_NAME || c.author.trim() === SECOND_TEACHER_NAME)) || authorNameLower === 'profesora' || authorNameLower === 'profesor' || authorNameLower === 'la profe' || authorNameLower === 'docente gina' || authorNameLower === 'profesora gina' || authorNameLower === 'docente camilo' || authorNameLower === 'profesor camilo';
 
                                 const isOwner = (
                                     (loggedInNameLower && (authorNameLower === loggedInNameLower || authorDisplayNameLower === loggedInNameLower)) ||
                                     (currentUserIdLower && (authorIdLower === currentUserIdLower || (c.uid && currentUser?.uid && c.uid === currentUser.uid))) ||
+                                    (myChatClean && (authorIdLower === myChatClean || (c.authorUsername && c.authorUsername.toLowerCase().replace('@', '') === myChatClean))) ||
+                                    (myEmailPrefix && (authorIdLower === myEmailPrefix || (c.authorUsername && c.authorUsername.toLowerCase() === myEmailPrefix))) ||
                                     (role === 'teacher' && isTeacherAuthor)
                                 );
                                 const isEditing = editingCommentId === cid;
@@ -4919,8 +4941,8 @@ const TaskCard = React.memo(({
                                             </div>
                                         )}
 
-                                        {/* Visualización de Calificación Numérica (Docente en Tareas) */}
-                                        {isTask && c.grade !== undefined && c.grade !== null && c.grade !== '' && (
+                                        {/* Visualización de Calificación Numérica (Solo Docente y Estudiante Calificado en Tareas y Foros) */}
+                                        {(isTask || isForum) && (role === 'teacher' || isOwner) && c.grade !== undefined && c.grade !== null && c.grade !== '' && (
                                             <div className="mt-2 flex items-center justify-between flex-wrap gap-2 p-2 rounded-xl bg-amber-500/10 border border-amber-500/20">
                                                 <div className="flex items-center gap-2">
                                                     <div className="p-1 rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400">
@@ -4949,8 +4971,8 @@ const TaskCard = React.memo(({
                                             </div>
                                         )}
 
-                                        {/* Módulo de Calificación In-line (Docente en Tareas) */}
-                                        {role === 'teacher' && isTask && isStudentAuthor && (
+                                        {/* Módulo de Calificación In-line (Docente en Tareas y Foros) */}
+                                        {role === 'teacher' && (isTask || isForum) && isStudentAuthor && (
                                             <div className="mt-2">
                                                 {gradingCid === cid ? (
                                                     <div className="flex flex-col gap-2.5 p-3 rounded-2xl border bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-sm animate-in fade-in">
@@ -5026,7 +5048,7 @@ const TaskCard = React.memo(({
                                                             onClick={() => { setGradingCid(cid); setGradeValue(""); setGradeFeedback(""); }} 
                                                             className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-700 hover:text-amber-800 dark:text-amber-300 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/50 border border-amber-300/80 dark:border-amber-700/80 px-3 py-1 rounded-xl transition shadow-2xs"
                                                         >
-                                                            <Star size={13} className="text-amber-500" /> Calificar entrega
+                                                            <Star size={13} className="text-amber-500" /> {isForum ? "Calificar aporte" : "Calificar entrega"}
                                                         </button>
                                                     )
                                                 )}
@@ -5156,7 +5178,7 @@ const TaskCard = React.memo(({
                                 );
                             };
 
-                            const displayedRoots = (filterOnlyUngraded && role === 'teacher' && isTask)
+                            const displayedRoots = (filterOnlyUngraded && role === 'teacher' && (isTask || isForum))
                                 ? roots.filter(r => {
                                     if (r.isDeleted) return false;
                                     const authorLower = (r.author || '').trim().toLowerCase();
@@ -5169,7 +5191,7 @@ const TaskCard = React.memo(({
                                 return (
                                     <p className="text-xs text-gray-400 italic text-center mt-8">
                                         {filterOnlyUngraded
-                                            ? 'No hay entregas pendientes de calificar.'
+                                            ? (isForum ? 'No hay aportes pendientes de calificar.' : 'No hay entregas pendientes de calificar.')
                                             : (isForum ? 'No hay aportes en el foro aún. ¡Sé el primero en participar!' : 'No hay comentarios aún. ¡Escribe el primero!')
                                         }
                                     </p>
