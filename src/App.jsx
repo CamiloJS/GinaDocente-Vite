@@ -4433,7 +4433,7 @@ useEffect(() => {
                       }
                       if (call.type !== 'group') {
                           const calleeId = call.callee || ''
-                          const isMeCallee = calleeId === myChatId || (myChatId === 'teacher' && calleeId === 'teacher_gina') || (myChatId === 'camilodocente' && calleeId === 'teacher_camilo')
+                          const isMeCallee = calleeId === myChatId || (isTeacherId(myChatId) && isTeacherId(calleeId) && (isCamiloTeacher(myChatId) === isCamiloTeacher(calleeId)))
                           if (isMeCallee) {
                               setIncomingCall({
                                   callId: d.id,
@@ -4463,7 +4463,7 @@ useEffect(() => {
               return () => unsubscribe()
           }, [myChatId, isDemoMode, publicKahootActive, publicOvaId])
 
-          // Ringtone para llamada entrante
+          // Ringtone para llamada entrante, soporte de tecla Escape y bloqueo de fondo
           useEffect(() => {
               if (incomingCall) {
                   incomingRingtoneRef.current = playRingtone()
@@ -4473,6 +4473,26 @@ useEffect(() => {
               }
               return () => { stopRingtone(); incomingRingtoneRef.current = null }
           }, [incomingCall])
+
+          useEffect(() => {
+              if (!incomingCall || activeCall) return
+              const handleKeyDown = (e) => {
+                  if (e.key === 'Escape') {
+                      rejectIncomingCall()
+                  }
+              }
+              window.addEventListener('keydown', handleKeyDown)
+              const originalOverflow = typeof document !== 'undefined' ? document.body.style.overflow : ''
+              if (typeof document !== 'undefined') {
+                  document.body.style.overflow = 'hidden'
+              }
+              return () => {
+                  window.removeEventListener('keydown', handleKeyDown)
+                  if (typeof document !== 'undefined') {
+                      document.body.style.overflow = originalOverflow
+                  }
+              }
+          }, [incomingCall, activeCall])
 
           // Aceptar llamada entrante
           const acceptIncomingCall = () => {
@@ -4510,6 +4530,9 @@ useEffect(() => {
               const callIdToReject = incomingCall.callId
               const wasGroup = !!incomingCall.isGroup
               rejectedCallIdsRef.current.add(callIdToReject)
+              setTimeout(() => {
+                  try { rejectedCallIdsRef.current.delete(callIdToReject) } catch (e) {}
+              }, 60000)
               setIncomingCall(null)
               if (isDemoMode) return
               const callRef = doc(db, 'artifacts', appId, 'public', 'data', 'calls', callIdToReject)
@@ -16770,7 +16793,7 @@ Escribe en español con tono pedagógico moderno.`;
                                                   } else {
                                                       const targetId = getDmTargetUserId(activeChat, myChatId)
                                                       setActiveCall({
-                                                          callId: `dm_${[myChatId, targetId].sort().join('_')}`,
+                                                          callId: `dm_${[myChatId, targetId].sort().join('_')}_${Date.now()}`,
                                                           role: 'initiator',
                                                           isGroup: false,
                                                           name: activeChat.name,
@@ -17987,14 +18010,21 @@ Escribe en español con tono pedagógico moderno.`;
               )}
 
               {/* MODAL DE LLAMADA ENTRANTE */}
-              {incomingCall && !activeCall && (
-                  <div className="fixed inset-0 z-[600] flex items-center justify-center bg-black/90 backdrop-blur-sm animate-in fade-in duration-200 p-4">
-                      <div className={`w-full max-w-sm rounded-3xl p-6 sm:p-8 text-center space-y-5 sm:space-y-6 ${isDarkMode ? 'bg-gray-900 border border-gray-700' : 'bg-white'}`}>
-                          <div className="relative mx-auto w-20 h-20 sm:w-24 sm:h-24">
-                              <div className={`w-full h-full rounded-full bg-orange-500 animate-pulse flex items-center justify-center text-white shadow-lg`}>
-                                  <span className="text-2xl font-bold">{incomingCall.callerName?.charAt(0)?.toUpperCase() || '?'}</span>
+              {incomingCall && !activeCall && (() => {
+                  const callerId = incomingCall.targetId || incomingCall.initiatorId || ''
+                  const callerPhoto = resolveUserPhoto(callerId, userMappings, '')
+                  return (
+                      <div className="fixed inset-0 z-[600] flex items-center justify-center bg-black/90 backdrop-blur-sm animate-in fade-in duration-200 p-4">
+                          <div className={`w-full max-w-sm rounded-3xl p-6 sm:p-8 text-center space-y-5 sm:space-y-6 ${isDarkMode ? 'bg-gray-900 border border-gray-700' : 'bg-white'}`}>
+                              <div className="relative mx-auto w-20 h-20 sm:w-24 sm:h-24">
+                                  <div className={`w-full h-full rounded-full bg-orange-500 animate-pulse flex items-center justify-center text-white shadow-lg overflow-hidden border-2 ${isDarkMode ? 'border-gray-700' : 'border-white'}`}>
+                                      {callerPhoto ? (
+                                          <img src={callerPhoto} alt={incomingCall.callerName} className="w-full h-full object-cover" />
+                                      ) : (
+                                          <span className="text-2xl font-bold">{incomingCall.callerName?.charAt(0)?.toUpperCase() || '?'}</span>
+                                      )}
+                                  </div>
                               </div>
-                          </div>
                           <div>
                               <h3 className={`text-lg sm:text-xl font-bold truncate ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                                   {incomingCall.callerName} te está llamando...
@@ -18023,7 +18053,8 @@ Escribe en español con tono pedagógico moderno.`;
                           </div>
                       </div>
                   </div>
-              )}
+                  )
+              })()}
 
               {/* MODAL GLOBAL DE CONFIRMACIÓN */}
               {globalGifCallback && ReactDOM.createPortal(<React.Suspense fallback={null}><GifPickerModal onSelect={(url) => { globalGifCallback(url); setGlobalGifCallback(null); }} onClose={() => setGlobalGifCallback(null)} isDarkMode={isDarkMode} /></React.Suspense>, document.body)}

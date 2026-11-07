@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { db, appId } from '../firebase/config.js'
 import { doc, setDoc, onSnapshot, deleteDoc, updateDoc, getDoc, collection } from 'firebase/firestore'
-import { playHangupSound, playConnectedSound, connectRemoteAudio } from '../utils/callSounds.js'
+import { playHangupSound, playConnectedSound, playOutgoingRing, stopOutgoingRing, connectRemoteAudio } from '../utils/callSounds.js'
+import { resolveUserPhoto, resolveUserDisplayName, isTeacherId } from '../utils/helpers.js'
 
 // Iconos inline (evitan conflictos de import)
 const PhoneIcon = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
@@ -16,7 +17,8 @@ const ICE_SERVERS = {
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun.cloudflare.com:3478' },
+    { urls: 'stun:stun.services.mozilla.com' },
   ]
 }
 
@@ -67,10 +69,25 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
   const pendingCandidatesRef = useRef(new Map()) // pc -> [candidates]
   const pendingInitiatorIceRef = useRef([])      // participante grupal: ICE del iniciador antes de crear pc
 
+  const processedIceRef = useRef(new WeakMap()) // pc -> Set<string>
+  const getCandidateKey = (c) => {
+    if (!c) return ''
+    return typeof c === 'string' ? c : `${c.sdpMid || ''}_${c.sdpMLineIndex || ''}_${c.candidate || ''}`
+  }
+
   const addIceCandidateSafe = (pc, candidate) => {
-    if (!pc || pc.signalingState === 'closed') return
+    if (!pc || pc.signalingState === 'closed' || !candidate) return
     try {
-      if (pc.remoteDescription) {
+      let seen = processedIceRef.current.get(pc)
+      if (!seen) {
+        seen = new Set()
+        processedIceRef.current.set(pc, seen)
+      }
+      const key = getCandidateKey(candidate)
+      if (key && seen.has(key)) return
+      if (key) seen.add(key)
+
+      if (pc.remoteDescription && pc.remoteDescription.type) {
         pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(() => {})
       } else {
         const list = pendingCandidatesRef.current.get(pc) || []
@@ -201,7 +218,7 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
     } catch (e) {}
   }
 
-  // ---- Detección de voz tipo Discord ----
+  // ---- Detección de voz tipo Discord con prevención de fugas de memoria ----
   const monitorStream = useCallback((stream, peerId) => {
     try {
       if (!stream || !stream.getAudioTracks().length) return
@@ -216,68 +233,58 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
       analyser.smoothingTimeConstant = 0.8
       src.connect(analyser)
       const data = new Uint8Array(analyser.frequencyBinCount)
-      let rafId = null
       let speaking = false
+      const stateObj = { ctx, analyser, src, rafId: null, isStopped: false }
+
       const tick = () => {
-        analyser.getByteFrequencyData(data)
-        let sum = 0
-        for (let i = 0; i < data.length; i++) sum += data[i]
-        const avg = data.length > 0 ? (sum / data.length) : 0
-        // isMuted solo afecta al local
-        const muted = peerId === myChatId && isMutedRef.current
-        const nowSpeaking = !muted && avg > 18
-        if (nowSpeaking !== speaking) {
-          speaking = nowSpeaking
-          setSpeakingMap(prev => {
-            const next = { ...prev, [peerId]: nowSpeaking }
-            if (!nowSpeaking) delete next[peerId]
-            return next
-          })
-          if (peerId === myChatId) updateSpeakingStatus(nowSpeaking)
+        if (stateObj.isStopped) return
+        try {
+          analyser.getByteFrequencyData(data)
+          let sum = 0
+          for (let i = 0; i < data.length; i++) sum += data[i]
+          const avg = data.length > 0 ? (sum / data.length) : 0
+          // isMuted solo afecta al local
+          const muted = peerId === myChatId && isMutedRef.current
+          const nowSpeaking = !muted && avg > 18
+          if (nowSpeaking !== speaking) {
+            speaking = nowSpeaking
+            setSpeakingMap(prev => {
+              const next = { ...prev, [peerId]: nowSpeaking }
+              if (!nowSpeaking) delete next[peerId]
+              return next
+            })
+            if (peerId === myChatId) updateSpeakingStatus(nowSpeaking)
+          }
+        } catch (e) {}
+        if (!stateObj.isStopped) {
+          stateObj.rafId = requestAnimationFrame(tick)
         }
-        rafId = requestAnimationFrame(tick)
       }
-      tick()
-      analysersRef.current.set(peerId, { ctx, analyser, rafId, src })
+      stateObj.rafId = requestAnimationFrame(tick)
+      analysersRef.current.set(peerId, stateObj)
       remoteCleanupsRef.current.push(() => {
-        try { cancelAnimationFrame(rafId); src.disconnect(); analyser.disconnect(); ctx.close() } catch(e) {}
+        stateObj.isStopped = true
+        try {
+          if (stateObj.rafId) cancelAnimationFrame(stateObj.rafId)
+          src.disconnect()
+          analyser.disconnect()
+          ctx.close().catch(() => {})
+        } catch(e) {}
         analysersRef.current.delete(peerId)
       })
     } catch (e) {}
   }, [myChatId, updateSpeakingStatus])
 
-  // Sincronizar speakingMap grupal vía Firestore para que todos vean quién habla
-  useEffect(() => {
-    if (isDemoMode || !isGroup || !callId) return
-    const speakingCol = collection(db, ...callsBase(callId), 'speaking')
-    const unsub = onSnapshot(speakingCol, (snap) => {
-      const remoteSpeaking = {}
-      snap.docs.forEach(d => {
-        const data = d.data()
-        if (data.isSpeaking && d.id !== myChatId) {
-          remoteSpeaking[d.id] = true
-        }
-      })
-      setSpeakingMap(prev => {
-        const next = { ...prev }
-        Object.keys(next).forEach(k => {
-          if (k !== myChatId && k !== 'main' && !remoteSpeaking[k]) {
-            delete next[k]
-          }
-        })
-        Object.keys(remoteSpeaking).forEach(k => {
-          next[k] = true
-        })
-        return next
-      })
-    })
-    return () => unsub()
-  }, [isGroup, callId, myChatId])
-
   const stopMonitor = useCallback((peerId) => {
     const entry = analysersRef.current.get(peerId)
     if (entry) {
-      try { cancelAnimationFrame(entry.rafId); entry.src.disconnect(); entry.analyser.disconnect(); entry.ctx.close() } catch(e) {}
+      entry.isStopped = true
+      try {
+        if (entry.rafId) cancelAnimationFrame(entry.rafId)
+        entry.src.disconnect()
+        entry.analyser.disconnect()
+        entry.ctx.close().catch(() => {})
+      } catch(e) {}
       analysersRef.current.delete(peerId)
     }
     setSpeakingMap(prev => { const n = { ...prev }; delete n[peerId]; return n })
@@ -304,8 +311,11 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
         logDiag('ontrack_fired', 'key=' + key + ' kind=' + event.track.kind)
         const stream = (event.streams && event.streams[0]) ? event.streams[0] : new MediaStream([event.track])
 
+        // Activar detección y animación de voz del peer remoto en tiempo real
+        monitorStream(stream, key)
+
         let audioEl = document.getElementById(`remote-audio-${key}`)
-        if (!audioEl) {
+        if (!audioEl && key === 'main') {
           audioEl = document.getElementById('remote-audio-main')
         }
         if (!audioEl) {
@@ -313,6 +323,8 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
           audioEl.id = `remote-audio-${key}`
           audioEl.autoplay = true
           audioEl.playsInline = true
+          audioEl.setAttribute('playsinline', 'true')
+          audioEl.setAttribute('webkit-playsinline', 'true')
           document.body.appendChild(audioEl)
           remoteCleanupsRef.current.push(() => {
             try { audioEl.pause(); audioEl.srcObject = null; audioEl.remove() } catch (e) {}
@@ -331,14 +343,19 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
     pc.onconnectionstatechange = () => {
       logDiag('conn_state', 'key=' + key + ' state=' + pc.connectionState + ' ice=' + (pc.iceConnectionState || 'n/a') + ' sig=' + pc.signalingState)
       if (pc.connectionState === 'connected') {
+        stopOutgoingRing()
         setCallState('connected')
         setConnectedPeers(prev => prev + 1)
-      } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+      } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed' || pc.connectionState === 'closed' || pc.iceConnectionState === 'failed') {
         stopMonitor(key)
         setConnectedPeers(prev => Math.max(0, prev - 1))
+        if (isGroup) {
+          peersRef.current.delete(key)
+          startingPeersRef.current.delete(key)
+        }
         // SOLO DM: colgar únicamente en 'failed' (terminal). 'disconnected' es transitorio
         // y Chrome lo reporta a veces durante la negociación; colgar ahí cortaba llamadas vivas.
-        if (!isGroup && callStateRef.current === 'connected' && pc.connectionState === 'failed') {
+        if (!isGroup && callStateRef.current === 'connected' && (pc.connectionState === 'failed' || pc.iceConnectionState === 'failed')) {
           endCall()
         }
       }
@@ -360,10 +377,7 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
 
       pc.onicecandidate = (e) => {
         if (e.candidate) {
-          const list = pc._ice || []
-          list.push(e.candidate.toJSON())
-          pc._ice = list
-          saveCandidates([...callsBase(callId), 'callerCandidates', 'list'], pc)
+          pushIceCandidate([...callsBase(callId), 'callerCandidates', 'list'], e.candidate.toJSON())
         }
       }
 
@@ -617,10 +631,7 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
       attachRemoteStream(pc, 'main')
       pc.onicecandidate = (e) => {
         if (e.candidate) {
-          const list = pc._ice || []
-          list.push(e.candidate.toJSON())
-          pc._ice = list
-          saveCandidates([...callsBase(callId), 'calleeCandidates', 'list'], pc)
+          pushIceCandidate([...callsBase(callId), 'calleeCandidates', 'list'], e.candidate.toJSON())
         }
       }
       await pc.setRemoteDescription(new RTCSessionDescription(activeCall.offer))
@@ -683,11 +694,23 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
     }
   }, [activeCall?.callId, isDemoMode])
 
+  // Tono de timbrado para llamadas salientes mientras espera respuesta
+  useEffect(() => {
+    if (callState === 'calling' || callState === 'joining') {
+      playOutgoingRing()
+    } else {
+      stopOutgoingRing()
+    }
+    return () => { stopOutgoingRing() }
+  }, [callState])
+
   // Timer duración
   useEffect(() => {
     if (callState === 'connected') {
+      stopOutgoingRing()
       playConnectedSound()
       setCallError(null)
+      if (callTimerRef.current) clearInterval(callTimerRef.current)
       callTimerRef.current = setInterval(() => setCallDuration(prev => prev + 1), 1000)
     } else {
       if (callTimerRef.current) clearInterval(callTimerRef.current)
@@ -695,6 +718,28 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
     }
     return () => { if (callTimerRef.current) clearInterval(callTimerRef.current) }
   }, [callState])
+
+  // Soporte de tecla Escape y bloqueo de desplazamiento de fondo
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (callError || callState === 'calling' || callState === 'joining') {
+          endCall()
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    const originalOverflow = typeof document !== 'undefined' ? document.body.style.overflow : ''
+    if (typeof document !== 'undefined') {
+      document.body.style.overflow = 'hidden'
+    }
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      if (typeof document !== 'undefined') {
+        document.body.style.overflow = originalOverflow
+      }
+    }
+  }, [callError, callState])
 
   const formatDuration = (seconds) => {
     const validSec = (typeof seconds === 'number' && !isNaN(seconds) && isFinite(seconds) && seconds >= 0) ? Math.floor(seconds) : 0
@@ -706,6 +751,7 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
   const endCall = async () => {
     if (endingRef.current) return
     endingRef.current = true
+    stopOutgoingRing()
     playHangupSound()
     const wasGroup = isGroup
     const wasInitiator = isInitiator
@@ -801,15 +847,24 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
   }
 
   const toggleMute = () => {
+    const nextMuted = !isMuted
     if (localStreamRef.current) {
-      localStreamRef.current.getAudioTracks().forEach(t => { t.enabled = !t.enabled })
+      localStreamRef.current.getAudioTracks().forEach(t => { t.enabled = !nextMuted })
     }
-    setIsMuted(prev => !prev)
+    setIsMuted(nextMuted)
+    isMutedRef.current = nextMuted
+    if (nextMuted) {
+      updateSpeakingStatus(false)
+      setSpeakingMap(prev => { const n = { ...prev }; delete n[myChatId]; return n })
+    }
   }
 
   if (callState === 'idle' && !callError) return null
 
   const displayName = isInitiator ? otherName : (activeCall.callerName || otherName)
+  const dmTargetId = activeCall.targetId || (isInitiator ? activeCall.targetId : activeCall.initiatorId) || ''
+  const dmPhoto = resolveUserPhoto(dmTargetId, userMappings, '')
+  const isSpeakingMain = (speakingMap[isGroup ? myChatId : 'main'] || speakingMap[myChatId]) && callState === 'connected'
 
   return (
     <>
@@ -832,16 +887,25 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
           {isGroup ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 max-h-[42vh] md:max-h-[55vh] overflow-y-auto p-1 pr-1">
               {/* Yo */}
-              <div className={`flex flex-col items-center gap-2 p-3 md:p-4 rounded-2xl border-2 transition-all ${speakingMap[myChatId] && !isMuted && callState === 'connected' ? 'border-green-400 bg-green-500/15 shadow-lg shadow-green-500/20 scale-[1.02]' : 'border-white/10 bg-white/5'}`}>
-                <div className={`relative w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full flex items-center justify-center text-white font-bold shadow-lg transition-all text-lg md:text-xl ${speakingMap[myChatId] && !isMuted && callState === 'connected' ? 'bg-green-500 ring-4 ring-green-400 ring-offset-2 ring-offset-gray-900 scale-105' : 'bg-blue-600'}`}>
-                  <span className="text-lg">{myName?.charAt(0)?.toUpperCase() || 'Y'}</span>
+              {(() => {
+                const myPhoto = resolveUserPhoto(myChatId, userMappings, '')
+                return (
+                  <div className={`flex flex-col items-center gap-2 p-3 md:p-4 rounded-2xl border-2 transition-all ${speakingMap[myChatId] && !isMuted && callState === 'connected' ? 'border-green-400 bg-green-500/15 shadow-lg shadow-green-500/20 scale-[1.02]' : 'border-white/10 bg-white/5'}`}>
+                    <div className={`relative w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full flex items-center justify-center text-white font-bold shadow-lg transition-all text-lg md:text-xl overflow-hidden ${speakingMap[myChatId] && !isMuted && callState === 'connected' ? 'bg-green-500 ring-4 ring-green-400 ring-offset-2 ring-offset-gray-900 scale-105' : 'bg-blue-600'}`}>
+                      {myPhoto ? (
+                        <img src={myPhoto} alt={myName} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-lg">{myName?.charAt(0)?.toUpperCase() || 'Y'}</span>
+                      )}
                   {isMuted && <span className="absolute -bottom-1 -right-1 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center border-2 border-white dark:border-gray-900"><MicOffIcon size={12} /></span>}
                   {speakingMap[myChatId] && !isMuted && callState === 'connected' && <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-green-400 rounded-full border-2 border-white dark:border-gray-900 animate-ping"></span>}
                   {speakingMap[myChatId] && !isMuted && callState === 'connected' && <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-green-400 rounded-full border-2 border-white dark:border-gray-900"></span>}
                 </div>
                 <span className={`text-xs font-bold truncate max-w-full ${speakingMap[myChatId] && !isMuted && callState === 'connected' ? 'text-green-400' : isDarkMode ? 'text-white' : 'text-gray-900'}`}>{myName} (Tú)</span>
                 <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${speakingMap[myChatId] && !isMuted && callState === 'connected' ? 'bg-green-500 text-white animate-pulse' : isMuted ? 'bg-red-500 text-white' : 'bg-gray-700 text-gray-300'}`}>{isMuted ? 'Silenciado' : (speakingMap[myChatId] && callState === 'connected') ? 'Hablando...' : 'Conectado'}</span>
-              </div>
+                  </div>
+                )
+              })()}
               {/* Participantes remotos (filtra "yo" y deduplica por id) */}
               {(() => {
                 const raw = normalizeParticipants(liveParticipants || activeCall.participants)
@@ -882,13 +946,19 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
             </div>
           ) : (
             <div className="relative mx-auto w-20 h-20 sm:w-24 sm:h-24">
-              <div className={`w-full h-full rounded-full flex items-center justify-center text-white text-2xl sm:text-3xl font-bold shadow-lg transition-all duration-200 ${
-                (speakingMap[isGroup ? myChatId : 'main'] || speakingMap[myChatId]) && callState === 'connected' ? 'bg-green-500 ring-4 ring-green-400 ring-offset-2 ring-offset-gray-900 scale-105 shadow-green-500/30' :
-                callState === 'connected' ? 'bg-green-500' :
-                callState === 'calling' || callState === 'joining' ? 'bg-blue-500 animate-pulse' :
-                'bg-orange-500 animate-pulse'
+              <div className={`w-full h-full rounded-full flex items-center justify-center text-white text-2xl sm:text-3xl font-bold shadow-lg transition-all duration-200 overflow-hidden border-2 ${
+                isSpeakingMain ? 'bg-green-500 ring-4 ring-green-400 ring-offset-2 ring-offset-gray-900 scale-105 shadow-green-500/30 border-green-400' :
+                callState === 'connected' ? 'bg-green-500 border-green-500' :
+                callState === 'calling' || callState === 'joining' ? 'bg-blue-500 animate-pulse border-blue-400' :
+                'bg-orange-500 animate-pulse border-orange-400'
               }`}>
-                {isGroup ? <UsersIcon size={32} /> : <PhoneIcon size={32} className={callState !== 'connected' ? 'animate-bounce' : ''} />}
+                {dmPhoto ? (
+                  <img src={dmPhoto} alt={displayName} className="w-full h-full object-cover" />
+                ) : isGroup ? (
+                  <UsersIcon size={32} />
+                ) : (
+                  <PhoneIcon size={32} className={callState !== 'connected' ? 'animate-bounce' : ''} />
+                )}
               </div>
               {(speakingMap['main'] || (speakingMap[myChatId] && !isMuted)) && callState === 'connected' && (
                 <span className="absolute -top-1 -right-1 flex h-4 w-4">

@@ -119,6 +119,60 @@ export const playHangupSound = () => {
   } catch (e) {}
 }
 
+
+let outgoingTimer = null
+let outgoingCtx = null
+let outgoingNodes = []
+
+// Sonido de llamada saliente (tono de timbrado que escucha quien llama mientras espera respuesta)
+export const playOutgoingRing = () => {
+  try {
+    stopOutgoingRing()
+    const Ctx = window.AudioContext || window.webkitAudioContext
+    if (!Ctx) return null
+    const ctx = new Ctx()
+    outgoingCtx = ctx
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {})
+
+    const playTone = () => {
+      if (!outgoingCtx || outgoingCtx !== ctx) return
+      const now = ctx.currentTime
+      // Tono dual armónico de central telefónica (440Hz + 480Hz)
+      const freqs = [440, 480]
+      freqs.forEach(freq => {
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        osc.type = 'sine'
+        osc.frequency.value = freq
+        // Suave envolvente de volumen para no molestar el oído
+        gain.gain.setValueAtTime(0.001, now)
+        gain.gain.linearRampToValueAtTime(0.16, now + 0.1)
+        gain.gain.setValueAtTime(0.16, now + 1.4)
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 1.5)
+        osc.start(now)
+        osc.stop(now + 1.55)
+        outgoingNodes.push(osc)
+      })
+      outgoingTimer = setTimeout(playTone, 3800)
+    }
+    playTone()
+    return ctx
+  } catch (e) {
+    return null
+  }
+}
+
+export const stopOutgoingRing = () => {
+  try {
+    if (outgoingTimer) { clearTimeout(outgoingTimer); outgoingTimer = null }
+    outgoingNodes.forEach(n => { try { n.stop() } catch (e) {} })
+    outgoingNodes = []
+    if (outgoingCtx) { try { outgoingCtx.close().catch(() => {}) } catch (e) {} outgoingCtx = null }
+  } catch (e) {}
+}
+
 let sharedAudioCtx = null
 const getSharedAudioContext = () => {
   try {
@@ -135,49 +189,53 @@ const getSharedAudioContext = () => {
   }
 }
 
-// Conectar stream remoto con doble ruta garantizada:
-// 1. Web Audio API (MediaStreamSource -> Gain -> AudioContext.destination para salida directa por altavoces)
-// 2. HTML5 Media Element (audioEl.srcObject -> play)
+// Conectar stream remoto de forma universal y sin eco:
+// 1. HTML5 Media Element: canal principal con salida nativa a altavoces/auricular (100% compatible con iOS WebKit y Android)
+// 2. Web Audio API: solo fallback si no existe elemento de audio en el DOM
 export const connectRemoteAudio = (audioEl, stream) => {
   const cleanups = []
   if (!stream) return cleanups
 
-  let webAudioConnected = false
+  let isHtmlAudioActive = false
 
-  // 1. Pipeline Web Audio API
-  try {
-    const ctx = getSharedAudioContext()
-    if (ctx) {
-      const source = ctx.createMediaStreamSource(stream)
-      const gain = ctx.createGain()
-      gain.gain.value = 1.0
-      source.connect(gain)
-      gain.connect(ctx.destination)
-      webAudioConnected = true
-      cleanups.push(() => {
-        try { source.disconnect(); gain.disconnect() } catch (e) {}
-      })
-    }
-  } catch (e) {
-    console.warn('Web Audio destination route notice:', e)
-  }
-
-  // 2. Pipeline HTML5 Audio Element (Muted if Web Audio is active to avoid double audio / reverb echo)
+  // 1. Pipeline HTML5 Audio Element (canal nativo para salida por altavoces del dispositivo)
   if (audioEl) {
     try {
       audioEl.srcObject = stream
-      audioEl.muted = webAudioConnected
+      audioEl.muted = false
       audioEl.volume = 1.0
       audioEl.autoplay = true
       audioEl.playsInline = true
+      audioEl.setAttribute('playsinline', 'true')
+      audioEl.setAttribute('webkit-playsinline', 'true')
       const p = audioEl.play()
       if (p && typeof p.catch === 'function') {
         p.catch(() => {
           // Autoplay bloqueado hasta interacción del usuario
         })
       }
+      isHtmlAudioActive = true
     } catch (e) {
       console.error('Error connecting remote audio element:', e)
+    }
+  }
+
+  // 2. Pipeline Web Audio API (solo como respaldo si no hay elemento HTML5)
+  if (!isHtmlAudioActive) {
+    try {
+      const ctx = getSharedAudioContext()
+      if (ctx) {
+        const source = ctx.createMediaStreamSource(stream)
+        const gain = ctx.createGain()
+        gain.gain.value = 1.0
+        source.connect(gain)
+        gain.connect(ctx.destination)
+        cleanups.push(() => {
+          try { source.disconnect(); gain.disconnect() } catch (e) {}
+        })
+      }
+    } catch (e) {
+      console.warn('Web Audio destination fallback notice:', e)
     }
   }
 
@@ -188,7 +246,7 @@ export const connectRemoteAudio = (audioEl, stream) => {
         sharedAudioCtx.resume().catch(() => {})
       }
       if (audioEl) {
-        if (!webAudioConnected) audioEl.muted = false
+        audioEl.muted = false
         audioEl.volume = 1.0
         const p = audioEl.play()
         if (p && typeof p.catch === 'function') p.catch(() => {})
@@ -196,16 +254,21 @@ export const connectRemoteAudio = (audioEl, stream) => {
     } catch (e) {}
   }
 
-  window.addEventListener('pointerdown', unlockAll, { passive: true })
-  window.addEventListener('click', unlockAll, { passive: true })
-  window.addEventListener('touchstart', unlockAll, { passive: true })
-  window.addEventListener('keydown', unlockAll, { passive: true })
+  if (typeof window !== 'undefined') {
+    window.addEventListener('pointerdown', unlockAll, { passive: true })
+    window.addEventListener('click', unlockAll, { passive: true })
+    window.addEventListener('touchstart', unlockAll, { passive: true })
+    window.addEventListener('keydown', unlockAll, { passive: true })
+
+    cleanups.push(() => {
+      try { window.removeEventListener('pointerdown', unlockAll) } catch (e) {}
+      try { window.removeEventListener('click', unlockAll) } catch (e) {}
+      try { window.removeEventListener('touchstart', unlockAll) } catch (e) {}
+      try { window.removeEventListener('keydown', unlockAll) } catch (e) {}
+    })
+  }
 
   cleanups.push(() => {
-    try { window.removeEventListener('pointerdown', unlockAll) } catch (e) {}
-    try { window.removeEventListener('click', unlockAll) } catch (e) {}
-    try { window.removeEventListener('touchstart', unlockAll) } catch (e) {}
-    try { window.removeEventListener('keydown', unlockAll) } catch (e) {}
     if (audioEl) {
       try {
         audioEl.pause()
