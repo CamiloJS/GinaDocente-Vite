@@ -5724,19 +5724,21 @@ useEffect(() => {
               return;
           }
 
-          await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'chats', activeChat.id, 'messages'), {
-              text: textToSend,
-              imageUrl: imgToSend,
-              fileUrl: fileToSend,
-              fileName: fileNameToSend,
-              audioUrl: audioToSend,
+          const messageData = {
+              text: textToSend || '',
+              imageUrl: imgToSend || '',
+              fileUrl: fileToSend || '',
+              fileName: fileNameToSend || '',
+              audioUrl: audioToSend || '',
               author: authorName,
               authorId: myChatId,
               uid: user?.uid || myChatId || '',
               status: 'sent',
-              replyTo: replyToSend,
+              replyTo: replyToSend || null,
               createdAt: nowTs
-          });
+          };
+          const cleanMessageData = sanitizeFirestoreData ? sanitizeFirestoreData(messageData) : messageData;
+          await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'chats', activeChat.id, 'messages'), cleanMessageData);
 
           // Scroll hacia abajo instantáneo al enviar
           setTimeout(() => scrollToChatBottom('smooth'), 30);

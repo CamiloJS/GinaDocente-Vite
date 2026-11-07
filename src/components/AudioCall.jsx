@@ -813,7 +813,7 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
           }
         } else {
           await setDoc(callRefToClean, { status: 'ended' }, { merge: true }).catch(() => {})
-          await deleteDoc(callRefToClean).catch(() => {})
+          setTimeout(() => deleteDoc(callRefToClean).catch(() => {}), 1500)
         }
       }
     } catch (e) {}
