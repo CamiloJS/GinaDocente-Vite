@@ -625,8 +625,9 @@ const TaskCard = React.memo(({
             };
 
             const nowTs = Date.now();
+            const clientMsgId = isDemoMode ? `demo_msg_${nowTs}` : `msg_${nowTs}_${Math.random().toString(36).substring(2, 9)}`;
             const newMsgPayload = {
-                id: isDemoMode ? `demo_msg_${nowTs}` : undefined,
+                id: clientMsgId,
                 text: messageText,
                 sharedItem,
                 author: authorName,
@@ -652,6 +653,7 @@ const TaskCard = React.memo(({
                 timestamp: nowTs
             };
 
+            let finalMsgId = clientMsgId;
             if (isDemoMode) {
                 const existing = loadDemoChatMessages(targetChatId);
                 const nextMsgs = [...existing, newMsgPayload];
@@ -659,7 +661,10 @@ const TaskCard = React.memo(({
                 saveDemoSandboxItem('lastMessages', { ...lastMessagePayload, id: targetChatId });
             } else {
                 const cleanPayload = sanitizeFirestoreData ? sanitizeFirestoreData(newMsgPayload) : newMsgPayload;
-                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'chats', targetChatId, 'messages'), cleanPayload);
+                const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'chats', targetChatId, 'messages'), cleanPayload);
+                if (docRef?.id) {
+                    finalMsgId = docRef.id;
+                }
                 const cleanLast = sanitizeFirestoreData ? sanitizeFirestoreData(lastMessagePayload) : lastMessagePayload;
                 await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'lastMessages', targetChatId), cleanLast, { merge: true }).catch(() => {});
             }
@@ -669,7 +674,7 @@ const TaskCard = React.memo(({
                 window.dispatchEvent(new CustomEvent('englishtech:chat_message_sent', {
                     detail: {
                         chatId: targetChatId,
-                        message: newMsgPayload,
+                        message: { ...newMsgPayload, id: finalMsgId },
                         lastMessage: lastMessagePayload
                     }
                 }));

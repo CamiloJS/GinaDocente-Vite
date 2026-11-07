@@ -943,6 +943,12 @@ const TasksTab = React.memo(({
         });
     }, [filteredTasks, visiblePinnedTasks]);
 
+    // Publicación solicitada vía modal directo (#post/<id>) que podría no estar en el listado filtrado actual
+    const modalStandaloneTask = React.useMemo(() => {
+        if (!activePostModalId) return null;
+        return (combinedTasks || tasks || []).find(t => String(t?.id) === String(activePostModalId)) || null;
+    }, [activePostModalId, combinedTasks, tasks]);
+
     const teacherPic = resolveUserPhoto(myChatId, userMappings, userMappings?.[myChatId]?.profilePicUrl || '');
     const activeComposerGroupObj = (academicGroups || []).find(g => String(g?.id || '').replace(/^acad_/i, '').toLowerCase() === String((fixedTargetGroup || postTargetGroup || '')).replace(/^acad_/i, '').toLowerCase());
 
@@ -2763,6 +2769,50 @@ Descripción original: ${taskDesc}`;
                     </div>
                 ))}
             </div>
+
+            {/* TaskCard standalone si el post compartido no está visible en el feed actual (filtro/paginación) */}
+            {modalStandaloneTask && !regularTasksToRender.some(t => String(t.id) === String(modalStandaloneTask.id)) && !filteredPinnedTasks.some(t => String(t.id) === String(modalStandaloneTask.id)) && (
+                <div key={`modal-standalone-${modalStandaloneTask.id}`} style={{ display: 'none' }}>
+                    <TaskCard 
+                        task={{...modalStandaloneTask, type: modalStandaloneTask.type || 'task'}} 
+                        role={role} 
+                        isDemoMode={isDemoMode}
+                        setTasks={setTasks}
+                        db={db} 
+                        appId={appId} 
+                        academicGroups={academicGroups}
+                        glassCard={glassCard} 
+                        glassInput={glassInput} 
+                        callGemini={callGemini} 
+                        currentUser={user} 
+                        showMessage={showMessage} 
+                        loggedInName={loggedInName} 
+                        myChatId={myChatId}
+                        isDarkMode={isDarkMode} 
+                        themeMode={themeMode}
+                        confirmAction={confirmAction} 
+                        handleOpenProfileByName={handleOpenProfileByName} 
+                        setFullScreenImage={setFullScreenImage} 
+                        userMappings={userMappings} 
+                        evaluations={evaluations}
+                        grades={grades}
+                        reviews={reviews}
+                        books={books}
+                        onStartEvaluation={onStartEvaluation}
+                        onOpenEvaluationResults={onOpenEvaluationResults}
+                        onOpenImmediateFeedback={onOpenImmediateFeedback}
+                        onRetryDemoEvaluation={onRetryDemoEvaluation}
+                        onOpenEvaluationsTab={onOpenEvaluationsTab}
+                        onOpenReviewsTab={onOpenReviewsTab}
+                        onOpenBooksTab={onOpenBooksTab}
+                        activePostModalId={activePostModalId}
+                        setActivePostModalId={setActivePostModalId}
+                        setUserPosts={setUserPosts}
+                        chatGroups={chatGroups}
+                        students={students}
+                    />
+                </div>
+            )}
             {/* Sentinel y controles de carga de publicaciones anteriores (Scroll infinito + botón de respaldo) */}
             {hasMoreTasks && (
                 <div className="w-full flex flex-col items-center justify-center py-4">

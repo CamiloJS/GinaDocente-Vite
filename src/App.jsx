@@ -4605,7 +4605,7 @@ useEffect(() => {
 
               // Solo los ultimos 300 mensajes (antes cargaba TODO el historial del chat)
               const unsubscribe = onSnapshot(query(collection(db, ...base, 'chats', activeChat.id, 'messages'), orderBy('createdAt', 'desc'), limit(chatWindow)), s => {
-                  const msgs = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.createdAt - b.createdAt);
+                  const msgs = s.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => a.createdAt - b.createdAt);
 
                   // Si no es la carga inicial y se agregó un mensaje nuevo
                   if (!isInitialLoad && s.docChanges().length > 0) {
@@ -4745,7 +4745,7 @@ useEffect(() => {
                       setLastMessages(prev => ({ ...prev, [chatId]: lastMessage }));
                   }
                   if (activeChat && (activeChat.id === chatId || `group_${activeChat.id}` === chatId || activeChat.id === `group_${chatId}`)) {
-                      if (message) {
+                      if (message && message.id) {
                           setChatMessages(prev => {
                               if (prev.some(m => m.id === message.id)) return prev;
                               return [...prev, message];
@@ -5064,7 +5064,7 @@ useEffect(() => {
           };
 
           const handleEditAppMessage = async () => {
-              if (!activeChat || !editAppMessageText.trim()) return;
+              if (!activeChat || !editingAppMessageId || !editAppMessageText.trim()) return;
               const trimmedEdit = editAppMessageText.trim();
               
               const originalMsg = chatMessages.find(m => m.id === editingAppMessageId);
@@ -7191,7 +7191,7 @@ useEffect(() => {
                         <EmptyState icon={FileText} title="Sin publicaciones" message={isMyProfile ? "Comparte algo en tu perfil para que otros lo vean." : "Este usuario aún no ha publicado nada."} isDarkMode={isDarkMode} />
                     ) : null}
                     {myPosts.map(post => {
-                        const isEditingThis = editingProfilePostId === post.id;
+                        const isEditingThis = Boolean(editingProfilePostId) && editingProfilePostId === post.id;
 
                         // Resolución limpia del autor de la publicación para mostrar arriba de cada tarjeta (inclusive en su propio perfil)
                         const postAuthorKey = post.authorUsername || post.authorId || post.author || '';
@@ -12029,7 +12029,7 @@ Escribe en español con tono pedagógico moderno.`;
                                                       )}
                                                   </td>
                                                   <td className="p-3.5 text-center">
-                                                      {editingGrade.id === grade.id ? (
+                                                      {Boolean(editingGrade?.id) && editingGrade.id === grade.id ? (
                                                           <div className="flex justify-center items-center gap-1.5">
                                                               <input 
                                                                   type="number" 
@@ -17286,7 +17286,7 @@ Escribe en español con tono pedagógico moderno.`;
                                   
                                               const isMe = m.authorId === myChatId;
                                               const isTeacher = m.author === TEACHER_NAME || m.author === SECOND_TEACHER_NAME || isTeacherId(m.authorId);
-                                              const isEditingThis = editingAppMessageId === m.id;
+                                              const isEditingThis = Boolean(editingAppMessageId) && editingAppMessageId === m.id;
                                               
                                               const bubbleRadius = isMe
                                                   ? `rounded-l-2xl ${isFirstInGroup ? 'rounded-tr-2xl' : 'rounded-tr-[4px]'} ${isLastInGroup ? 'rounded-br-2xl' : 'rounded-br-[4px]'}`
@@ -19178,7 +19178,7 @@ Escribe en español con tono pedagógico moderno.`;
                               
                               <div className="max-h-60 overflow-y-auto space-y-2 pr-2">
                                   {teacherBotInfoList.map(item => {
-                                      const isEditing = editingIAId === item.id;
+                                      const isEditing = Boolean(editingIAId) && editingIAId === item.id;
                                       const botDocId = isCamiloTeacher(myChatId) ? 'teacherBot_camilodocente' : 'teacherBot';
                                       return (
                                       <div key={item.id} className="bg-gray-50 dark:bg-gray-800 p-3 rounded-xl text-xs flex justify-between items-start gap-3 border border-gray-200 dark:border-gray-700 shadow-sm">

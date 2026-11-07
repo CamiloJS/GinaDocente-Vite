@@ -8,7 +8,19 @@
 export const parseSharedPost = (message, tasks = []) => {
   if (!message) return null;
   if (message.sharedItem && typeof message.sharedItem === 'object' && message.sharedItem.id) {
-    return message.sharedItem;
+    const foundTask = Array.isArray(tasks) ? tasks.find(t => String(t.id) === String(message.sharedItem.id)) : null;
+    return {
+      ...message.sharedItem,
+      ...(foundTask ? {
+        title: foundTask.title || message.sharedItem.title,
+        description: foundTask.description || message.sharedItem.description,
+        imageUrl: foundTask.imageUrl || (Array.isArray(foundTask.attachments) && foundTask.attachments[0]?.url) || message.sharedItem.imageUrl,
+        dueDate: foundTask.dueDate || message.sharedItem.dueDate,
+        dueTime: foundTask.dueTime || message.sharedItem.dueTime,
+        commentsCount: Array.isArray(foundTask.comments) ? foundTask.comments.length : (foundTask.comments && typeof foundTask.comments === 'object' ? Object.keys(foundTask.comments).length : (message.sharedItem.commentsCount || 0)),
+        rating: typeof foundTask.rating === 'number' ? foundTask.rating : (message.sharedItem.rating || 5.0)
+      } : {})
+    };
   }
   const text = message.text || '';
   if (!text || typeof text !== 'string') return null;

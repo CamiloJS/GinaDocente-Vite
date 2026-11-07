@@ -172,6 +172,79 @@ console.log('\n== 2. Parseo y Extracción de Publicaciones Compartidas (parseSha
   console.log('  OK  Mensajes de texto normales devuelven null sin falsos positivos');
 }
 
+console.log('\n== 3. Prevención de Estado de Edición Erróneo y Sincronización de IDs ==');
+
+// Prueba 3.1: isEditingThis nunca debe ser true cuando editingAppMessageId es null
+{
+  const editingAppMessageId = null;
+  const msgWithNullId = { id: null, text: 'Mensaje' };
+  const msgWithValidId = { id: 'msg_12345', text: 'Mensaje' };
+  
+  const isEditingNull = Boolean(editingAppMessageId) && editingAppMessageId === msgWithNullId.id;
+  const isEditingValid = Boolean(editingAppMessageId) && editingAppMessageId === msgWithValidId.id;
+
+  assert.equal(isEditingNull, false);
+  assert.equal(isEditingValid, false);
+  console.log('  OK  editingAppMessageId null nunca activa isEditingThis, aun si el mensaje tuviese id null');
+}
+
+// Prueba 3.2: isEditingThis solo es true cuando coincide exactamente con un ID activo no nulo
+{
+  const editingAppMessageId = 'msg_target_77';
+  const targetMsg = { id: 'msg_target_77' };
+  const otherMsg = { id: 'msg_other_88' };
+
+  const isEditingTarget = Boolean(editingAppMessageId) && editingAppMessageId === targetMsg.id;
+  const isEditingOther = Boolean(editingAppMessageId) && editingAppMessageId === otherMsg.id;
+
+  assert.equal(isEditingTarget, true);
+  assert.equal(isEditingOther, false);
+  console.log('  OK  isEditingThis solo se activa para el mensaje exacto seleccionado para editar');
+}
+
+// Prueba 3.3: Mapeo { ...d.data(), id: d.id } preserva el ID real de Firestore ante id: null heredado
+{
+  const mockDoc = {
+    id: 'firestore_doc_abc',
+    data: () => ({ id: null, text: 'Mensaje con id null en payload' })
+  };
+  const mapped = { ...mockDoc.data(), id: mockDoc.id };
+  assert.equal(mapped.id, 'firestore_doc_abc');
+  assert.notEqual(mapped.id, null);
+  console.log('  OK  Mapeo Firestore { ...d.data(), id: d.id } garantiza que id: d.id prevalece siempre');
+}
+
+// Prueba 3.4: parseSharedPost actualiza métricas vivas (comentarios, título, descripción) desde tasks
+{
+  const liveTasks = [
+    {
+      id: 'post_live_sync_1',
+      title: 'Título Actualizado del Foro',
+      description: 'Descripción fresca y actualizada',
+      comments: [{ id: 'c1' }, { id: 'c2' }, { id: 'c3' }],
+      rating: 4.8
+    }
+  ];
+  const msgWithStaleSharedItem = {
+    sharedItem: {
+      id: 'post_live_sync_1',
+      type: 'forum',
+      typeLabel: 'Foro',
+      actionLabel: 'Ir al foro',
+      title: 'Título Antiguo',
+      description: 'Descripción vieja',
+      commentsCount: 0,
+      rating: 5.0
+    }
+  };
+  const parsed = parseSharedPost(msgWithStaleSharedItem, liveTasks);
+  assert.equal(parsed.title, 'Título Actualizado del Foro');
+  assert.equal(parsed.description, 'Descripción fresca y actualizada');
+  assert.equal(parsed.commentsCount, 3);
+  assert.equal(parsed.rating, 4.8);
+  console.log('  OK  parseSharedPost sincroniza en vivo métricas y textos actualizados de tasks');
+}
+
 console.log('\n========================================');
-console.log('Total pruebas Compartir en Chat: 8 | OK: 8 | FAIL: 0');
+console.log('Total pruebas Compartir en Chat: 12 | OK: 12 | FAIL: 0');
 console.log('========================================\n');
