@@ -257,6 +257,47 @@ console.log('\n== 3. Prevención de Estado de Edición Erróneo y Sincronizació
   console.log('  OK  parseSharedPost sincroniza en vivo métricas y textos actualizados de tasks');
 }
 
+// Prueba 3.5: isEditingThis nunca debe activarse para publicaciones compartidas ni mensajes eliminados
+{
+  const editingAppMessageId = 'msg_shared_101';
+  const sharedPostMsg = {
+    id: 'msg_shared_101',
+    text: '📌 *MOVIE FORUM #1*\nhttps://englishtech.vercel.app/#post/forum_101',
+    isDeleted: false
+  };
+  const mockTasks = [{ id: 'forum_101', title: 'MOVIE FORUM #1' }];
+
+  const isEditing = Boolean(editingAppMessageId) && 
+    editingAppMessageId === sharedPostMsg.id && 
+    !sharedPostMsg.isDeleted && 
+    !parseSharedPost(sharedPostMsg, mockTasks);
+
+  assert.equal(isEditing, false);
+  console.log('  OK  isEditingThis nunca se activa para publicaciones compartidas (previene input de edición espurio)');
+}
+
+// Prueba 3.6: Botón de editar texto plano se suprime en tarjetas compartidas, audios y mensajes eliminados
+{
+  const myChatId = 'user_123';
+  const mockTasks = [{ id: 'task_001', title: 'Tarea 1' }];
+
+  const sharedMsg = { id: 'm1', authorId: myChatId, text: '📌 *Tarea 1*\nhttps://englishtech.vercel.app/#post/task_001' };
+  const audioMsg = { id: 'm2', authorId: myChatId, text: '', audioUrl: 'blob:audio.mp3' };
+  const deletedMsg = { id: 'm3', authorId: myChatId, text: 'Este mensaje fue eliminado', isDeleted: true };
+  const normalTextMsg = { id: 'm4', authorId: myChatId, text: 'Hola a todos' };
+
+  const canEdit = (m) => {
+    const isMe = m.authorId === myChatId;
+    return isMe && !m.isDeleted && !m.audioUrl && !parseSharedPost(m, mockTasks) && Boolean(m.text);
+  };
+
+  assert.equal(canEdit(sharedMsg), false);
+  assert.equal(canEdit(audioMsg), false);
+  assert.equal(canEdit(deletedMsg), false);
+  assert.equal(canEdit(normalTextMsg), true);
+  console.log('  OK  Botón de editar texto se restringe exclusivamente a mensajes de texto plano válidos');
+}
+
 console.log('\n========================================');
-console.log('Total pruebas Compartir en Chat: 13 | OK: 13 | FAIL: 0');
+console.log('Total pruebas Compartir en Chat: 15 | OK: 15 | FAIL: 0');
 console.log('========================================\n');

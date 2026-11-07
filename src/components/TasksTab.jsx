@@ -15,7 +15,7 @@ import AudioPlayer, { AudioRecordingVisualizer } from './AudioPlayer.jsx'
 import CustomVideoPlayer from './CustomVideoPlayer.jsx'
 import GeniallyEmbedPlayer, { extractGeniallyUrl } from './GeniallyEmbedPlayer.jsx'
 import { DEMO_TTL_MS, saveDemoSandboxItem } from '../utils/demoData.js'
-import { getCanonicalTeacherId, getItemTeacherId, getTeacherDisplayName, uploadImageToStorage, uploadRawFileToStorage, deleteFileFromStorage, generateId, resolveUserPhoto } from '../utils/helpers.js'
+import { getCanonicalTeacherId, getItemTeacherId, getTeacherDisplayName, uploadImageToStorage, uploadRawFileToStorage, deleteFileFromStorage, generateId, resolveUserPhoto, sanitizeFirestoreData } from '../utils/helpers.js'
 import { createDefaultKahootQuestion, validateKahootConfig, generateKahootPin } from '../utils/kahootEngine.js'
 import { BOOK_THEMES, renderPdfToBookPages, uploadBookPagesToStorage, sanitizeBookForFirestore, buildFallbackBookPages, buildBookPagesFromOutline, extractBookOutlinePageTexts, syncBookOutlineMetadata, stripBookHtml, generateAiBookPages, applyCustomCoverToPages, compressBookImageDataUrl, READING_AUDIO_PRESETS, getReadingAudioPreset, clampReadingVolume, readingAmbientPlayer } from '../utils/flipbookEngine.js'
 import Flipbook3DModal from './Flipbook3DModal.jsx'
@@ -2466,7 +2466,7 @@ Descripción original: ${taskDesc}`;
                                                 }
                                             } else {
                                                 await withTimeout(setDoc(doc(effectiveDb, 'artifacts', effectiveAppId, 'public', 'data', 'books', bookId), sanitizedBook, { merge: true }));
-                                                await withTimeout(setDoc(doc(effectiveDb, 'artifacts', effectiveAppId, 'public', 'data', 'tasks', wallPostId), wallPostPayload, { merge: true }));
+                                                await withTimeout(setDoc(doc(effectiveDb, 'artifacts', effectiveAppId, 'public', 'data', 'tasks', wallPostId), sanitizeFirestoreData(wallPostPayload), { merge: true }));
                                                 if (typeof setRawBooks === 'function') {
                                                     setRawBooks(prev => [inMemoryBook, ...(prev || []).filter(b => String(b.id) !== String(bookId))]);
                                                 }
@@ -2555,7 +2555,7 @@ Descripción original: ${taskDesc}`;
                                             }
                                         } else {
                                             try {
-                                                await withTimeout(addDoc(collection(effectiveDb, 'artifacts', effectiveAppId, 'public', 'data', 'tasks'), payload));
+                                                await withTimeout(addDoc(collection(effectiveDb, 'artifacts', effectiveAppId, 'public', 'data', 'tasks'), sanitizeFirestoreData(payload)));
                                             } catch (primaryErr) {
                                                 console.warn("Retrying task creation with basic schema:", primaryErr);
                                                 const basicPayload = {
@@ -2582,7 +2582,7 @@ Descripción original: ${taskDesc}`;
                                                 if (postGeniallyUrl && postGeniallyUrl.trim()) basicPayload.geniallyUrl = extractGeniallyUrl(postGeniallyUrl.trim());
                                                 if (validPoll) basicPayload.poll = validPoll;
                                                 if (validKahoot) basicPayload.kahoot = validKahoot;
-                                                await withTimeout(addDoc(collection(effectiveDb, 'artifacts', effectiveAppId, 'public', 'data', 'tasks'), basicPayload), 10000);
+                                                await withTimeout(addDoc(collection(effectiveDb, 'artifacts', effectiveAppId, 'public', 'data', 'tasks'), sanitizeFirestoreData(basicPayload)), 10000);
                                             }
                                         }
 

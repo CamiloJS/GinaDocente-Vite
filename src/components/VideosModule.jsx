@@ -27,7 +27,7 @@ import {
   User
 } from './Icons.jsx';
 import { parseVideoUrl, normalizeVideoItem, deduplicateVideos } from '../utils/videoEngine.js';
-import { resolveUserPhoto } from '../utils/helpers.js';
+import { resolveUserPhoto, sanitizeFirestoreData } from '../utils/helpers.js';
 import {
   db as defaultDb,
   appId as defaultAppId,
@@ -438,7 +438,8 @@ export default function VideosModule({
           });
         }
       } else {
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'videos', videoItem.id), videoItem);
+        const cleanVideoItem = sanitizeFirestoreData(videoItem);
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'videos', videoItem.id), cleanVideoItem);
         if (typeof setVideos === 'function') {
           setVideos(prev => {
             const list = Array.isArray(prev) ? prev : [];
@@ -494,10 +495,14 @@ export default function VideosModule({
       if (isDemoMode || String(video.id).startsWith('demo_')) {
         saveDemoSandboxItem('videos', updatedVideo);
       } else {
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'videos', video.id), {
+        const likeUpdates = sanitizeFirestoreData({
           likes: updatedLikes,
           updatedAt: Date.now()
         });
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'videos', video.id), likeUpdates)
+          .catch(async () => {
+            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'videos', video.id), sanitizeFirestoreData(updatedVideo), { merge: true });
+          });
       }
     } catch (err) {
       console.error('Error al actualizar reacción:', err);
@@ -544,10 +549,14 @@ export default function VideosModule({
       if (isDemoMode || String(activePlayingVideo.id).startsWith('demo_')) {
         saveDemoSandboxItem('videos', updatedVideo);
       } else {
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'videos', activePlayingVideo.id), {
+        const commentUpdates = sanitizeFirestoreData({
           comments: updatedComments,
           updatedAt: now
         });
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'videos', activePlayingVideo.id), commentUpdates)
+          .catch(async () => {
+            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'videos', activePlayingVideo.id), sanitizeFirestoreData(updatedVideo), { merge: true });
+          });
       }
       setTimeout(() => {
         commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -582,10 +591,14 @@ export default function VideosModule({
         if (isDemoMode || String(activePlayingVideo.id).startsWith('demo_')) {
           saveDemoSandboxItem('videos', updatedVideo);
         } else {
-          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'videos', activePlayingVideo.id), {
+          const deleteCommentUpdates = sanitizeFirestoreData({
             comments: updatedComments,
             updatedAt: Date.now()
           });
+          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'videos', activePlayingVideo.id), deleteCommentUpdates)
+            .catch(async () => {
+              await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'videos', activePlayingVideo.id), sanitizeFirestoreData(updatedVideo), { merge: true });
+            });
         }
       } catch (err) {
         console.error('Error al borrar comentario:', err);
@@ -670,13 +683,17 @@ export default function VideosModule({
       if (isDemoMode || String(editingVideo.id).startsWith('demo_')) {
         saveDemoSandboxItem('videos', updatedVideo);
       } else {
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'videos', String(editingVideo.id)), {
+        const editVideoUpdates = sanitizeFirestoreData({
           title: cleanTitle,
           description: editDescription.trim(),
           className: finalClass || editingVideo.className || 'Inglés Técnico Económico',
           format: editFormat || editingVideo.format || 'long',
           updatedAt: now
         });
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'videos', String(editingVideo.id)), editVideoUpdates)
+          .catch(async () => {
+            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'videos', String(editingVideo.id)), sanitizeFirestoreData(updatedVideo), { merge: true });
+          });
       }
       showMessage('Vídeo actualizado con éxito.');
       setEditingVideo(null);

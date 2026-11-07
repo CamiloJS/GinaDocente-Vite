@@ -677,7 +677,7 @@ function App() {
   const [chatMessages, setChatMessages] = useState([]);
   const [chatWindow, setChatWindow] = useState(300); // cuantos mensajes del chat se cargan
   const cargandoMasRef = useRef(false);
-  useEffect(() => { setChatWindow(300); cargandoMasRef.current = false; }, [activeChat?.id]);
+  useEffect(() => { setChatWindow(300); cargandoMasRef.current = false; setEditingAppMessageId(null); setEditAppMessageText(""); }, [activeChat?.id]);
   const [rawChatGroups, setChatGroups] = useState(() => initialIsDemo ? DEMO_CHAT_GROUPS : []);
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
     const [rawAcademicGroups, setAcademicGroups] = useState(() => initialIsDemo ? DEMO_ACADEMIC_GROUPS : []);
@@ -4858,6 +4858,8 @@ useEffect(() => {
                   return;
               }
               setActiveChat(chat);
+              setEditingAppMessageId(null);
+              setEditAppMessageText("");
               setIsChatMinimized(false);
               setShowChatSettings(false);
               setShowGroupInfo(false);
@@ -17312,7 +17314,7 @@ Escribe en español con tono pedagógico moderno.`;
                                   
                                               const isMe = m.authorId === myChatId;
                                               const isTeacher = m.author === TEACHER_NAME || m.author === SECOND_TEACHER_NAME || isTeacherId(m.authorId);
-                                              const isEditingThis = Boolean(editingAppMessageId) && editingAppMessageId === m.id;
+                                              const isEditingThis = Boolean(editingAppMessageId) && editingAppMessageId === m.id && !m.isDeleted && !parseSharedPost(m, tasks);
                                               
                                               const bubbleRadius = isMe
                                                   ? `rounded-l-2xl ${isFirstInGroup ? 'rounded-tr-2xl' : 'rounded-tr-[4px]'} ${isLastInGroup ? 'rounded-br-2xl' : 'rounded-br-[4px]'}`
@@ -17405,7 +17407,7 @@ Escribe en español con tono pedagógico moderno.`;
                                                                   
                                                                   {isEditingThis ? (
                                                                       <div className="flex gap-2 items-center min-w-[180px] bg-black/40 p-1.5 rounded-xl backdrop-blur-md">
-                                                                          <input className="py-1 px-2 text-xs flex-1 rounded bg-white/20 outline-none text-white placeholder-white/50" value={editAppMessageText} onChange={e => setEditAppMessageText(e.target.value)} autoFocus />
+                                                                          <input className="py-1 px-2 text-xs flex-1 rounded bg-white/20 outline-none text-white placeholder-white/50" value={editAppMessageText} onChange={e => setEditAppMessageText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleEditAppMessage(); if (e.key === 'Escape') setEditingAppMessageId(null); }} autoFocus />
                                                                           <button onClick={handleEditAppMessage} className="text-green-300 hover:text-green-400" title="Guardar"><CheckLine size={16}/></button>
                                                                           <button onClick={() => setEditingAppMessageId(null)} className="text-red-300 hover:text-red-400" title="Cancelar"><XLine size={16}/></button>
                                                                       </div>
@@ -17638,7 +17640,7 @@ Escribe en español con tono pedagógico moderno.`;
                                                                   
                                                                   {(isMe || role === 'teacher') && !isEditingThis && (
                                                                       <>
-                                                                          {isMe && !m.isDeleted && <button onClick={() => {setEditingAppMessageId(m.id); setEditAppMessageText(m.text || "");}} className="p-1 rounded-full shadow-xs bg-white/90 text-gray-600 hover:bg-white dark:bg-gray-800 dark:text-gray-300 cursor-pointer" title="Editar"><Edit3 size={13}/></button>}
+                                                                          {isMe && !m.isDeleted && !m.audioUrl && !parseSharedPost(m, tasks) && Boolean(m.text) && <button onClick={() => {setEditingAppMessageId(m.id); setEditAppMessageText(m.text || "");}} className="p-1 rounded-full shadow-xs bg-white/90 text-gray-600 hover:bg-white dark:bg-gray-800 dark:text-gray-300 cursor-pointer" title="Editar"><Edit3 size={13}/></button>}
                                                                           <button onClick={() => confirmAction(role === 'teacher' ? "¿Deseas eliminar este mensaje definitivamente?" : "¿Deseas eliminar este mensaje para todos?", () => handleDeleteAppMessage(m.id, role === 'teacher'))} className="p-1 rounded-full shadow-xs bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/50 dark:text-red-400 cursor-pointer" title="Eliminar"><Trash2 size={13}/></button>
                                                                       </>
                                                                   )}
