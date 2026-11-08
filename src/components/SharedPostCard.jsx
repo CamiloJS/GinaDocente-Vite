@@ -12,9 +12,9 @@ import {
   Star,
   Sparkles
 } from './Icons.jsx';
-import { parseSharedPost } from '../utils/sharedPostParser.js';
+import { parseSharedPost, isSharedPostMessage } from '../utils/sharedPostParser.js';
 
-export { parseSharedPost };
+export { parseSharedPost, isSharedPostMessage };
 
 export const SharedPostCard = ({
   sharedItem,
@@ -88,7 +88,16 @@ export const SharedPostCard = ({
 
   return (
     <div 
-      className={`mt-1.5 w-full min-w-[260px] max-w-[340px] sm:max-w-[370px] rounded-2xl p-3 sm:p-3.5 border transition-all select-none shadow-md ${
+      onClick={handleCardClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleCardClick(e);
+        }
+      }}
+      className={`mt-1.5 w-full min-w-[260px] max-w-[340px] sm:max-w-[370px] rounded-2xl p-3 sm:p-3.5 border transition-all select-none shadow-md cursor-pointer hover:shadow-lg active:scale-[0.99] ${
         isMe 
           ? 'bg-black/25 hover:bg-black/35 border-white/25 text-white' 
           : (isDarkMode 
@@ -126,7 +135,7 @@ export const SharedPostCard = ({
       <h4 className={`text-sm sm:text-[15px] font-extrabold leading-snug line-clamp-2 mb-2 ${
         isMe ? 'text-white' : (isDarkMode ? 'text-white' : 'text-gray-900')
       }`}>
-        {title}
+        {title || 'Publicación compartida'}
       </h4>
 
       {/* Imagen adjunta en miniatura si existe */}

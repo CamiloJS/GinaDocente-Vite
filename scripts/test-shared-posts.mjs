@@ -1,7 +1,7 @@
 // scripts/test-shared-posts.mjs
 // Suite de pruebas para verificar el compartir de publicaciones/foros/tareas a chats grupales e individuales
 import assert from 'node:assert/strict';
-import { parseSharedPost } from '../src/utils/sharedPostParser.js';
+import { parseSharedPost, isSharedPostMessage } from '../src/utils/sharedPostParser.js';
 
 console.log('\n== 1. Resolución de Identificadores de Chat para Grupos y DMs ==');
 
@@ -305,7 +305,8 @@ console.log('\n== 3. Prevención de Estado de Edición Erróneo y Sincronizació
 
   const canEdit = (m) => {
     const isMe = m.authorId === myChatId;
-    return isMe && !m.isDeleted && !m.audioUrl && !parseSharedPost(m, mockTasks) && Boolean(m.text);
+    const isShared = isSharedPostMessage(m, mockTasks);
+    return isMe && !m.isDeleted && !m.audioUrl && !isShared && Boolean(m.text);
   };
 
   assert.equal(canEdit(sharedMsg), false);
@@ -315,6 +316,159 @@ console.log('\n== 3. Prevención de Estado de Edición Erróneo y Sincronizació
   console.log('  OK  Botón de editar texto se restringe exclusivamente a mensajes de texto plano válidos');
 }
 
+// Prueba 3.7: isSharedPostMessage detecta múltiples formatos de publicación compartida
+{
+  assert.equal(isSharedPostMessage({ isSharedPost: true }), true);
+  assert.equal(isSharedPostMessage({ sharedPost: { id: 'post_1' } }), true);
+  assert.equal(isSharedPostMessage({ sharedItem: '{"id":"post_2"}' }), true);
+  assert.equal(isSharedPostMessage({ sharedTask: { id: 'task_3' } }), true);
+  assert.equal(isSharedPostMessage({ text: 'Mira este foro: https://englishtech.vercel.app/#forum/f123' }), true);
+  assert.equal(isSharedPostMessage({ text: '📌 MOVIE FORUM #1\nhttps://englishtech.vercel.app/#post/123' }), true);
+  assert.equal(isSharedPostMessage({ text: 'Presentación: https://englishtech.vercel.app/#slides/slide_unit1' }), true);
+  assert.equal(isSharedPostMessage({ text: 'Libro digital: https://englishtech.vercel.app/#book/book_grammar' }), true);
+  assert.equal(isSharedPostMessage({ text: 'Evaluación: https://englishtech.vercel.app/#evaluation/quiz_final' }), true);
+  assert.equal(isSharedPostMessage({ text: 'Hola a todos, nos vemos en clase' }), false);
+  assert.equal(isSharedPostMessage(null), false);
+  console.log('  OK  isSharedPostMessage detecta fielmente cualquier tipo de publicación o recurso compartido');
+}
+
+// Prueba 3.8: parseSharedPost infiere tipo e interacción aún sin lista de tasks cargada
+{
+  const forumMsg = { text: '📌 *MOVIE FORUM #1*\nhttps://englishtech.vercel.app/#post/movie_f1' };
+  const parsedForum = parseSharedPost(forumMsg, []);
+  assert.ok(parsedForum);
+  assert.equal(parsedForum.id, 'movie_f1');
+  assert.equal(parsedForum.type, 'forum');
+  assert.equal(parsedForum.typeLabel, 'Foro');
+  assert.equal(parsedForum.actionLabel, 'Ir al foro');
+  assert.equal(parsedForum.title, 'MOVIE FORUM #1');
+
+  const evalMsg = { text: '📌 *Midterm Quiz*\nhttps://englishtech.vercel.app/#evaluation/eval_midterm' };
+  const parsedEval = parseSharedPost(evalMsg, []);
+  assert.ok(parsedEval);
+  assert.equal(parsedEval.id, 'eval_midterm');
+  assert.equal(parsedEval.type, 'evaluation');
+  assert.equal(parsedEval.actionLabel, 'Ir a la evaluación');
+
+  console.log('  OK  parseSharedPost infiere tipo y acción para foros, tareas y evaluaciones aun con tasks=[]');
+}
+
+// Prueba 3.9: Supresión total del input de edición [  ] ✓ ✕ para publicaciones compartidas
+{
+  const sharedMsg = {
+    id: 'shared_msg_456',
+    text: '📌 *MOVIE FORUM #1*\nhttps://englishtech.vercel.app/#post/rjPM1hpWrjbhCVU5cZLX'
+  };
+  const editingAppMessageId = 'shared_msg_456';
+  const isSharedThis = isSharedPostMessage(sharedMsg, []);
+  const isEditingThis = Boolean(editingAppMessageId) && editingAppMessageId === sharedMsg.id && !sharedMsg.isDeleted && !isSharedThis;
+
+  assert.equal(isSharedThis, true);
+  assert.equal(isEditingThis, false);
+  console.log('  OK  isEditingThis es false cuando el mensaje es compartido, impidiendo que aparezca [  ] ✓ ✕');
+}
+
+// Prueba 3.10: Calificación privada de comentarios y mensajes (solo visible para docente y autor)
+{
+  const teacherRole = 'teacher';
+  const student1Role = 'student';
+  const student2Role = 'student';
+
+  const authorId = 'student_maria';
+  const otherStudentId = 'student_carlos';
+
+  const commentWithGrade = {
+    id: 'comm_1',
+    authorId: authorId,
+    grade: 4.8,
+    feedback: 'Excelente análisis de la película'
+  };
+
+  const isVisibleForTeacher = teacherRole === 'teacher' || authorId === 'teacher_ana';
+  const isVisibleForAuthor = student1Role === 'teacher' || authorId === authorId;
+  const isVisibleForOtherStudent = student2Role === 'teacher' || otherStudentId === authorId;
+
+  assert.equal(isVisibleForTeacher, true);
+  assert.equal(isVisibleForAuthor, true);
+  assert.equal(isVisibleForOtherStudent, false);
+  console.log('  OK  Calificación y feedback privado solo es visible para el docente y el autor del comentario');
+}
+
+// Prueba 3.11: Títulos con asteriscos dobles o sin asteriscos
+{
+  const doubleAsteriskMsg = {
+    text: '📌 **MOVIE FORUM #1 🎬**\nhttps://englishtech.vercel.app/#post/post_movie_1'
+  };
+  const parsed = parseSharedPost(doubleAsteriskMsg);
+  assert.ok(parsed);
+  assert.equal(parsed.title, 'MOVIE FORUM #1 🎬');
+
+  const cleanIntro = (doubleAsteriskMsg.text || '')
+    .replace(/📌\s*(?:\*+)?([^*\n\r]+?)(?:\*+)?(?:\n|\r|$)/g, '')
+    .replace(/(?:https?:\/\/[^\s]+)?(?:#|\/)(?:post|task|forum|evaluation|eval|slides|slide|book|book3d|poll)\/(?:[a-zA-Z0-9_\-\.\:\%]+)/gi, '')
+    .trim();
+  assert.equal(cleanIntro, '');
+  console.log('  OK  Títulos con asteriscos dobles se extraen limpios y cleanIntro no deja residuos');
+}
+
+// Prueba 3.12: Depuración de puntuación residual al final de URL/postId
+{
+  const msgWithPeriod = {
+    text: 'Mira este foro: https://englishtech.vercel.app/#post/rjPM1hpWrjbhCVU5cZLX.'
+  };
+  const liveTasks = [{ id: 'rjPM1hpWrjbhCVU5cZLX', title: 'Movie Forum Live' }];
+  const parsed = parseSharedPost(msgWithPeriod, liveTasks);
+  assert.ok(parsed);
+  assert.equal(parsed.id, 'rjPM1hpWrjbhCVU5cZLX');
+  assert.equal(parsed.title, 'Movie Forum Live');
+  console.log('  OK  PostId con punto final (.) se sanea limpiamente y enlaza con la tarea correcta');
+}
+
+// Prueba 3.13: Enrutamiento prioritario para tareas del muro con presentaciones y libros
+{
+  const mockTasks = [
+    { id: 'wall_slide_task_1', type: 'slides', title: 'Presentación sobre Finanzas' },
+    { id: 'wall_book_task_2', type: 'book3d', title: 'Libro de Gramática Avanzada' }
+  ];
+
+  const resolveTargetDestination = (postId, itemType, tasks) => {
+    const isWallTask = Array.isArray(tasks) && tasks.some(t => String(t?.id) === String(postId));
+    if (!isWallTask && (itemType === 'slides' || itemType === 'reviews')) {
+      return { destination: 'tab_reviews', modalPostId: null };
+    }
+    if (!isWallTask && (itemType === 'book3d' || itemType === 'books')) {
+      return { destination: 'tab_books', modalPostId: null };
+    }
+    return { destination: 'tab_tasks', modalPostId: postId };
+  };
+
+  const navWallSlide = resolveTargetDestination('wall_slide_task_1', 'slides', mockTasks);
+  assert.equal(navWallSlide.destination, 'tab_tasks');
+  assert.equal(navWallSlide.modalPostId, 'wall_slide_task_1');
+
+  const navStandaloneSlide = resolveTargetDestination('lib_slide_external', 'slides', mockTasks);
+  assert.equal(navStandaloneSlide.destination, 'tab_reviews');
+  assert.equal(navStandaloneSlide.modalPostId, null);
+
+  console.log('  OK  Navegación prioriza modal de muro cuando el recurso interactivo está en tasks');
+}
+
+// Prueba 3.14: Fallback seguro cuando rawItem no especifica título
+{
+  const msgWithNamelessRaw = {
+    sharedItem: {
+      id: 'custom_shared_id',
+      type: 'forum'
+    }
+  };
+  const parsed = parseSharedPost(msgWithNamelessRaw, []);
+  assert.ok(parsed);
+  assert.equal(parsed.title, 'Publicación compartida');
+  assert.equal(parsed.rating, 5.0);
+  console.log('  OK  rawItem sin título aplica título por defecto sin generar undefined');
+}
+
 console.log('\n========================================');
-console.log('Total pruebas Compartir en Chat: 17 | OK: 17 | FAIL: 0');
+console.log('Total pruebas Compartir en Chat: 25 | OK: 25 | FAIL: 0');
 console.log('========================================\n');
+

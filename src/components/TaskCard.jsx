@@ -631,6 +631,8 @@ const TaskCard = React.memo(({
                 id: clientMsgId,
                 text: messageText,
                 sharedItem,
+                sharedPost: sharedItem,
+                isSharedPost: true,
                 author: authorName,
                 authorId: myChatId,
                 authorRole: role,

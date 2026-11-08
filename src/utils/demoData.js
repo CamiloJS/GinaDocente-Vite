@@ -1702,6 +1702,7 @@ const demoValeriaTeacherMessages = [
 export const DEMO_INITIAL_CHATS = {
   'group_demo_chat_group_1': demoGroup1Messages,
   [`acad_${DEMO_SUBJECT_ID}`]: demoGroup1Messages,
+  [`group_acad_${DEMO_SUBJECT_ID}`]: demoGroup1Messages,
   'group_demo_chat_group_2': [
     {
       id: 'demo_msg_g2_1',
@@ -1740,6 +1741,17 @@ export const DEMO_LAST_MESSAGES = {
     senderName: 'La profe'
   },
   [`acad_${DEMO_SUBJECT_ID}`]: {
+    text: 'Great question Carlos! Please mention both, and explain why central banks monitor Core Inflation closely.',
+    createdAt: nowMs - 90 * 60 * 1000,
+    timestamp: nowMs - 90 * 60 * 1000,
+    lastStudentAt: nowMs - 2 * 3600 * 1000,
+    authorId: 'teacher',
+    author: 'La profe',
+    authorRole: 'teacher',
+    senderId: 'teacher',
+    senderName: 'La profe'
+  },
+  [`group_acad_${DEMO_SUBJECT_ID}`]: {
     text: 'Great question Carlos! Please mention both, and explain why central banks monitor Core Inflation closely.',
     createdAt: nowMs - 90 * 60 * 1000,
     timestamp: nowMs - 90 * 60 * 1000,
@@ -1960,14 +1972,19 @@ function normalizeDemoChatMessage(msg) {
 
 export function loadDemoChatMessages(chatId) {
   if (!chatId) return [];
-  const base = (DEMO_INITIAL_CHATS[chatId] || []).map(normalizeDemoChatMessage);
+  const normalizedId = String(chatId).startsWith('group_') ? chatId : `group_${chatId}`;
+  const unPrefixedId = String(chatId).replace(/^group_/, '');
+  const baseList = DEMO_INITIAL_CHATS[chatId] || DEMO_INITIAL_CHATS[normalizedId] || DEMO_INITIAL_CHATS[unPrefixedId] || [];
+  const base = baseList.map(normalizeDemoChatMessage);
   if (typeof window === 'undefined') return base;
   try {
     const raw = window.localStorage.getItem(DEMO_CHAT_STORAGE_KEY);
     if (!raw) return base;
     const parsed = JSON.parse(raw);
-    if (parsed && Array.isArray(parsed[chatId])) {
-      return parsed[chatId].map(normalizeDemoChatMessage);
+    if (parsed) {
+      if (Array.isArray(parsed[chatId])) return parsed[chatId].map(normalizeDemoChatMessage);
+      if (Array.isArray(parsed[normalizedId])) return parsed[normalizedId].map(normalizeDemoChatMessage);
+      if (Array.isArray(parsed[unPrefixedId])) return parsed[unPrefixedId].map(normalizeDemoChatMessage);
     }
     return base;
   } catch {
@@ -1980,7 +1997,14 @@ export function saveDemoChatMessages(chatId, messages) {
   try {
     const raw = window.localStorage.getItem(DEMO_CHAT_STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : {};
-    parsed[chatId] = Array.isArray(messages) ? messages.map(normalizeDemoChatMessage) : [];
+    const normalizedMsgs = Array.isArray(messages) ? messages.map(normalizeDemoChatMessage) : [];
+    parsed[chatId] = normalizedMsgs;
+    if (String(chatId).startsWith('group_') || String(chatId).startsWith('acad_') || String(chatId).startsWith('demo_chat_group')) {
+      const normalizedId = String(chatId).startsWith('group_') ? chatId : `group_${chatId}`;
+      const unPrefixedId = String(chatId).replace(/^group_/, '');
+      parsed[normalizedId] = normalizedMsgs;
+      parsed[unPrefixedId] = normalizedMsgs;
+    }
     window.localStorage.setItem(DEMO_CHAT_STORAGE_KEY, JSON.stringify(parsed));
   } catch {
     // Ignore localStorage quota errors
