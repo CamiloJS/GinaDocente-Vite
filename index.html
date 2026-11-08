@@ -60,30 +60,9 @@
           }
         });
 
-        // Sincronización precisa de altura en iOS PWA (elimina el chin gap de WebKit)
-        function setAppViewportHeight() {
-          var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-          var isStandalone = window.navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
-          var h = window.innerHeight;
-          if (isIOS && isStandalone) {
-            h = Math.max(window.innerHeight, window.screen.height);
-          } else if (window.visualViewport) {
-            h = window.visualViewport.height;
-          }
-          document.documentElement.style.setProperty('--app-height', h + 'px');
-        }
-        setAppViewportHeight();
-        window.addEventListener('resize', setAppViewportHeight, { passive: true });
-        window.addEventListener('orientationchange', setAppViewportHeight, { passive: true });
-        if (window.visualViewport) {
-          window.visualViewport.addEventListener('resize', setAppViewportHeight, { passive: true });
-        }
-
-        // Si el usuario vuelve a la app (visibilidad activa en iOS PWA), resincronizar altura y versión
+        // Si el usuario vuelve a la app (visibilidad activa en iOS PWA), resincronizar versión
         document.addEventListener('visibilitychange', function() {
           if (document.visibilityState === 'visible') {
-            setAppViewportHeight();
-            window.scrollTo(0, 0);
             if (window.fetch) {
               fetch('/version.json?_t=' + Date.now(), { cache: 'no-store' })
                 .then(function(res) { return res.json(); })

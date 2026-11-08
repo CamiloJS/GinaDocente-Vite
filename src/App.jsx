@@ -4739,67 +4739,29 @@ useEffect(() => {
               }
           }, [chatMessages.length, isChatMinimized, isChatAppOpen, activeChat?.id]);
             
-          // Bloqueo y reseteo definitivo del viewport en iOS/Android (elimina chin gap en PWA y restaura tras teclado)
+          // Asegurar que al cerrar el teclado virtual en móviles el viewport vuelva a su posición limpia
           useEffect(() => {
-              const syncAppViewport = () => {
-                  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-                  const isStandalone = window.navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
-
-                  let realH = window.innerHeight;
-                  if (isIOS && isStandalone) {
-                      realH = Math.max(window.innerHeight, window.screen.height);
-                  } else if (window.visualViewport) {
-                      realH = window.visualViewport.height;
-                  }
-
-                  document.documentElement.style.setProperty('--app-height', `${realH}px`);
-
-                  if (window.scrollY !== 0) {
+              const resetWindowScroll = () => {
+                  const activeTag = document.activeElement?.tagName;
+                  if (!['INPUT', 'TEXTAREA', 'SELECT'].includes(activeTag) && window.scrollY !== 0) {
                       window.scrollTo(0, 0);
                   }
-                  if (document.body && document.body.scrollTop !== 0) {
-                      document.body.scrollTop = 0;
-                  }
-                  if (document.documentElement && document.documentElement.scrollTop !== 0) {
-                      document.documentElement.scrollTop = 0;
-                  }
               };
-
-              syncAppViewport();
-              window.addEventListener('scroll', syncAppViewport, { passive: true });
-              window.addEventListener('resize', syncAppViewport, { passive: true });
-              window.addEventListener('orientationchange', syncAppViewport, { passive: true });
-
-              if (window.visualViewport) {
-                  window.visualViewport.addEventListener('resize', syncAppViewport, { passive: true });
-                  window.visualViewport.addEventListener('scroll', syncAppViewport, { passive: true });
-              }
-
               const handleFocusOut = (e) => {
                   if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName)) {
-                      setTimeout(syncAppViewport, 80);
-                      setTimeout(syncAppViewport, 250);
+                      setTimeout(resetWindowScroll, 60);
+                      setTimeout(resetWindowScroll, 200);
                   }
               };
               window.addEventListener('focusout', handleFocusOut, true);
-
-              const handleVis = () => {
-                  if (document.visibilityState === 'visible') {
-                      syncAppViewport();
-                  }
-              };
-              document.addEventListener('visibilitychange', handleVis);
-
+              if (window.visualViewport) {
+                  window.visualViewport.addEventListener('resize', resetWindowScroll, { passive: true });
+              }
               return () => {
-                  window.removeEventListener('scroll', syncAppViewport);
-                  window.removeEventListener('resize', syncAppViewport);
-                  window.removeEventListener('orientationchange', syncAppViewport);
-                  if (window.visualViewport) {
-                      window.visualViewport.removeEventListener('resize', syncAppViewport);
-                      window.visualViewport.removeEventListener('scroll', syncAppViewport);
-                  }
                   window.removeEventListener('focusout', handleFocusOut, true);
-                  document.removeEventListener('visibilitychange', handleVis);
+                  if (window.visualViewport) {
+                      window.visualViewport.removeEventListener('resize', resetWindowScroll);
+                  }
               };
           }, []);
 
@@ -15619,7 +15581,7 @@ Escribe en español con tono pedagógico moderno.`;
           }
 
           return (
-            <div style={{ height: 'var(--app-height, 100%)', maxHeight: 'var(--app-height, 100%)' }} className={`fixed inset-0 w-full app-root-bg app-root-shell font-sans overflow-hidden flex flex-col transition-colors duration-300 ${isDarkMode ? 'dark' : ''}`}>
+            <div className={`min-h-screen md:h-screen w-full app-root-bg app-root-shell font-sans md:overflow-hidden relative flex flex-col transition-colors duration-300 ${isDarkMode ? 'dark' : ''}`}>
                             <style>{`
                 .dark .text-gray-900 { color: #f9fafb !important; }
                 .dark .text-gray-800 { color: #f3f4f6 !important; }
@@ -16322,7 +16284,7 @@ Escribe en español con tono pedagógico moderno.`;
               </div>
 
               {/* BARRA DE NAVEGACIÓN MÓVIL REDISEÑADA (4 BOTONES PRINCIPALES LIMPIOS) */}
-              <nav className={`shrink-0 z-30 w-full backdrop-blur-2xl border-t grid grid-cols-4 items-center px-1.5 py-1.5 pb-safe md:hidden transition-colors duration-300 ${
+              <nav className={`fixed bottom-0 left-0 right-0 w-full z-40 backdrop-blur-2xl border-t grid grid-cols-4 items-center px-1.5 py-1.5 pb-safe md:hidden transition-colors duration-300 ${
                   isDarkMode 
                       ? 'bg-gray-900/95 border-gray-800 shadow-[0_-8px_30px_rgba(0,0,0,0.6)]' 
                       : 'bg-white/95 border-gray-200/90 shadow-[0_-8px_30px_rgba(0,0,0,0.06)]'
