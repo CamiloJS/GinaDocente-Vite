@@ -46,7 +46,7 @@ const ScrollToTop = ({ isDarkMode }) => {
     <button
       onClick={handleScrollToTop}
       aria-label="Volver arriba"
-      className={`fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-[90] w-11 h-11 rounded-full shadow-xl transition-all duration-300 flex items-center justify-center backdrop-blur-md active:scale-95 ${
+      className={`fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] sm:bottom-6 right-4 sm:right-6 z-[90] w-11 h-11 rounded-full shadow-xl transition-all duration-300 flex items-center justify-center backdrop-blur-md active:scale-95 ${
         show ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-4 pointer-events-none'
       } ${isDarkMode ? 'bg-gray-800/90 text-gray-200 hover:bg-gray-700 border border-gray-700' : 'bg-white/90 text-gray-700 hover:bg-gray-100 border border-gray-200'}`}
     >

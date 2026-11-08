@@ -15568,7 +15568,7 @@ Escribe en español con tono pedagógico moderno.`;
           }
 
           return (
-            <div className={`h-[100dvh] min-h-[100dvh] max-h-[100dvh] app-root-bg font-sans relative overflow-hidden flex flex-col transition-colors duration-300 ${isDarkMode ? 'dark' : ''}`}>
+            <div className={`fixed inset-0 w-full h-full app-root-bg font-sans overflow-hidden flex flex-col transition-colors duration-300 ${isDarkMode ? 'dark' : ''}`}>
                             <style>{`
                 .dark .text-gray-900 { color: #f9fafb !important; }
                 .dark .text-gray-800 { color: #f3f4f6 !important; }
@@ -16271,7 +16271,7 @@ Escribe en español con tono pedagógico moderno.`;
               </div>
 
               {/* BARRA DE NAVEGACIÓN MÓVIL REDISEÑADA (4 BOTONES PRINCIPALES LIMPIOS) */}
-              <nav className={`fixed bottom-0 left-0 w-full backdrop-blur-2xl border-t grid grid-cols-4 items-center px-1.5 py-1.5 pb-safe md:hidden z-[100] transition-colors duration-300 ${
+              <nav className={`shrink-0 z-30 w-full backdrop-blur-2xl border-t grid grid-cols-4 items-center px-1.5 py-1.5 pb-safe md:hidden transition-colors duration-300 ${
                   isDarkMode 
                       ? 'bg-gray-900/95 border-gray-800 shadow-[0_-8px_30px_rgba(0,0,0,0.6)]' 
                       : 'bg-white/95 border-gray-200/90 shadow-[0_-8px_30px_rgba(0,0,0,0.06)]'
