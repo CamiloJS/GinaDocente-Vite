@@ -4739,17 +4739,68 @@ useEffect(() => {
               }
           }, [chatMessages.length, isChatMinimized, isChatAppOpen, activeChat?.id]);
             
-          // Bloquear desplazamiento residual de la ventana global en navegadores móviles (iOS/Android)
-          // Evita que el viewport se desplace hacia arriba y deje botones inaccesibles o espacios vacíos abajo
+          // Bloqueo y reseteo definitivo del viewport en iOS/Android (elimina chin gap en PWA y restaura tras teclado)
           useEffect(() => {
-              const handleWindowScroll = () => {
+              const syncAppViewport = () => {
+                  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+                  const isStandalone = window.navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+
+                  let realH = window.innerHeight;
+                  if (isIOS && isStandalone) {
+                      realH = Math.max(window.innerHeight, window.screen.height);
+                  } else if (window.visualViewport) {
+                      realH = window.visualViewport.height;
+                  }
+
+                  document.documentElement.style.setProperty('--app-height', `${realH}px`);
+
                   if (window.scrollY !== 0) {
                       window.scrollTo(0, 0);
                   }
+                  if (document.body && document.body.scrollTop !== 0) {
+                      document.body.scrollTop = 0;
+                  }
+                  if (document.documentElement && document.documentElement.scrollTop !== 0) {
+                      document.documentElement.scrollTop = 0;
+                  }
               };
-              window.addEventListener('scroll', handleWindowScroll, { passive: true });
-              handleWindowScroll();
-              return () => window.removeEventListener('scroll', handleWindowScroll);
+
+              syncAppViewport();
+              window.addEventListener('scroll', syncAppViewport, { passive: true });
+              window.addEventListener('resize', syncAppViewport, { passive: true });
+              window.addEventListener('orientationchange', syncAppViewport, { passive: true });
+
+              if (window.visualViewport) {
+                  window.visualViewport.addEventListener('resize', syncAppViewport, { passive: true });
+                  window.visualViewport.addEventListener('scroll', syncAppViewport, { passive: true });
+              }
+
+              const handleFocusOut = (e) => {
+                  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName)) {
+                      setTimeout(syncAppViewport, 80);
+                      setTimeout(syncAppViewport, 250);
+                  }
+              };
+              window.addEventListener('focusout', handleFocusOut, true);
+
+              const handleVis = () => {
+                  if (document.visibilityState === 'visible') {
+                      syncAppViewport();
+                  }
+              };
+              document.addEventListener('visibilitychange', handleVis);
+
+              return () => {
+                  window.removeEventListener('scroll', syncAppViewport);
+                  window.removeEventListener('resize', syncAppViewport);
+                  window.removeEventListener('orientationchange', syncAppViewport);
+                  if (window.visualViewport) {
+                      window.visualViewport.removeEventListener('resize', syncAppViewport);
+                      window.visualViewport.removeEventListener('scroll', syncAppViewport);
+                  }
+                  window.removeEventListener('focusout', handleFocusOut, true);
+                  document.removeEventListener('visibilitychange', handleVis);
+              };
           }, []);
 
           // Sincronización en vivo de mensajes compartidos emitidos desde TaskCard u otros componentes
@@ -15568,7 +15619,7 @@ Escribe en español con tono pedagógico moderno.`;
           }
 
           return (
-            <div className={`fixed inset-0 w-full h-full app-root-bg font-sans overflow-hidden flex flex-col transition-colors duration-300 ${isDarkMode ? 'dark' : ''}`}>
+            <div style={{ height: 'var(--app-height, 100%)', maxHeight: 'var(--app-height, 100%)' }} className={`fixed inset-0 w-full app-root-bg app-root-shell font-sans overflow-hidden flex flex-col transition-colors duration-300 ${isDarkMode ? 'dark' : ''}`}>
                             <style>{`
                 .dark .text-gray-900 { color: #f9fafb !important; }
                 .dark .text-gray-800 { color: #f3f4f6 !important; }
