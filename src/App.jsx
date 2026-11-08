@@ -4739,6 +4739,19 @@ useEffect(() => {
               }
           }, [chatMessages.length, isChatMinimized, isChatAppOpen, activeChat?.id]);
             
+          // Bloquear desplazamiento residual de la ventana global en navegadores móviles (iOS/Android)
+          // Evita que el viewport se desplace hacia arriba y deje botones inaccesibles o espacios vacíos abajo
+          useEffect(() => {
+              const handleWindowScroll = () => {
+                  if (window.scrollY !== 0) {
+                      window.scrollTo(0, 0);
+                  }
+              };
+              window.addEventListener('scroll', handleWindowScroll, { passive: true });
+              handleWindowScroll();
+              return () => window.removeEventListener('scroll', handleWindowScroll);
+          }, []);
+
           // Sincronización en vivo de mensajes compartidos emitidos desde TaskCard u otros componentes
           useEffect(() => {
               const handleChatMessageSent = (e) => {
@@ -15555,7 +15568,7 @@ Escribe en español con tono pedagógico moderno.`;
           }
 
           return (
-            <div className={`h-screen app-root-bg font-sans relative overflow-hidden transition-colors duration-300 ${isDarkMode ? 'dark' : ''}`}>
+            <div className={`h-[100dvh] min-h-[100dvh] max-h-[100dvh] app-root-bg font-sans relative overflow-hidden flex flex-col transition-colors duration-300 ${isDarkMode ? 'dark' : ''}`}>
                             <style>{`
                 .dark .text-gray-900 { color: #f9fafb !important; }
                 .dark .text-gray-800 { color: #f3f4f6 !important; }
@@ -15566,8 +15579,8 @@ Escribe en español con tono pedagógico moderno.`;
                 .dark input, .dark textarea { color: #ffffff !important; }
                 .dark input::placeholder, .dark textarea::placeholder { color: #9ca3af !important; }
 
-                .pb-safe { padding-bottom: env(safe-area-inset-bottom, 20px); }
-                .pt-safe { padding-top: env(safe-area-inset-top, 20px); }
+                .pb-safe { padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px)); }
+                .pt-safe { padding-top: max(0.5rem, env(safe-area-inset-top, 0px)); }
               
                 .dark .text-black { color: #f9fafb !important; }
                 .dark .text-blue-600 { color: #93c5fd !important; }
@@ -15631,8 +15644,8 @@ Escribe en español con tono pedagógico moderno.`;
               )}
 
               {/* Navbar Principal Estilo Moderno */}
-              <nav className={`sticky top-0 z-30 backdrop-blur-md border-b transition-colors duration-300 ${isDarkMode ? 'bg-gray-900/80 border-gray-800' : 'bg-white/80 border-gray-200'}`}>
-                <div className="max-w-[1600px] mx-auto px-4 h-16 flex items-center justify-between gap-4">
+              <nav className={`shrink-0 z-30 pt-safe backdrop-blur-md border-b transition-colors duration-300 ${isDarkMode ? 'bg-gray-900/80 border-gray-800' : 'bg-white/80 border-gray-200'}`}>
+                <div className="max-w-[1600px] mx-auto px-4 h-14 sm:h-16 flex items-center justify-between gap-3 sm:gap-4">
                   {/* Left: Brand */}
                   <div className="flex items-center gap-3 cursor-pointer select-none" onClick={() => changeTab('tasks')}>
                     <div className="w-10 h-10 bg-gradient-to-br from-[#AD3333] to-[#8a2828] rounded-xl flex items-center justify-center text-white font-black text-lg shadow-md shadow-[#AD3333]/30">
@@ -15768,9 +15781,9 @@ Escribe en español con tono pedagógico moderno.`;
                 </div>
               </nav>
 
-              <div className="max-w-[1600px] mx-auto w-full flex justify-center items-start px-2 md:px-4 gap-4 xl:gap-6 relative h-[calc(100vh-64px)] overflow-y-auto">
+              <div id="main-scroll-container" className="max-w-[1600px] mx-auto w-full flex-1 min-h-0 flex justify-center items-start px-2 md:px-4 gap-4 xl:gap-6 relative overflow-y-auto smooth-scroll-gpu">
                   {/* LEFT SIDEBAR (Panel de Navegación Fijo / Sticky Optimizado) */}
-                  <aside className={`w-[245px] xl:w-[265px] hidden lg:flex flex-col justify-between sticky top-0 h-[calc(100vh-64px)] pr-2 py-3.5 z-0 shrink-0 overflow-y-auto overflow-x-hidden select-none ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  <aside className={`w-[245px] xl:w-[265px] hidden lg:flex flex-col justify-between sticky top-0 h-full max-h-full pr-2 py-3.5 z-0 shrink-0 overflow-y-auto overflow-x-hidden select-none ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                       <div className="space-y-3">
                           {/* Profile Card Compacto */}
                           <div className={`p-3 rounded-2xl border shadow-xs flex items-center gap-3 transition-colors ${isDarkMode ? 'bg-gray-800/90 border-gray-700/80' : 'bg-white border-gray-200'}`}>
@@ -15894,7 +15907,7 @@ Escribe en español con tono pedagógico moderno.`;
                   </aside>
 
                   {/* CENTER CONTENT */}
-                  <main className="flex-1 max-w-5xl xl:max-w-6xl min-w-0 w-full p-2 md:p-6 pb-28 md:pb-8 relative mx-auto transition-all duration-300">
+                  <main className="flex-1 max-w-5xl xl:max-w-6xl min-w-0 w-full p-2 md:p-6 pb-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:pb-8 relative mx-auto transition-all duration-300">
                       {activeTab === 'tasks' && (
                           <React.Suspense fallback={<div className="space-y-4 p-4">{[1,2,3].map(i => <div key={i} className="p-4 rounded-2xl border animate-pulse bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800"><div className="flex items-center gap-3 mb-4"><div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700" /><div className="flex-1 space-y-2"><div className="h-3 w-1/3 rounded bg-gray-200 dark:bg-gray-700" /></div></div><div className="h-4 w-full rounded mb-2 bg-gray-200 dark:bg-gray-700" /><div className="h-4 w-5/6 rounded bg-gray-200 dark:bg-gray-700" /></div>)}</div>}>
                           <TasksTab 
@@ -16024,7 +16037,7 @@ Escribe en español con tono pedagógico moderno.`;
                   </main>
 
                   {/* RIGHT SIDEBAR (Barra lateral de Chats fija estilo Facebook con Scroll Independiente) */}
-                  <aside className={`w-[275px] xl:w-[310px] hidden lg:flex flex-col sticky top-0 h-[calc(100vh-64px)] pl-3 border-l z-0 shrink-0 py-3.5 overflow-hidden ${isDarkMode ? 'border-gray-800 text-gray-300' : 'border-gray-200 text-gray-700'}`}>
+                  <aside className={`w-[275px] xl:w-[310px] hidden lg:flex flex-col sticky top-0 h-full max-h-full pl-3 border-l z-0 shrink-0 py-3.5 overflow-hidden ${isDarkMode ? 'border-gray-800 text-gray-300' : 'border-gray-200 text-gray-700'}`}>
                       {/* Encabezado de Chats (Fijo arriba) */}
                        <div className="flex items-center justify-between px-1 pb-2">
                            <h3 className={`text-xs font-bold uppercase tracking-wider ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Mensajes</h3>
