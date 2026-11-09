@@ -2,7 +2,7 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="description" content="English TECH - Plataforma educativa interactiva de aprendizaje de inglés para estudiantes de la Universidad de Pamplona." />
     <meta name="theme-color" content="#AD3333" />
     <meta name="color-scheme" content="light dark" />
@@ -12,7 +12,6 @@
     <link rel="manifest" href="/manifest.json" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="English TECH" />
     <link rel="apple-touch-icon" href="/icono.png" />
     <title>English TECH - Universidad de Pamplona</title>
@@ -68,6 +67,11 @@
                 .then(function(res) { return res.json(); })
                 .then(function(data) {
                   if (data && data.version && String(data.version) !== String(buildId)) {
+                    if ('caches' in window) {
+                      caches.keys().then(function(names) {
+                        for (var i = 0; i < names.length; i++) caches.delete(names[i]);
+                      });
+                    }
                     window.location.replace(window.location.pathname + '?_v=' + data.version + '&_ts=' + Date.now() + window.location.hash);
                   }
                 }).catch(function() {});
@@ -75,23 +79,20 @@
           }
         });
 
-        // Comprobación de versión ultra-rápida contra el servidor
+        // Comprobación de versión ultra-rápida contra el servidor al iniciar
         try {
           if (window.fetch) {
             fetch('/version.json?_t=' + Date.now(), { cache: 'no-store' })
               .then(function(res) { return res.json(); })
               .then(function(data) {
                 if (data && data.version && String(data.version) !== String(buildId)) {
+                  if ('caches' in window) {
+                    caches.keys().then(function(names) {
+                      for (var i = 0; i < names.length; i++) caches.delete(names[i]);
+                    });
+                  }
                   var freshUrl = window.location.pathname + '?_v=' + data.version + '&_ts=' + Date.now() + window.location.hash;
                   window.location.replace(freshUrl);
-                } else {
-                  if (window.location.search.indexOf('_v=') !== -1 || window.location.search.indexOf('_fresh=') !== -1 || window.location.search.indexOf('r=') !== -1 || window.location.search.indexOf('_ts=') !== -1) {
-                    setTimeout(function() {
-                      try {
-                        window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
-                      } catch (e) {}
-                    }, 1200);
-                  }
                 }
               }).catch(function() {});
           }

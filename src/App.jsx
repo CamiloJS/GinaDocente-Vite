@@ -4741,28 +4741,15 @@ useEffect(() => {
             
           // Asegurar que al cerrar el teclado virtual en móviles el viewport vuelva a su posición limpia
           useEffect(() => {
-              const resetWindowScroll = () => {
-                  const activeTag = document.activeElement?.tagName;
-                  if (!['INPUT', 'TEXTAREA', 'SELECT'].includes(activeTag) && window.scrollY !== 0) {
-                      window.scrollTo(0, 0);
-                  }
-              };
               const handleFocusOut = (e) => {
                   if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName)) {
-                      setTimeout(resetWindowScroll, 60);
-                      setTimeout(resetWindowScroll, 200);
+                      setTimeout(() => {
+                          if (window.scrollY !== 0) window.scrollTo(0, 0);
+                      }, 100);
                   }
               };
               window.addEventListener('focusout', handleFocusOut, true);
-              if (window.visualViewport) {
-                  window.visualViewport.addEventListener('resize', resetWindowScroll, { passive: true });
-              }
-              return () => {
-                  window.removeEventListener('focusout', handleFocusOut, true);
-                  if (window.visualViewport) {
-                      window.visualViewport.removeEventListener('resize', resetWindowScroll);
-                  }
-              };
+              return () => window.removeEventListener('focusout', handleFocusOut, true);
           }, []);
 
           // Sincronización en vivo de mensajes compartidos emitidos desde TaskCard u otros componentes
@@ -15581,7 +15568,7 @@ Escribe en español con tono pedagógico moderno.`;
           }
 
           return (
-            <div className={`min-h-screen md:h-screen w-full app-root-bg app-root-shell font-sans md:overflow-hidden relative flex flex-col transition-colors duration-300 ${isDarkMode ? 'dark' : ''}`}>
+            <div className={`h-full w-full app-root-bg app-root-shell font-sans overflow-hidden flex flex-col transition-colors duration-300 ${isDarkMode ? 'dark' : ''}`}>
                             <style>{`
                 .dark .text-gray-900 { color: #f9fafb !important; }
                 .dark .text-gray-800 { color: #f3f4f6 !important; }
@@ -15657,7 +15644,7 @@ Escribe en español con tono pedagógico moderno.`;
               )}
 
               {/* Navbar Principal Estilo Moderno */}
-              <nav className={`shrink-0 z-30 pt-safe backdrop-blur-md border-b transition-colors duration-300 ${isDarkMode ? 'bg-gray-900/80 border-gray-800' : 'bg-white/80 border-gray-200'}`}>
+              <nav className={`shrink-0 z-30 backdrop-blur-md border-b transition-colors duration-300 ${isDarkMode ? 'bg-gray-900/80 border-gray-800' : 'bg-white/80 border-gray-200'}`}>
                 <div className="max-w-[1600px] mx-auto px-4 h-14 sm:h-16 flex items-center justify-between gap-3 sm:gap-4">
                   {/* Left: Brand */}
                   <div className="flex items-center gap-3 cursor-pointer select-none" onClick={() => changeTab('tasks')}>
@@ -15920,7 +15907,7 @@ Escribe en español con tono pedagógico moderno.`;
                   </aside>
 
                   {/* CENTER CONTENT */}
-                  <main className="flex-1 max-w-5xl xl:max-w-6xl min-w-0 w-full p-2 md:p-6 pb-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:pb-8 relative mx-auto transition-all duration-300">
+                  <main className="flex-1 max-w-5xl xl:max-w-6xl min-w-0 w-full p-2 md:p-6 pb-20 md:pb-8 relative mx-auto transition-all duration-300">
                       {activeTab === 'tasks' && (
                           <React.Suspense fallback={<div className="space-y-4 p-4">{[1,2,3].map(i => <div key={i} className="p-4 rounded-2xl border animate-pulse bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800"><div className="flex items-center gap-3 mb-4"><div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700" /><div className="flex-1 space-y-2"><div className="h-3 w-1/3 rounded bg-gray-200 dark:bg-gray-700" /></div></div><div className="h-4 w-full rounded mb-2 bg-gray-200 dark:bg-gray-700" /><div className="h-4 w-5/6 rounded bg-gray-200 dark:bg-gray-700" /></div>)}</div>}>
                           <TasksTab 
@@ -16284,7 +16271,7 @@ Escribe en español con tono pedagógico moderno.`;
               </div>
 
               {/* BARRA DE NAVEGACIÓN MÓVIL REDISEÑADA (4 BOTONES PRINCIPALES LIMPIOS) */}
-              <nav className={`fixed bottom-0 left-0 right-0 w-full z-40 backdrop-blur-2xl border-t grid grid-cols-4 items-center px-1.5 py-1.5 pb-safe md:hidden transition-colors duration-300 ${
+              <nav className={`shrink-0 z-40 w-full backdrop-blur-2xl border-t grid grid-cols-4 items-center px-1.5 py-1.5 md:hidden transition-colors duration-300 ${
                   isDarkMode 
                       ? 'bg-gray-900/95 border-gray-800 shadow-[0_-8px_30px_rgba(0,0,0,0.6)]' 
                       : 'bg-white/95 border-gray-200/90 shadow-[0_-8px_30px_rgba(0,0,0,0.06)]'
@@ -18690,6 +18677,22 @@ Escribe en español con tono pedagógico moderno.`;
                                               <span className="text-xs font-bold">Cerrar sesión</span>
                                           </div>
                                           <ChevronRight size={16} className="text-red-400" />
+                                      </button>
+
+                                      <button
+                                          type="button"
+                                          onClick={() => {
+                                              if ('caches' in window) {
+                                                  caches.keys().then(function(names) {
+                                                      for (var i = 0; i < names.length; i++) caches.delete(names[i]);
+                                                  });
+                                              }
+                                              window.location.replace(window.location.pathname + '?_fresh=' + Date.now());
+                                          }}
+                                          className="w-full flex items-center justify-center gap-2 p-3 text-[11px] font-bold text-gray-500 hover:text-blue-600 transition-colors border-t border-gray-100 dark:border-gray-800"
+                                      >
+                                          <RotateCcw size={13} />
+                                          <span>Actualizar versión de la aplicación</span>
                                       </button>
                                   </div>
                               </div>
