@@ -1,40 +1,22 @@
 // src/components/AppleEmoji.jsx
 import React from 'react';
+import {
+  EMOJI_REGEX,
+  getUnifiedHex,
+  getAppleEmojiUrl,
+  hasAppleEmojiFailed,
+  markAppleEmojiFailed
+} from '../utils/appleEmoji.js';
 
-export const EMOJI_REGEX = /(?:[\u2700-\u27bf]|(?:[\ud83c\udde6-\ud83c\uddff]){2}|[\ud800-\udbff][\udc00-\udfff]|[\u0023-\u0039]\ufe0f?\u20e3|\u3299|\u3297|\u303d|\u3030|\u24c2|[\u2934-\u2935]|[\u25aa-\u25ab]|\u25b6|\u25c0|[\u25fb-\u25fe]|[\u2600-\u26ff]|[\u2b05-\u2b07]|[\u2b1b-\u2b1c]|\u2b50|\u2b55|[\u2300-\u23ff]|[\u200d\ufe0f\ufe0e])+/gu;
-
-export function getUnifiedHex(emoji) {
-  if (!emoji) return '';
-  const codePoints = [];
-  for (let i = 0; i < emoji.length; i++) {
-    const code = emoji.codePointAt(i);
-    if (code > 0xffff) {
-      i++;
-    }
-    codePoints.push(code.toString(16).toLowerCase());
-  }
-  let hex = codePoints.join('-');
-  // Normalizar variaciones de selección de formato unicode para Apple Emoji datasource
-  if (hex === '2764') hex = '2764-fe0f';
-  if (hex === '26a0') hex = '26a0-fe0f';
-  if (hex === '267f') hex = '267f-fe0f';
-  if (hex === '23f1') hex = '23f1-fe0f';
-  if (hex === '2695') hex = '2695-fe0f';
-  if (hex === '2696') hex = '2696-fe0f';
-  return hex;
-}
-
-export function getAppleEmojiUrl(emoji) {
-  const hex = getUnifiedHex(emoji);
-  if (!hex) return '';
-  return `https://cdn.jsdelivr.net/npm/emoji-datasource-apple@15.0.1/img/apple/64/${hex}.png`;
-}
+export { EMOJI_REGEX, getUnifiedHex, getAppleEmojiUrl };
 
 export const AppleEmoji = ({ emoji, size = '1.25em', className = '', alt, style = {} }) => {
   const [failedEmoji, setFailedEmoji] = React.useState(null);
   if (!emoji) return null;
   const hex = getUnifiedHex(emoji);
-  if (!hex || failedEmoji === emoji) return <span>{emoji}</span>;
+  if (!hex || failedEmoji === emoji || hasAppleEmojiFailed(hex)) {
+    return <span className="apple-emoji-ignore">{emoji}</span>;
+  }
 
   const url = `https://cdn.jsdelivr.net/npm/emoji-datasource-apple@15.0.1/img/apple/64/${hex}.png`;
   const sizeVal = typeof size === 'number' ? `${size}px` : size;
@@ -52,7 +34,10 @@ export const AppleEmoji = ({ emoji, size = '1.25em', className = '', alt, style 
         verticalAlign: size === '1.25em' ? '-0.22em' : 'middle',
         ...style
       }}
-      onError={() => setFailedEmoji(emoji)}
+      onError={() => {
+        markAppleEmojiFailed(hex);
+        setFailedEmoji(emoji);
+      }}
     />
   );
 };

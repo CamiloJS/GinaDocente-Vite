@@ -2074,10 +2074,10 @@ const TaskCard = React.memo(({
         const displayRating = hoverRating || myCurrentScore || 0;
 
         return (
-            <div className="flex flex-wrap items-center gap-2.5 pt-2 select-none">
+            <div className="flex flex-wrap items-center gap-2.5 pt-2 select-none apple-emoji-ignore">
                 {/* Selector de 5 estrellas */}
                 <div 
-                    className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full border transition-all ${
+                    className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full border transition-colors ${
                         hasVoted 
                             ? 'bg-amber-50/80 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700/60 ring-2 ring-amber-400/20' 
                             : 'bg-gray-50 dark:bg-gray-800/80 border-gray-200 dark:border-gray-700'
@@ -2092,16 +2092,14 @@ const TaskCard = React.memo(({
                                 type="button"
                                 onClick={() => toggleForumRating(starValue)}
                                 onMouseEnter={() => setHoverRating(starValue)}
-                                className="p-0.5 transition-all transform hover:scale-125 focus:outline-none cursor-pointer active:scale-90"
+                                className="p-0.5 transition-transform duration-150 transform hover:scale-125 focus:outline-none cursor-pointer active:scale-90"
                                 title={`Puntuar con ${starValue} estrella${starValue > 1 ? 's' : ''}`}
                             >
                                 <Star
                                     size={18}
                                     fill={isStarActive ? "#FBBF24" : "transparent"}
                                     stroke={isStarActive ? "#F59E0B" : (isDarkMode ? "#6B7280" : "#D1D5DB")}
-                                    className={`transition-all ${
-                                        isStarActive ? 'text-amber-400 drop-shadow-xs' : 'text-gray-300 dark:text-gray-600'
-                                    }`}
+                                    className={isStarActive ? 'text-amber-400 drop-shadow-xs' : 'text-gray-300 dark:text-gray-600'}
                                 />
                             </button>
                         );
@@ -2109,7 +2107,7 @@ const TaskCard = React.memo(({
 
                     {/* Tu valoración activa */}
                     {hasVoted && (
-                        <span className="ml-1 text-[11px] font-extrabold text-amber-700 dark:text-amber-300 bg-amber-200/60 dark:bg-amber-900/60 px-1.5 py-0.5 rounded-md border border-amber-300 dark:border-amber-700/50">
+                        <span className="ml-1 text-[11px] font-extrabold text-amber-700 dark:text-amber-300 bg-amber-200/60 dark:bg-amber-900/60 px-1.5 py-0.5 rounded-md border border-amber-300 dark:border-amber-700/50 whitespace-nowrap apple-emoji-ignore">
                             {myCurrentScore} ★
                         </span>
                     )}
@@ -5061,9 +5059,12 @@ const TaskCard = React.memo(({
                                         <div className="mt-2 pt-1.5 border-t border-gray-100 dark:border-gray-800/80 flex items-center justify-between flex-wrap gap-1.5">
                                             {/* Valoración por estrellas en Foros */}
                                             {isForum ? (
-                                                <div className="flex items-center gap-1.5">
+                                                <div className="flex items-center gap-1.5 apple-emoji-ignore">
                                                     <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400">Valorar:</span>
-                                                    <div className="flex items-center gap-0.5">
+                                                    <div
+                                                        className="flex items-center gap-0.5"
+                                                        onMouseLeave={() => setRatingHover(prev => ({ ...prev, [cid]: 0 }))}
+                                                    >
                                                         {[1, 2, 3, 4, 5].map(star => {
                                                             const rawUserRating = (c.ratings || {})[currentUserId];
                                                             const myRating = typeof rawUserRating === 'object' && rawUserRating !== null ? (rawUserRating.stars || 0) : (typeof rawUserRating === 'number' ? rawUserRating : 0);
@@ -5074,9 +5075,8 @@ const TaskCard = React.memo(({
                                                                     key={star}
                                                                     type="button"
                                                                     onMouseEnter={() => setRatingHover(prev => ({ ...prev, [cid]: star }))}
-                                                                    onMouseLeave={() => setRatingHover(prev => ({ ...prev, [cid]: 0 }))}
                                                                     onClick={() => handleRateForumComment(cid, star)}
-                                                                    className={`p-0.5 transition-all duration-150 transform hover:scale-125 active:scale-90 ${
+                                                                    className={`p-0.5 transition-transform duration-150 transform hover:scale-125 active:scale-90 ${
                                                                         isFilled ? 'text-amber-400 fill-amber-400 drop-shadow-[0_0_4px_rgba(251,191,36,0.6)]' : 'text-gray-300 dark:text-gray-600 hover:text-amber-300'
                                                                     }`}
                                                                     title={`Valorar con ${star} estrella${star > 1 ? 's' : ''}`}
