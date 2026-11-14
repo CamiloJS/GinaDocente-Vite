@@ -1,7 +1,7 @@
 // scripts/test-videos.mjs
 // Suite de pruebas unitarias para el motor de vídeos y compatibilidad de plataformas
 
-import { parseVideoUrl, normalizeVideoItem, deduplicateVideos, DEMO_VIDEOS } from '../src/utils/videoEngine.js';
+import { parseVideoUrl, extractFirstVideoUrl, normalizeVideoItem, deduplicateVideos, DEMO_VIDEOS } from '../src/utils/videoEngine.js';
 
 let passed = 0;
 let failed = 0;
@@ -84,6 +84,56 @@ assert(deduped[0].id === 'vid_123' && deduped[0].updatedAt === 2000, 'Conserva l
 assert(deduped[1].id === 'vid_456', 'Conserva los demás elementos sin alterarlos');
 assert(deduplicateVideos([]).length === 0, 'Maneja arrays vacíos sin romper');
 assert(deduplicateVideos(null).length === 0, 'Maneja null sin romper');
+
+console.log('== 7. Extracción de URLs de Vídeo en Comentarios ==');
+const extractedYt = extractFirstVideoUrl('Miren este video https://www.youtube.com/watch?v=dQw4w9WgXcQ para la tarea.');
+assert(extractedYt && extractedYt.isValid && extractedYt.platform === 'youtube' && extractedYt.videoId === 'dQw4w9WgXcQ', 'Extrae enlace de YouTube en texto');
+
+const extractedTikTok = extractFirstVideoUrl('Explicación rápida: https://www.tiktok.com/@teacher/video/1234567890123456789!');
+assert(extractedTikTok && extractedTikTok.isValid && extractedTikTok.platform === 'tiktok', 'Extrae enlace de TikTok con puntuación');
+
+const extractedDirect = extractFirstVideoUrl('Descarguen https://cdn.example.com/demo.mp4');
+assert(extractedDirect && extractedDirect.isValid && extractedDirect.playerType === 'direct', 'Extrae enlace directo de vídeo MP4');
+
+const noVideo = extractFirstVideoUrl('Comentario normal sin enlaces ni videos https://google.com/search');
+assert(noVideo === null, 'Ignora enlaces genéricos que no son de video');
+assert(extractFirstVideoUrl('') === null, 'Maneja texto vacío');
+assert(extractFirstVideoUrl(null) === null, 'Maneja null');
+
+console.log('== 8. Comentarios Ricos: Imágenes, Vídeos y Respuestas Anidadas ==');
+const richItem = normalizeVideoItem({
+  title: 'Video con comentarios ricos',
+  comments: [
+    {
+      id: 'comm_root_1',
+      userName: 'Carlos',
+      text: '¿Alguien tiene la fórmula del ROI?',
+      imageUrl: 'https://firebasestorage.googleapis.com/.../formula.jpg',
+      videoUrl: 'https://youtu.be/dQw4w9WgXcQ'
+    },
+    {
+      id: 'comm_reply_1',
+      userName: 'Gina Docente',
+      userRole: 'teacher',
+      text: 'Revisa el minuto 2:15 de este vídeo adicional:',
+      parentId: 'comm_root_1',
+      replyTo: {
+        id: 'comm_root_1',
+        userName: 'Carlos',
+        text: '¿Alguien tiene la fórmula del ROI?'
+      },
+      imageUrl: null,
+      videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
+    }
+  ]
+});
+
+assert(richItem.comments.length === 2, 'Conserva los comentarios');
+assert(richItem.comments[0].imageUrl.includes('formula.jpg'), 'Conserva imageUrl en comentario raíz');
+assert(richItem.comments[0].videoUrl.includes('dQw4w9WgXcQ'), 'Conserva videoUrl en comentario raíz');
+assert(richItem.comments[1].parentId === 'comm_root_1', 'Conserva parentId para anidación de respuestas');
+assert(richItem.comments[1].replyTo && richItem.comments[1].replyTo.id === 'comm_root_1', 'Conserva metadata replyTo');
+assert(richItem.comments[1].replyTo.userName === 'Carlos', 'Conserva nombre del autor respondido');
 
 console.log('\n========================================');
 console.log(`Total pruebas Vídeos: ${passed + failed} | OK: ${passed} | FAIL: ${failed}`);

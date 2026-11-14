@@ -24,10 +24,14 @@ import {
   Smartphone,
   SmartphoneHorizontal,
   Loader2,
-  User
+  User,
+  ImageIcon,
+  ReplyIcon,
+  Send
 } from './Icons.jsx';
-import { parseVideoUrl, normalizeVideoItem, deduplicateVideos } from '../utils/videoEngine.js';
-import { resolveUserPhoto, sanitizeFirestoreData } from '../utils/helpers.js';
+import { parseVideoUrl, extractFirstVideoUrl, normalizeVideoItem, deduplicateVideos } from '../utils/videoEngine.js';
+import { resolveUserPhoto, sanitizeFirestoreData, compressImage, uploadImageToStorage } from '../utils/helpers.js';
+import LinkifyText from './LinkifyText.jsx';
 import {
   db as defaultDb,
   appId as defaultAppId,
@@ -161,8 +165,15 @@ export default function VideosModule({
 
   // Estado para nuevo comentario en el reproductor
   const [commentInput, setCommentInput] = useState('');
+  const [commentImagePreview, setCommentImagePreview] = useState(null);
+  const [commentVideoUrl, setCommentVideoUrl] = useState('');
+  const [showVideoUrlInput, setShowVideoUrlInput] = useState(false);
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [viewingImageModal, setViewingImageModal] = useState(null);
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const commentsEndRef = useRef(null);
+  const commentInputRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   // Estado de sincronización inicial para evitar parpadeo en móviles
   const [isInitialSync, setIsInitialSync] = useState(() => (!videos || videos.length === 0));
@@ -509,43 +520,107 @@ export default function VideosModule({
     }
   };
 
-  // Manejador: Enviar comentario
+  // Selección de imagen para adjuntar al comentario
+  const handleCommentImageSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const compressed = await compressImage(file);
+      setCommentImagePreview(compressed);
+    } catch (err) {
+      console.warn('Compresión fallback para comentario:', err);
+      const reader = new FileReader();
+      reader.onload = (ev) => setCommentImagePreview(ev.target?.result);
+      reader.readAsDataURL(file);
+    } finally {
+      e.target.value = '';
+    }
+  };
+
+  // Pegar imagen directamente desde el portapapeles (Ctrl + V)
+  const handleCommentPaste = async (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type && item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) {
+          e.preventDefault();
+          try {
+            const compressed = await compressImage(file);
+            setCommentImagePreview(compressed);
+          } catch {
+            const reader = new FileReader();
+            reader.onload = (ev) => setCommentImagePreview(ev.target?.result);
+            reader.readAsDataURL(file);
+          }
+          break;
+        }
+      }
+    }
+  };
+
+  // Manejador: Enviar comentario (soporta texto, imágenes, enlaces de vídeo y respuestas anidadas)
   const handleAddComment = async (e) => {
     if (e && typeof e.preventDefault === 'function') e.preventDefault();
     if (isSubmittingComment) return;
 
     const cleanText = commentInput.trim();
-    if (!cleanText || !activePlayingVideo) return;
+    const explicitVideo = commentVideoUrl.trim();
+    const hasImage = Boolean(commentImagePreview);
+
+    if ((!cleanText && !hasImage && !explicitVideo) || !activePlayingVideo) return;
 
     setIsSubmittingComment(true);
     const now = Date.now();
-    const newComment = {
-      id: `comm_${now}_${Math.random().toString(36).substring(2, 7)}`,
-      userId: myChatId,
-      userName: loggedInName || (role === 'teacher' ? 'Docente' : 'Estudiante'),
-      userRole: role,
-      userAvatar: resolveAuthorPhoto({ userId: myChatId, userName: loggedInName, userRole: role }) || user?.photoURL || '',
-      text: cleanText,
-      createdAt: now
-    };
-
-    const currentComments = Array.isArray(activePlayingVideo.comments) ? activePlayingVideo.comments : [];
-    const updatedComments = [...currentComments, newComment];
-
-    const updatedVideo = {
-      ...activePlayingVideo,
-      comments: updatedComments,
-      updatedAt: now
-    };
-
-    // Actualización optimista
-    setActivePlayingVideo(updatedVideo);
-    if (typeof setVideos === 'function') {
-      setVideos(prev => (prev || []).map(v => (String(v?.id) === String(activePlayingVideo.id) ? updatedVideo : v)));
-    }
-    setCommentInput('');
 
     try {
+      let uploadedImageUrl = null;
+      if (commentImagePreview) {
+        uploadedImageUrl = await uploadImageToStorage(commentImagePreview, 'video_comments');
+      }
+
+      // Detectar URL de vídeo explícita o embebida en el texto
+      const detectedVideo = explicitVideo || extractFirstVideoUrl(cleanText)?.url || null;
+
+      const newComment = {
+        id: `comm_${now}_${Math.random().toString(36).substring(2, 7)}`,
+        userId: myChatId,
+        userName: loggedInName || (role === 'teacher' ? 'Docente' : 'Estudiante'),
+        userRole: role,
+        userAvatar: resolveAuthorPhoto({ userId: myChatId, userName: loggedInName, userRole: role }) || user?.photoURL || '',
+        text: cleanText,
+        imageUrl: uploadedImageUrl || null,
+        videoUrl: detectedVideo || null,
+        parentId: replyingTo ? replyingTo.id : null,
+        replyTo: replyingTo ? {
+          id: replyingTo.id,
+          userName: replyingTo.userName,
+          text: replyingTo.text
+        } : null,
+        createdAt: now
+      };
+
+      const currentComments = Array.isArray(activePlayingVideo.comments) ? activePlayingVideo.comments : [];
+      const updatedComments = [...currentComments, newComment];
+
+      const updatedVideo = {
+        ...activePlayingVideo,
+        comments: updatedComments,
+        updatedAt: now
+      };
+
+      // Actualización optimista
+      setActivePlayingVideo(updatedVideo);
+      if (typeof setVideos === 'function') {
+        setVideos(prev => (prev || []).map(v => (String(v?.id) === String(activePlayingVideo.id) ? updatedVideo : v)));
+      }
+      setCommentInput('');
+      setCommentImagePreview(null);
+      setCommentVideoUrl('');
+      setShowVideoUrlInput(false);
+      setReplyingTo(null);
+
       if (isDemoMode || String(activePlayingVideo.id).startsWith('demo_')) {
         saveDemoSandboxItem('videos', updatedVideo);
       } else {
@@ -569,12 +644,16 @@ export default function VideosModule({
     }
   };
 
-  // Manejador: Eliminar comentario
+  // Manejador: Eliminar comentario y sus respuestas asociadas
   const handleDeleteComment = async (commentId) => {
     if (!activePlayingVideo || !commentId) return;
     askConfirm('¿Deseas eliminar este comentario?', async () => {
       const currentComments = Array.isArray(activePlayingVideo.comments) ? activePlayingVideo.comments : [];
-      const updatedComments = currentComments.filter(c => String(c?.id) !== String(commentId));
+      const updatedComments = currentComments.filter(c => 
+        String(c?.id) !== String(commentId) &&
+        String(c?.parentId) !== String(commentId) &&
+        String(c?.replyTo?.id) !== String(commentId)
+      );
 
       const updatedVideo = {
         ...activePlayingVideo,
@@ -1322,29 +1401,40 @@ export default function VideosModule({
         </div>
       )}
 
-      {/* ================= MODAL DEL REPRODUCTOR INMERSIVO (CINE / THEATER) ================= */}
+      {/* ================= MODAL DEL REPRODUCTOR INMERSIVO (CINE / THEATER EXPANDIDO) ================= */}
       {activePlayingVideo && renderPortal(
         <div
-          onClick={() => setActivePlayingVideo(null)}
-          className={`fixed inset-0 z-[99999] flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200 cursor-pointer ${isDarkMode ? 'dark' : ''}`}
+          onClick={() => {
+            setActivePlayingVideo(null);
+            setViewingImageModal(null);
+            setReplyingTo(null);
+            setCommentImagePreview(null);
+            setCommentVideoUrl('');
+            setShowVideoUrlInput(false);
+          }}
+          className={`fixed inset-0 z-[99999] flex items-center justify-center p-1.5 sm:p-3 md:p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-200 cursor-pointer ${isDarkMode ? 'dark' : ''}`}
         >
           <div
+            data-testid="video-theater-modal"
             onClick={(e) => e.stopPropagation()}
-            className={`relative w-full max-w-5xl h-[94dvh] sm:h-auto max-h-[94dvh] sm:max-h-[92vh] rounded-2xl sm:rounded-3xl shadow-2xl border overflow-hidden flex flex-col cursor-default pb-safe ${
+            className={`relative w-full max-w-[98vw] sm:max-w-[96vw] xl:max-w-[95vw] 2xl:max-w-[1650px] h-[96dvh] sm:h-[94vh] max-h-[96dvh] rounded-2xl sm:rounded-3xl shadow-2xl border overflow-hidden flex flex-col cursor-default pb-safe ${
               isDarkMode
                 ? 'bg-gray-900 border-gray-800 text-gray-100'
                 : 'bg-white border-gray-200 text-gray-900'
             }`}
           >
             {/* Barra superior del modal */}
-            <div className={`px-4 py-3 border-b flex items-center justify-between gap-3 ${
+            <div className={`px-4 sm:px-6 py-3 border-b flex items-center justify-between gap-3 shrink-0 ${
               isDarkMode
-                ? 'bg-gray-800 border-gray-700'
+                ? 'bg-gray-800/90 border-gray-700'
                 : 'bg-gray-50 border-gray-200'
             }`}>
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="px-2.5 py-1 rounded-xl bg-[#AD3333] text-white text-xs font-black shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="px-3 py-1 rounded-xl bg-[#AD3333] text-white text-xs font-black shrink-0 tracking-wide uppercase shadow-xs">
                   {activePlayingVideo.className}
+                </span>
+                <span className={`text-xs font-bold truncate hidden md:inline ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                  {activePlayingVideo.title}
                 </span>
               </div>
 
@@ -1353,50 +1443,57 @@ export default function VideosModule({
                   type="button"
                   onClick={(e) => handleShareVideo(activePlayingVideo, e)}
                   title="Compartir vídeo"
-                  className={`p-1.5 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-3 py-1.5 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 text-xs font-bold ${
                     isDarkMode
                       ? 'text-gray-300 hover:text-white hover:bg-gray-700'
-                      : 'text-gray-500 hover:text-gray-800 hover:bg-gray-200'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
                   }`}
                 >
-                  <Share2 size={16} />
-                  <span className="text-xs font-bold hidden sm:inline">Compartir</span>
+                  <Share2 size={15} />
+                  <span>Compartir</span>
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => setActivePlayingVideo(null)}
+                  onClick={() => {
+                    setActivePlayingVideo(null);
+                    setViewingImageModal(null);
+                    setReplyingTo(null);
+                    setCommentImagePreview(null);
+                    setCommentVideoUrl('');
+                    setShowVideoUrlInput(false);
+                  }}
                   title="Cerrar reproductor"
                   className={`p-1.5 rounded-xl transition-colors cursor-pointer ${
                     isDarkMode
                       ? 'text-gray-300 hover:text-white hover:bg-gray-700'
-                      : 'text-gray-500 hover:text-gray-800 hover:bg-gray-200'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
                   }`}
                 >
-                  <X size={18} />
+                  <X size={20} />
                 </button>
               </div>
             </div>
 
-            {/* Cuerpo del modal: Reproductor + Panel de Comentarios */}
-            <div className="flex-1 overflow-y-auto grid grid-cols-1 lg:grid-cols-3 gap-0">
-              {/* Columna izquierda / principal: Reproductor y detalles */}
-              <div className={`lg:col-span-2 p-3 sm:p-5 space-y-4 border-b lg:border-b-0 lg:border-r flex flex-col justify-between ${
+            {/* Cuerpo del modal: 2 columnas espaciosas (Vídeo + Comentarios) */}
+            <div className="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-12 min-h-0 h-full">
+              {/* Columna izquierda / principal: Reproductor amplio y metadatos */}
+              <div className={`lg:col-span-7 xl:col-span-8 p-3 sm:p-5 md:p-6 overflow-y-auto space-y-4 border-b lg:border-b-0 lg:border-r flex flex-col justify-between ${
                 isDarkMode ? 'border-gray-800 bg-gray-900' : 'border-gray-200 bg-white'
               }`}>
                 <div className="space-y-4">
-                  {/* Área del reproductor */}
-                  <div className={`w-full overflow-hidden rounded-2xl bg-black ${
+                  {/* Área del reproductor espacioso */}
+                  <div className={`w-full overflow-hidden rounded-2xl sm:rounded-3xl bg-black shadow-2xl ${
                     activePlayingVideo.format === 'short'
-                      ? 'aspect-[9/16] max-h-[60vh] mx-auto w-auto'
-                      : 'aspect-video w-full'
+                      ? 'aspect-[9/16] max-h-[68vh] mx-auto w-auto'
+                      : 'aspect-video w-full max-h-[66vh]'
                   }`}>
                     {renderEmbeddedPlayer(activePlayingVideo, true)}
                   </div>
 
                   {/* Título y metadatos */}
-                  <div className="space-y-2">
-                    <h2 className={`text-lg sm:text-xl font-black leading-tight ${
+                  <div className="space-y-3 pt-1">
+                    <h2 className={`text-lg sm:text-2xl font-black leading-tight ${
                       isDarkMode ? 'text-gray-100' : 'text-gray-900'
                     }`}>
                       {activePlayingVideo.title}
@@ -1487,9 +1584,9 @@ export default function VideosModule({
 
                   {/* Descripción */}
                   {activePlayingVideo.description && (
-                    <div className={`p-3.5 rounded-2xl border text-xs whitespace-pre-line leading-relaxed ${
+                    <div className={`p-3.5 sm:p-4 rounded-2xl border text-xs whitespace-pre-line leading-relaxed ${
                       isDarkMode
-                        ? 'bg-gray-800 border-gray-700 text-gray-300'
+                        ? 'bg-gray-800/80 border-gray-700 text-gray-300'
                         : 'bg-gray-50 border-gray-100 text-gray-700'
                     }`}>
                       {activePlayingVideo.description}
@@ -1498,11 +1595,11 @@ export default function VideosModule({
                 </div>
               </div>
 
-              {/* Columna derecha: Comentarios interactivos */}
-              <div className={`lg:col-span-1 p-3 sm:p-4 flex flex-col justify-between max-h-[500px] lg:max-h-none overflow-hidden ${
+              {/* Columna derecha: Comentarios interactivos, imágenes, enlaces de vídeo y respuestas anidadas */}
+              <div className={`lg:col-span-5 xl:col-span-4 p-3 sm:p-4 flex flex-col justify-between h-full overflow-hidden min-h-0 ${
                 isDarkMode
                   ? 'bg-gray-900 border-gray-800'
-                  : 'bg-gray-50/50 border-gray-200'
+                  : 'bg-gray-50/70 border-gray-200'
               }`}>
                 <div className="space-y-3 flex-1 flex flex-col min-h-0">
                   <div className={`flex items-center justify-between pb-2 border-b shrink-0 ${
@@ -1516,33 +1613,67 @@ export default function VideosModule({
                     </h4>
                   </div>
 
-                  {/* Lista de comentarios con scroll */}
-                  <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
-                    {(activePlayingVideo.comments || []).length === 0 ? (
-                      <div className={`py-8 text-center text-xs ${
-                        isDarkMode ? 'text-gray-400' : 'text-gray-400'
-                      }`}>
-                        Aún no hay comentarios. ¡Sé el primero en opinar!
-                      </div>
-                    ) : (
-                      (activePlayingVideo.comments || []).map((comm) => {
+                  {/* Lista de comentarios con scroll y agrupación en hilos */}
+                  <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+                    {(() => {
+                      const allComments = Array.isArray(activePlayingVideo.comments) ? activePlayingVideo.comments : [];
+                      if (allComments.length === 0) {
+                        return (
+                          <div className={`py-12 text-center text-xs space-y-1 ${
+                            isDarkMode ? 'text-gray-400' : 'text-gray-400'
+                          }`}>
+                            <p className="font-bold">Aún no hay comentarios.</p>
+                            <p className="text-[11px] opacity-80">¡Sé el primero en opinar, adjuntar una imagen o compartir un vídeo!</p>
+                          </div>
+                        );
+                      }
+
+                      // Agrupación en árbol: raíces y respuestas
+                      const idMap = new Map();
+                      const roots = [];
+                      const repliesMap = new Map();
+
+                      allComments.forEach((c) => {
+                        if (c?.id) idMap.set(String(c.id), c);
+                      });
+
+                      allComments.forEach((c) => {
+                        const parentId = c?.parentId || c?.replyTo?.id;
+                        if (parentId && idMap.has(String(parentId)) && String(parentId) !== String(c.id)) {
+                          const pIdStr = String(parentId);
+                          if (!repliesMap.has(pIdStr)) repliesMap.set(pIdStr, []);
+                          repliesMap.get(pIdStr).push(c);
+                        } else {
+                          roots.push(c);
+                        }
+                      });
+
+                      // Renderizador unificado para cada tarjeta de comentario
+                      const renderCommentCard = (comm, isReply = false) => {
                         const canDeleteComment = canModifyComment(comm);
                         const commPhoto = resolveAuthorPhoto(comm);
+
+                        // Detección de vídeo embebido
+                        const videoLink = comm.videoUrl || extractFirstVideoUrl(comm.text)?.url;
+                        const parsedVideo = videoLink ? parseVideoUrl(videoLink) : null;
+
                         return (
                           <div
                             key={comm.id}
-                            className={`p-2.5 rounded-2xl border text-xs space-y-1 relative group ${
+                            data-comment-id={comm.id}
+                            data-is-reply={String(isReply)}
+                            className={`p-3 rounded-2xl border text-xs space-y-2 relative group transition-all ${
                               isDarkMode
-                                ? 'bg-gray-800 border-gray-700 text-gray-200'
-                                : 'bg-white border-gray-100 text-gray-800'
+                                ? 'bg-gray-800/90 border-gray-700/80 text-gray-200 shadow-xs'
+                                : 'bg-white border-gray-100 text-gray-800 shadow-xs'
                             }`}
                           >
                             <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-1.5 min-w-0">
-                                <div className={`relative w-5 h-5 rounded-full overflow-hidden shrink-0 ring-1 ${
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className={`relative w-6 h-6 rounded-full overflow-hidden shrink-0 ring-1 ${
                                   isDarkMode ? 'ring-gray-700 bg-red-950/40 text-red-400' : 'ring-gray-200 bg-[#AD3333]/10 text-[#AD3333]'
                                 }`}>
-                                  <div className="w-full h-full flex items-center justify-center font-bold text-[9px]">
+                                  <div className="w-full h-full flex items-center justify-center font-bold text-[10px]">
                                     {(comm.userName || 'U').charAt(0).toUpperCase()}
                                   </div>
                                   {commPhoto && (
@@ -1554,16 +1685,18 @@ export default function VideosModule({
                                     />
                                   )}
                                 </div>
-                                <span className={`font-bold flex items-center gap-1 truncate ${
-                                  isDarkMode ? 'text-gray-100' : 'text-gray-900'
-                                }`}>
-                                  {comm.userName}
-                                  {comm.userRole === 'teacher' && (
-                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-[#AD3333] text-white shrink-0">
-                                      Docente
-                                    </span>
-                                  )}
-                                </span>
+                                <div className="min-w-0">
+                                  <span className={`font-bold text-xs flex items-center gap-1 truncate ${
+                                    isDarkMode ? 'text-gray-100' : 'text-gray-900'
+                                  }`}>
+                                    {comm.userName}
+                                    {comm.userRole === 'teacher' && (
+                                      <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-[#AD3333] text-white shrink-0">
+                                        Docente
+                                      </span>
+                                    )}
+                                  </span>
+                                </div>
                               </div>
                               <span className={`text-[10px] shrink-0 ${
                                 isDarkMode ? 'text-gray-400' : 'text-gray-400'
@@ -1572,57 +1705,296 @@ export default function VideosModule({
                               </span>
                             </div>
 
-                            <p className={`leading-relaxed font-normal ${
-                              isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                            }`}>
-                              {comm.text}
-                            </p>
+                            {/* Indicador de respuesta si aplica */}
+                            {isReply && comm.replyTo?.userName && (
+                              <div className="text-[10px] font-semibold flex items-center gap-1 text-[#AD3333] dark:text-red-400">
+                                <ReplyIcon size={11} className="shrink-0" />
+                                <span>Respondiendo a @{comm.replyTo.userName}</span>
+                              </div>
+                            )}
 
-                            {canDeleteComment && (
+                            {/* Texto del comentario */}
+                            {comm.text && (
+                              <div className={`leading-relaxed font-normal text-xs break-words ${
+                                isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                              }`}>
+                                <LinkifyText text={comm.text} isDarkMode={isDarkMode} embedVideos={false} />
+                              </div>
+                            )}
+
+                            {/* Imagen adjunta con zoom */}
+                            {comm.imageUrl && (
+                              <div className="pt-1">
+                                <div className="relative rounded-xl overflow-hidden max-w-sm border border-gray-200 dark:border-gray-700 bg-black/10 inline-block">
+                                  <img
+                                    src={comm.imageUrl}
+                                    alt="Adjunto de comentario"
+                                    loading="lazy"
+                                    className="max-h-52 sm:max-h-60 w-auto object-cover rounded-xl cursor-pointer hover:opacity-95 transition-opacity"
+                                    onClick={() => setViewingImageModal(comm.imageUrl)}
+                                  />
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Vídeo embebido interactivo */}
+                            {parsedVideo && parsedVideo.isValid && (
+                              <div className={`mt-2 rounded-xl overflow-hidden border shadow-sm max-w-sm ${
+                                isDarkMode ? 'border-gray-700 bg-black/70' : 'border-gray-200 bg-gray-900'
+                              }`}>
+                                <div className="relative aspect-video w-full bg-black">
+                                  {renderEmbeddedPlayer({ ...parsedVideo, title: parsedVideo.title || 'Vídeo en comentario' })}
+                                </div>
+                                <div className="px-2.5 py-1.5 flex items-center justify-between gap-2 text-[10px] bg-black/50 text-gray-300">
+                                  <span className="truncate font-semibold flex items-center gap-1">
+                                    <Film size={11} className="text-[#AD3333]" />
+                                    <span>{parsedVideo.platform.toUpperCase()}</span>
+                                  </span>
+                                  <a
+                                    href={parsedVideo.originalUrl || parsedVideo.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-red-400 hover:text-red-300 hover:underline flex items-center gap-0.5 shrink-0"
+                                  >
+                                    <span>Abrir enlace</span>
+                                    <ExternalLink size={10} />
+                                  </a>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Botón para responder y eliminar */}
+                            <div className="flex items-center justify-between pt-1 border-t border-gray-100 dark:border-gray-800/60">
                               <button
                                 type="button"
-                                onClick={() => handleDeleteComment(comm.id)}
-                                title="Borrar comentario"
-                                className="absolute top-2 right-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-1 text-gray-400 hover:text-red-400 transition-opacity cursor-pointer"
+                                onClick={() => {
+                                  setReplyingTo({
+                                    id: comm.id,
+                                    userName: comm.userName,
+                                    text: comm.text || (comm.imageUrl ? '📷 Imagen' : (comm.videoUrl ? '🎥 Vídeo' : 'Comentario'))
+                                  });
+                                  setTimeout(() => commentInputRef.current?.focus(), 80);
+                                }}
+                                className={`inline-flex items-center gap-1 text-[11px] font-bold transition-colors cursor-pointer ${
+                                  isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-[#AD3333]'
+                                }`}
                               >
-                                <Trash2 size={12} />
+                                <ReplyIcon size={12} />
+                                <span>Responder</span>
                               </button>
+
+                              {canDeleteComment && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteComment(comm.id)}
+                                  title="Borrar comentario"
+                                  className="p-1 text-gray-400 hover:text-red-400 transition-colors cursor-pointer"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      };
+
+                      return roots.map((rootCmt) => {
+                        const hasReplies = repliesMap.has(String(rootCmt.id));
+                        const replies = hasReplies ? repliesMap.get(String(rootCmt.id)) : [];
+                        return (
+                          <div key={rootCmt.id} className="space-y-2">
+                            {renderCommentCard(rootCmt, false)}
+
+                            {/* Respuestas anidadas (estilo Reddit / YouTube / Slack) */}
+                            {hasReplies && (
+                              <div className="ml-3 sm:ml-5 pl-2.5 sm:pl-3.5 border-l-2 border-[#AD3333]/30 dark:border-red-500/30 space-y-2 mt-1.5">
+                                {replies.map((replyCmt) => (
+                                  <React.Fragment key={replyCmt.id}>
+                                    {renderCommentCard(replyCmt, true)}
+                                  </React.Fragment>
+                                ))}
+                              </div>
                             )}
                           </div>
                         );
-                      })
-                    )}
+                      });
+                    })()}
                     <div ref={commentsEndRef} />
                   </div>
                 </div>
 
-                {/* Formulario para agregar nuevo comentario */}
-                <form onSubmit={handleAddComment} className={`pt-3 border-t mt-2 shrink-0 ${
-                  isDarkMode ? 'border-gray-800' : 'border-gray-200'
-                }`}>
-                  <div className="flex items-center gap-2">
+                {/* Formulario enriquecido para agregar comentario, imagen, vídeo o respuesta */}
+                <form
+                  onSubmit={handleAddComment}
+                  className={`pt-3 border-t mt-2 shrink-0 space-y-2 ${
+                    isDarkMode ? 'border-gray-800' : 'border-gray-200'
+                  }`}
+                >
+                  {/* Banner de respuesta a otro comentario */}
+                  {replyingTo && (
+                    <div className={`flex items-center justify-between px-3 py-1.5 rounded-xl text-xs border animate-in fade-in duration-150 ${
+                      isDarkMode ? 'bg-[#AD3333]/15 border-[#AD3333]/30 text-gray-200' : 'bg-red-50 border-red-200 text-gray-800'
+                    }`}>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <ReplyIcon size={12} className="text-[#AD3333] shrink-0" />
+                        <span className="font-bold text-[#AD3333] shrink-0">Respondiendo a @{replyingTo.userName}:</span>
+                        <span className="truncate text-gray-400 text-[11px]">{replyingTo.text}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setReplyingTo(null)}
+                        className="p-1 text-gray-400 hover:text-red-500 rounded-md transition-colors cursor-pointer"
+                        title="Cancelar respuesta"
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Previsualización de imagen adjunta */}
+                  {commentImagePreview && (
+                    <div className="flex items-center gap-2 p-1.5 rounded-xl border bg-gray-50 dark:bg-gray-800/80 border-gray-200 dark:border-gray-700 animate-in fade-in">
+                      <img
+                        src={commentImagePreview}
+                        alt="Previsualización"
+                        className="w-12 h-12 object-cover rounded-lg border border-gray-300 dark:border-gray-600"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[11px] font-bold text-gray-800 dark:text-gray-200 truncate">Imagen adjunta</p>
+                        <p className="text-[10px] text-gray-400">Se subirá junto a tu comentario</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setCommentImagePreview(null)}
+                        className="p-1 text-gray-400 hover:text-red-500 rounded-lg cursor-pointer"
+                        title="Quitar imagen"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Campo desplegable para adjuntar enlace de vídeo */}
+                  {showVideoUrlInput && (
+                    <div className="flex items-center gap-1.5 p-1.5 rounded-xl border border-red-200 dark:border-red-950/60 bg-red-50/60 dark:bg-red-950/20 text-xs animate-in fade-in">
+                      <Film size={14} className="text-[#AD3333] shrink-0 ml-1" />
+                      <input
+                        type="url"
+                        value={commentVideoUrl}
+                        onChange={(e) => setCommentVideoUrl(e.target.value)}
+                        placeholder="Pega enlace de vídeo (YouTube, TikTok, Drive, MP4)..."
+                        className="flex-1 bg-transparent border-0 outline-none text-xs text-inherit placeholder-gray-400"
+                        autoFocus
+                      />
+                      {commentVideoUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setCommentVideoUrl('')}
+                          className="p-1 text-gray-400 hover:text-red-500"
+                        >
+                          <X size={12} />
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Entrada principal con botones de adjunto y envío */}
+                  <div className="flex items-center gap-1.5">
+                    {/* Botón para adjuntar imagen */}
                     <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleCommentImageSelect}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      title="Adjuntar imagen o captura"
+                      className={`p-2 rounded-xl transition-colors cursor-pointer shrink-0 ${
+                        commentImagePreview
+                          ? 'bg-red-500/10 text-[#AD3333]'
+                          : (isDarkMode ? 'text-gray-400 hover:text-gray-200 hover:bg-gray-800' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100')
+                      }`}
+                    >
+                      <ImageIcon size={16} />
+                    </button>
+
+                    {/* Botón para adjuntar vídeo */}
+                    <button
+                      type="button"
+                      onClick={() => setShowVideoUrlInput(prev => !prev)}
+                      title="Adjuntar enlace de vídeo"
+                      className={`p-2 rounded-xl transition-colors cursor-pointer shrink-0 ${
+                        showVideoUrlInput || commentVideoUrl
+                          ? 'bg-red-500/10 text-[#AD3333]'
+                          : (isDarkMode ? 'text-gray-400 hover:text-gray-200 hover:bg-gray-800' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100')
+                      }`}
+                    >
+                      <Film size={16} />
+                    </button>
+
+                    <input
+                      ref={commentInputRef}
                       type="text"
                       value={commentInput}
                       onChange={(e) => setCommentInput(e.target.value)}
-                      placeholder="Escribe un comentario o pregunta..."
+                      onPaste={handleCommentPaste}
+                      placeholder={
+                        replyingTo
+                          ? `Responder a @${replyingTo.userName}...`
+                          : 'Escribe un comentario o pregunta...'
+                      }
                       className={`flex-1 px-3 py-2 rounded-xl border text-xs outline-none ${
                         isDarkMode
                           ? 'bg-gray-800 border-gray-700 text-gray-100 placeholder-gray-500 focus:border-[#AD3333]'
                           : 'bg-white border-gray-200 text-gray-900 placeholder-gray-400 focus:border-[#AD3333]'
                       }`}
                     />
+
                     <button
                       type="submit"
-                      disabled={!commentInput.trim() || isSubmittingComment}
-                      className="px-3.5 py-2 rounded-xl bg-[#AD3333] hover:bg-[#8f2828] text-white text-xs font-bold transition-all disabled:opacity-40 cursor-pointer"
+                      disabled={(!commentInput.trim() && !commentImagePreview && !commentVideoUrl.trim()) || isSubmittingComment}
+                      className="px-3.5 py-2 rounded-xl bg-[#AD3333] hover:bg-[#8f2828] text-white text-xs font-bold transition-all disabled:opacity-40 cursor-pointer flex items-center gap-1 shrink-0 shadow-xs"
                     >
-                      {isSubmittingComment ? <Loader2 size={13} className="animate-spin" /> : 'Enviar'}
+                      {isSubmittingComment ? (
+                        <Loader2 size={13} className="animate-spin" />
+                      ) : (
+                        <>
+                          <Send size={13} />
+                          <span className="hidden sm:inline">Enviar</span>
+                        </>
+                      )}
                     </button>
                   </div>
                 </form>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL LIGHTBOX PARA VISUALIZAR IMÁGENES DE COMENTARIOS ================= */}
+      {viewingImageModal && renderPortal(
+        <div
+          onClick={() => setViewingImageModal(null)}
+          className="fixed inset-0 z-[100000] flex items-center justify-center p-3 sm:p-6 bg-black/95 backdrop-blur-md animate-in fade-in duration-150 cursor-pointer"
+        >
+          <div className="relative max-w-4xl max-h-[92vh] flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              onClick={() => setViewingImageModal(null)}
+              className="absolute -top-11 right-0 p-2 text-white hover:text-red-400 bg-white/10 hover:bg-white/20 rounded-full transition-colors cursor-pointer"
+              title="Cerrar imagen"
+            >
+              <X size={20} />
+            </button>
+            <img
+              src={viewingImageModal}
+              alt="Visualización de imagen en comentario"
+              className="max-w-full max-h-[86vh] object-contain rounded-2xl shadow-2xl border border-gray-700"
+            />
           </div>
         </div>
       )}

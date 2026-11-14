@@ -181,6 +181,23 @@ export function parseVideoUrl(rawUrl = '') {
 }
 
 /**
+ * Extrae y valida la primera URL de vídeo detectada dentro de un texto arbitrario.
+ * Soporta YouTube, Shorts, TikTok, Google Drive, Dropbox, Vimeo, pCloud, FileGarden y enlaces directos MP4/WebM.
+ */
+export function extractFirstVideoUrl(text = '') {
+  if (!text || typeof text !== 'string') return null;
+  const urls = text.match(/https?:\/\/[^\s<>"'{}|\\^`]+/gi) || [];
+  for (const raw of urls) {
+    const clean = raw.replace(/[.,;:!?)]+$/, '');
+    const parsed = parseVideoUrl(clean);
+    if (parsed.isValid && (parsed.platform !== 'generic' || parsed.playerType === 'direct')) {
+      return { ...parsed, url: clean };
+    }
+  }
+  return null;
+}
+
+/**
  * Normaliza y asegura que un objeto de vídeo tenga todos los campos requeridos
  * para mostrarse de forma minimalista, robusta y sin fallos.
  */
@@ -213,6 +230,14 @@ export function normalizeVideoItem(raw = {}) {
         userRole: String(c.userRole || c.role || 'student'),
         userAvatar: String(c.userAvatar || ''),
         text: String(c.text || '').trim(),
+        imageUrl: c.imageUrl ? String(c.imageUrl) : null,
+        videoUrl: c.videoUrl ? String(c.videoUrl) : null,
+        parentId: c.parentId ? String(c.parentId) : (c.replyTo?.id ? String(c.replyTo.id) : null),
+        replyTo: c.replyTo && typeof c.replyTo === 'object' ? {
+          id: String(c.replyTo.id || ''),
+          userName: String(c.replyTo.userName || c.replyTo.author || ''),
+          text: String(c.replyTo.text || '')
+        } : null,
         createdAt: Number(c.createdAt) || now
       }))
     : [];
