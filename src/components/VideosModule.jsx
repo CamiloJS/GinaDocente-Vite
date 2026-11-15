@@ -1433,9 +1433,6 @@ export default function VideosModule({
                 <span className="px-3 py-1 rounded-xl bg-[#AD3333] text-white text-xs font-black shrink-0 tracking-wide uppercase shadow-xs">
                   {activePlayingVideo.className}
                 </span>
-                <span className={`text-xs font-bold truncate hidden md:inline ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                  {activePlayingVideo.title}
-                </span>
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
