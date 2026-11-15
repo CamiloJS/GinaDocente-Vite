@@ -43,17 +43,9 @@ import {
   ChevronDown, ChevronUp, Minus, HelpCircle, Lightbulb, GraduationCap, Laptop, PenTool,
   Compass, Atom, Award, Star, Bookmark, Terminal, Folder, Globe, Target, Layers, RotateCcw,
   Archive, ShieldAlert, Unlock, Menu, UserPlus, Camera, Upload, Phone, PhoneOff, Share2,
-  Lock, Key, ClipboardList, BarChart3, Music, Video, Film, Timer, Coins, Calculator, SpotifyIcon
+  Lock, Key, ClipboardList, BarChart3, Music, Video, Film, Timer, Coins, Calculator
 } from './components/Icons.jsx'
 import ProfileHoverCard from './components/ProfileHoverCard.jsx'
-import SpotifyWidget from './components/SpotifyWidget.jsx'
-import SpotifyConnectModal from './components/SpotifyConnectModal.jsx'
-import { 
-  exchangeSpotifyCode, 
-  fetchCurrentlyPlaying, 
-  getStoredSpotifyAuth, 
-  clearStoredSpotifyAuth 
-} from './utils/spotify.js'
 import FloatingToolsOverlay from './components/FloatingToolsOverlay.jsx'
 import {
   parseAiResponse,
@@ -419,7 +411,6 @@ function App() {
   const [editingProfilePostId, setEditingProfilePostId] = useState(null);
   const [editProfilePostData, setEditProfilePostData] = useState({ title: "", text: "" });
   const [showAvatarUploadModal, setShowAvatarUploadModal] = useState(false);
-  const [showSpotifyModal, setShowSpotifyModal] = useState(false);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState("");
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [appPreviewDoc, setAppPreviewDoc] = useState(null);
@@ -2273,7 +2264,6 @@ function App() {
       if (e.key === 'Escape') {
         setFullScreenImage(null);
         setAppPreviewDoc(null);
-        setShowSpotifyModal(false);
         setShowSugModal(false);
         setGlobalGifCallback(null);
         setShowChatSettings(false);
@@ -6540,112 +6530,6 @@ useEffect(() => {
         setIsUploadingAvatar(false);
     };
 
-    // --- INTEGRACIÓN SPOTIFY: Guardado y Sincronización en Tiempo Real ---
-    const handleSaveSpotifyStatus = async (spotifyStatus) => {
-        if (!myChatId) return;
-        const cleanKey = String(myChatId || '').toLowerCase().replace(/^@/, '');
-        
-        setUserMappings(prev => ({
-            ...prev,
-            [myChatId]: { ...(prev[myChatId] || {}), spotifyStatus },
-            ...(cleanKey ? { [cleanKey]: { ...(prev[cleanKey] || {}), spotifyStatus } } : {})
-        }));
-        userMappingsRef.current = {
-            ...userMappingsRef.current,
-            [myChatId]: { ...(userMappingsRef.current[myChatId] || {}), spotifyStatus },
-            ...(cleanKey ? { [cleanKey]: { ...(userMappingsRef.current[cleanKey] || {}), spotifyStatus } } : {})
-        };
-
-        if (isDemoMode) {
-            saveDemoSandboxItem('userMappings', { id: myChatId, ...(userMappings[myChatId] || {}), spotifyStatus });
-            return;
-        }
-
-        try {
-            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'userMappings', myChatId), { spotifyStatus }, { merge: true });
-        } catch (e) {
-            console.warn('Error al guardar estado de Spotify en Firestore:', e);
-        }
-    };
-
-    // Detección de retorno de Spotify OAuth (?code=...)
-    useEffect(() => {
-        if (typeof window === 'undefined') return;
-        const urlParams = new URLSearchParams(window.location.search);
-        const spotifyCode = urlParams.get('code');
-        const spotifyError = urlParams.get('error');
-
-        if (spotifyCode) {
-            exchangeSpotifyCode(spotifyCode)
-                .then((auth) => {
-                    if (auth?.accessToken) {
-                        showMessage("🎵 ¡Cuenta de Spotify vinculada exitosamente!");
-                        fetchCurrentlyPlaying().then((playing) => {
-                            if (playing && myChatId) {
-                                handleSaveSpotifyStatus(playing);
-                            }
-                        });
-                    }
-                })
-                .catch((err) => {
-                    console.warn('Error al vincular con Spotify:', err);
-                    showMessage(`No se pudo completar la conexión con Spotify: ${err.message || err}`);
-                })
-                .finally(() => {
-                    const newParams = new URLSearchParams(window.location.search);
-                    newParams.delete('code');
-                    newParams.delete('state');
-                    newParams.delete('error');
-                    const searchStr = newParams.toString();
-                    const cleanUrl = window.location.pathname + (searchStr ? `?${searchStr}` : '') + window.location.hash;
-                    window.history.replaceState(null, '', cleanUrl);
-                });
-        } else if (spotifyError) {
-            console.warn('Spotify auth error:', spotifyError);
-            const newParams = new URLSearchParams(window.location.search);
-            newParams.delete('code');
-            newParams.delete('state');
-            newParams.delete('error');
-            const searchStr = newParams.toString();
-            const cleanUrl = window.location.pathname + (searchStr ? `?${searchStr}` : '') + window.location.hash;
-            window.history.replaceState(null, '', cleanUrl);
-        }
-    }, [myChatId]);
-
-    // Sincronización periódica en vivo de Spotify (cada 25s) mientras el usuario está en la app
-    useEffect(() => {
-        if (!hasEntered || !myChatId) return;
-
-        let isMounted = true;
-        const syncCurrentPlaying = async () => {
-            const auth = getStoredSpotifyAuth();
-            if (!auth?.accessToken) return;
-            if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
-            try {
-                const playing = await fetchCurrentlyPlaying();
-                if (!isMounted) return;
-                if (playing) {
-                    handleSaveSpotifyStatus(playing);
-                }
-            } catch {}
-        };
-
-        syncCurrentPlaying();
-        const interval = setInterval(syncCurrentPlaying, 25000);
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === 'visible') {
-                syncCurrentPlaying();
-            }
-        };
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-
-        return () => {
-            isMounted = false;
-            clearInterval(interval);
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-        };
-    }, [hasEntered, myChatId, showSpotifyModal]);
-
     // --- LÓGICA DE PUBLICACIONES DE PERFIL ---
     const handleProfileImageUpload = async (e) => {
         const rawFile = e.target.files?.[0];
@@ -7113,29 +6997,7 @@ useEffect(() => {
                                     <span>Enviar mensaje</span>
                                 </button>
                             )}
-                            {isMyProfile && (
-                                <button
-                                    type="button"
-                                    onClick={() => setShowSpotifyModal(true)}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-[#1DB954]/15 hover:bg-[#1DB954]/25 text-[#1DB954] border border-[#1DB954]/30 shadow-2xs transition-all cursor-pointer active:scale-95"
-                                    title="Vincular cuenta de Spotify o canción favorita"
-                                >
-                                    <SpotifyIcon size={14} />
-                                    <span>{userData?.spotifyStatus?.track ? 'Música en Spotify' : 'Vincular Spotify'}</span>
-                                </button>
-                            )}
                         </div>
-
-                        {/* Widget de Spotify si el usuario tiene música activa */}
-                        {userData?.spotifyStatus && (
-                            <div className="mt-3 max-w-sm">
-                                <SpotifyWidget 
-                                    spotifyStatus={userData.spotifyStatus} 
-                                    isOwn={isMyProfile}
-                                    onManage={() => setShowSpotifyModal(true)}
-                                />
-                            </div>
-                        )}
                     </div>
                 </div>
 
@@ -18197,16 +18059,6 @@ Escribe en español con tono pedagógico moderno.`;
                       isDarkMode={isDarkMode}
                   />
               )}
-
-              {/* MODAL DE VINCULACIÓN DE SPOTIFY */}
-              <SpotifyConnectModal
-                  isOpen={showSpotifyModal}
-                  onClose={() => setShowSpotifyModal(false)}
-                  isDarkMode={isDarkMode}
-                  currentStatus={userMappings[myChatId]?.spotifyStatus || null}
-                  onSaveStatus={handleSaveSpotifyStatus}
-                  showMessage={showMessage}
-              />
 
               {/* ONBOARDING PRIMERA VEZ */}
               {showOnboarding && hasEntered && !isDemoMode && (

@@ -196,8 +196,3 @@ export const ThumbsUp = (p) => <svg width={p.size || 20} height={p.size || 20} v
 export const Link2 = (p) => <svg width={p.size || 20} height={p.size || 20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={p.className}><path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" x2="16" y1="12" y2="12"/></svg>
 export const Forward = (p) => <svg width={p.size || 20} height={p.size || 20} viewBox="0 0 24 24" fill={p.fill || "none"} stroke="currentColor" strokeWidth={p.strokeWidth || 2} strokeLinecap="round" strokeLinejoin="round" className={p.className}><polyline points="15 17 20 12 15 7" /><path d="M4 18v-2a4 4 0 0 1 4-4h12" /></svg>
 export const User = UserIcon
-export const SpotifyIcon = (p) => (
-  <svg width={p.size || 20} height={p.size || 20} viewBox="0 0 24 24" fill={p.fill || "currentColor"} className={p.className}>
-    <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.495 17.303c-.216.354-.678.468-1.032.252-2.827-1.728-6.386-2.118-10.578-1.161-.403.092-.806-.16-.898-.563-.092-.403.16-.806.563-.898 4.588-1.048 8.523-.61 11.693 1.338.354.216.468.678.252 1.032zm1.467-3.262c-.272.443-.854.585-1.297.313-3.235-1.988-8.167-2.563-11.993-1.401-.497.151-1.026-.135-1.177-.632-.151-.497.135-1.026.632-1.177 4.382-1.33 9.813-.687 13.522 1.599.443.272.585.854.313 1.298zm.126-3.41c-3.879-2.303-10.278-2.515-13.985-1.389-.594.18-1.228-.155-1.408-.749-.18-.594.155-1.228.749-1.408 4.256-1.292 11.319-1.042 15.795 1.616.534.317.708 1.009.391 1.543-.317.534-1.009.708-1.542.387z"/>
-  </svg>
-);

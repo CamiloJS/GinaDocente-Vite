@@ -5,7 +5,6 @@ import ReactDOM from 'react-dom';
 import { 
   UserIcon, MessageCircle, ExternalLink, TeacherIcon, CheckCircle2 
 } from './Icons.jsx';
-import { SpotifyWidget } from './SpotifyWidget.jsx';
 import { 
   resolveUserDisplayName, 
   resolveUserPhoto, 
@@ -205,7 +204,6 @@ export const ProfileHoverCard = ({
   const groupName = uData.groupName || uData.academicGroupName || uData.career || '';
   const email = uData.email || (cleanId.includes('@') ? cleanId : '');
   const bio = uData.bio || uData.statusMessage || uData.customStatus || '';
-  const spotifyStatus = uData.spotifyStatus || null;
 
   // Estado de presencia
   const pData = getUserPresenceData(userId, userPresence, userMappings);
@@ -371,13 +369,6 @@ export const ProfileHoverCard = ({
               <p className="mt-2 p-2 rounded-xl text-[11px] italic bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800 leading-snug line-clamp-2 text-gray-600 dark:text-gray-300">
                 "{bio}"
               </p>
-            )}
-
-            {/* Widget de Spotify si la persona tiene música activa */}
-            {spotifyStatus && (
-              <div className="mt-2.5">
-                <SpotifyWidget spotifyStatus={spotifyStatus} compact={false} />
-              </div>
             )}
           </div>
         </div>,
