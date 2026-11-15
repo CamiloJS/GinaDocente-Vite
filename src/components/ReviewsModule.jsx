@@ -2725,7 +2725,7 @@ export const SlidePresenterViewer = ({ presentation, onClose, onEdit, role, them
   const currentSlide = slides[safeIdx] || {};
   const displayTitle = activePres?.slides?.[0]?.title || activePres?.topic || 'Presentación';
   const transitionType = currentSlide.transition || activePres?.transition || 'fade';
-  const transitionDuration = Number(currentSlide.transitionDuration || activePres?.transitionDuration || 400);
+  const transitionDuration = Number(currentSlide.transitionDuration || activePres?.transitionDuration || 250);
   const autoAdvanceSec = Number(currentSlide.autoAdvanceSeconds ?? activePres?.autoAdvanceSeconds ?? 0);
 
   const isLight = themeMode === 'light';
@@ -2933,15 +2933,15 @@ export const SlidePresenterViewer = ({ presentation, onClose, onEdit, role, them
     : (isDim ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700' : 'bg-neutral-900 hover:bg-neutral-800 text-white border border-neutral-800');
 
   const transitionAnimClass = {
-    fade: 'animate-in fade-in duration-300',
-    slide: 'animate-in fade-in slide-in-from-right-8 duration-300',
-    push_up: 'animate-in fade-in slide-in-from-bottom-8 duration-300',
-    wipe: 'animate-in fade-in slide-in-from-left-8 duration-300',
-    split: 'animate-in fade-in zoom-in-95 duration-300',
-    zoom: 'animate-in fade-in zoom-in-90 duration-300',
-    flip: 'animate-in fade-in zoom-in-90 duration-300',
+    fade: 'animate-in fade-in',
+    slide: 'animate-in fade-in slide-in-from-right-8',
+    push_up: 'animate-in fade-in slide-in-from-bottom-8',
+    wipe: 'animate-in fade-in slide-in-from-left-8',
+    split: 'animate-in fade-in zoom-in-95',
+    zoom: 'animate-in fade-in zoom-in-90',
+    flip: 'animate-in fade-in zoom-in-90',
     none: ''
-  }[transitionType] || 'animate-in fade-in duration-200';
+  }[transitionType] || 'animate-in fade-in';
 
   const currentStrokes = strokesBySlide[safeIdx] || [];
 
@@ -3391,7 +3391,7 @@ export const SlideEditorModal = ({
     theme: presentation?.theme || 'unipamplona',
     fontFamily: presentation?.fontFamily || 'sans',
     transition: presentation?.transition || 'fade',
-    transitionDuration: presentation?.transitionDuration || 450,
+    transitionDuration: presentation?.transitionDuration || 250,
     autoAdvanceSeconds: presentation?.autoAdvanceSeconds || 0,
     bgPattern: presentation?.bgPattern || 'none',
     targetGroupId: presentation?.targetGroupId || 'all',
@@ -4505,7 +4505,7 @@ export const SlideEditorModal = ({
       theme: deckMeta.theme,
       fontFamily: deckMeta.fontFamily,
       transition: deckMeta.transition,
-      transitionDuration: deckMeta.transitionDuration || 450,
+      transitionDuration: deckMeta.transitionDuration || 250,
       autoAdvanceSeconds: deckMeta.autoAdvanceSeconds || 0,
       bgPattern: deckMeta.bgPattern,
       targetGroupId: deckMeta.targetGroupId || 'all',
@@ -4845,18 +4845,19 @@ export const SlideEditorModal = ({
     ? 'hover:bg-gray-800 text-gray-200 border-gray-700/80'
     : 'hover:bg-gray-100 text-gray-700 border-gray-200';
 
+  const activeDurationMs = Number(activeSlide.transitionDuration || deckMeta.transitionDuration || 250);
   const activeTransitionType = activeSlide.transition || deckMeta.transition || 'fade';
   const previewTransitionClass = previewAnimKey > 0
     ? ({
-        fade: 'animate-in fade-in duration-500',
-        slide: 'animate-in fade-in slide-in-from-right-8 duration-500',
-        push_up: 'animate-in fade-in slide-in-from-bottom-8 duration-500',
-        wipe: 'animate-in fade-in slide-in-from-left-8 duration-500',
-        split: 'animate-in fade-in zoom-in-95 duration-500',
-        zoom: 'animate-in fade-in zoom-in-90 duration-500',
-        flip: 'animate-in fade-in zoom-in-90 duration-500',
+        fade: 'animate-in fade-in',
+        slide: 'animate-in fade-in slide-in-from-right-8',
+        push_up: 'animate-in fade-in slide-in-from-bottom-8',
+        wipe: 'animate-in fade-in slide-in-from-left-8',
+        split: 'animate-in fade-in zoom-in-95',
+        zoom: 'animate-in fade-in zoom-in-90',
+        flip: 'animate-in fade-in zoom-in-90',
         none: ''
-      }[activeTransitionType] || 'animate-in fade-in duration-300')
+      }[activeTransitionType] || 'animate-in fade-in')
     : '';
 
   return createPortal(
@@ -5816,7 +5817,7 @@ export const SlideEditorModal = ({
                   <label className="flex items-center gap-1 text-xs font-bold">
                     <span className="text-gray-500">Duración:</span>
                     <select
-                      value={activeSlide.transitionDuration || deckMeta.transitionDuration || 450}
+                      value={activeSlide.transitionDuration || deckMeta.transitionDuration || 250}
                       onChange={(e) => {
                         const ms = Number(e.target.value);
                         handleSlideChange('transitionDuration', ms);
@@ -5824,8 +5825,8 @@ export const SlideEditorModal = ({
                       }}
                       className={`px-2 py-1 rounded-lg border text-xs font-bold outline-none ${inputBg}`}
                     >
-                      <option value={250}>0.25 s (Rápida)</option>
-                      <option value={450}>0.45 s (Normal)</option>
+                      <option value={250}>0.25 s (Rápida / Tiempo real - Por defecto)</option>
+                      <option value={450}>0.45 s (Media)</option>
                       <option value={700}>0.70 s (Suave)</option>
                       <option value={1000}>1.00 s (Lenta)</option>
                     </select>
@@ -5851,7 +5852,7 @@ export const SlideEditorModal = ({
                     type="button"
                     onClick={() => {
                       const tr = activeSlide.transition || deckMeta.transition || 'fade';
-                      const dur = activeSlide.transitionDuration || deckMeta.transitionDuration || 450;
+                      const dur = activeSlide.transitionDuration || deckMeta.transitionDuration || 250;
                       setDeckMeta(prev => ({ ...prev, transition: tr, transitionDuration: dur }));
                       updateSlidesWithHistory(prev => prev.map(s => ({ ...s, transition: tr, transitionDuration: dur })));
                       showMessage('Transición aplicada a todas las diapositivas.');
@@ -6331,9 +6332,13 @@ export const SlideEditorModal = ({
                 ref={stageContainerRef}
                 style={{
                   width: `${canvasZoom}%`,
-                  maxWidth: canvasZoom > 100 ? '1100px' : '920px'
+                  maxWidth: canvasZoom > 100 ? '1100px' : '920px',
+                  ...(previewAnimKey > 0 ? {
+                    animationDuration: `${activeDurationMs}ms`,
+                    animationFillMode: 'both'
+                  } : {})
                 }}
-                className={`w-full shadow-2xl rounded-2xl transition-all duration-150 ring-1 ring-black/10 dark:ring-white/10 ${previewTransitionClass}`}
+                className={`w-full shadow-2xl rounded-2xl ring-1 ring-black/10 dark:ring-white/10 ${previewTransitionClass}`}
               >
                 <SlideCanvasSurface
                   presentation={deckMeta}
@@ -8009,7 +8014,7 @@ export const ReviewsModule = ({
       theme: selectedTheme || tpl.theme || 'unipamplona',
       fontFamily: 'sans',
       transition: 'fade',
-      transitionDuration: 450,
+      transitionDuration: 250,
       autoAdvanceSeconds: 0,
       bgPattern: 'none',
       slides: initialSlides,
@@ -8220,7 +8225,7 @@ export const ReviewsModule = ({
         theme: review.theme || 'unipamplona',
         fontFamily: review.fontFamily || 'sans',
         transition: review.transition || 'fade',
-        transitionDuration: Number(review.transitionDuration) || 450,
+        transitionDuration: Number(review.transitionDuration) || 250,
         autoAdvanceSeconds: Number(review.autoAdvanceSeconds) || 0,
         bgPattern: review.bgPattern || 'none',
         slides: clonedSlides,
@@ -8254,7 +8259,7 @@ export const ReviewsModule = ({
           theme: updatedPres.theme || 'unipamplona',
           fontFamily: updatedPres.fontFamily || 'sans',
           transition: updatedPres.transition || 'fade',
-          transitionDuration: Number(updatedPres.transitionDuration) || 450,
+          transitionDuration: Number(updatedPres.transitionDuration) || 250,
           autoAdvanceSeconds: Number(updatedPres.autoAdvanceSeconds) || 0,
           bgPattern: updatedPres.bgPattern || 'none',
           slides: updatedPres.slides || [],
@@ -8279,7 +8284,7 @@ export const ReviewsModule = ({
         theme: updatedPres.theme || 'unipamplona',
         fontFamily: updatedPres.fontFamily || 'sans',
         transition: updatedPres.transition || 'fade',
-        transitionDuration: Number(updatedPres.transitionDuration) || 450,
+        transitionDuration: Number(updatedPres.transitionDuration) || 250,
         autoAdvanceSeconds: Number(updatedPres.autoAdvanceSeconds) || 0,
         bgPattern: updatedPres.bgPattern || 'none',
         targetGroupId: updatedPres.targetGroupId || 'all',

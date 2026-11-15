@@ -485,7 +485,7 @@ export default function Flipbook3DModal({
             playPageFlipSound({ muted: soundMuted, direction });
             const startAngle = Number.isFinite(initialAngleDeg) ? initialAngleDeg : 0;
             const remainingRatio = Math.max(0.25, 1 - Math.min(1, Math.abs(startAngle) / 180));
-            const durationMs = Math.max(180, Math.round(520 * remainingRatio));
+            const durationMs = Math.max(160, Math.round(340 * remainingRatio));
 
             setFlipAnim({
                 direction,
@@ -840,7 +840,7 @@ export default function Flipbook3DModal({
                 direction: flipAnim.direction,
                 targetSpread,
                 angleDeg,
-                durationMs: flipAnim.durationMs || 520,
+                durationMs: flipAnim.durationMs || 340,
                 progress: isTurning ? 1 : Math.min(1, Math.abs(startAngle) / 180),
                 shadowOpacity: isTurning ? 0.35 : 0.18,
                 highlightOpacity: 0.22,
