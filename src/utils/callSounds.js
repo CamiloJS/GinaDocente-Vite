@@ -17,6 +17,7 @@ export const playRingtone = () => {
     const notes = [523.25, 659.25, 783.99, 1046.5]
     const playCycle = () => {
       if (!ringCtx || ringCtx !== ctx) return
+      ringNodes = []
       const now = ctx.currentTime
       notes.forEach((freq, i) => {
         const osc = ctx.createOscillator()
@@ -136,6 +137,7 @@ export const playOutgoingRing = () => {
 
     const playTone = () => {
       if (!outgoingCtx || outgoingCtx !== ctx) return
+      outgoingNodes = []
       const now = ctx.currentTime
       // Tono dual armónico de central telefónica (440Hz + 480Hz)
       const freqs = [440, 480]
@@ -248,8 +250,10 @@ export const connectRemoteAudio = (audioEl, stream) => {
       if (audioEl) {
         audioEl.muted = false
         audioEl.volume = 1.0
-        const p = audioEl.play()
-        if (p && typeof p.catch === 'function') p.catch(() => {})
+        if (audioEl.paused) {
+          const p = audioEl.play()
+          if (p && typeof p.catch === 'function') p.catch(() => {})
+        }
       }
     } catch (e) {}
   }

@@ -4413,19 +4413,24 @@ useEffect(() => {
                           try { deleteDoc(d.ref) } catch (e) {}
                           continue
                       }
-                      // Limpieza DM muerta: sonando hace más de 10 minutos (nadie contestó)
+                      // Limpieza DM muerta: sonando hace más de 2 minutos (nadie contestó o cerró pestaña)
                       // IMPORTANTE: NO borrar DM con status 'connected' (llamada activa)
-                      if (!isGroupCall && call.status === 'ringing' && startedAt && (now - startedAt > 10 * 60 * 1000)) {
+                      if (!isGroupCall && call.status === 'ringing' && startedAt && (now - startedAt > 2 * 60 * 1000)) {
                           try { deleteDoc(d.ref) } catch (e) {}
                           continue
                       }
+                      const isSameCallUser = (idA, idB) => {
+                          if (!idA || !idB) return false
+                          if (idA === idB) return true
+                          return isTeacherId(idA) && isTeacherId(idB) && (isCamiloTeacher(idA) === isCamiloTeacher(idB))
+                      }
                       // Llamada fantasma para mí: ya estaba unido antes de recargar -> ignorar y limpiar mi marca
-                      if (isGroupCall && parts.some(p => p && p.id === myChatId && p.joined === true) && call.initiator !== myChatId) {
+                      if (isGroupCall && parts.some(p => p && isSameCallUser(p.id, myChatId) && p.joined === true) && !isSameCallUser(call.initiator, myChatId)) {
                           continue
                       }
                       if (call.type !== 'group') {
                           const calleeId = call.callee || ''
-                          const isMeCallee = calleeId === myChatId || (isTeacherId(myChatId) && isTeacherId(calleeId) && (isCamiloTeacher(myChatId) === isCamiloTeacher(calleeId)))
+                          const isMeCallee = isSameCallUser(calleeId, myChatId)
                           if (isMeCallee) {
                               setIncomingCall({
                                   callId: d.id,
@@ -4437,8 +4442,8 @@ useEffect(() => {
                               break
                           }
                       } else {
-                          const isMe = parts.some(p => !p?.rejected && (p.id === myChatId || (myChatId === 'teacher' && p.id === 'teacher_gina') || (myChatId === 'camilodocente' && p.id === 'teacher_camilo')))
-                          const isInitiator = call.initiator === myChatId || (myChatId === 'teacher' && call.initiator === 'teacher_gina') || (myChatId === 'camilodocente' && call.initiator === 'teacher_camilo')
+                          const isMe = parts.some(p => p && !p.rejected && isSameCallUser(p.id, myChatId))
+                          const isInitiator = isSameCallUser(call.initiator, myChatId)
                           if (isMe && !isInitiator) {
                               setIncomingCall({
                                   callId: d.id,
@@ -4535,12 +4540,18 @@ useEffect(() => {
                       const snap = await getDoc(callRef)
                       const data = snap.data()
                       if (data && Array.isArray(data.participants)) {
+                          const isSameUser = (idA, idB) => idA === idB || (isTeacherId(idA) && isTeacherId(idB) && (isCamiloTeacher(idA) === isCamiloTeacher(idB)))
                           const newParts = data.participants.map(p =>
-                              (p && (p.id === myChatId || (myChatId === 'teacher' && p.id === 'teacher_gina') || (myChatId === 'camilodocente' && p.id === 'teacher_camilo')))
+                              (p && isSameUser(p.id, myChatId))
                                   ? { ...p, joined: false, rejected: true }
                                   : p
                           )
-                          await updateDoc(callRef, { participants: newParts }).catch(() => {})
+                          const allRejected = newParts.length > 0 && newParts.every(p => p && p.rejected === true) && !newParts.some(p => p && p.joined === true)
+                          if (allRejected) {
+                              await setDoc(callRef, { participants: newParts, status: 'ended' }, { merge: true }).catch(() => {})
+                          } else {
+                              await updateDoc(callRef, { participants: newParts }).catch(() => {})
+                          }
                       }
                   } catch (e) {}
               } else {
@@ -16840,6 +16851,7 @@ Escribe en español con tono pedagógico moderno.`;
                                           <button 
                                               type="button" 
                                               onClick={() => {
+                                                  if (activeCall) return
                                                   if (activeChat.type === 'group') {
                                                       const grp = chatGroups.find(g => g.id === activeChat.id || `group_${g.id}` === activeChat.id || `acad_${g.academicGroupId}` === activeChat.id || `acad_${g.id}` === activeChat.id)
                                                       const rawGroupMembers = Array.isArray(grp?.members) ? grp.members : (grp?.members && typeof grp.members === 'object' ? Object.keys(grp.members) : []);

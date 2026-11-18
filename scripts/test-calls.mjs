@@ -34,6 +34,7 @@ const mockAudioEl = {
   volume: 0,
   autoplay: false,
   playsInline: false,
+  paused: true,
   attributes: {},
   setAttribute(k, v) { this.attributes[k] = v; },
   play() { return Promise.resolve(); },
@@ -144,6 +145,32 @@ assert.strictEqual(acceptedCall.targetId, 'student_yeisor');
 assert.strictEqual(acceptedCall.initiatorId, 'student_yeisor');
 console.log('  OK  Aceptación de llamada entrante en DM propaga targetId e initiatorId para avatar');
 
+console.log('\n== 6. Invariantes de Estabilidad WebRTC y Llamadas Grupales ==');
+import fs from 'fs';
+const audioCallSrc = fs.readFileSync(new URL('../src/components/AudioCall.jsx', import.meta.url), 'utf8');
+const appSrc = fs.readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
+const callSoundsSrc = fs.readFileSync(new URL('../src/utils/callSounds.js', import.meta.url), 'utf8');
+
+// Test 8: AudioContext único compartido (evita límite de 6 contextos hardware en grupos)
+assert(audioCallSrc.includes('monitorAudioCtxRef') && audioCallSrc.includes('getMonitorAudioContext'), 'AudioCall debe reutilizar un único AudioContext compartido para detección de voz');
+
+// Test 9: Estado transitorio 'disconnected' NO destruye monitor ni elimina peer
+const connStateBlock = audioCallSrc.slice(audioCallSrc.indexOf('pc.onconnectionstatechange ='), audioCallSrc.indexOf('// ---------- INICIADOR: llamada DM ----------'));
+assert(!connStateBlock.includes("pc.connectionState === 'disconnected'"), "onconnectionstatechange no debe destruir monitorStream ni peers en estado transitorio 'disconnected'");
+
+// Test 10: answerDMCall suscribe onSnapshot(callRef) antes de createPC()
+const answerBlock = audioCallSrc.slice(audioCallSrc.indexOf('const answerDMCall ='), audioCallSrc.indexOf('// ---------- Ciclo de vida ----------'));
+assert(answerBlock.indexOf('onSnapshot(callRef') < answerBlock.indexOf('await createPC()'), 'answerDMCall debe escuchar cancelación del llamante antes de solicitar el micrófono');
+
+// Test 11: getCandidateKey preserva sdpMLineIndex 0 usando ??
+assert(audioCallSrc.includes('c.sdpMLineIndex ??'), 'getCandidateKey debe usar operador ?? para sdpMLineIndex=0');
+
+// Test 12: Rechazo total grupal finaliza la llamada y unlockAll verifica paused
+assert(appSrc.includes('allRejected'), 'rejectIncomingCall debe cerrar llamada grupal si todos los participantes rechazan');
+assert(callSoundsSrc.includes('if (audioEl.paused)'), 'unlockAll solo debe invocar audioEl.play() cuando el audio esté pausado');
+
+console.log('  OK  AudioContext único compartido, estado disconnected seguro, answerDMCall sin race condition y cierre grupal por rechazo total');
+
 console.log('\n========================================');
-console.log('Total pruebas Llamadas: 7 | OK: 7 | FAIL: 0');
+console.log('Total pruebas Llamadas: 12 | OK: 12 | FAIL: 0');
 console.log('========================================\n');

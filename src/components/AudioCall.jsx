@@ -3,7 +3,31 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { db, appId } from '../firebase/config.js'
 import { doc, setDoc, onSnapshot, deleteDoc, updateDoc, getDoc, collection } from 'firebase/firestore'
 import { playHangupSound, playConnectedSound, playOutgoingRing, stopOutgoingRing, connectRemoteAudio } from '../utils/callSounds.js'
-import { resolveUserPhoto, resolveUserDisplayName, isTeacherId } from '../utils/helpers.js'
+import { resolveUserPhoto, resolveUserDisplayName, isTeacherId, isCamiloTeacher } from '../utils/helpers.js'
+
+const isSameUserOrTeacherAlias = (idA, idB) => {
+  if (!idA || !idB) return false
+  if (idA === idB) return true
+  return isTeacherId(idA) && isTeacherId(idB) && (isCamiloTeacher(idA) === isCamiloTeacher(idB))
+}
+
+const formatMicError = (err, fallbackMsg = 'No se pudo iniciar la llamada') => {
+  const name = err?.name || ''
+  const msg = String(err?.message || '')
+  if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+    return 'Permiso de micrófono denegado. Habilítalo en tu navegador para continuar.'
+  }
+  if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+    return 'No se encontró ningún micrófono conectado en este dispositivo.'
+  }
+  if (name === 'NotReadableError' || name === 'TrackStartError') {
+    return 'El micrófono está siendo usado por otra aplicación.'
+  }
+  if (msg.includes('HTTPS') || msg.includes('disponible')) {
+    return msg
+  }
+  return fallbackMsg
+}
 
 // Iconos inline (evitan conflictos de import)
 const PhoneIcon = ({size=24, className=""}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
@@ -53,7 +77,10 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
   const callDocRef = useRef(null)
   const unsubsRef = useRef([])
   const offerProcessedRef = useRef(false)
-  const analysersRef = useRef(new Map()) // peerId -> { ctx, analyser, raf }
+  const analysersRef = useRef(new Map()) // peerId -> { analyser, src, rafId, isStopped }
+  const monitorAudioCtxRef = useRef(null) // Único AudioContext compartido para evitar límite hardware (6)
+  const connectedPeerKeysRef = useRef(new Set())
+  const noAnswerTimerRef = useRef(null)
   const isMutedRef = useRef(isMuted)
   useEffect(() => { isMutedRef.current = isMuted }, [isMuted])
   const callStateRef = useRef(callState)
@@ -72,7 +99,7 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
   const processedIceRef = useRef(new WeakMap()) // pc -> Set<string>
   const getCandidateKey = (c) => {
     if (!c) return ''
-    return typeof c === 'string' ? c : `${c.sdpMid || ''}_${c.sdpMLineIndex || ''}_${c.candidate || ''}`
+    return typeof c === 'string' ? c : `${c.sdpMid ?? ''}_${c.sdpMLineIndex ?? ''}_${c.candidate || ''}`
   }
 
   const addIceCandidateSafe = (pc, candidate) => {
@@ -143,7 +170,15 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
     try {
       stream = await navigator.mediaDevices.getUserMedia(constraints)
     } catch (eOverconstrained) {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+      // Conservar cancelación de eco y supresión de ruido en Safari/iOS/Firefox antes de caer a { audio: true }
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          video: false
+        })
+      } catch (eStandard) {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+      }
     }
     if (endingRef.current || !isMountedRef.current) {
       try { stream.getTracks().forEach(t => { try { t.stop() } catch (e) {} }) } catch (e) {}
@@ -218,15 +253,25 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
     } catch (e) {}
   }
 
-  // ---- Detección de voz tipo Discord con prevención de fugas de memoria ----
+  // ---- Detección de voz tipo Discord con AudioContext único compartido (sin fugas ni límite hardware) ----
+  const getMonitorAudioContext = () => {
+    const Ctx = window.AudioContext || window.webkitAudioContext
+    if (!Ctx) return null
+    if (!monitorAudioCtxRef.current || monitorAudioCtxRef.current.state === 'closed') {
+      monitorAudioCtxRef.current = new Ctx()
+    }
+    if (monitorAudioCtxRef.current.state === 'suspended') {
+      monitorAudioCtxRef.current.resume().catch(() => {})
+    }
+    return monitorAudioCtxRef.current
+  }
+
   const monitorStream = useCallback((stream, peerId) => {
     try {
       if (!stream || !stream.getAudioTracks().length) return
       if (analysersRef.current.has(peerId)) return
-      const Ctx = window.AudioContext || window.webkitAudioContext
-      if (!Ctx) return
-      const ctx = new Ctx()
-      if (ctx.state === 'suspended') ctx.resume().catch(() => {})
+      const ctx = getMonitorAudioContext()
+      if (!ctx) return
       const src = ctx.createMediaStreamSource(stream)
       const analyser = ctx.createAnalyser()
       analyser.fftSize = 512
@@ -234,7 +279,7 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
       src.connect(analyser)
       const data = new Uint8Array(analyser.frequencyBinCount)
       let speaking = false
-      const stateObj = { ctx, analyser, src, rafId: null, isStopped: false }
+      const stateObj = { analyser, src, rafId: null, isStopped: false }
 
       const tick = () => {
         if (stateObj.isStopped) return
@@ -268,7 +313,6 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
           if (stateObj.rafId) cancelAnimationFrame(stateObj.rafId)
           src.disconnect()
           analyser.disconnect()
-          ctx.close().catch(() => {})
         } catch(e) {}
         analysersRef.current.delete(peerId)
       })
@@ -283,7 +327,6 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
         if (entry.rafId) cancelAnimationFrame(entry.rafId)
         entry.src.disconnect()
         entry.analyser.disconnect()
-        entry.ctx.close().catch(() => {})
       } catch(e) {}
       analysersRef.current.delete(peerId)
     }
@@ -343,19 +386,22 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
     pc.onconnectionstatechange = () => {
       logDiag('conn_state', 'key=' + key + ' state=' + pc.connectionState + ' ice=' + (pc.iceConnectionState || 'n/a') + ' sig=' + pc.signalingState)
       if (pc.connectionState === 'connected') {
+        connectedPeerKeysRef.current.add(key)
+        setConnectedPeers(connectedPeerKeysRef.current.size)
         stopOutgoingRing()
         setCallState('connected')
-        setConnectedPeers(prev => prev + 1)
-      } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed' || pc.connectionState === 'closed' || pc.iceConnectionState === 'failed') {
+      } else if (pc.connectionState === 'failed' || pc.connectionState === 'closed' || pc.iceConnectionState === 'failed') {
+        connectedPeerKeysRef.current.delete(key)
+        setConnectedPeers(connectedPeerKeysRef.current.size)
         stopMonitor(key)
-        setConnectedPeers(prev => Math.max(0, prev - 1))
         if (isGroup) {
+          try { if (pc.signalingState !== 'closed') pc.close() } catch (e) {}
           peersRef.current.delete(key)
           startingPeersRef.current.delete(key)
         }
         // SOLO DM: colgar únicamente en 'failed' (terminal). 'disconnected' es transitorio
         // y Chrome lo reporta a veces durante la negociación; colgar ahí cortaba llamadas vivas.
-        if (!isGroup && callStateRef.current === 'connected' && (pc.connectionState === 'failed' || pc.iceConnectionState === 'failed')) {
+        if (!isGroup && callStateRef.current === 'connected') {
           endCall()
         }
       }
@@ -393,17 +439,22 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
         startedAt: Date.now()
       })
 
+      let answerApplied = false
       addUnsub(onSnapshot(callRef, (snap) => {
         const data = snap.data()
         if (!data) { endCall(); return }
-        if (data.answer && pc && pc.remoteDescription === null) {
+        if (data.status === 'ended') { endCall(); return }
+        if (data.answer && pc && !answerApplied && !pc.remoteDescription) {
           if (pc.signalingState === 'have-local-offer') {
+            answerApplied = true
             pc.setRemoteDescription(new RTCSessionDescription(data.answer)).then(() => {
               flushPendingCandidates(pc)
-            }).catch(err => { console.error('setRemote answer err', err); })
+            }).catch(err => {
+              answerApplied = false
+              console.error('setRemote answer err', err)
+            })
           }
         }
-        if (data.status === 'ended') endCall()
       }))
 
       addUnsub(onSnapshot(doc(db, ...callsBase(callId), 'calleeCandidates', 'list'), (snap) => {
@@ -415,7 +466,7 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
     } catch (err) {
       if (endingRef.current || !isMountedRef.current) return
       console.error('Error starting DM call:', err)
-      setCallError('No se pudo iniciar la llamada')
+      setCallError(formatMicError(err, 'No se pudo iniciar la llamada'))
       setCallState('idle')
     }
   }
@@ -502,14 +553,16 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
       let hasAnswered = false
       const unsubOffer = onSnapshot(offerDocRef, async (snap) => {
         const data = snap.data()
-        if (!data?.offer || hasAnswered) return
+        if (!data?.offer || hasAnswered || pc.signalingState === 'closed') return
         hasAnswered = true
         try {
           await pc.setRemoteDescription(new RTCSessionDescription(data.offer))
+          if (pc.signalingState === 'closed') return
           flushPendingCandidates(pc)
           logDiag('mesh_remote_offer_set', `peer=${otherId}`)
 
           const answer = await pc.createAnswer()
+          if (pc.signalingState === 'closed') return
           await pc.setLocalDescription(answer)
           await setDoc(answerDocRef, {
             answer: pc.localDescription.toJSON(),
@@ -561,14 +614,18 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
           startedAt: Date.now()
         })
       } else {
-        // Si soy participante, marcar mi joined: true
+        // Si soy participante, marcar mi joined: true (soportando alias de docentes)
         try {
           const snap = await getDoc(callRef)
           const data = snap.data()
+          if (!snap.exists() || !data || data.status === 'ended') {
+            endCall()
+            return
+          }
           const parts = normalizeParticipants(data?.participants || activeCall.participants)
-          const idx = parts.findIndex(p => p.id === myChatId)
+          const idx = parts.findIndex(p => isSameUserOrTeacherAlias(p?.id, myChatId))
           if (idx >= 0) {
-            const newParts = parts.map((p, i) => (i === idx ? { ...p, joined: true } : p))
+            const newParts = parts.map((p, i) => (i === idx ? { ...p, joined: true, rejected: false } : p))
             await updateDoc(callRef, { participants: newParts }).catch(() => {})
           }
         } catch (e) {}
@@ -586,12 +643,16 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
           if (anyJoined) {
             setGroupCallStatus('connected')
             setCallState('connected')
+          } else if (norm.length > 0 && norm.every(pt => pt.rejected === true)) {
+            // Todos rechazaron la llamada grupal -> finalizar limpiamente
+            endCall()
+            return
           }
           // Descubrimiento dinámico de participantes que se unan
           const initiatorId = data.initiator || (isInitiator ? myChatId : (activeCall.initiatorId || 'teacher'))
-          const allMemberIds = Array.from(new Set([initiatorId, ...norm.map(p => p.id)])).filter(Boolean)
+          const allMemberIds = Array.from(new Set([initiatorId, ...norm.filter(p => !p?.rejected).map(p => p.id)])).filter(Boolean)
           allMemberIds.forEach(pid => {
-            if (pid !== myChatId && !peersRef.current.has(pid) && !startingPeersRef.current.has(pid)) {
+            if (!isSameUserOrTeacherAlias(pid, myChatId) && !peersRef.current.has(pid) && !startingPeersRef.current.has(pid)) {
               setupMeshPeer(pid, stream)
             }
           })
@@ -601,9 +662,9 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
       // 3. Inicializar mesh con todos los miembros conocidos
       const initiatorId = isInitiator ? myChatId : (activeCall.initiatorId || 'teacher')
       const rawParts = normalizeParticipants(liveParticipants || activeCall.participants)
-      const allMemberIds = Array.from(new Set([initiatorId, ...rawParts.map(p => p.id)])).filter(Boolean)
+      const allMemberIds = Array.from(new Set([initiatorId, ...rawParts.filter(p => !p?.rejected).map(p => p.id)])).filter(Boolean)
       allMemberIds.forEach(pid => {
-        if (pid !== myChatId && !peersRef.current.has(pid) && !startingPeersRef.current.has(pid)) {
+        if (!isSameUserOrTeacherAlias(pid, myChatId) && !peersRef.current.has(pid) && !startingPeersRef.current.has(pid)) {
           setupMeshPeer(pid, stream)
         }
       })
@@ -611,7 +672,18 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
     } catch (err) {
       if (endingRef.current || !isMountedRef.current) return
       console.error('Error starting group mesh call:', err)
-      setCallError('Error al iniciar la llamada grupal')
+      if (!isInitiator) {
+        try {
+          const snap = await getDoc(callRef).catch(() => null)
+          const parts = normalizeParticipants(snap?.data()?.participants)
+          const idx = parts.findIndex(p => isSameUserOrTeacherAlias(p?.id, myChatId))
+          if (idx >= 0) {
+            const newParts = parts.map((p, i) => (i === idx ? { ...p, joined: false, rejected: true } : p))
+            await updateDoc(callRef, { participants: newParts }).catch(() => {})
+          }
+        } catch (e) {}
+      }
+      setCallError(formatMicError(err, 'Error al iniciar la llamada grupal'))
       setCallState('idle')
     }
   }
@@ -625,8 +697,23 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
     setCallError(null)
     const callRef = doc(db, ...callsBase(callId))
     callDocRef.current = callRef
+    let callerHungUpBeforeAnswer = false
+
+    // Suscribirse ANTES de pedir el micrófono para no perder si el llamante cuelga mientras tanto
+    addUnsub(onSnapshot(callRef, (snap) => {
+      const d = snap.data()
+      if (!d || d.status === 'ended') {
+        callerHungUpBeforeAnswer = true
+        endCall()
+      }
+    }))
+
     try {
       const pc = await createPC()
+      if (callerHungUpBeforeAnswer || endingRef.current || !isMountedRef.current) {
+        try { pc.close() } catch (e) {}
+        return
+      }
       peerRef.current = pc
       attachRemoteStream(pc, 'main')
       pc.onicecandidate = (e) => {
@@ -638,6 +725,15 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
       flushPendingCandidates(pc)
       const answer = await pc.createAnswer()
       await pc.setLocalDescription(answer)
+
+      // Verificar que el documento de llamada siga vivo antes de escribir la respuesta
+      const latestSnap = await getDoc(callRef).catch(() => null)
+      if (!latestSnap || !latestSnap.exists() || latestSnap.data()?.status === 'ended' || callerHungUpBeforeAnswer || endingRef.current) {
+        try { pc.close() } catch (e) {}
+        endCall()
+        return
+      }
+
       await setDoc(callRef, { answer: pc.localDescription.toJSON(), status: 'connected' }, { merge: true })
 
       addUnsub(onSnapshot(doc(db, ...callsBase(callId), 'callerCandidates', 'list'), (snap) => {
@@ -646,15 +742,14 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
           data.candidates.forEach(c => addIceCandidateSafe(pc, c))
         }
       }))
-
-      addUnsub(onSnapshot(callRef, (snap) => {
-        const d = snap.data()
-        if (!d || d.status === 'ended') endCall()
-      }))
     } catch (err) {
       if (endingRef.current || !isMountedRef.current) return
       console.error('Error answering DM call:', err)
-      setCallError('Error al contestar la llamada')
+      // Avisar al llamante que no se pudo contestar para que no siga timbrando indefinidamente
+      try {
+        await setDoc(callRef, { status: 'ended' }, { merge: true }).catch(() => {})
+      } catch (e) {}
+      setCallError(formatMicError(err, 'Error al contestar la llamada'))
       setCallState('idle')
     }
   }
@@ -694,15 +789,52 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
     }
   }, [activeCall?.callId, isDemoMode])
 
-  // Tono de timbrado para llamadas salientes mientras espera respuesta
+  // Tono de timbrado y timeout automático (60s) si nadie contesta
   useEffect(() => {
+    if (noAnswerTimerRef.current) {
+      clearTimeout(noAnswerTimerRef.current)
+      noAnswerTimerRef.current = null
+    }
     if (callState === 'calling' || callState === 'joining') {
       playOutgoingRing()
+      if (callState === 'calling' && !isDemoMode) {
+        noAnswerTimerRef.current = setTimeout(() => {
+          if (!endingRef.current && isMountedRef.current && callStateRef.current === 'calling') {
+            endCall()
+          }
+        }, 60000)
+      }
     } else {
       stopOutgoingRing()
     }
-    return () => { stopOutgoingRing() }
-  }, [callState])
+    return () => {
+      stopOutgoingRing()
+      if (noAnswerTimerRef.current) {
+        clearTimeout(noAnswerTimerRef.current)
+        noAnswerTimerRef.current = null
+      }
+    }
+  }, [callState, isDemoMode])
+
+  // Limpieza ante cierre abrupto de pestaña / recarga
+  useEffect(() => {
+    const handlePageHide = () => {
+      try {
+        if (localStreamRef.current) {
+          localStreamRef.current.getTracks().forEach(t => { try { t.stop() } catch (e) {} })
+        }
+        if (callDocRef.current && !isDemoMode && (isInitiator || !isGroup)) {
+          setDoc(callDocRef.current, { status: 'ended' }, { merge: true }).catch(() => {})
+        }
+      } catch (e) {}
+    }
+    window.addEventListener('pagehide', handlePageHide)
+    window.addEventListener('beforeunload', handlePageHide)
+    return () => {
+      window.removeEventListener('pagehide', handlePageHide)
+      window.removeEventListener('beforeunload', handlePageHide)
+    }
+  }, [isDemoMode, isInitiator, isGroup])
 
   // Timer duración
   useEffect(() => {
@@ -779,7 +911,7 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
             try {
               const snap = await getDoc(callRefToClean).catch(() => null)
               const parts = normalizeParticipants(snap?.data()?.participants || liveParticipants || activeCall?.participants)
-              const idx = parts.findIndex(p => p.id === leavingId)
+              const idx = parts.findIndex(p => isSameUserOrTeacherAlias(p?.id, leavingId))
               const hadJoined = idx >= 0 && parts[idx]?.joined === true
               if (idx >= 0) {
                 // CRÍTICO: escribir array COMPLETO (dot-notation destruye id/name)
@@ -825,11 +957,21 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
       setLiveParticipants(null)
       setGroupCallStatus('ringing')
     }
-    // limpiar analizadores restantes
-    analysersRef.current.forEach(({ ctx, analyser, rafId, src }) => {
-      try { cancelAnimationFrame(rafId); src.disconnect(); analyser.disconnect(); ctx.close() } catch(e) {}
+    // limpiar analizadores restantes y cerrar el único AudioContext compartido
+    analysersRef.current.forEach(({ analyser, rafId, src }) => {
+      try { cancelAnimationFrame(rafId); src.disconnect(); analyser.disconnect() } catch(e) {}
     })
     analysersRef.current.clear()
+    if (monitorAudioCtxRef.current) {
+      try { monitorAudioCtxRef.current.close().catch(() => {}) } catch (e) {}
+      monitorAudioCtxRef.current = null
+    }
+    connectedPeerKeysRef.current.clear()
+    setConnectedPeers(0)
+    if (noAnswerTimerRef.current) {
+      clearTimeout(noAnswerTimerRef.current)
+      noAnswerTimerRef.current = null
+    }
     startingPeersRef.current.clear()
     pendingCandidatesRef.current.clear()
     pendingInitiatorIceRef.current = []
@@ -870,16 +1012,16 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
     <>
       {/* Elementos de audio remoto en el JSX para heredar activación de usuario (Autoplay) */}
       <audio id="remote-audio-main" autoPlay playsInline />
-      {isGroup && (
-        <>
-          {normalizeParticipants(liveParticipants || activeCall.participants).map(p => (
-            <audio key={p.id} id={`remote-audio-${p.id}`} autoPlay playsInline />
-          ))}
-          {activeCall.initiatorId && (
-            <audio key={activeCall.initiatorId} id={`remote-audio-${activeCall.initiatorId}`} autoPlay playsInline />
-          )}
-        </>
-      )}
+      {isGroup && (() => {
+        const parts = normalizeParticipants(liveParticipants || activeCall.participants)
+        const audioIds = Array.from(new Set([
+          ...parts.map(p => p?.id),
+          activeCall.initiatorId
+        ].filter(Boolean)))
+        return audioIds.map(pid => (
+          <audio key={pid} id={`remote-audio-${pid}`} autoPlay playsInline />
+        ))
+      })()}
 
       <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/90 backdrop-blur-sm animate-in fade-in duration-200 p-4">
         <div className={`w-full rounded-3xl p-6 sm:p-8 text-center space-y-5 sm:space-y-6 ${isGroup ? 'max-w-[95vw] sm:max-w-[600px] md:max-w-[720px] lg:max-w-[800px] md:p-10' : 'max-w-sm'} ${isDarkMode ? 'bg-gray-900 border border-gray-700' : 'bg-white'}`}>
@@ -911,38 +1053,54 @@ const AudioCall = ({ activeCall, myChatId, myName, isDarkMode, userMappings, onC
                 const raw = normalizeParticipants(liveParticipants || activeCall.participants)
                 const seen = new Set()
                 const remote = raw.filter(p => {
-                  if (!p || !p.id || p.id === myChatId || seen.has(p.id)) return false
+                  if (!p || !p.id || isSameUserOrTeacherAlias(p.id, myChatId) || seen.has(p.id)) return false
                   seen.add(p.id)
                   return true
                 })
                 return remote.map(p => {
                   const displayName = p.name || userMappings?.[p.id]?.fullName || p.id || '?'
+                  const peerPhoto = resolveUserPhoto(p.id, userMappings, '')
                   const isJoined = p.joined === true
+                  const isRejected = p.rejected === true
                   const isSpeaking = !!speakingMap[p.id] && isJoined
                   return (
                     <div key={p.id} className={`flex flex-col items-center gap-2 p-3 md:p-4 rounded-2xl border-2 transition-all ${isSpeaking ? 'border-green-400 bg-green-500/15 shadow-lg shadow-green-500/20 scale-[1.02]' : isJoined ? 'border-white/10 bg-white/5' : 'border-white/5 bg-white/5 opacity-60'}`}>
-                      <div className={`relative w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full flex items-center justify-center text-white font-bold shadow-lg transition-all ${isSpeaking ? 'bg-green-500 ring-4 ring-green-400 ring-offset-2 ring-offset-gray-900 scale-105' : isJoined ? 'bg-gray-700' : 'bg-gray-600'}`}>
-                        <span className="text-lg md:text-xl">{displayName.charAt(0).toUpperCase()}</span>
+                      <div className={`relative w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full flex items-center justify-center text-white font-bold shadow-lg transition-all overflow-hidden ${isSpeaking ? 'bg-green-500 ring-4 ring-green-400 ring-offset-2 ring-offset-gray-900 scale-105' : isJoined ? 'bg-gray-700' : 'bg-gray-600'}`}>
+                        {peerPhoto ? (
+                          <img src={peerPhoto} alt={displayName} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-lg md:text-xl">{displayName.charAt(0).toUpperCase()}</span>
+                        )}
                         {isSpeaking && <><span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-green-400 rounded-full border-2 border-white dark:border-gray-900 animate-ping"></span><span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-green-400 rounded-full border-2 border-white dark:border-gray-900"></span></>}
-                        {!isJoined && <span className="absolute -bottom-1 -right-1 w-5 h-5 bg-gray-500 rounded-full flex items-center justify-center border-2 border-white dark:border-gray-900 text-[10px]">…</span>}
+                        {!isJoined && <span className="absolute -bottom-1 -right-1 w-5 h-5 bg-gray-500 rounded-full flex items-center justify-center border-2 border-white dark:border-gray-900 text-[10px]">{isRejected ? '✕' : '…'}</span>}
                       </div>
                       <span className={`text-xs font-bold truncate max-w-full ${isSpeaking ? 'text-green-400' : isJoined ? (isDarkMode ? 'text-white' : 'text-gray-900') : 'text-gray-400'}`}>{displayName}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${isSpeaking ? 'bg-green-500 text-white animate-pulse' : isJoined ? 'bg-gray-700 text-gray-300' : 'bg-gray-600 text-gray-400'}`}>{!isJoined ? 'Llamando...' : isSpeaking ? 'Hablando...' : 'Conectado'}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${isSpeaking ? 'bg-green-500 text-white animate-pulse' : isJoined ? 'bg-gray-700 text-gray-300' : isRejected ? 'bg-red-900/70 text-red-200' : 'bg-gray-600 text-gray-400'}`}>{isRejected ? 'Rechazó' : !isJoined ? 'Llamando...' : isSpeaking ? 'Hablando...' : 'Conectado'}</span>
                     </div>
                   )
                 })
               })()}
               {/* Iniciador para participantes (si no está en la lista) */}
-              {!isInitiator && activeCall.callerName && !normalizeParticipants(activeCall.participants).some(p => p.id === (activeCall.initiatorId || '')) && (
-                <div className={`flex flex-col items-center gap-2 p-3 md:p-4 rounded-2xl border-2 transition-all ${speakingMap[activeCall.initiatorId || 'main'] && callState === 'connected' ? 'border-green-400 bg-green-500/15 shadow-lg' : 'border-white/10 bg-white/5'}`}>
-                  <div className={`relative w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full flex items-center justify-center text-white font-bold shadow-lg ${speakingMap[activeCall.initiatorId || 'main'] && callState === 'connected' ? 'bg-green-500 ring-4 ring-green-400 ring-offset-2 ring-offset-gray-900 scale-105' : 'bg-teal-600'}`}>
-                    <span className="text-lg md:text-xl">{(activeCall.callerName || userMappings?.[activeCall.initiatorId]?.fullName || '?').charAt(0).toUpperCase()}</span>
-                    {speakingMap[activeCall.initiatorId || 'main'] && callState === 'connected' && <><span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-green-400 rounded-full border-2 border-white dark:border-gray-900 animate-ping"></span><span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-green-400 rounded-full border-2 border-white dark:border-gray-900"></span></>}
+              {!isInitiator && activeCall.callerName && !normalizeParticipants(liveParticipants || activeCall.participants).some(p => isSameUserOrTeacherAlias(p.id, activeCall.initiatorId || '')) && (() => {
+                const initId = activeCall.initiatorId || ''
+                const initPhoto = resolveUserPhoto(initId, userMappings, '')
+                const initName = activeCall.callerName || userMappings?.[initId]?.fullName || 'Docente'
+                const initSpeaking = !!speakingMap[initId || 'main'] && callState === 'connected'
+                return (
+                  <div className={`flex flex-col items-center gap-2 p-3 md:p-4 rounded-2xl border-2 transition-all ${initSpeaking ? 'border-green-400 bg-green-500/15 shadow-lg' : 'border-white/10 bg-white/5'}`}>
+                    <div className={`relative w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full flex items-center justify-center text-white font-bold shadow-lg overflow-hidden ${initSpeaking ? 'bg-green-500 ring-4 ring-green-400 ring-offset-2 ring-offset-gray-900 scale-105' : 'bg-teal-600'}`}>
+                      {initPhoto ? (
+                        <img src={initPhoto} alt={initName} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-lg md:text-xl">{initName.charAt(0).toUpperCase()}</span>
+                      )}
+                      {initSpeaking && <><span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-green-400 rounded-full border-2 border-white dark:border-gray-900 animate-ping"></span><span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-green-400 rounded-full border-2 border-white dark:border-gray-900"></span></>}
+                    </div>
+                    <span className={`text-xs font-bold truncate max-w-full ${initSpeaking ? 'text-green-400' : isDarkMode ? 'text-white' : 'text-gray-900'}`}>{initName}</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${initSpeaking ? 'bg-green-500 text-white animate-pulse' : 'bg-gray-700 text-gray-300'}`}>{initSpeaking ? 'Hablando...' : 'Conectado'}</span>
                   </div>
-                  <span className={`text-xs font-bold truncate max-w-full ${speakingMap[activeCall.initiatorId || 'main'] && callState === 'connected' ? 'text-green-400' : isDarkMode ? 'text-white' : 'text-gray-900'}`}>{activeCall.callerName || userMappings?.[activeCall.initiatorId]?.fullName || 'Docente'}</span>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${speakingMap[activeCall.initiatorId || 'main'] && callState === 'connected' ? 'bg-green-500 text-white animate-pulse' : 'bg-gray-700 text-gray-300'}`}>{speakingMap[activeCall.initiatorId || 'main'] && callState === 'connected' ? 'Hablando...' : 'Conectado'}</span>
-                </div>
-              )}
+                )
+              })()}
             </div>
           ) : (
             <div className="relative mx-auto w-20 h-20 sm:w-24 sm:h-24">
