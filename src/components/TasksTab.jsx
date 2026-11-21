@@ -1872,7 +1872,7 @@ const TasksTab = React.memo(({
                                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300">Obligatorio</span>
                                         </h4>
                                         <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
-                                            Selecciona el grupo específico para evitar confusiones entre estudiantes.
+                                            Selecciona un grupo.
                                         </p>
                                     </div>
                                 </div>
