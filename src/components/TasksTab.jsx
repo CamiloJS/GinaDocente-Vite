@@ -48,6 +48,7 @@ const TasksTab = React.memo(({
     const [localIsFormExpanded, setLocalIsFormExpanded] = useState(false);
     const [isPublishing, setIsPublishing] = useState(false);
     const isPublishingRef = useRef(false);
+    const forceDuplicatePublishRef = useRef(false);
     const [localPostTargetGroup, setLocalPostTargetGroup] = useState(fixedTargetGroup || "");
     const [composerStep, setComposerStep] = useState(() => (fixedTargetGroup ? 2 : 1));
     const isFormExpanded = propIsFormExpanded !== undefined ? propIsFormExpanded : localIsFormExpanded;
@@ -970,6 +971,60 @@ const TasksTab = React.memo(({
     const currentImgList = (postImageUrls && postImageUrls.length > 0 ? postImageUrls : (postImageUrl ? [postImageUrl] : []));
     const hasAttachments = Boolean((currentImgList && currentImgList.length > 0) || postVideoUrl || postGeniallyUrl || postFileUrl || audioPub);
 
+    // Detección silenciosa e inteligente de publicaciones repetidas en la misma materia
+    const findDuplicateTask = () => {
+        const normalizeText = (txt) => {
+            if (!txt) return '';
+            return String(txt)
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/[^\w\s]/gi, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+        };
+
+        const currentTitle = normalizeText(taskTitle);
+        const currentDesc = normalizeText(taskDesc);
+        const currentFileName = normalizeText(postFileName);
+        const targetGrp = String(fixedTargetGroup || postTargetGroup || 'all').replace(/^acad_/i, '').trim().toLowerCase();
+
+        const taskList = Array.isArray(tasks) ? tasks : [];
+        if (taskList.length === 0) return null;
+
+        return taskList.find(t => {
+            if (!t || t.isDeletedFromWall) return false;
+
+            // Verificar coincidencia de grupo (misma materia o ambas globales)
+            const tGroup = String(t.targetGroupId || 'all').replace(/^acad_/i, '').trim().toLowerCase();
+            const sameGroup = (targetGrp === tGroup) || (targetGrp === 'all' && tGroup === 'all');
+            if (!sameGroup) return false;
+
+            const existingTitle = normalizeText(t.title);
+            const existingDesc = normalizeText(t.description);
+            const existingFileName = normalizeText(t.fileName);
+
+            // 1. Mismo título (mínimo 4 caracteres)
+            if (currentTitle && currentTitle.length >= 4 && currentTitle === existingTitle) {
+                return true;
+            }
+
+            // 2. Misma descripción sustancial (mínimo 15 caracteres)
+            if (currentDesc && currentDesc.length >= 15 && currentDesc === existingDesc) {
+                return true;
+            }
+
+            // 3. Mismo archivo adjunto y título o descripción concordante
+            if (currentFileName && currentFileName.length >= 5 && currentFileName === existingFileName) {
+                if (!currentTitle || currentTitle === existingTitle || currentDesc === existingDesc) {
+                    return true;
+                }
+            }
+
+            return false;
+        }) || null;
+    };
+
     // FUNCIÓN UNIFICADA DE PUBLICACIÓN BLINDADA (PASO 4)
     const executePublishTask = async () => {
         if (isPublishing || isPublishingRef.current) return;
@@ -1001,6 +1056,20 @@ const TasksTab = React.memo(({
             setComposerStep(1);
             return showMessage("⚠️ Por favor selecciona a qué materia o grupo deseas dirigir la publicación.");
         }
+
+        // Verificación silenciosa antes de publicar: si está repetida, pedir confirmación explícita
+        const duplicateTask = findDuplicateTask();
+        if (duplicateTask && !forceDuplicatePublishRef.current) {
+            const confirmFn = typeof confirmAction === 'function' ? confirmAction : (msg, onOk) => { if (window.confirm(msg)) onOk(); };
+            return confirmFn(
+                "Atención, esta publicación va a estar repetida si la subes de nuevo. ¿Estás seguro?",
+                () => {
+                    forceDuplicatePublishRef.current = true;
+                    executePublishTask();
+                }
+            );
+        }
+        forceDuplicatePublishRef.current = false;
 
         let validPoll = null;
         if (currentPostType === 'poll') {
@@ -1485,6 +1554,7 @@ const TasksTab = React.memo(({
             showMessage(`Error al publicar: ${err?.message || 'Intenta nuevamente.'}`);
         } finally {
             isPublishingRef.current = false;
+            forceDuplicatePublishRef.current = false;
             setIsPublishing(false);
         }
     };
@@ -3075,6 +3145,18 @@ Descripción original: ${taskDesc}`;
                                                 })()}
                                             </span>
                                         </div>
+
+                                        {/* Indicador silencioso de publicación repetida */}
+                                        {(() => {
+                                            const duplicate = findDuplicateTask();
+                                            if (!duplicate) return null;
+                                            return (
+                                                <div className="col-span-full flex items-center gap-1.5 pt-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400 animate-in fade-in">
+                                                    <AlertTriangle size={13} className="shrink-0 text-amber-500" />
+                                                    <span>Atención: Ya existe una publicación con título o contenido idéntico en este grupo.</span>
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
 

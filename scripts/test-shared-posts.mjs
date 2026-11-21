@@ -468,7 +468,100 @@ console.log('\n== 3. Prevención de Estado de Edición Erróneo y Sincronizació
   console.log('  OK  rawItem sin título aplica título por defecto sin generar undefined');
 }
 
+console.log('\n== 4. Detección Inteligente de Publicaciones Repetidas ==');
+
+// Helper que replica exactamente la lógica de TasksTab.jsx
+function findDuplicateTaskHelper({ taskTitle, taskDesc, postFileName, targetGroup, tasks }) {
+  const normalizeText = (txt) => {
+    if (!txt) return '';
+    return String(txt)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^\w\s]/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  const currentTitle = normalizeText(taskTitle);
+  const currentDesc = normalizeText(taskDesc);
+  const currentFileName = normalizeText(postFileName);
+  const targetGrp = String(targetGroup || 'all').replace(/^acad_/i, '').trim().toLowerCase();
+
+  const taskList = Array.isArray(tasks) ? tasks : [];
+  if (taskList.length === 0) return null;
+
+  return taskList.find(t => {
+    if (!t || t.isDeletedFromWall) return false;
+
+    const tGroup = String(t.targetGroupId || 'all').replace(/^acad_/i, '').trim().toLowerCase();
+    const sameGroup = (targetGrp === tGroup) || (targetGrp === 'all' && tGroup === 'all');
+    if (!sameGroup) return false;
+
+    const existingTitle = normalizeText(t.title);
+    const existingDesc = normalizeText(t.description);
+    const existingFileName = normalizeText(t.fileName);
+
+    if (currentTitle && currentTitle.length >= 4 && currentTitle === existingTitle) {
+      return true;
+    }
+    if (currentDesc && currentDesc.length >= 15 && currentDesc === existingDesc) {
+      return true;
+    }
+    if (currentFileName && currentFileName.length >= 5 && currentFileName === existingFileName) {
+      if (!currentTitle || currentTitle === existingTitle || currentDesc === existingDesc) {
+        return true;
+      }
+    }
+
+    return false;
+  }) || null;
+}
+
+// 4.1 Identificación de tarea repetida por título idéntico en el mismo grupo
+{
+  const existingTasks = [
+    { id: 't1', title: 'Tarea para el 24 de Noviembre', targetGroupId: 'acad_tic', isDeletedFromWall: false }
+  ];
+  const found = findDuplicateTaskHelper({
+    taskTitle: 'tarea para el 24 de noviembre',
+    targetGroup: 'acad_tic',
+    tasks: existingTasks
+  });
+  assert.ok(found, 'Debe detectar duplicado en el mismo grupo');
+  assert.equal(found.id, 't1');
+  console.log('  OK  Detecta publicación duplicada por título normalizado en el mismo grupo');
+}
+
+// 4.2 No marca duplicado si la materia es distinta
+{
+  const existingTasks = [
+    { id: 't1', title: 'Tarea para el 24 de Noviembre', targetGroupId: 'acad_tic', isDeletedFromWall: false }
+  ];
+  const found = findDuplicateTaskHelper({
+    taskTitle: 'Tarea para el 24 de Noviembre',
+    targetGroup: 'acad_economico',
+    tasks: existingTasks
+  });
+  assert.equal(found, null, 'No debe marcar duplicado en materias diferentes');
+  console.log('  OK  No marca duplicado cuando va dirigida a un grupo académico diferente');
+}
+
+// 4.3 Ignora publicaciones eliminadas del muro
+{
+  const existingTasks = [
+    { id: 't1', title: 'Tarea para el 24 de Noviembre', targetGroupId: 'acad_tic', isDeletedFromWall: true }
+  ];
+  const found = findDuplicateTaskHelper({
+    taskTitle: 'Tarea para el 24 de Noviembre',
+    targetGroup: 'acad_tic',
+    tasks: existingTasks
+  });
+  assert.equal(found, null, 'No debe marcar duplicado si la anterior fue eliminada');
+  console.log('  OK  Ignora publicaciones marcadas como eliminadas en el muro');
+}
+
 console.log('\n========================================');
-console.log('Total pruebas Compartir en Chat: 25 | OK: 25 | FAIL: 0');
+console.log('Total pruebas Compartir y Duplicados: 28 | OK: 28 | FAIL: 0');
 console.log('========================================\n');
 
