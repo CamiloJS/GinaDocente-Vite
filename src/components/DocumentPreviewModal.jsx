@@ -17,7 +17,7 @@ import UniversalImage from './UniversalImage.jsx';
 import { isImageLikeUrl, isHeicUrl } from '../utils/heicConverter.js';
 import { renderPdfToBookPages } from '../utils/flipbookEngine.js';
 import { handleForceDownload, sanitizeDocumentDownloadName } from '../utils/helpers.js';
-import { getStorage, ref, getBlob } from '../firebase/config.js';
+import { storage, ref, getBlob } from '../firebase/config.js';
 
 export const getGoogleDocViewerUrl = (url) => {
   if (!url || typeof url !== 'string') return '';
@@ -118,21 +118,16 @@ export const DocumentPreviewModal = ({
       let createdBlobUrl = null;
 
       // Si es Firebase Storage, resolver blob mediante getBlob oficial para eludir bloqueos CORS
-      if (typeof documentUrl === 'string' && documentUrl.includes('firebasestorage.googleapis.com')) {
+      if (typeof documentUrl === 'string' && (documentUrl.includes('firebasestorage.googleapis.com') || documentUrl.includes('firebasestorage.app')) && storage) {
         try {
-          const storage = getStorage();
-          const match = documentUrl.match(/\/o\/([^?]+)/);
-          if (match && match[1]) {
-            const decodedPath = decodeURIComponent(match[1]);
-            const fileRef = ref(storage, decodedPath);
-            const blob = await getBlob(fileRef);
-            if (blob && blob.size > 0) {
-              pdfSource = blob;
-              if (typeof window !== 'undefined' && window.URL?.createObjectURL) {
-                createdBlobUrl = window.URL.createObjectURL(blob);
-                blobUrlRef.current = createdBlobUrl;
-                if (!isCancelled) setBlobPdfUrl(createdBlobUrl);
-              }
+          const storageRef = ref(storage, documentUrl);
+          const blob = await getBlob(storageRef);
+          if (blob && blob.size > 0) {
+            pdfSource = blob;
+            if (typeof window !== 'undefined' && window.URL?.createObjectURL) {
+              createdBlobUrl = window.URL.createObjectURL(blob);
+              blobUrlRef.current = createdBlobUrl;
+              if (!isCancelled) setBlobPdfUrl(createdBlobUrl);
             }
           }
         } catch (e) {

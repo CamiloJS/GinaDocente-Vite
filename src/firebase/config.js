@@ -42,6 +42,7 @@ import {
   uploadString,
   uploadBytes,
   getDownloadURL,
+  getBlob,
 } from 'firebase/storage'
 import {
   getDatabase,
@@ -134,4 +135,5 @@ export {
   uploadString,
   uploadBytes,
   getDownloadURL,
+  getBlob,
 }
