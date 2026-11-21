@@ -1,7 +1,7 @@
 // src/components/TasksTab.jsx
 import React, { useState, useRef, useEffect } from 'react'
 import {
-  Book, BookOpen, CheckCheck, CheckCircle2, ChevronRight, Globe, ImageIcon, Mic, NavNotebook, PaperclipIcon, Plus, SearchIcon, Sparkles, Square, Target, Loader2, Undo2, UploadCloud, X, Play, Pause, MessageCircle, BarChart2, Vote, Gamepad2, ClipboardList, NavSlides, Music, Volume2, VolumeX, CheckLine, AlertTriangle, ArrowRightIcon, ArrowLeftIcon, Lock
+  Book, BookOpen, CheckCheck, CheckCircle2, ChevronRight, Globe, ImageIcon, Mic, NavNotebook, PaperclipIcon, Plus, SearchIcon, Sparkles, Square, Target, Loader2, Undo2, UploadCloud, X, Play, Pause, MessageCircle, BarChart2, Vote, Gamepad2, ClipboardList, NavSlides, Music, Volume2, VolumeX, CheckLine, AlertTriangle, ArrowRightIcon, ArrowLeftIcon, Lock, Link2
 } from './Icons.jsx'
 import TaskCard from './TaskCard.jsx'
 import KahootBuilder from './KahootBuilder.jsx'
@@ -1683,57 +1683,57 @@ const TasksTab = React.memo(({
                     <div 
                         className={`transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
                             isFormExpanded 
-                                ? 'max-h-[8000px] opacity-100 p-6' 
+                                ? 'max-h-[8000px] opacity-100 p-4 sm:p-5' 
                                 : 'max-h-0 opacity-0 p-0 pointer-events-none'
-                        } flex flex-col gap-4 bg-white dark:bg-gray-900`}
+                        }`}
                     >
-                        {/* Cabecera */}
-                        <div className="flex justify-between items-center pb-3 border-b border-gray-200 dark:border-gray-800">
+                        {/* Drawer Header */}
+                        <div className="flex items-center justify-between pb-3 border-b border-gray-200 dark:border-gray-800">
                             <div className="flex items-center gap-3">
                                 {teacherPic ? (
-                                    <img loading="lazy" decoding="async" 
+                                    <img 
                                         src={teacherPic} 
                                         alt={loggedInName} 
-                                        className="w-11 h-11 rounded-full object-cover shadow-md border-2 border-white dark:border-gray-700 shrink-0" 
+                                        className="w-10 h-10 rounded-full object-cover border-2 border-white dark:border-gray-700 shadow-sm shrink-0" 
                                     />
                                 ) : (
-                                    <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#AD3333] to-[#8a2828] text-white flex items-center justify-center font-bold text-sm shadow-md shrink-0">
+                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#AD3333] to-[#8a2828] text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
                                         {loggedInName?.charAt(0) || 'G'}
                                     </div>
                                 )}
                                 <div>
                                     <h3 className="font-bold text-sm leading-tight text-gray-900 dark:text-gray-100">{loggedInName}</h3>
-                                    <p className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Crear contenido docente</p>
+                                    <p className="text-[11px] font-semibold text-gray-500 dark:text-gray-400">Crear contenido docente</p>
                                 </div>
                             </div>
 
                             <button 
                                 type="button" 
                                 onClick={() => setIsFormExpanded(false)} 
-                                className="p-2 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors cursor-pointer" 
+                                className="p-1.5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors cursor-pointer" 
                                 title="Minimizar formulario"
                             >
                                 <X size={18} />
                             </button>
                         </div>
 
-                        {/* Barra de Pasos (Stepper) */}
-                        <div className="w-full pb-3 border-b border-gray-200 dark:border-gray-800">
-                            <div className="flex items-center justify-between gap-1 sm:gap-2 max-w-2xl mx-auto select-none">
+                        {/* Barra de Pasos Minimalista (Stepper) */}
+                        <div className="w-full py-2.5 border-b border-gray-200 dark:border-gray-800">
+                            <div className="flex items-center justify-between gap-1 sm:gap-2 max-w-xl mx-auto select-none">
                                 {/* Paso 1: Grupo */}
                                 <button
                                     type="button"
                                     onClick={() => setComposerStep(1)}
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                                         composerStep === 1 
-                                            ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' 
+                                            ? 'bg-blue-600 text-white shadow-xs' 
                                             : postTargetGroup 
                                                 ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 hover:bg-blue-100' 
-                                                : 'bg-gray-100 dark:bg-gray-800 text-gray-500'
+                                                : 'bg-gray-100 dark:bg-gray-800 text-gray-400'
                                     }`}
                                 >
-                                    <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black border border-current">
-                                        {postTargetGroup && composerStep > 1 ? <CheckLine size={12} className="text-current" /> : '1'}
+                                    <span className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black border border-current">
+                                        {postTargetGroup && composerStep > 1 ? <CheckLine size={10} className="text-current" /> : '1'}
                                     </span>
                                     <span className="hidden sm:inline">1. Grupo</span>
                                 </button>
@@ -1745,16 +1745,16 @@ const TasksTab = React.memo(({
                                     type="button"
                                     disabled={!postTargetGroup}
                                     onClick={() => postTargetGroup && setComposerStep(2)}
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer ${
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer ${
                                         composerStep === 2 
-                                            ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' 
+                                            ? 'bg-blue-600 text-white shadow-xs' 
                                             : (taskTitle || taskDesc || composerStep > 2) 
                                                 ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 hover:bg-blue-100' 
-                                                : 'bg-gray-100 dark:bg-gray-800 text-gray-500'
+                                                : 'bg-gray-100 dark:bg-gray-800 text-gray-400'
                                     }`}
                                 >
-                                    <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black border border-current">
-                                        {(taskTitle || taskDesc) && composerStep > 2 ? <CheckLine size={12} className="text-current" /> : '2'}
+                                    <span className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black border border-current">
+                                        {(taskTitle || taskDesc) && composerStep > 2 ? <CheckLine size={10} className="text-current" /> : '2'}
                                     </span>
                                     <span className="hidden sm:inline">2. Contenido</span>
                                 </button>
@@ -1766,16 +1766,16 @@ const TasksTab = React.memo(({
                                     type="button"
                                     disabled={!postTargetGroup}
                                     onClick={() => postTargetGroup && setComposerStep(3)}
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer ${
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer ${
                                         composerStep === 3 
-                                            ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' 
+                                            ? 'bg-blue-600 text-white shadow-xs' 
                                             : composerStep > 3 
                                                 ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 hover:bg-blue-100' 
-                                                : 'bg-gray-100 dark:bg-gray-800 text-gray-500'
+                                                : 'bg-gray-100 dark:bg-gray-800 text-gray-400'
                                     }`}
                                 >
-                                    <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black border border-current">
-                                        {hasAttachments ? <CheckLine size={12} className="text-current" /> : '3'}
+                                    <span className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black border border-current">
+                                        {hasAttachments ? <CheckLine size={10} className="text-current" /> : '3'}
                                     </span>
                                     <span className="hidden sm:inline">3. Adjuntos</span>
                                 </button>
@@ -1794,62 +1794,58 @@ const TasksTab = React.memo(({
                                         }
                                         setComposerStep(4);
                                     }}
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer ${
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer ${
                                         composerStep === 4 
-                                            ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20' 
-                                            : 'bg-gray-100 dark:bg-gray-800 text-gray-500'
+                                            ? 'bg-emerald-600 text-white shadow-xs' 
+                                            : 'bg-gray-100 dark:bg-gray-800 text-gray-400'
                                     }`}
                                 >
-                                    <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black border border-current">
+                                    <span className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black border border-current">
                                         4
                                     </span>
-                                    <span className="hidden sm:inline">4. Confirmación</span>
+                                    <span className="hidden sm:inline">4. Confirmar</span>
                                 </button>
                             </div>
                         </div>
 
                         {/* PASO 1: SELECCIÓN OBLIGATORIA DE MATERIA O GRUPO */}
                         {composerStep === 1 && (
-                            <div className="space-y-4 animate-in fade-in duration-200">
-                                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/40 dark:to-indigo-950/40 p-4 rounded-2xl border border-blue-200/80 dark:border-blue-800/60">
-                                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-600 text-white text-[10px] font-black uppercase tracking-wider mb-2">
-                                        Paso 1 de 4 • Selección obligatoria
+                            <div className="space-y-3 pt-2 animate-in fade-in duration-200">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h4 className="text-sm font-extrabold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                                            <span>¿A qué materia va dirigida la publicación?</span>
+                                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300">Obligatorio</span>
+                                        </h4>
+                                        <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                                            Selecciona el grupo específico para evitar confusiones entre estudiantes.
+                                        </p>
                                     </div>
-                                    <h4 className="text-base sm:text-lg font-black text-gray-900 dark:text-gray-100 leading-tight">
-                                        ¿A qué materia o grupo va dirigida esta publicación?
-                                    </h4>
-                                    <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 leading-relaxed">
-                                        Elige la materia correspondiente para que <strong>únicamente los estudiantes inscritos</strong> en ella puedan verla y realizarla. Así evitarás que estudiantes de otros cursos se confundan.
-                                    </p>
                                 </div>
 
                                 {fixedTargetGroup ? (
-                                    <div className="p-4 rounded-2xl bg-teal-50 dark:bg-teal-950/40 border-2 border-teal-500/50 flex items-center justify-between gap-3">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-11 h-11 rounded-xl bg-teal-600 text-white flex items-center justify-center font-bold shadow-sm shrink-0">
-                                                <Book size={22} />
+                                    <div className="p-3 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-500/50 flex items-center justify-between gap-3">
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-8 h-8 rounded-lg bg-teal-600 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
+                                                <Book size={16} />
                                             </div>
                                             <div>
-                                                <span className="text-[10px] font-black uppercase tracking-wider text-teal-600 dark:text-teal-400 block">
+                                                <span className="text-[10px] font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400 block">
                                                     Materia fijada actualmente
                                                 </span>
-                                                <h5 className="font-extrabold text-sm sm:text-base text-gray-900 dark:text-gray-100">
+                                                <h5 className="font-extrabold text-xs sm:text-sm text-gray-900 dark:text-gray-100">
                                                     {academicGroups?.find(g => String(g?.id || '').replace(/^acad_/i, '').toLowerCase() === String(fixedTargetGroup || '').replace(/^acad_/i, '').toLowerCase())?.name || 'Materia seleccionada'}
                                                 </h5>
                                             </div>
                                         </div>
-                                        <span className="text-xs font-bold text-teal-700 dark:text-teal-300 bg-teal-100 dark:bg-teal-900/60 px-3 py-1 rounded-full">
+                                        <span className="text-[11px] font-bold text-teal-700 dark:text-teal-300 bg-teal-100 dark:bg-teal-900/60 px-2.5 py-0.5 rounded-full">
                                             Canal activo
                                         </span>
                                     </div>
                                 ) : (
-                                    <div className="space-y-3">
-                                        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">
-                                            Materias disponibles ({academicGroups?.length || 0}):
-                                        </label>
-                                        
+                                    <div className="space-y-2">
                                         {/* Cuadrícula de materias específicas */}
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                             {academicGroups && academicGroups.length > 0 ? (
                                                 academicGroups.map((g) => {
                                                     const isSelected = postTargetGroup === g.id;
@@ -1857,72 +1853,76 @@ const TasksTab = React.memo(({
                                                         <div
                                                             key={g.id}
                                                             onClick={() => setPostTargetGroup(g.id)}
-                                                            className={`p-3.5 rounded-2xl border-2 cursor-pointer transition-all flex items-center gap-3 ${
+                                                            className={`p-3 rounded-xl border-2 cursor-pointer transition-all flex items-center gap-2.5 ${
                                                                 isSelected
-                                                                    ? 'bg-blue-50/90 dark:bg-blue-950/50 border-blue-600 shadow-md shadow-blue-500/20 scale-[1.01]'
-                                                                    : 'bg-gray-50/70 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 hover:border-blue-400 hover:bg-white dark:hover:bg-gray-800'
+                                                                    ? 'bg-blue-50/90 dark:bg-blue-950/50 border-blue-600 shadow-xs'
+                                                                    : 'bg-gray-50/60 dark:bg-gray-800/40 border-gray-200 dark:border-gray-700 hover:border-blue-400 hover:bg-white dark:hover:bg-gray-800'
                                                             }`}
                                                         >
-                                                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold shrink-0 transition-colors ${
+                                                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold shrink-0 transition-colors ${
                                                                 isSelected ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
                                                             }`}>
-                                                                <Book size={18} />
+                                                                <Book size={15} />
                                                             </div>
                                                             <div className="flex-1 min-w-0">
-                                                                <h5 className="text-xs sm:text-sm font-black text-gray-900 dark:text-gray-100 truncate">
+                                                                <h5 className="text-xs font-bold text-gray-900 dark:text-gray-100 truncate">
                                                                     {g.name}
                                                                 </h5>
-                                                                <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
-                                                                    {g.code ? `Código: ${g.code} • ` : ''}Exclusivo para este grupo
-                                                                </p>
+                                                                {g.code && (
+                                                                    <p className="text-[10px] text-gray-400 truncate">
+                                                                        {g.code}
+                                                                    </p>
+                                                                )}
                                                             </div>
-                                                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
+                                                            <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
                                                                 isSelected ? 'border-blue-600 bg-blue-600 text-white' : 'border-gray-300 dark:border-gray-600'
                                                             }`}>
-                                                                {isSelected && <CheckLine size={13} className="text-white" />}
+                                                                {isSelected && <CheckLine size={10} className="text-white" />}
                                                             </div>
                                                         </div>
                                                     );
                                                 })
                                             ) : (
-                                                <div className="col-span-full p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300">
-                                                    No tienes materias registradas aún en el Directorio. Si deseas crear contenido para un grupo específico, créalo primero en Directorio o selecciona la opción General de abajo.
+                                                <div className="col-span-full p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300">
+                                                    No tienes materias registradas aún en el Directorio. Selecciona la opción General para continuar.
                                                 </div>
                                             )}
                                         </div>
 
-                                        {/* Opción General (Strictly at the bottom) */}
+                                        {/* Opción General (Strictly at the bottom, compact) */}
                                         <div className="pt-2 border-t border-gray-200 dark:border-gray-800">
                                             <div
                                                 onClick={() => setPostTargetGroup('all')}
-                                                className={`p-3.5 rounded-2xl border-2 cursor-pointer transition-all flex items-center gap-3 ${
+                                                className={`p-2.5 sm:p-3 rounded-xl border-2 cursor-pointer transition-all flex items-center justify-between ${
                                                     postTargetGroup === 'all'
-                                                        ? 'bg-amber-50/90 dark:bg-amber-950/50 border-amber-500 shadow-md shadow-amber-500/20 scale-[1.01]'
-                                                        : 'bg-gray-50/50 dark:bg-gray-800/40 border-gray-200 dark:border-gray-700/80 hover:border-amber-400 hover:bg-amber-50/30'
+                                                        ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-500 shadow-xs'
+                                                        : 'bg-gray-50/40 dark:bg-gray-800/30 border-gray-200 dark:border-gray-700 hover:border-amber-400'
                                                 }`}
                                             >
-                                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold shrink-0 transition-colors ${
-                                                    postTargetGroup === 'all' ? 'bg-amber-500 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
-                                                }`}>
-                                                    <Globe size={18} />
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-2">
-                                                        <h5 className="text-xs sm:text-sm font-black text-gray-900 dark:text-gray-100">
-                                                            Todas las materias (General para todos los estudiantes)
-                                                        </h5>
-                                                        <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300">
-                                                            Público general
-                                                        </span>
+                                                <div className="flex items-center gap-2.5 min-w-0">
+                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold shrink-0 ${
+                                                        postTargetGroup === 'all' ? 'bg-amber-500 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                                                    }`}>
+                                                        <Globe size={15} />
                                                     </div>
-                                                    <p className="text-[11px] text-amber-800 dark:text-amber-300/90 mt-0.5">
-                                                        ⚠️ <strong>Visible para todos los estudiantes de cualquier carrera.</strong> Solo selecciónala para circulares, saludos o avisos generales.
-                                                    </p>
+                                                    <div className="min-w-0">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-xs font-bold text-gray-900 dark:text-gray-100 truncate">
+                                                                Todas las materias (General)
+                                                            </span>
+                                                            <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-300 shrink-0">
+                                                                Público
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-[10.5px] text-gray-500 dark:text-gray-400">
+                                                            Visible para todos los estudiantes de cualquier curso
+                                                        </p>
+                                                    </div>
                                                 </div>
-                                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
+                                                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
                                                     postTargetGroup === 'all' ? 'border-amber-500 bg-amber-500 text-white' : 'border-gray-300 dark:border-gray-600'
                                                 }`}>
-                                                    {postTargetGroup === 'all' && <CheckLine size={13} className="text-white" />}
+                                                    {postTargetGroup === 'all' && <CheckLine size={10} className="text-white" />}
                                                 </div>
                                             </div>
                                         </div>
@@ -1930,19 +1930,19 @@ const TasksTab = React.memo(({
                                 )}
 
                                 {/* Barra de navegación de Paso 1 */}
-                                <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-800">
+                                <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-800">
                                     <button
                                         type="button"
                                         onClick={() => setIsFormExpanded(false)}
-                                        className="px-4 py-2.5 rounded-xl text-xs font-bold text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                                        className="px-3.5 py-2 rounded-xl text-xs font-bold text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
                                     >
                                         Cancelar
                                     </button>
 
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-2.5">
                                         {!postTargetGroup && (
                                             <span className="text-[11px] font-bold text-red-500 dark:text-red-400 flex items-center gap-1 animate-pulse">
-                                                <AlertTriangle size={13} /> Selecciona un grupo para continuar
+                                                <AlertTriangle size={12} /> Selecciona un grupo
                                             </span>
                                         )}
                                         <button
@@ -1952,10 +1952,10 @@ const TasksTab = React.memo(({
                                                 if (!postTargetGroup) return showMessage("⚠️ Por favor selecciona a qué materia o grupo deseas dirigir la publicación.");
                                                 setComposerStep(2);
                                             }}
-                                            className="px-5 py-2.5 rounded-xl text-xs font-black bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white shadow-md shadow-blue-500/25 flex items-center gap-1.5 transition-all hover:scale-102 cursor-pointer"
+                                            className="px-4 py-2 rounded-xl text-xs font-black bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
                                         >
-                                            <span>Siguiente: Redactar contenido</span>
-                                            <ArrowRightIcon size={15} />
+                                            <span>Siguiente: Contenido</span>
+                                            <ArrowRightIcon size={14} />
                                         </button>
                                     </div>
                                 </div>
@@ -1964,13 +1964,13 @@ const TasksTab = React.memo(({
 
                         {/* PASO 2: REDACCIÓN DEL CONTENIDO */}
                         {composerStep === 2 && (
-                            <div className="space-y-4 animate-in fade-in duration-200">
-                                {/* Banner superior de materia seleccionada */}
-                                <div className="flex items-center justify-between p-3 rounded-2xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-800/60">
-                                    <div className="flex items-center gap-2.5 text-xs min-w-0">
-                                        <span className="font-bold text-blue-700 dark:text-blue-300 shrink-0">Dirigido a:</span>
-                                        <span className="font-extrabold text-blue-900 dark:text-blue-100 flex items-center gap-1.5 truncate">
-                                            {postTargetGroup === 'all' ? <Globe size={14} className="text-amber-500 shrink-0" /> : <Book size={14} className="text-blue-600 dark:text-blue-400 shrink-0" />}
+                            <div className="space-y-3 pt-2 animate-in fade-in duration-200">
+                                {/* Barra superior compacta de materia */}
+                                <div className="flex items-center justify-between py-1 px-2.5 rounded-lg bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/50 dark:border-blue-800/40 text-xs">
+                                    <div className="flex items-center gap-1.5 truncate">
+                                        <span className="text-[11px] text-gray-500 dark:text-gray-400">Dirigido a:</span>
+                                        <span className="font-bold text-blue-700 dark:text-blue-300 flex items-center gap-1 truncate">
+                                            {postTargetGroup === 'all' ? <Globe size={13} className="text-amber-500 shrink-0" /> : <Book size={13} className="text-blue-600 dark:text-blue-400 shrink-0" />}
                                             <span className="truncate">{currentGroupName}</span>
                                         </span>
                                     </div>
@@ -1978,58 +1978,58 @@ const TasksTab = React.memo(({
                                         <button
                                             type="button"
                                             onClick={() => setComposerStep(1)}
-                                            className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline shrink-0 ml-2 cursor-pointer flex items-center gap-1"
+                                            className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline shrink-0 ml-2 cursor-pointer"
                                         >
-                                            Cambiar grupo
+                                            Cambiar
                                         </button>
                                     )}
                                 </div>
 
-                                {/* Selector de Tipo de Publicación */}
-                                <div className="flex items-center gap-2">
-                                    <label className="text-xs font-bold text-gray-600 dark:text-gray-300 shrink-0">Tipo:</label>
-                                    <div className="flex flex-wrap gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-xl border border-gray-200 dark:border-gray-700">
+                                {/* Selector de Tipo de Publicación (Sleek Pills) */}
+                                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
+                                    <span className="text-[11px] font-bold text-gray-400 uppercase shrink-0">Tipo:</span>
+                                    <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800/80 p-0.5 rounded-xl border border-gray-200 dark:border-gray-700 shrink-0">
                                         <button 
                                             type="button" 
                                             onClick={() => setPostType('task')} 
-                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${postType === 'task' ? 'bg-white dark:bg-gray-900 shadow-sm text-[#AD3333]' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'}`}
+                                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${postType === 'task' ? 'bg-white dark:bg-gray-900 shadow-2xs text-[#AD3333]' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'}`}
                                         >
-                                            <NavNotebook size={14} /> Tarea
+                                            <NavNotebook size={13} /> Tarea
                                         </button>
                                         <button 
                                             type="button" 
                                             onClick={() => setPostType('forum')} 
-                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${postType === 'forum' ? 'bg-white dark:bg-gray-900 shadow-sm text-emerald-600 dark:text-emerald-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'}`}
+                                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${postType === 'forum' ? 'bg-white dark:bg-gray-900 shadow-2xs text-emerald-600 dark:text-emerald-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'}`}
                                         >
-                                            <MessageCircle size={14} /> Foro
+                                            <MessageCircle size={13} /> Foro
                                         </button>
                                         <button 
                                             type="button" 
                                             onClick={() => setPostType('post')} 
-                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${postType === 'post' ? 'bg-white dark:bg-gray-900 shadow-sm text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'}`}
+                                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${postType === 'post' ? 'bg-white dark:bg-gray-900 shadow-2xs text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'}`}
                                         >
-                                            <BookOpen size={14} /> Publicación
+                                            <BookOpen size={13} /> Publicación
                                         </button>
                                         <button 
                                             type="button" 
                                             onClick={() => setPostType('poll')} 
-                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${postType === 'poll' ? 'bg-white dark:bg-gray-900 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'}`}
+                                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${postType === 'poll' ? 'bg-white dark:bg-gray-900 shadow-2xs text-indigo-600 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'}`}
                                         >
-                                            <BarChart2 size={14} /> Encuesta
+                                            <BarChart2 size={13} /> Encuesta
                                         </button>
                                         <button 
                                             type="button" 
                                             onClick={() => setPostType('kahoot')} 
-                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${postType === 'kahoot' ? 'bg-white dark:bg-gray-900 shadow-sm text-purple-600 dark:text-purple-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'}`}
+                                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${postType === 'kahoot' ? 'bg-white dark:bg-gray-900 shadow-2xs text-purple-600 dark:text-purple-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'}`}
                                         >
-                                            <Gamepad2 size={14} /> Kahoot
+                                            <Gamepad2 size={13} /> Kahoot
                                         </button>
                                         <button 
                                             type="button" 
                                             onClick={() => setPostType('book3d')} 
-                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${postType === 'book3d' ? 'bg-white dark:bg-gray-900 shadow-sm text-orange-700 dark:text-orange-300' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'}`}
+                                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${postType === 'book3d' ? 'bg-white dark:bg-gray-900 shadow-2xs text-orange-700 dark:text-orange-300' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'}`}
                                         >
-                                            <Book size={14} /> Libro
+                                            <Book size={13} /> Libro
                                         </button>
                                         {typeof onOpenEvaluationsTab === 'function' && (
                                             <button 
@@ -2038,9 +2038,9 @@ const TasksTab = React.memo(({
                                                     activeComposerGroupObj?.id || fixedTargetGroup || 'all',
                                                     activeComposerGroupObj?.name || 'Todos los estudiantes (Global)'
                                                 )} 
-                                                className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 text-rose-600 dark:text-rose-400 hover:bg-white dark:hover:bg-gray-900"
+                                                className="px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 text-rose-600 dark:text-rose-400 hover:bg-white dark:hover:bg-gray-900 cursor-pointer"
                                             >
-                                                <ClipboardList size={14} /> Evaluación
+                                                <ClipboardList size={13} /> Evaluación
                                             </button>
                                         )}
                                         {typeof onOpenReviewsTab === 'function' && (
@@ -2051,38 +2051,37 @@ const TasksTab = React.memo(({
                                                     targetGroupId: activeComposerGroupObj?.id || fixedTargetGroup || 'all',
                                                     targetGroupName: activeComposerGroupObj?.name || 'Todos los estudiantes (Global)'
                                                 })} 
-                                                className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 text-amber-700 dark:text-amber-300 hover:bg-white dark:hover:bg-gray-900"
+                                                className="px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 text-amber-700 dark:text-amber-300 hover:bg-white dark:hover:bg-gray-900 cursor-pointer"
                                             >
-                                                <NavSlides size={14} /> Diapositivas
+                                                <NavSlides size={13} /> Diapositivas
                                             </button>
                                         )}
                                     </div>
                                 </div>
 
-                                {/* Editor unificado con colores contrastados */}
-                                <div className="p-4 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 transition-all focus-within:border-blue-500 dark:focus-within:border-blue-400">
+                                {/* Editor con diseño despejado */}
+                                <div className="p-3.5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50/70 dark:bg-gray-800/60 focus-within:border-blue-500 focus-within:bg-white dark:focus-within:bg-gray-800 transition-all">
                                     <input 
                                         value={taskTitle} 
                                         onChange={(e) => setTaskTitle(e.target.value)} 
-                                        placeholder={postType === 'task' ? "Título claro de la tarea..." : postType === 'forum' ? "Tema central del foro de debate..." : postType === 'poll' ? "Pregunta de la encuesta (ej. ¿Cuál es tu horario preferido?)..." : postType === 'kahoot' ? "Título del Kahoot..." : postType === 'book3d' ? "Título del libro..." : "Título de la publicación..."} 
-                                        className="w-full text-base font-bold bg-transparent outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 pb-2 border-b border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100" 
+                                        placeholder={postType === 'task' ? "Título claro de la tarea..." : postType === 'forum' ? "Tema central del debate..." : postType === 'poll' ? "Pregunta de la encuesta..." : postType === 'kahoot' ? "Título del Kahoot..." : postType === 'book3d' ? "Título del libro..." : "Título de la publicación..."} 
+                                        className="w-full text-sm font-bold bg-transparent outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 pb-2 border-b border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100" 
                                         required 
                                     />
-                                    {/* Editor Visual Enriquecido */}
                                     <div className="mt-2">
                                         <RichVisualEditor 
                                             value={taskDesc}
                                             onChange={setTaskDesc}
-                                            placeholder={postType === 'forum' ? "Escribe la pregunta detonante, pautas o tema de discusión para el debate..." : postType === 'poll' ? "Detalles, contexto o indicaciones adicionales de la encuesta (opcional)..." : postType === 'kahoot' ? "Descripción o instrucciones (opcional)..." : postType === 'book3d' ? "Descripción (opcional)..." : "Escribe las instrucciones detalladas, indicaciones o una idea general..."}
+                                            placeholder={postType === 'forum' ? "Escribe la pregunta detonante, pautas o tema de discusión..." : postType === 'poll' ? "Detalles o contexto de la encuesta (opcional)..." : postType === 'kahoot' ? "Descripción o instrucciones (opcional)..." : postType === 'book3d' ? "Descripción (opcional)..." : "Escribe las instrucciones detalladas o contenido..."}
                                             isDarkMode={isDarkMode}
                                             minHeight="110px"
                                         />
                                     </div>
                                 </div>
 
-                                {/* Barra de IA */}
-                                <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-                                    <div className="flex flex-wrap items-center gap-2">
+                                {/* Barra de IA (Compacta y bien alineada) */}
+                                <div className="flex flex-wrap items-center justify-between gap-1.5">
+                                    <div className="flex flex-wrap items-center gap-1.5">
                                         <button 
                                             type="button" 
                                             onClick={async () => {
@@ -2125,9 +2124,10 @@ DESCRIPCION: [Instrucciones claras, motivadoras y bien estructuradas]`;
                                                 }
                                             }} 
                                             disabled={isAiLoading} 
-                                            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow-md shadow-purple-500/20 transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                                            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-2.5 py-1 rounded-lg text-xs font-bold shadow-xs transition-all flex items-center gap-1 disabled:opacity-50 cursor-pointer"
                                         >
-                                            {isAiLoading ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />} Potenciar con IA
+                                            {isAiLoading ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                                            <span>Potenciar con IA</span>
                                         </button>
                                         
                                         <button 
@@ -2185,65 +2185,60 @@ Descripción original: ${taskDesc}`;
                                                 }
                                             }} 
                                             disabled={isAiLoading} 
-                                            className="px-3 py-2 rounded-xl text-xs font-bold border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all flex items-center gap-1.5 disabled:opacity-50 shadow-sm cursor-pointer"
+                                            className="px-2.5 py-1 rounded-lg text-xs font-bold border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all flex items-center gap-1 disabled:opacity-50 shadow-2xs cursor-pointer"
                                         >
-                                            {isAiLoading ? <Loader2 size={15} className="animate-spin" /> : <CheckCheck size={15} />} Corregir
+                                            {isAiLoading ? <Loader2 size={13} className="animate-spin" /> : <CheckCheck size={13} />}
+                                            <span>Corregir</span>
                                         </button>
 
-                                        <div className="flex flex-wrap gap-1.5">
-                                            <button type="button" onClick={() => handleAiTranslate('Inglés')} disabled={isAiLoading} className="px-3 py-2 rounded-xl text-xs font-bold border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all shadow-sm flex items-center gap-1.5 cursor-pointer" title="Traducir a inglés"><Globe size={14} /> Traducir a inglés</button>
-                                            <button type="button" onClick={() => handleAiTranslate('Francés')} disabled={isAiLoading} className="px-3 py-2 rounded-xl text-xs font-bold border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all shadow-sm flex items-center gap-1.5 cursor-pointer" title="Traducir a francés"><Globe size={14} /> Traducir a francés</button>
-                                        </div>
+                                        <button type="button" onClick={() => handleAiTranslate('Inglés')} disabled={isAiLoading} className="px-2 py-1 rounded-lg text-xs font-bold border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all shadow-2xs flex items-center gap-1 cursor-pointer" title="Traducir a inglés"><Globe size={12} /> Inglés</button>
+                                        <button type="button" onClick={() => handleAiTranslate('Francés')} disabled={isAiLoading} className="px-2 py-1 rounded-lg text-xs font-bold border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all shadow-2xs flex items-center gap-1 cursor-pointer" title="Traducir a francés"><Globe size={12} /> Francés</button>
 
                                         {hasAiModified && (
-                                            <button type="button" onClick={() => { setTaskTitle(prevTaskTitle); setTaskDesc(prevTaskDesc); setHasAiModified(false); }} className="bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer">
-                                                <Undo2 size={15} /> Deshacer IA
+                                            <button type="button" onClick={() => { setTaskTitle(prevTaskTitle); setTaskDesc(prevTaskDesc); setHasAiModified(false); }} className="bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 px-2 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer">
+                                                <Undo2 size={13} /> Deshacer
                                             </button>
                                         )}
                                     </div>
                                 </div>
 
-                                {/* Configuración específica de Encuestas */}
+                                {/* Configuración de Encuesta */}
                                 {postType === 'poll' && (
-                                    <div className="p-4 rounded-2xl border border-indigo-200 dark:border-indigo-800/60 bg-indigo-50/40 dark:bg-indigo-950/20 space-y-3.5 mt-2 animate-in fade-in duration-200">
-                                        <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-indigo-200/60 dark:border-indigo-800/40">
+                                    <div className="p-3.5 rounded-2xl border border-indigo-200 dark:border-indigo-800/60 bg-indigo-50/40 dark:bg-indigo-950/20 space-y-3 mt-2 animate-in fade-in duration-200">
+                                        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-indigo-200/60 dark:border-indigo-800/40">
                                             <span className="text-xs font-extrabold text-indigo-900 dark:text-indigo-200 flex items-center gap-1.5">
-                                                <BarChart2 size={16} className="text-indigo-600 dark:text-indigo-400" />
-                                                Modo de selección de la encuesta
+                                                <BarChart2 size={15} className="text-indigo-600 dark:text-indigo-400" />
+                                                Modalidad de voto
                                             </span>
-                                            <div className="flex items-center gap-1 bg-white dark:bg-gray-900 p-1 rounded-xl border border-indigo-200 dark:border-indigo-800 shadow-2xs">
+                                            <div className="flex items-center gap-1 bg-white dark:bg-gray-900 p-0.5 rounded-lg border border-indigo-200 dark:border-indigo-800">
                                                 <button
                                                     type="button"
                                                     onClick={() => setIsMultipleChoice(false)}
-                                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                                        !isMultipleChoice 
-                                                            ? 'bg-indigo-600 text-white shadow-xs' 
-                                                            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                                                    className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                                                        !isMultipleChoice ? 'bg-indigo-600 text-white shadow-2xs' : 'text-gray-600 dark:text-gray-400'
                                                     }`}
                                                 >
-                                                    Selección única
+                                                    Única
                                                 </button>
                                                 <button
                                                     type="button"
                                                     onClick={() => setIsMultipleChoice(true)}
-                                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                                        isMultipleChoice 
-                                                            ? 'bg-indigo-600 text-white shadow-xs' 
-                                                            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                                                    className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                                                        isMultipleChoice ? 'bg-indigo-600 text-white shadow-2xs' : 'text-gray-600 dark:text-gray-400'
                                                     }`}
                                                 >
-                                                    Selección múltiple
+                                                    Múltiple
                                                 </button>
                                             </div>
                                         </div>
 
                                         <div className="space-y-2">
-                                            <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">
-                                                Opciones de respuesta <span className="text-red-500">*</span> (mínimo 2, máximo 8):
+                                            <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300">
+                                                Opciones (mín. 2, máx. 8):
                                             </label>
                                             {pollOptions.map((opt, idx) => (
                                                 <div key={idx} className="flex items-center gap-2">
-                                                    <div className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 text-xs font-bold flex items-center justify-center shrink-0">
+                                                    <div className="w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 text-[10px] font-bold flex items-center justify-center shrink-0">
                                                         {idx + 1}
                                                     </div>
                                                     <input
@@ -2255,37 +2250,33 @@ Descripción original: ${taskDesc}`;
                                                             setPollOptions(next);
                                                         }}
                                                         placeholder={`Opción ${idx + 1}...`}
-                                                        className="flex-1 py-2 px-3 text-xs font-medium rounded-xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-indigo-500"
+                                                        className="flex-1 py-1.5 px-3 text-xs font-medium rounded-lg bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 outline-none focus:ring-1 focus:ring-indigo-500"
                                                     />
                                                     {pollOptions.length > 2 && (
                                                         <button
                                                             type="button"
-                                                            onClick={() => {
-                                                                setPollOptions(pollOptions.filter((_, i) => i !== idx));
-                                                            }}
-                                                            className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
-                                                            title="Eliminar opción"
+                                                            onClick={() => setPollOptions(pollOptions.filter((_, i) => i !== idx))}
+                                                            className="p-1 text-gray-400 hover:text-red-500 rounded cursor-pointer"
                                                         >
-                                                            <X size={15} />
+                                                            <X size={14} />
                                                         </button>
                                                     )}
                                                 </div>
                                             ))}
-
                                             {pollOptions.length < 8 && (
                                                 <button
                                                     type="button"
                                                     onClick={() => setPollOptions([...pollOptions, ""])}
-                                                    className="mt-1 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 flex items-center gap-1.5 py-1.5 px-3 rounded-xl hover:bg-indigo-100/60 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer"
+                                                    className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 pt-1 cursor-pointer"
                                                 >
-                                                    <Plus size={14} /> Añadir otra opción
+                                                    <Plus size={13} /> Añadir opción
                                                 </button>
                                             )}
                                         </div>
                                     </div>
                                 )}
 
-                                {/* Constructor Interactivo de Kahoot */}
+                                {/* Kahoot Builder */}
                                 {postType === 'kahoot' && (
                                     <div className="mt-2 animate-in fade-in duration-200">
                                         <KahootBuilder
@@ -2303,13 +2294,13 @@ Descripción original: ${taskDesc}`;
 
                                 {/* Crear o subir libro */}
                                 {postType === 'book3d' && (
-                                    <div className="p-4 rounded-2xl border border-orange-200 dark:border-orange-800/60 bg-orange-50/40 dark:bg-orange-950/20 space-y-3.5 mt-2 animate-in fade-in duration-200">
-                                        <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-orange-200/60 dark:border-orange-800/40">
-                                            <div className="inline-flex rounded-xl bg-orange-100/80 dark:bg-gray-900/80 p-1">
+                                    <div className="p-3.5 rounded-2xl border border-orange-200 dark:border-orange-800/60 bg-orange-50/40 dark:bg-orange-950/20 space-y-3 mt-2 animate-in fade-in duration-200">
+                                        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-orange-200/60 dark:border-orange-800/40">
+                                            <div className="inline-flex rounded-lg bg-orange-100/80 dark:bg-gray-900/80 p-0.5">
                                                 <button
                                                     type="button"
                                                     onClick={() => handleSwitchBook3dMode('create')}
-                                                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                                    className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
                                                         book3dMode === 'create'
                                                             ? 'bg-white dark:bg-gray-800 text-orange-700 dark:text-orange-300 shadow-2xs'
                                                             : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
@@ -2320,7 +2311,7 @@ Descripción original: ${taskDesc}`;
                                                 <button
                                                     type="button"
                                                     onClick={() => handleSwitchBook3dMode('upload')}
-                                                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                                    className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
                                                         book3dMode === 'upload'
                                                             ? 'bg-white dark:bg-gray-800 text-orange-700 dark:text-orange-300 shadow-2xs'
                                                             : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
@@ -2333,18 +2324,18 @@ Descripción original: ${taskDesc}`;
                                                 <button
                                                     type="button"
                                                     onClick={() => onOpenBooksTab()}
-                                                    className="px-3 py-1 rounded-xl text-[11px] font-bold bg-white dark:bg-gray-900 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-800 hover:bg-orange-100 dark:hover:bg-orange-950/40 transition-colors cursor-pointer"
+                                                    className="px-2.5 py-0.5 rounded-lg text-[11px] font-bold bg-white dark:bg-gray-900 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-800 hover:bg-orange-100 transition-colors cursor-pointer"
                                                 >
                                                     Ver libros
                                                 </button>
                                             )}
                                         </div>
 
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                                             {book3dMode === 'upload' ? (
                                                 <div
                                                     onClick={() => !isRenderingBook3d && book3dFileInputRef.current?.click()}
-                                                    className={`p-4 rounded-xl border-2 border-dashed cursor-pointer transition-all flex flex-col items-center justify-center text-center gap-1.5 ${
+                                                    className={`p-3.5 rounded-xl border-2 border-dashed cursor-pointer transition-all flex flex-col items-center justify-center text-center gap-1 ${
                                                         book3dPages.length > 0
                                                             ? 'border-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/20'
                                                             : 'border-orange-300 dark:border-orange-700/70 hover:border-orange-500 bg-white/80 dark:bg-gray-900/60'
@@ -2359,56 +2350,49 @@ Descripción original: ${taskDesc}`;
                                                     />
                                                     {isRenderingBook3d ? (
                                                         <>
-                                                            <Loader2 size={24} className="animate-spin text-orange-600" />
+                                                            <Loader2 size={20} className="animate-spin text-orange-600" />
                                                             <span className="text-xs font-bold text-gray-800 dark:text-gray-200">
                                                                 Procesando PDF ({book3dProgress.currentPage}/{book3dProgress.totalPages || '?'})...
                                                             </span>
                                                         </>
                                                     ) : book3dPages.length > 0 ? (
                                                         <>
-                                                            <UploadCloud size={22} className="text-emerald-600" />
-                                                            <span className="text-xs font-extrabold text-emerald-700 dark:text-emerald-300">
+                                                            <UploadCloud size={18} className="text-emerald-600" />
+                                                            <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300">
                                                                 {book3dPdfFile?.name || 'PDF listo'} ({book3dPages.length} págs)
-                                                            </span>
-                                                            <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400">
-                                                                Cambiar archivo PDF
                                                             </span>
                                                         </>
                                                     ) : (
                                                         <>
-                                                            <UploadCloud size={24} className="text-orange-600 dark:text-orange-400" />
-                                                            <span className="text-xs font-extrabold text-gray-800 dark:text-gray-200">
-                                                                Seleccionar archivo PDF
+                                                            <UploadCloud size={20} className="text-orange-600 dark:text-orange-400" />
+                                                            <span className="text-xs font-bold text-gray-800 dark:text-gray-200">
+                                                                Seleccionar PDF
                                                             </span>
                                                         </>
                                                     )}
                                                 </div>
                                             ) : (
-                                                <div className="p-3.5 rounded-xl border border-orange-200/80 dark:border-orange-800/50 bg-white/85 dark:bg-gray-900/60 flex flex-col justify-between gap-2.5">
+                                                <div className="p-3 rounded-xl border border-orange-200/80 dark:border-orange-800/50 bg-white/85 dark:bg-gray-900/60 flex flex-col justify-between gap-2">
                                                     <div className="grid grid-cols-2 gap-2">
                                                         <div>
-                                                            <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">
-                                                                Páginas
-                                                            </label>
+                                                            <label className="block text-[10px] font-bold uppercase text-gray-500 mb-0.5">Páginas</label>
                                                             <select
                                                                 value={book3dPageCount}
                                                                 onChange={(e) => setBook3dPageCount(Number(e.target.value) || 6)}
-                                                                className="w-full px-2.5 py-1.5 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 text-xs font-bold outline-none"
+                                                                className="w-full px-2 py-1 rounded bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-bold"
                                                             >
-                                                                <option value={5}>5 páginas</option>
-                                                                <option value={6}>6 páginas</option>
-                                                                <option value={8}>8 páginas</option>
-                                                                <option value={10}>10 páginas</option>
+                                                                <option value={5}>5 págs</option>
+                                                                <option value={6}>6 págs</option>
+                                                                <option value={8}>8 págs</option>
+                                                                <option value={10}>10 págs</option>
                                                             </select>
                                                         </div>
                                                         <div>
-                                                            <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">
-                                                                Idioma
-                                                            </label>
+                                                            <label className="block text-[10px] font-bold uppercase text-gray-500 mb-0.5">Idioma</label>
                                                             <select
                                                                 value={book3dLanguage}
                                                                 onChange={(e) => setBook3dLanguage(e.target.value)}
-                                                                className="w-full px-2.5 py-1.5 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 text-xs font-bold outline-none"
+                                                                className="w-full px-2 py-1 rounded bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-bold"
                                                             >
                                                                 <option value="Inglés">Inglés</option>
                                                                 <option value="Bilingüe">Bilingüe</option>
@@ -2421,21 +2405,17 @@ Descripción original: ${taskDesc}`;
                                                         type="button"
                                                         disabled={isGeneratingBook3d}
                                                         onClick={handleGenerateBook3dPages}
-                                                        className="w-full py-2 px-3 rounded-xl bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                                                        className="w-full py-1.5 px-2.5 rounded-lg bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                                                     >
                                                         {isGeneratingBook3d ? (
                                                             <>
-                                                                <Loader2 size={14} className="animate-spin" />
+                                                                <Loader2 size={13} className="animate-spin" />
                                                                 <span>Creando páginas...</span>
                                                             </>
                                                         ) : (
                                                             <>
-                                                                <BookOpen size={14} />
-                                                                <span>
-                                                                    {book3dPages.length > 0
-                                                                        ? `Actualizar páginas (${book3dPages.length})`
-                                                                        : 'Vista previa de páginas'}
-                                                                </span>
+                                                                <BookOpen size={13} />
+                                                                <span>{book3dPages.length > 0 ? `Actualizar páginas (${book3dPages.length})` : 'Generar páginas'}</span>
                                                             </>
                                                         )}
                                                     </button>
@@ -2450,36 +2430,32 @@ Descripción original: ${taskDesc}`;
                                                     onChange={handleSelectBook3dCustomCover}
                                                     className="hidden"
                                                 />
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <span className="text-[11px] font-bold text-gray-700 dark:text-gray-300">
-                                                        Portada personalizada
-                                                    </span>
-                                                    <div className="flex items-center gap-1.5">
+                                                <div className="flex items-center justify-between gap-2 text-xs">
+                                                    <span className="text-[11px] font-bold text-gray-700 dark:text-gray-300">Portada personalizada</span>
+                                                    <div className="flex items-center gap-1">
                                                         <button
                                                             type="button"
                                                             onClick={() => book3dCoverInputRef.current?.click()}
-                                                            className="px-2.5 py-1 rounded-lg bg-white dark:bg-gray-900 border border-orange-200 dark:border-orange-800 text-orange-700 dark:text-orange-300 text-[11px] font-bold inline-flex items-center gap-1 hover:bg-orange-50 transition-colors cursor-pointer"
+                                                            className="px-2 py-0.5 rounded bg-white dark:bg-gray-900 border border-orange-200 dark:border-orange-800 text-orange-700 dark:text-orange-300 text-[11px] font-bold inline-flex items-center gap-1 hover:bg-orange-50 cursor-pointer"
                                                         >
-                                                            <ImageIcon size={12} />
-                                                            <span>{book3dCustomCover ? 'Cambiar portada' : 'Subir portada'}</span>
+                                                            <ImageIcon size={11} />
+                                                            <span>{book3dCustomCover ? 'Cambiar' : 'Subir'}</span>
                                                         </button>
                                                         {book3dCustomCover && (
                                                             <button
                                                                 type="button"
                                                                 onClick={handleClearBook3dCustomCover}
-                                                                className="p-1 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer"
-                                                                title="Quitar portada personalizada"
+                                                                className="p-0.5 text-red-500 hover:bg-red-50 rounded cursor-pointer"
                                                             >
                                                                 <X size={12} />
                                                             </button>
                                                         )}
                                                     </div>
                                                 </div>
+
                                                 <div className="flex items-center justify-between gap-2">
-                                                    <span className="text-[11px] font-bold text-gray-700 dark:text-gray-300">
-                                                        Color
-                                                    </span>
-                                                    <div className="flex items-center gap-2">
+                                                    <span className="text-[11px] font-bold text-gray-700 dark:text-gray-300">Color</span>
+                                                    <div className="flex items-center gap-1.5">
                                                         {Object.values(BOOK_THEMES).map((th) => (
                                                             <button
                                                                 key={th.id}
@@ -2487,161 +2463,68 @@ Descripción original: ${taskDesc}`;
                                                                 onClick={() => handleSelectBook3dTheme(th.id)}
                                                                 title={th.name}
                                                                 aria-label={th.name}
-                                                                className={`w-6 h-6 rounded-full border transition-all cursor-pointer ${
-                                                                    book3dTheme === th.id
-                                                                        ? 'border-white ring-2 ring-[#AD3333] scale-110'
-                                                                        : 'border-gray-300 dark:border-gray-700 opacity-75 hover:opacity-100'
+                                                                className={`w-5 h-5 rounded-full border transition-all cursor-pointer ${
+                                                                    book3dTheme === th.id ? 'border-white ring-2 ring-[#AD3333] scale-110' : 'opacity-70 hover:opacity-100'
                                                                 }`}
-                                                                style={{
-                                                                    background: `linear-gradient(135deg, ${th.coverBg}, ${th.accentColor})`
-                                                                }}
+                                                                style={{ background: `linear-gradient(135deg, ${th.coverBg}, ${th.accentColor})` }}
                                                             />
                                                         ))}
                                                     </div>
                                                 </div>
-                                                {book3dPages.length > 0 && (
-                                                    <div className="flex items-center gap-2 pt-1 overflow-x-auto no-scrollbar">
-                                                        {book3dPages.slice(0, 5).map((pg, idx) => (
-                                                            <img loading="lazy" decoding="async"
-                                                                key={idx}
-                                                                src={typeof pg === 'string' ? pg : (pg?.imageUrl || pg?.thumbUrl || '')}
-                                                                alt={`Pág. ${idx + 1}`}
-                                                                onClick={() =>
-                                                                    setBook3dPreviewModal({
-                                                                        book: {
-                                                                            id: 'wall_preview_book',
-                                                                            title: (taskTitle || '').trim() || 'Vista previa',
-                                                                            description: stripBookHtml(taskDesc || ''),
-                                                                            theme: book3dTheme,
-                                                                            category: 'textbook',
-                                                                            aspectRatio: book3dAspectRatio || 0.707,
-                                                                            bookPages: book3dPages,
-                                                                            pageTexts: book3dPageTexts,
-                                                                            pageCount: book3dPages.length,
-                                                                            ambientAudio: {
-                                                                                enabled: Boolean(book3dAmbientEnabled),
-                                                                                trackId: book3dAmbientTrack || 'piano-calm',
-                                                                                customUrl: (book3dAmbientUrl || '').trim(),
-                                                                                volume: clampReadingVolume(book3dAmbientVolume),
-                                                                                title: getReadingAudioPreset(book3dAmbientTrack)?.name
-                                                                            }
-                                                                        },
-                                                                        initialPage: idx
-                                                                    })
-                                                                }
-                                                                className="w-10 h-14 object-cover rounded border border-gray-300 dark:border-gray-700 shrink-0 shadow-2xs bg-white cursor-pointer hover:ring-2 hover:ring-orange-500 transition-all"
-                                                            />
-                                                        ))}
-                                                        {book3dPages.length > 5 && (
-                                                            <span className="text-[10px] font-bold text-gray-500 shrink-0">
-                                                                +{book3dPages.length - 5} págs.
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                )}
 
                                                 {/* Música de fondo */}
-                                                <div className="p-3 rounded-xl bg-white dark:bg-gray-900 border border-orange-200/80 dark:border-orange-800/60 space-y-2.5">
-                                                    <div className="flex items-center justify-between">
-                                                        <label className="text-[11px] font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
-                                                            <Music size={13} className="text-emerald-500" />
-                                                            <span>Música de fondo</span>
-                                                        </label>
-                                                        <div className="flex items-center gap-2">
+                                                <div className="p-2.5 rounded-xl bg-white dark:bg-gray-900 border border-orange-200/80 dark:border-orange-800/60 space-y-2">
+                                                    <div className="flex items-center justify-between text-xs">
+                                                        <span className="font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1">
+                                                            <Music size={12} className="text-emerald-500" />
+                                                            Música de fondo
+                                                        </span>
+                                                        <div className="flex items-center gap-1.5">
                                                             <button
                                                                 type="button"
                                                                 onClick={handleToggleBook3dPreviewAmbient}
-                                                                className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold flex items-center gap-1 transition-all cursor-pointer ${
-                                                                    book3dPreviewingAmbient
-                                                                        ? 'bg-emerald-600 text-white shadow-xs'
-                                                                        : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
+                                                                className={`px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 cursor-pointer ${
+                                                                    book3dPreviewingAmbient ? 'bg-emerald-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
                                                                 }`}
-                                                                title={book3dPreviewingAmbient ? 'Detener prueba' : 'Escuchar muestra'}
                                                             >
-                                                                {book3dPreviewingAmbient ? <Square size={10} className="fill-white" /> : <Play size={10} />}
+                                                                {book3dPreviewingAmbient ? <Square size={9} className="fill-white" /> : <Play size={9} />}
                                                                 <span>{book3dPreviewingAmbient ? 'Detener' : 'Probar'}</span>
                                                             </button>
                                                             <button
                                                                 type="button"
                                                                 onClick={() => setBook3dAmbientEnabled((v) => !v)}
-                                                                className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer ${
-                                                                    book3dAmbientEnabled
-                                                                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                                                                        : 'bg-gray-200 dark:bg-gray-700 text-gray-500'
+                                                                className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer ${
+                                                                    book3dAmbientEnabled ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30' : 'bg-gray-200 dark:bg-gray-700 text-gray-500'
                                                                 }`}
                                                             >
-                                                                {book3dAmbientEnabled ? 'Activado' : 'Desactivado'}
+                                                                {book3dAmbientEnabled ? 'On' : 'Off'}
                                                             </button>
                                                         </div>
                                                     </div>
 
                                                     {book3dAmbientEnabled && (
-                                                        <div className="space-y-2 pt-1 animate-in fade-in duration-150">
-                                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                                                <div>
-                                                                    <label className="block text-[10px] font-semibold text-gray-500 dark:text-gray-400 mb-1">
-                                                                        Pista ambiental
-                                                                    </label>
-                                                                    <select
-                                                                        value={book3dAmbientTrack}
-                                                                        onChange={(e) => setBook3dAmbientTrack(e.target.value)}
-                                                                        className="w-full px-2.5 py-1.5 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white text-xs font-medium focus:outline-none"
-                                                                    >
-                                                                        {READING_AUDIO_PRESETS.map((p) => (
-                                                                            <option key={p.id} value={p.id}>
-                                                                                {p.name} {p.recommended ? '(Recomendado)' : ''}
-                                                                            </option>
-                                                                        ))}
-                                                                    </select>
-                                                                </div>
-
-                                                                <div>
-                                                                    <div className="flex items-center justify-between text-[10px] font-semibold text-gray-500 dark:text-gray-400 mb-1">
-                                                                        <span>Volumen</span>
-                                                                        <span>{Math.round((book3dAmbientVolume / 0.65) * 100)}%</span>
-                                                                    </div>
-                                                                    <div className="flex items-center gap-2 pt-1">
-                                                                        <Volume2 size={13} className="text-gray-400 shrink-0" />
-                                                                        <input
-                                                                            type="range"
-                                                                            min="0.04"
-                                                                            max="0.65"
-                                                                            step="0.02"
-                                                                            value={book3dAmbientVolume}
-                                                                            onChange={(e) => setBook3dAmbientVolume(parseFloat(e.target.value))}
-                                                                            className="w-full accent-emerald-500 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-lg cursor-pointer"
-                                                                        />
-                                                                    </div>
-                                                                </div>
+                                                        <div className="grid grid-cols-2 gap-2 pt-1 border-t border-gray-100 dark:border-gray-800 text-xs">
+                                                            <select
+                                                                value={book3dAmbientTrack}
+                                                                onChange={(e) => setBook3dAmbientTrack(e.target.value)}
+                                                                className="w-full px-2 py-1 rounded bg-gray-50 dark:bg-gray-800 text-xs font-medium"
+                                                            >
+                                                                {READING_AUDIO_PRESETS.map((p) => (
+                                                                    <option key={p.id} value={p.id}>{p.name}</option>
+                                                                ))}
+                                                            </select>
+                                                            <div className="flex items-center gap-1.5">
+                                                                <Volume2 size={12} className="text-gray-400 shrink-0" />
+                                                                <input
+                                                                    type="range"
+                                                                    min="0.04"
+                                                                    max="0.65"
+                                                                    step="0.02"
+                                                                    value={book3dAmbientVolume}
+                                                                    onChange={(e) => setBook3dAmbientVolume(parseFloat(e.target.value))}
+                                                                    className="w-full accent-emerald-500 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-lg cursor-pointer"
+                                                                />
                                                             </div>
-
-                                                            {book3dAmbientTrack === 'custom' && (
-                                                                <div className="pt-1.5 space-y-1.5 border-t border-gray-200 dark:border-gray-700/60">
-                                                                    <input
-                                                                        ref={book3dAmbientFileInputRef}
-                                                                        type="file"
-                                                                        accept="audio/*,.mp3,.wav,.ogg,.m4a"
-                                                                        onChange={handleSelectBook3dCustomAudioFile}
-                                                                        className="hidden"
-                                                                    />
-                                                                    <div className="flex items-center gap-2">
-                                                                        <input
-                                                                            type="url"
-                                                                            value={book3dAmbientUrl}
-                                                                            onChange={(e) => setBook3dAmbientUrl(e.target.value)}
-                                                                            placeholder="Enlace de audio MP3 o sube un archivo..."
-                                                                            className="flex-1 px-2.5 py-1.5 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white text-xs focus:outline-none"
-                                                                        />
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => book3dAmbientFileInputRef.current?.click()}
-                                                                            className="px-2.5 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-xs font-bold shrink-0 cursor-pointer"
-                                                                        >
-                                                                            Subir audio
-                                                                        </button>
-                                                                    </div>
-                                                                </div>
-                                                            )}
                                                         </div>
                                                     )}
                                                 </div>
@@ -2687,106 +2570,80 @@ Descripción original: ${taskDesc}`;
                                     </div>
                                 )}
 
-                                {/* Parámetros de Entrega y Cierre (Tareas, Foros y Encuestas) */}
-                                {(postType === 'task' || postType === 'forum' || postType === 'poll') && (
-                                    <div className={`p-4 rounded-2xl border mt-2 space-y-3 ${
-                                        postType === 'forum' 
-                                            ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/60' 
-                                            : postType === 'poll'
-                                                ? 'bg-indigo-50/50 dark:bg-indigo-950/20 border-indigo-200 dark:border-indigo-800/60'
-                                                : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700'
-                                    }`}>
-                                        <div className="flex items-center justify-between pb-2 border-b border-gray-200/60 dark:border-gray-700/60">
-                                            <label className="flex items-center gap-2 cursor-pointer select-none">
+                                {/* AJUSTES DE ENTREGA Y VISIBILIDAD (UNIFICADO, ULTRA-COMPACTO Y EN EL MISMO LUGAR) */}
+                                <div className="p-3 rounded-xl bg-gray-50/80 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/80 space-y-2">
+                                    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
+                                        {(postType === 'task' || postType === 'forum' || postType === 'poll') && (
+                                            <label className="flex items-center gap-1.5 cursor-pointer select-none text-xs font-bold text-gray-700 dark:text-gray-200">
                                                 <input 
                                                     type="checkbox" 
                                                     checked={hasDueDate} 
                                                     onChange={(e) => setHasDueDate(e.target.checked)} 
-                                                    className={`w-4 h-4 rounded ${
-                                                        postType === 'forum' 
-                                                            ? 'accent-emerald-600' 
-                                                            : postType === 'poll'
-                                                                ? 'accent-indigo-600'
-                                                                : 'accent-[#AD3333]'
-                                                    }`} 
+                                                    className="w-3.5 h-3.5 rounded accent-blue-600 cursor-pointer" 
                                                 />
-                                                <span className="text-xs font-bold text-gray-800 dark:text-gray-200">
-                                                    {postType === 'forum' 
-                                                        ? 'Establecer fecha límite de cierre' 
-                                                        : postType === 'poll'
-                                                            ? 'Establecer fecha y hora límite de votación'
-                                                            : 'Establecer fecha y hora límite de entrega'
-                                                    }
+                                                <span>
+                                                    {postType === 'forum' ? 'Límite de cierre' : postType === 'poll' ? 'Límite de votación' : 'Fecha límite de entrega'}
                                                 </span>
                                             </label>
-                                            {!hasDueDate && (
-                                                <span className="text-[11px] font-semibold text-gray-400 italic">
-                                                    Abierto sin límite de tiempo
-                                                </span>
+                                        )}
+
+                                        <label className="flex items-center gap-1.5 cursor-pointer select-none text-xs font-bold text-gray-700 dark:text-gray-200">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={hidePublicationDate} 
+                                                onChange={(e) => setHidePublicationDate(e.target.checked)} 
+                                                className="w-3.5 h-3.5 rounded accent-blue-600 cursor-pointer" 
+                                            />
+                                            <span>Ocultar fecha de publicación</span>
+                                        </label>
+                                    </div>
+
+                                    {hasDueDate && (postType === 'task' || postType === 'forum' || postType === 'poll') && (
+                                        <div className="pt-2 border-t border-gray-200/60 dark:border-gray-700/60 flex flex-wrap items-center gap-2.5 animate-in fade-in">
+                                            <div className="flex items-center gap-1">
+                                                <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400">Fecha:</span>
+                                                <input 
+                                                    type="date" 
+                                                    value={taskDate} 
+                                                    onChange={(e) => setTaskDate(e.target.value)} 
+                                                    className="py-1 px-2 text-xs font-bold rounded-lg bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 outline-none" 
+                                                    required={hasDueDate} 
+                                                />
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                                <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400">Hora:</span>
+                                                <input 
+                                                    type="time" 
+                                                    value={taskTime} 
+                                                    onChange={(e) => setTaskTime(e.target.value)} 
+                                                    className="py-1 px-2 text-xs font-bold rounded-lg bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 outline-none" 
+                                                    required={hasDueDate} 
+                                                />
+                                            </div>
+                                            {postType !== 'poll' && (
+                                                <label className="flex items-center gap-1.5 cursor-pointer select-none text-[11px] font-semibold text-gray-600 dark:text-gray-300 ml-auto sm:ml-2">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={allowLate} 
+                                                        onChange={(e) => setAllowLate(e.target.checked)} 
+                                                        className="w-3.5 h-3.5 rounded accent-blue-600 cursor-pointer" 
+                                                    />
+                                                    <span>{postType === 'forum' ? 'Aportes tardíos' : 'Entregas tardías'}</span>
+                                                </label>
                                             )}
                                         </div>
-
-                                        {hasDueDate && (
-                                            <div className="flex flex-wrap gap-4 items-center animate-in fade-in duration-200">
-                                                <div>
-                                                    <label className="text-xs font-bold text-gray-600 dark:text-gray-300 block mb-1">
-                                                        {postType === 'forum' ? 'Fecha de cierre' : postType === 'poll' ? 'Cierre de votación' : 'Fecha límite'}
-                                                    </label>
-                                                    <input type="date" value={taskDate} onChange={(e) => setTaskDate(e.target.value)} className="py-1.5 px-3 text-xs font-bold rounded-xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500" required={hasDueDate} />
-                                                </div>
-                                                <div>
-                                                    <label className="text-xs font-bold text-gray-600 dark:text-gray-300 block mb-1">
-                                                        {postType === 'forum' ? 'Hora de cierre' : postType === 'poll' ? 'Hora de cierre' : 'Hora límite'}
-                                                    </label>
-                                                    <input type="time" value={taskTime} onChange={(e) => setTaskTime(e.target.value)} className="py-1.5 px-3 text-xs font-bold rounded-xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500" required={hasDueDate} />
-                                                </div>
-                                                {postType !== 'poll' && (
-                                                    <label className="flex items-center gap-2 cursor-pointer pt-4">
-                                                        <input 
-                                                            type="checkbox" 
-                                                            checked={allowLate} 
-                                                            onChange={(e) => setAllowLate(e.target.checked)} 
-                                                            className={`w-4 h-4 rounded ${postType === 'forum' ? 'accent-emerald-600' : 'accent-[#AD3333]'}`} 
-                                                        />
-                                                        <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
-                                                            {postType === 'forum' ? 'Permitir aportes tardíos' : 'Permitir entregas tardías'}
-                                                        </span>
-                                                    </label>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-
-                                {/* Opción Docente: Ocultar fecha y hora de publicación */}
-                                <div className="flex items-center justify-between p-2.5 rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-gray-200/80 dark:border-gray-700/80 mt-1 mb-1">
-                                    <label className="flex items-center gap-2 cursor-pointer select-none">
-                                        <input 
-                                            type="checkbox" 
-                                            checked={hidePublicationDate} 
-                                            onChange={(e) => setHidePublicationDate(e.target.checked)} 
-                                            className="w-4 h-4 rounded accent-[#AD3333]" 
-                                        />
-                                        <div className="flex flex-col">
-                                            <span className="text-xs font-bold text-gray-800 dark:text-gray-200">
-                                                Ocultar día, fecha y hora de la publicación
-                                            </span>
-                                            <span className="text-[10px] text-gray-500 dark:text-gray-400">
-                                                Los estudiantes no verán el momento en que se publicó esta tarea o contenido.
-                                            </span>
-                                        </div>
-                                    </label>
+                                    )}
                                 </div>
 
                                 {/* Barra de navegación de Paso 2 */}
-                                <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-800">
+                                <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-800">
                                     <button
                                         type="button"
                                         onClick={() => setComposerStep(1)}
-                                        className="px-4 py-2.5 rounded-xl text-xs font-bold text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-1.5 transition-colors cursor-pointer"
+                                        className="px-3.5 py-2 rounded-xl text-xs font-bold text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-1.5 transition-colors cursor-pointer"
                                     >
-                                        <ArrowLeftIcon size={15} />
-                                        <span>Anterior: Cambiar grupo</span>
+                                        <ArrowLeftIcon size={14} />
+                                        <span>Cambiar grupo</span>
                                     </button>
 
                                     <button
@@ -2798,121 +2655,129 @@ Descripción original: ${taskDesc}`;
                                                 if (book3dMode === 'upload' && (book3dPages.length === 0 || !book3dPdfFile)) {
                                                     return showMessage("⚠️ Selecciona un archivo PDF para el libro.");
                                                 }
-                                                if (book3dMode === 'create' && !cleanTitle) {
-                                                    return showMessage("⚠️ Escribe un título para el libro.");
+                                                if (book3dMode === 'create' && book3dPages.length === 0) {
+                                                    return showMessage("⚠️ Genera las páginas del libro antes de continuar.");
                                                 }
                                             }
                                             if (postType === 'kahoot') {
-                                                const validation = validateKahootConfig(kahootQuestions);
-                                                if (!validation.valid) return showMessage(`⚠️ ${validation.error}`);
+                                                if (!cleanTitle) return showMessage("Ingresa un título para el Kahoot.");
+                                                if (kahootQuestions.length === 0) return showMessage("Añade al menos una pregunta al Kahoot.");
                                             }
                                             if (postType === 'poll') {
-                                                if (!cleanTitle) return showMessage("⚠️ Por favor ingresa la pregunta principal de la encuesta.");
-                                                const validOptions = pollOptions.map(o => (o || '').trim()).filter(Boolean);
-                                                if (validOptions.length < 2) return showMessage("⚠️ La encuesta debe tener al menos 2 opciones de respuesta con texto.");
+                                                if (!cleanTitle) return showMessage("Ingresa la pregunta de la encuesta.");
+                                                const validOpts = pollOptions.filter(o => o.trim().length > 0);
+                                                if (validOpts.length < 2) return showMessage("Ingresa al menos 2 opciones de respuesta válidas.");
                                             }
                                             if (postType !== 'kahoot' && postType !== 'book3d' && postType !== 'poll' && !cleanTitle && !cleanDesc) {
-                                                return showMessage("Por favor ingresa al menos un título o descripción para continuar.");
+                                                return showMessage("Ingresa un título o una descripción para tu publicación.");
                                             }
                                             setComposerStep(3);
                                         }}
-                                        className="px-5 py-2.5 rounded-xl text-xs font-black bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/25 flex items-center gap-1.5 transition-all hover:scale-102 cursor-pointer"
+                                        className="px-4 py-2 rounded-xl text-xs font-black bg-blue-600 hover:bg-blue-700 text-white shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
                                     >
-                                        <span>Siguiente: Adjuntar recursos</span>
-                                        <ArrowRightIcon size={15} />
+                                        <span>Siguiente: Adjuntos</span>
+                                        <ArrowRightIcon size={14} />
                                     </button>
                                 </div>
                             </div>
                         )}
 
-                        {/* PASO 3: RECURSOS Y ADJUNTOS MULTIMEDIA */}
+                        {/* PASO 3: ADJUNTOS Y RECURSOS MULTIMEDIA (MINIMALISTA) */}
                         {composerStep === 3 && (
-                            <div className="space-y-4 animate-in fade-in duration-200">
-                                <div className="bg-gray-50 dark:bg-gray-800/60 p-4 rounded-2xl border border-gray-200 dark:border-gray-700">
-                                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-600 text-white text-[10px] font-black uppercase tracking-wider mb-2">
-                                        Paso 3 de 4 • Opcional
+                            <div className="space-y-3 pt-2 animate-in fade-in duration-200">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h4 className="text-sm font-extrabold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                                            <span>Adjuntar archivos o recursos</span>
+                                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">Opcional</span>
+                                        </h4>
+                                        <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                                            Agrega material de apoyo si lo requieres o continúa directamente al siguiente paso.
+                                        </p>
                                     </div>
-                                    <h4 className="text-base sm:text-lg font-black text-gray-900 dark:text-gray-100 leading-tight">
-                                        Adjuntar archivos y recursos multimedia
-                                    </h4>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
-                                        Puedes complementar tu publicación con fotos o imágenes (hasta 4 en carrusel), documentos PDF o Word, videos, enlaces de Genially o notas de voz grabadas directamente. Si no necesitas adjuntos, puedes continuar al paso final.
-                                    </p>
                                 </div>
 
-                                {/* Panel de Botones para Adjuntar */}
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                                    <label className="p-3.5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-blue-500 hover:bg-blue-50/30 dark:hover:bg-blue-950/20 cursor-pointer transition-all flex flex-col items-center justify-center text-center gap-1.5 shadow-2xs group">
-                                        <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                            <ImageIcon size={18} />
+                                {/* Barra de Acciones de Adjuntos (Sleek Grid) */}
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                    <label className="p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-blue-500 hover:bg-blue-50/20 cursor-pointer transition-all flex items-center gap-2.5 group shadow-2xs">
+                                        <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                            <ImageIcon size={16} />
                                         </div>
-                                        <span className="text-xs font-bold text-gray-800 dark:text-gray-200">Subir imagen</span>
-                                        <span className="text-[10px] text-gray-400 font-medium">Fotos o carrusel (4)</span>
+                                        <div className="min-w-0">
+                                            <span className="text-xs font-bold text-gray-800 dark:text-gray-200 block truncate">Imagen</span>
+                                            <span className="text-[10px] text-gray-400 block truncate">Hasta 4 fotos</span>
+                                        </div>
                                         <input type="file" multiple accept="image/*,.heic,.heif,image/heic,image/heif" className="hidden" onChange={(e) => handlePostLocalFileUpload(e)} />
                                     </label>
 
-                                    <label className="p-3.5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-blue-500 hover:bg-blue-50/30 dark:hover:bg-blue-950/20 cursor-pointer transition-all flex flex-col items-center justify-center text-center gap-1.5 shadow-2xs group">
-                                        <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                            <PaperclipIcon size={18} />
+                                    <label className="p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-emerald-500 hover:bg-emerald-50/20 cursor-pointer transition-all flex items-center gap-2.5 group shadow-2xs">
+                                        <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                            <PaperclipIcon size={16} />
                                         </div>
-                                        <span className="text-xs font-bold text-gray-800 dark:text-gray-200">Documento</span>
-                                        <span className="text-[10px] text-gray-400 font-medium">PDF, Word, etc.</span>
+                                        <div className="min-w-0">
+                                            <span className="text-xs font-bold text-gray-800 dark:text-gray-200 block truncate">Documento</span>
+                                            <span className="text-[10px] text-gray-400 block truncate">PDF o Word</span>
+                                        </div>
                                         <input type="file" accept=".pdf,.doc,.docx,.ppt,.pptx" className="hidden" onChange={(e) => handlePostLocalFileUpload(e)} />
                                     </label>
 
                                     <button
                                         type="button"
                                         onClick={() => setShowVideoInput(prev => !prev)}
-                                        className={`p-3.5 rounded-2xl border transition-all flex flex-col items-center justify-center text-center gap-1.5 shadow-2xs cursor-pointer group ${
+                                        className={`p-2.5 rounded-xl border transition-all flex items-center gap-2.5 cursor-pointer group shadow-2xs ${
                                             showVideoInput || postVideoUrl 
-                                                ? 'border-red-400 bg-red-50/40 dark:bg-red-950/30' 
+                                                ? 'border-red-400 bg-red-50/30 dark:bg-red-950/30' 
                                                 : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-red-400 hover:bg-red-50/20'
                                         }`}
                                     >
-                                        <div className="w-9 h-9 rounded-xl bg-red-50 dark:bg-red-950/50 text-red-600 dark:text-red-400 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                            <Play size={18} />
+                                        <div className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-950/50 text-red-600 dark:text-red-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                            <Play size={16} />
                                         </div>
-                                        <span className="text-xs font-bold text-gray-800 dark:text-gray-200">Video</span>
-                                        <span className="text-[10px] text-gray-400 font-medium">YouTube o enlace</span>
+                                        <div className="min-w-0 text-left">
+                                            <span className="text-xs font-bold text-gray-800 dark:text-gray-200 block truncate">Video</span>
+                                            <span className="text-[10px] text-gray-400 block truncate">YouTube / Link</span>
+                                        </div>
                                     </button>
 
                                     <button
                                         type="button"
                                         onClick={() => { recPub ? stopPub() : startPub(); }}
-                                        className={`p-3.5 rounded-2xl border transition-all flex flex-col items-center justify-center text-center gap-1.5 shadow-2xs cursor-pointer group ${
+                                        className={`p-2.5 rounded-xl border transition-all flex items-center gap-2.5 cursor-pointer group shadow-2xs ${
                                             recPub || audioPub 
-                                                ? 'border-purple-400 bg-purple-50/40 dark:bg-purple-950/30' 
+                                                ? 'border-purple-400 bg-purple-50/30 dark:bg-purple-950/30' 
                                                 : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-purple-400 hover:bg-purple-50/20'
                                         }`}
                                     >
-                                        <div className="w-9 h-9 rounded-xl bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                            {recPub ? <Square size={18} className="text-red-500 animate-pulse" /> : <Mic size={18} />}
+                                        <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                            {recPub ? <Square size={16} className="text-red-500 animate-pulse" /> : <Mic size={16} />}
                                         </div>
-                                        <span className="text-xs font-bold text-gray-800 dark:text-gray-200">
-                                            {recPub ? 'Grabando...' : 'Nota de voz'}
-                                        </span>
-                                        <span className="text-[10px] text-gray-400 font-medium">
-                                            {recPub ? 'Toca para parar' : 'Grabar audio'}
-                                        </span>
+                                        <div className="min-w-0 text-left">
+                                            <span className="text-xs font-bold text-gray-800 dark:text-gray-200 block truncate">
+                                                {recPub ? 'Grabando...' : 'Nota de voz'}
+                                            </span>
+                                            <span className="text-[10px] text-gray-400 block truncate">
+                                                {recPub ? 'Detener' : 'Grabar audio'}
+                                            </span>
+                                        </div>
                                     </button>
                                 </div>
 
-                                {/* Herramientas adicionales */}
-                                <div className="flex flex-wrap items-center gap-2 pt-1">
+                                {/* Píldoras secundarias */}
+                                <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                                     <button
                                         type="button"
                                         onClick={() => setShowGeniallyInput(prev => !prev)}
-                                        className="px-3 py-1.5 rounded-xl text-xs font-bold border border-purple-300 dark:border-purple-700 bg-white dark:bg-gray-800 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/40 flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                                        className="px-2.5 py-1 rounded-lg text-[11px] font-bold border border-purple-200 dark:border-purple-800 bg-white dark:bg-gray-800 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/40 flex items-center gap-1 shadow-2xs cursor-pointer"
                                     >
-                                        <Sparkles size={14} className="text-purple-500" /> Insertar Genially
+                                        <Sparkles size={12} className="text-purple-500" /> Genially
                                     </button>
 
                                     <button
                                         type="button"
                                         onClick={() => setShowImageInput(prev => !prev)}
-                                        className="px-3 py-1.5 rounded-xl text-xs font-bold border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                                        className="px-2.5 py-1 rounded-lg text-[11px] font-bold border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-1 shadow-2xs cursor-pointer"
                                     >
-                                        <ImageIcon size={14} /> Enlace directo de imagen
+                                        <Link2 size={12} /> Enlace imagen
                                     </button>
 
                                     <button
@@ -2931,15 +2796,15 @@ Descripción original: ${taskDesc}`;
                                                 }
                                             });
                                         }}
-                                        className="px-3 py-1.5 rounded-xl text-xs font-bold border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                                        className="px-2.5 py-1 rounded-lg text-[11px] font-bold border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-1 shadow-2xs cursor-pointer"
                                     >
-                                        <span className="font-black border border-current px-1 rounded text-[9px] flex items-center justify-center h-3.5">GIF</span> Insertar GIF
+                                        <span className="font-black border border-current px-0.5 rounded text-[8.5px] h-3 flex items-center">GIF</span> GIF
                                     </button>
                                 </div>
 
-                                {/* Inputs específicos de adjuntos */}
+                                {/* Inputs desplegables */}
                                 {showImageInput && (
-                                    <div className="flex gap-2 items-center p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 animate-in fade-in">
+                                    <div className="flex gap-2 items-center p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 animate-in fade-in">
                                         <input 
                                             value={postImageUrl} 
                                             onChange={(e) => {
@@ -2948,41 +2813,41 @@ Descripción original: ${taskDesc}`;
                                                     setPostImageUrls(e.target.value ? [e.target.value] : []);
                                                 }
                                             }} 
-                                            placeholder="Pega el enlace directo de la imagen o GIF..." 
-                                            className="flex-1 py-1.5 px-3 text-xs rounded-xl bg-transparent text-gray-900 dark:text-gray-100 outline-none" 
+                                            placeholder="Enlace directo de la imagen (.jpg, .png, .gif)..." 
+                                            className="flex-1 py-1 px-2.5 text-xs rounded-lg bg-transparent text-gray-900 dark:text-gray-100 outline-none" 
                                         />
-                                        <button type="button" onClick={() => setShowImageInput(false)} className="p-1.5 text-gray-400 hover:text-red-500 cursor-pointer"><X size={16}/></button>
+                                        <button type="button" onClick={() => setShowImageInput(false)} className="p-1 text-gray-400 hover:text-red-500 cursor-pointer"><X size={15}/></button>
                                     </div>
                                 )}
 
                                 {showVideoInput && (
-                                    <div className="flex gap-2 items-center p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 animate-in fade-in">
+                                    <div className="flex gap-2 items-center p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 animate-in fade-in">
                                         <input 
                                             value={postVideoUrl} 
                                             onChange={(e) => setPostVideoUrl(e.target.value)} 
-                                            placeholder="Pega el enlace de YouTube o enlace directo de video (.mp4, etc.)..." 
-                                            className="flex-1 py-1.5 px-3 text-xs rounded-xl bg-transparent text-gray-900 dark:text-gray-100 outline-none" 
+                                            placeholder="Enlace de YouTube o video directo (.mp4)..." 
+                                            className="flex-1 py-1 px-2.5 text-xs rounded-lg bg-transparent text-gray-900 dark:text-gray-100 outline-none" 
                                         />
-                                        <button type="button" onClick={() => setShowVideoInput(false)} className="p-1.5 text-gray-400 hover:text-red-500 cursor-pointer"><X size={16}/></button>
+                                        <button type="button" onClick={() => setShowVideoInput(false)} className="p-1 text-gray-400 hover:text-red-500 cursor-pointer"><X size={15}/></button>
                                     </div>
                                 )}
 
                                 {showGeniallyInput && (
-                                    <div className="flex gap-2 items-center p-3 rounded-xl bg-white dark:bg-gray-800 border border-purple-300 dark:border-purple-700 animate-in fade-in">
+                                    <div className="flex gap-2 items-center p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-purple-300 dark:border-purple-700 animate-in fade-in">
                                         <input 
                                             value={postGeniallyUrl} 
                                             onChange={(e) => setPostGeniallyUrl(e.target.value)} 
-                                            placeholder="Pega el enlace o código de inserción de Genially..." 
-                                            className="flex-1 py-1.5 px-3 text-xs rounded-xl bg-transparent text-gray-900 dark:text-gray-100 outline-none" 
+                                            placeholder="Enlace de Genially..." 
+                                            className="flex-1 py-1 px-2.5 text-xs rounded-lg bg-transparent text-gray-900 dark:text-gray-100 outline-none" 
                                         />
-                                        <button type="button" onClick={() => setShowGeniallyInput(false)} className="p-1.5 text-gray-400 hover:text-red-500 cursor-pointer"><X size={16}/></button>
+                                        <button type="button" onClick={() => setShowGeniallyInput(false)} className="p-1 text-gray-400 hover:text-red-500 cursor-pointer"><X size={15}/></button>
                                     </div>
                                 )}
 
-                                {/* Previsualización de adjuntos multimedia */}
+                                {/* Previsualización de adjuntos */}
                                 {((Array.isArray(postImageUrls) && postImageUrls.length > 0) || postImageUrl || postVideoUrl || postGeniallyUrl || postFileUrl || audioPub) && (
-                                    <div className="p-4 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-800/50 space-y-3 animate-in fade-in">
-                                        {/* Carrusel de imágenes */}
+                                    <div className="p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-800/50 space-y-2.5 animate-in fade-in">
+                                        {/* Carrusel de fotos */}
                                         {(() => {
                                             const currentImgs = (Array.isArray(postImageUrls) && postImageUrls.length > 0)
                                                 ? postImageUrls
@@ -2993,20 +2858,20 @@ Descripción original: ${taskDesc}`;
                                             return (
                                                 <div className="space-y-1.5">
                                                     <div className="flex items-center justify-between text-[11px] font-bold text-gray-500 dark:text-gray-400">
-                                                        <span>Imágenes adjuntas ({currentImgs.length}/4)</span>
+                                                        <span>Fotos adjuntas ({currentImgs.length}/4)</span>
                                                         {currentImgs.length > 1 && (
-                                                            <span className="text-blue-500 dark:text-blue-400 font-semibold">Se mostrarán en carrusel tipo Instagram</span>
+                                                            <span className="text-blue-500 font-semibold">Carrusel tipo Instagram</span>
                                                         )}
                                                     </div>
-                                                    <div className="flex flex-wrap gap-2.5 items-center">
+                                                    <div className="flex flex-wrap gap-2 items-center">
                                                         {currentImgs.map((url, idx) => (
                                                             <div key={idx} className="relative group/thumb">
                                                                 <UniversalImage 
                                                                     src={url} 
                                                                     alt={`Preview ${idx + 1}`} 
-                                                                    className="h-24 w-24 object-cover rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-black/5 shadow-xs" 
+                                                                    className="h-20 w-20 object-cover rounded-xl border border-gray-200 dark:border-gray-700 bg-black/5 shadow-2xs" 
                                                                 />
-                                                                <span className="absolute bottom-1 left-1 bg-black/70 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md">
+                                                                <span className="absolute bottom-1 left-1 bg-black/70 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
                                                                     {idx + 1}
                                                                 </span>
                                                                 <button 
@@ -3017,18 +2882,18 @@ Descripción original: ${taskDesc}`;
                                                                         if (typeof setPostImageUrls === 'function') setPostImageUrls(updated);
                                                                         if (typeof setPostImageUrl === 'function') setPostImageUrl(updated[0] || '');
                                                                     }} 
-                                                                    className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 hover:bg-red-700 transition shadow-md cursor-pointer"
-                                                                    title="Eliminar imagen"
+                                                                    className="absolute -top-1.5 -right-1.5 bg-red-600 text-white rounded-full p-1 hover:bg-red-700 transition shadow cursor-pointer"
+                                                                    title="Eliminar foto"
                                                                 >
-                                                                    <X size={12}/>
+                                                                    <X size={11}/>
                                                                 </button>
                                                             </div>
                                                         ))}
 
                                                         {currentImgs.length < 4 && (
-                                                            <label className="h-24 w-24 border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-500 rounded-xl flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors text-gray-400 hover:text-blue-500 bg-gray-50/50 dark:bg-gray-800/40" title="Añadir otra imagen (máximo 4)">
-                                                                <Plus size={20} />
-                                                                <span className="text-[10px] font-bold">{currentImgs.length}/4</span>
+                                                            <label className="h-20 w-20 border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-500 rounded-xl flex flex-col items-center justify-center gap-0.5 cursor-pointer transition-colors text-gray-400 hover:text-blue-500 bg-gray-50/50 dark:bg-gray-800/40" title="Añadir otra foto">
+                                                                <Plus size={18} />
+                                                                <span className="text-[9px] font-bold">{currentImgs.length}/4</span>
                                                                 <input 
                                                                     type="file" 
                                                                     multiple 
@@ -3044,36 +2909,36 @@ Descripción original: ${taskDesc}`;
                                         })()}
 
                                         {postVideoUrl && (
-                                            <div className="relative max-w-md my-2 rounded-2xl overflow-hidden shadow-md">
+                                            <div className="relative max-w-sm my-1 rounded-xl overflow-hidden shadow-sm">
                                                 <CustomVideoPlayer src={postVideoUrl} isDarkMode={isDarkMode} />
-                                                <button type="button" onClick={() => setPostVideoUrl("")} className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1.5 hover:bg-red-700 transition shadow-md z-10 cursor-pointer" title="Eliminar video"><X size={14}/></button>
+                                                <button type="button" onClick={() => setPostVideoUrl("")} className="absolute top-1.5 right-1.5 bg-red-600 text-white rounded-full p-1 hover:bg-red-700 transition shadow z-10 cursor-pointer"><X size={12}/></button>
                                             </div>
                                         )}
 
                                         {postGeniallyUrl && (
-                                            <div className="relative max-w-full my-2">
+                                            <div className="relative max-w-full my-1">
                                                 <GeniallyEmbedPlayer url={postGeniallyUrl} isDarkMode={isDarkMode} onRemove={() => setPostGeniallyUrl("")} />
                                             </div>
                                         )}
 
                                         {postFileUrl && (
-                                            <div className="flex items-center gap-2 p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-xs font-bold text-blue-700 dark:text-blue-300 w-fit">
-                                                <PaperclipIcon size={16} /> {postFileName || 'Documento adjunto'}
-                                                <button type="button" onClick={() => { if (!isDemoMode && postFileUrl) deleteFileFromStorage(postFileUrl).catch(() => {}); setPostFileUrl(""); setPostFileName(""); }} className="text-red-500 hover:text-red-700 ml-2 cursor-pointer"><X size={14}/></button>
+                                            <div className="flex items-center gap-2 p-2 rounded-lg bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-xs font-bold text-blue-700 dark:text-blue-300 w-fit">
+                                                <PaperclipIcon size={14} /> {postFileName || 'Documento adjunto'}
+                                                <button type="button" onClick={() => { if (!isDemoMode && postFileUrl) deleteFileFromStorage(postFileUrl).catch(() => {}); setPostFileUrl(""); setPostFileName(""); }} className="text-red-500 hover:text-red-700 ml-1.5 cursor-pointer"><X size={13}/></button>
                                             </div>
                                         )}
 
                                         {audioPub && (
-                                            <div className="mt-2">
+                                            <div className="mt-1">
                                                 <AudioPlayer src={audioPub} title="Nota de voz adjunta" onDelete={cancelPub} isDarkMode={isDarkMode} />
                                             </div>
                                         )}
                                     </div>
                                 )}
 
-                                {upPub && <p className="text-xs text-purple-600 dark:text-purple-400 italic pt-2">Subiendo audio adjunto...</p>}
+                                {upPub && <p className="text-xs text-purple-600 dark:text-purple-400 italic pt-1">Subiendo audio adjunto...</p>}
                                 {recPub && (
-                                    <div className="pt-2">
+                                    <div className="pt-1">
                                         <AudioRecordingVisualizer 
                                             recordingTime={recTimePub} 
                                             onStop={stopPub} 
@@ -3084,14 +2949,14 @@ Descripción original: ${taskDesc}`;
                                 )}
 
                                 {/* Barra de navegación de Paso 3 */}
-                                <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-800">
+                                <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-800">
                                     <button
                                         type="button"
                                         onClick={() => setComposerStep(2)}
-                                        className="px-4 py-2.5 rounded-xl text-xs font-bold text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-1.5 transition-colors cursor-pointer"
+                                        className="px-3.5 py-2 rounded-xl text-xs font-bold text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-1.5 transition-colors cursor-pointer"
                                     >
-                                        <ArrowLeftIcon size={15} />
-                                        <span>Anterior: Editar contenido</span>
+                                        <ArrowLeftIcon size={14} />
+                                        <span>Volver a contenido</span>
                                     </button>
 
                                     <button
@@ -3101,112 +2966,90 @@ Descripción original: ${taskDesc}`;
                                             if (upPub) return showMessage("Espera a que termine de subir la nota de voz...");
                                             setComposerStep(4);
                                         }}
-                                        className="px-5 py-2.5 rounded-xl text-xs font-black bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/25 flex items-center gap-1.5 transition-all hover:scale-102 cursor-pointer"
+                                        className="px-4 py-2 rounded-xl text-xs font-black bg-blue-600 hover:bg-blue-700 text-white shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
                                     >
-                                        <span>Siguiente: Confirmar y Publicar</span>
-                                        <ArrowRightIcon size={15} />
+                                        <span>Siguiente: Confirmar</span>
+                                        <ArrowRightIcon size={14} />
                                     </button>
                                 </div>
                             </div>
                         )}
 
-                        {/* PASO 4: CONFIRMACIÓN FINAL Y PUBLICAR */}
+                        {/* PASO 4: CONFIRMACIÓN FINAL Y PUBLICAR (MINIMALISTA) */}
                         {composerStep === 4 && (
-                            <div className="space-y-4 animate-in fade-in duration-200">
-                                {/* LETRERO DESTACADO DE CONFIRMACIÓN */}
+                            <div className="space-y-3 pt-2 animate-in fade-in duration-200">
+                                {/* Aviso conciso */}
                                 {postTargetGroup === 'all' ? (
-                                    <div className="p-4 sm:p-5 rounded-2xl bg-amber-500/15 border-2 border-amber-500/80 text-amber-900 dark:text-amber-200 shadow-md">
-                                        <div className="flex items-start gap-3.5">
-                                            <div className="w-11 h-11 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 font-bold shadow-sm">
-                                                <AlertTriangle size={22} />
+                                    <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/40 text-amber-900 dark:text-amber-200 flex items-start gap-2.5">
+                                        <div className="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0 font-bold shadow-2xs">
+                                            <AlertTriangle size={17} />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs font-black uppercase text-amber-600 dark:text-amber-400">Público General</span>
+                                                <span className="text-[10px] text-gray-500 dark:text-gray-400">• Todas las materias</span>
                                             </div>
-                                            <div className="flex-1">
-                                                <span className="text-[10px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-300 block mb-0.5">
-                                                    ⚠️ ATENCIÓN • PUBLICACIÓN ABIERTA A TODOS
-                                                </span>
-                                                <h4 className="text-base sm:text-lg font-black leading-tight text-gray-900 dark:text-gray-100">
-                                                    Estás publicando esto para: TODAS las materias (General)
-                                                </h4>
-                                                <p className="text-xs text-amber-800 dark:text-amber-300/90 mt-1 leading-relaxed">
-                                                    Esta publicación y sus notificaciones por correo llegarán a <strong>todos los estudiantes de cualquier materia</strong> en la plataforma. Si esta actividad corresponde solo a un curso específico, regresa al Paso 1 y cámbialo antes de publicar.
-                                                </p>
-                                            </div>
+                                            <p className="text-xs text-gray-700 dark:text-gray-300 mt-0.5">
+                                                Esta publicación será visible para <strong>todos los estudiantes</strong> de cualquier curso.
+                                            </p>
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="p-4 sm:p-5 rounded-2xl bg-emerald-500/15 border-2 border-emerald-500/80 text-emerald-900 dark:text-emerald-200 shadow-md">
-                                        <div className="flex items-start gap-3.5">
-                                            <div className="w-11 h-11 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 font-bold shadow-sm">
-                                                <CheckCircle2 size={22} />
+                                    <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/40 text-emerald-900 dark:text-emerald-200 flex items-start gap-2.5">
+                                        <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 font-bold shadow-2xs">
+                                            <CheckCircle2 size={17} />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs font-black uppercase text-emerald-600 dark:text-emerald-400">Exclusivo para</span>
+                                                <span className="text-xs font-black text-gray-900 dark:text-gray-100 truncate">{currentGroupName}</span>
                                             </div>
-                                            <div className="flex-1">
-                                                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-300 block mb-0.5">
-                                                    🔒 CONFIRMACIÓN DE GRUPO EXCLUSIVO
-                                                </span>
-                                                <h4 className="text-base sm:text-lg font-black leading-tight text-gray-900 dark:text-gray-100">
-                                                    Estás publicando este {postType === 'task' ? 'Tarea' : postType === 'forum' ? 'Foro' : postType === 'poll' ? 'Encuesta' : postType === 'kahoot' ? 'Kahoot' : postType === 'book3d' ? 'Libro' : 'Aviso'} EXCLUSIVAMENTE para:
-                                                </h4>
-                                                <div className="inline-flex items-center gap-2 mt-2 px-3.5 py-1.5 rounded-xl bg-emerald-600 text-white font-extrabold text-xs sm:text-sm shadow-xs">
-                                                    <Book size={16} />
-                                                    <span>{currentGroupName}</span>
-                                                </div>
-                                                <p className="text-xs text-emerald-800 dark:text-emerald-300/90 mt-2 leading-relaxed">
-                                                    <strong>100% Protegido:</strong> Solo los estudiantes matriculados en <strong>{currentGroupName}</strong> verán esta publicación y recibirán la notificación por correo. Ningún estudiante de otras materias la recibirá ni la verá.
-                                                </p>
-                                            </div>
+                                            <p className="text-xs text-gray-700 dark:text-gray-300 mt-0.5">
+                                                Solo los estudiantes de <strong>{currentGroupName}</strong> verán esta actividad.
+                                            </p>
                                         </div>
                                     </div>
                                 )}
 
-                                {/* FICHA DE RESUMEN */}
-                                <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 space-y-2.5">
-                                    <h5 className="text-[11px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                        Resumen de la publicación:
-                                    </h5>
-                                    
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                                {/* Resumen compacto */}
+                                <div className="p-3 rounded-xl bg-gray-50/80 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 space-y-1.5 text-xs">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        <div className="flex items-center gap-2 truncate">
+                                            <span className="text-gray-500 dark:text-gray-400 shrink-0 font-medium">Destino:</span>
+                                            <span className="font-bold text-blue-700 dark:text-blue-300 truncate">{currentGroupName}</span>
+                                        </div>
                                         <div className="flex items-center gap-2">
-                                            <span className="font-bold text-gray-500 dark:text-gray-400 w-24 shrink-0">Materia:</span>
-                                            <span className="font-extrabold text-blue-700 dark:text-blue-300 truncate">
-                                                {currentGroupName}
+                                            <span className="text-gray-500 dark:text-gray-400 shrink-0 font-medium">Tipo:</span>
+                                            <span className="font-bold text-gray-800 dark:text-gray-200">
+                                                {postType === 'task' ? '📝 Tarea' : postType === 'forum' ? '💬 Foro' : postType === 'poll' ? '📊 Encuesta' : postType === 'kahoot' ? '🎮 Kahoot' : postType === 'book3d' ? '📚 Libro' : '📢 Publicación'}
                                             </span>
                                         </div>
-
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-bold text-gray-500 dark:text-gray-400 w-24 shrink-0">Tipo:</span>
-                                            <span className="font-extrabold text-gray-900 dark:text-gray-100 capitalize">
-                                                {postType === 'task' ? '📝 Tarea' : postType === 'forum' ? '💬 Foro de debate' : postType === 'poll' ? '📊 Encuesta' : postType === 'kahoot' ? '🎮 Kahoot' : postType === 'book3d' ? '📚 Libro' : '📢 Publicación'}
-                                            </span>
-                                        </div>
-
                                         <div className="col-span-full flex items-start gap-2">
-                                            <span className="font-bold text-gray-500 dark:text-gray-400 w-24 shrink-0">Título:</span>
-                                            <span className="font-black text-gray-900 dark:text-gray-100 flex-1">
-                                                {taskTitle || (postType === 'kahoot' ? 'Kahoot interactivo' : postType === 'book3d' ? 'Libro' : 'Sin título')}
+                                            <span className="text-gray-500 dark:text-gray-400 shrink-0 font-medium">Título:</span>
+                                            <span className="font-bold text-gray-900 dark:text-gray-100 truncate">
+                                                {taskTitle || (postType === 'kahoot' ? 'Kahoot' : postType === 'book3d' ? 'Libro' : 'Sin título')}
                                             </span>
                                         </div>
-
                                         {hasDueDate && (postType === 'task' || postType === 'forum' || postType === 'poll') && (
-                                            <div className="flex items-center gap-2">
-                                                <span className="font-bold text-gray-500 dark:text-gray-400 w-24 shrink-0">Fecha límite:</span>
-                                                <span className="font-extrabold text-blue-600 dark:text-blue-400">
-                                                    {taskDate ? `${taskDate} a las ${taskTime || '23:59'}` : 'Abierto sin fecha límite'}
+                                            <div className="col-span-full flex items-center gap-2">
+                                                <span className="text-gray-500 dark:text-gray-400 shrink-0 font-medium">Límite:</span>
+                                                <span className="font-bold text-blue-600 dark:text-blue-400">
+                                                    {taskDate ? `${taskDate} a las ${taskTime || '23:59'}` : 'Sin fecha límite'}
                                                 </span>
                                             </div>
                                         )}
-
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-bold text-gray-500 dark:text-gray-400 w-24 shrink-0">Recursos:</span>
+                                        <div className="col-span-full flex items-center gap-2">
+                                            <span className="text-gray-500 dark:text-gray-400 shrink-0 font-medium">Adjuntos:</span>
                                             <span className="font-semibold text-gray-700 dark:text-gray-300">
                                                 {(() => {
                                                     const items = [];
                                                     const currentImgs = (Array.isArray(postImageUrls) && postImageUrls.length > 0) ? postImageUrls : (postImageUrl ? [postImageUrl] : []);
-                                                    if (currentImgs.length > 0) items.push(`${currentImgs.length} imagen(es)`);
+                                                    if (currentImgs.length > 0) items.push(`${currentImgs.length} foto(s)`);
                                                     if (postVideoUrl) items.push('1 video');
-                                                    if (postFileUrl) items.push(`1 doc (${postFileName || 'adjunto'})`);
-                                                    if (audioPub) items.push('1 nota de voz');
+                                                    if (postFileUrl) items.push(`1 doc (${postFileName || 'archivo'})`);
+                                                    if (audioPub) items.push('1 audio');
                                                     if (postGeniallyUrl) items.push('1 Genially');
-                                                    return items.length > 0 ? items.join(', ') : 'Sin archivos adjuntos';
+                                                    return items.length > 0 ? items.join(', ') : 'Ninguno';
                                                 })()}
                                             </span>
                                         </div>
@@ -3214,37 +3057,37 @@ Descripción original: ${taskDesc}`;
                                 </div>
 
                                 {/* Barra de navegación de Paso 4 */}
-                                <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-800">
+                                <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-800">
                                     <button
                                         type="button"
                                         onClick={() => setComposerStep(3)}
-                                        className="px-4 py-2.5 rounded-xl text-xs font-bold text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-1.5 transition-colors cursor-pointer"
+                                        className="px-3.5 py-2 rounded-xl text-xs font-bold text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-1.5 transition-colors cursor-pointer"
                                     >
-                                        <ArrowLeftIcon size={15} />
-                                        <span>Modificar algo</span>
+                                        <ArrowLeftIcon size={14} />
+                                        <span>Modificar</span>
                                     </button>
 
                                     <button
                                         type="button"
                                         disabled={isPublishing || upPub || isRenderingBook3d || isGeneratingBook3d}
                                         onClick={executePublishTask}
-                                        className={`px-7 py-3 rounded-xl text-xs font-black shadow-lg hover:scale-102 transition-all flex items-center gap-2 text-white cursor-pointer ${
+                                        className={`px-5 py-2.5 rounded-xl text-xs font-black shadow-md hover:scale-102 transition-all flex items-center gap-2 text-white cursor-pointer ${
                                             isPublishing ? 'opacity-70 cursor-not-allowed' : ''
                                         } ${
                                             postTargetGroup === 'all'
-                                                ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-600/30'
-                                                : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/30'
+                                                ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-600/20'
+                                                : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20'
                                         }`}
                                     >
                                         {isPublishing ? (
                                             <>
-                                                <Loader2 size={16} className="animate-spin" />
+                                                <Loader2 size={15} className="animate-spin" />
                                                 <span>Publicando...</span>
                                             </>
                                         ) : (
                                             <>
-                                                <CheckLine size={16} className="text-white" />
-                                                <span>Confirmar y Publicar ahora</span>
+                                                <CheckLine size={15} className="text-white" />
+                                                <span>Confirmar y Publicar</span>
                                             </>
                                         )}
                                     </button>
