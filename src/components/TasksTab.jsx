@@ -1659,22 +1659,6 @@ const TasksTab = React.memo(({
                                         <NavSlides size={15} /> Diapositivas
                                     </button>
                                 )}
-                                <button 
-                                    type="button" 
-                                    onClick={(e) => { 
-                                        e.stopPropagation(); 
-                                        if (fixedTargetGroup) {
-                                            setPostTargetGroup(fixedTargetGroup);
-                                            setComposerStep(3);
-                                        } else {
-                                            setComposerStep(1);
-                                        }
-                                        setIsFormExpanded(true); 
-                                    }} 
-                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors shrink-0 whitespace-nowrap"
-                                >
-                                    <PaperclipIcon size={15} /> Adjuntar
-                                </button>
                             </div>
                         </div>
                     </div>
