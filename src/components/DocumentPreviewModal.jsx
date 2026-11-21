@@ -16,7 +16,7 @@ import {
 import UniversalImage from './UniversalImage.jsx';
 import { isImageLikeUrl, isHeicUrl } from '../utils/heicConverter.js';
 import { renderPdfToBookPages } from '../utils/flipbookEngine.js';
-import { handleForceDownload } from '../utils/helpers.js';
+import { handleForceDownload, sanitizeDocumentDownloadName } from '../utils/helpers.js';
 
 export const getGoogleDocViewerUrl = (url) => {
   if (!url || typeof url !== 'string') return '';

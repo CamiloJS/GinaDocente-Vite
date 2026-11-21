@@ -973,6 +973,49 @@ export const generateId = () => {
   return `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 };
 
+export const sanitizeDocumentDownloadName = (fileName, isPdf = false) => {
+  if (!fileName) return isPdf ? 'documento.pdf' : 'documento';
+  let name = String(fileName).trim();
+
+  // 1. Quitar artefactos de doble extensión como .docx.pdf -> .pdf
+  name = name.replace(/\.(docx?|pptx?|xlsx?)\.pdf$/i, '.pdf');
+
+  // 2. Extraer extensión si existe
+  let ext = '';
+  const match = name.match(/\.([a-zA-Z0-9]{2,5})$/);
+  if (match) {
+    ext = match[0];
+    name = name.slice(0, -ext.length).trim();
+  }
+
+  // Si se trata de un PDF o no tenía extensión y es PDF, garantizar .pdf
+  if (isPdf && ext.toLowerCase() !== '.pdf') {
+    ext = '.pdf';
+  }
+
+  // 3. Limpiar puntos finales residuales del nombre base (ej. "consulta." -> "consulta")
+  name = name.replace(/\.+$/, '').trim();
+
+  // 4. Reemplazar guiones y guiones bajos por espacios ("con espacios, no con guiones, nada de Nombre-De-Ejemplo")
+  name = name.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+  if (!name) name = isPdf ? 'documento' : 'archivo';
+
+  return `${name}${ext}`;
+};
+
+export const cleanDisplayDocName = (fileName, stripPdf = false) => {
+  if (!fileName) return '';
+  let name = String(fileName).trim();
+  // Quitar artefactos dobles como .docx.pdf -> .pdf
+  name = name.replace(/\.(docx?|pptx?|xlsx?)\.pdf$/i, '.pdf');
+  if (stripPdf) {
+    name = name.replace(/\.pdf$/i, '').trim();
+    name = name.replace(/\.+$/, '').trim();
+  }
+  return name;
+};
+
 export const handleForceDownload = async (url, fileName = 'documento.pdf') => {
   if (!url || typeof document === 'undefined') return false;
 

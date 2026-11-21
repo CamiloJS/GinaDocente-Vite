@@ -1,6 +1,6 @@
 // scripts/test-download-pdf.mjs
 import assert from 'node:assert/strict';
-import { handleForceDownload } from '../src/utils/helpers.js';
+import { handleForceDownload, sanitizeDocumentDownloadName, cleanDisplayDocName } from '../src/utils/helpers.js';
 
 console.log('== Pruebas de Descarga Directa de PDF y Archivos ==');
 
@@ -99,6 +99,31 @@ globalThis.window = {
   console.log('  OK  descarga remota de Firebase Storage convierte a Blob y descarga directamente');
 }
 
+// 5. Sanitización de nombres de PDF: reemplazo de guiones por espacios y extensión garantizada
+{
+  assert.equal(
+    sanitizeDocumentDownloadName('Instrucciones - MODO OFFLINE.docx.pdf', true),
+    'Instrucciones MODO OFFLINE.pdf',
+    'Debe eliminar dobles extensiones, reemplazar guiones por espacios y terminar en .pdf'
+  );
+  assert.equal(
+    sanitizeDocumentDownloadName('Nombre-De-Ejemplo', true),
+    'Nombre De Ejemplo.pdf',
+    'Debe reemplazar guiones por espacios y agregar .pdf'
+  );
+  assert.equal(
+    sanitizeDocumentDownloadName('Nombre_De_Ejemplo.pdf', true),
+    'Nombre De Ejemplo.pdf',
+    'Debe reemplazar guiones bajos por espacios'
+  );
+  assert.equal(
+    cleanDisplayDocName('Instrucciones - MODO OFFLINE.docx.pdf', true),
+    'Instrucciones - MODO OFFLINE',
+    'cleanDisplayDocName debe remover dobles extensiones y el .pdf visual'
+  );
+  console.log('  OK  sanitizeDocumentDownloadName descarga con espacios, sin guiones y garantiza .pdf');
+}
+
 console.log('\n========================================');
-console.log('Total pruebas Descarga PDF: 4 | OK: 4 | FAIL: 0');
+console.log('Total pruebas Descarga PDF: 5 | OK: 5 | FAIL: 0');
 console.log('========================================\n');

@@ -15,7 +15,7 @@ import AudioPlayer, { AudioRecordingVisualizer } from './AudioPlayer.jsx'
 import CustomVideoPlayer from './CustomVideoPlayer.jsx'
 import GeniallyEmbedPlayer, { extractGeniallyUrl } from './GeniallyEmbedPlayer.jsx'
 import { DEMO_TTL_MS, saveDemoSandboxItem } from '../utils/demoData.js'
-import { getCanonicalTeacherId, getItemTeacherId, getTeacherDisplayName, uploadImageToStorage, uploadRawFileToStorage, deleteFileFromStorage, generateId, resolveUserPhoto, sanitizeFirestoreData } from '../utils/helpers.js'
+import { getCanonicalTeacherId, getItemTeacherId, getTeacherDisplayName, uploadImageToStorage, uploadRawFileToStorage, deleteFileFromStorage, generateId, resolveUserPhoto, sanitizeFirestoreData, cleanDisplayDocName } from '../utils/helpers.js'
 import { createDefaultKahootQuestion, validateKahootConfig, generateKahootPin } from '../utils/kahootEngine.js'
 import { BOOK_THEMES, renderPdfToBookPages, uploadBookPagesToStorage, sanitizeBookForFirestore, buildFallbackBookPages, buildBookPagesFromOutline, extractBookOutlinePageTexts, syncBookOutlineMetadata, stripBookHtml, generateAiBookPages, applyCustomCoverToPages, compressBookImageDataUrl, READING_AUDIO_PRESETS, getReadingAudioPreset, clampReadingVolume, readingAmbientPlayer } from '../utils/flipbookEngine.js'
 import Flipbook3DModal from './Flipbook3DModal.jsx'
@@ -2906,9 +2906,47 @@ Descripción original: ${taskDesc}`;
                                         )}
 
                                         {postFileUrl && (
-                                            <div className="flex items-center gap-2 p-2 rounded-lg bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-xs font-bold text-blue-700 dark:text-blue-300 w-fit">
-                                                <PaperclipIcon size={14} /> {postFileName || 'Documento adjunto'}
-                                                <button type="button" onClick={() => { if (!isDemoMode && postFileUrl) deleteFileFromStorage(postFileUrl).catch(() => {}); setPostFileUrl(""); setPostFileName(""); }} className="text-red-500 hover:text-red-700 ml-1.5 cursor-pointer"><X size={13}/></button>
+                                            <div className="p-2.5 rounded-xl bg-blue-50/80 dark:bg-blue-950/50 border border-blue-200/90 dark:border-blue-800/80 space-y-1.5 max-w-md">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <div className="flex items-center gap-2 min-w-0">
+                                                        <PaperclipIcon size={14} className="text-blue-600 dark:text-blue-400 shrink-0" />
+                                                        <span className="text-[11px] font-bold text-blue-900 dark:text-blue-200">
+                                                            Documento adjunto:
+                                                        </span>
+                                                    </div>
+                                                    <button 
+                                                        type="button" 
+                                                        onClick={() => { 
+                                                            if (!isDemoMode && postFileUrl) deleteFileFromStorage(postFileUrl).catch(() => {}); 
+                                                            setPostFileUrl(""); 
+                                                            setPostFileName(""); 
+                                                        }} 
+                                                        className="text-red-500 hover:text-red-700 p-1 rounded-md hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
+                                                        title="Eliminar documento adjunto"
+                                                    >
+                                                        <X size={14}/>
+                                                    </button>
+                                                </div>
+                                                <div className="flex items-center gap-1.5">
+                                                    <input
+                                                        type="text"
+                                                        value={postFileName || ''}
+                                                        onChange={(e) => setPostFileName(e.target.value)}
+                                                        placeholder="Nombre para el documento..."
+                                                        className="flex-1 text-xs font-bold py-1 px-2.5 rounded-lg border border-blue-300 dark:border-blue-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setPostFileName(cleanDisplayDocName(postFileName || '', true))}
+                                                        className="px-2 py-1 rounded-lg text-[10px] font-bold bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-gray-750 transition-colors shrink-0 shadow-2xs cursor-pointer"
+                                                        title="Quitar extensión .pdf visual"
+                                                    >
+                                                        Quitar .pdf
+                                                    </button>
+                                                </div>
+                                                <p className="text-[10px] text-gray-500 dark:text-gray-400 pl-1">
+                                                    Al descargarse, se asegurará la extensión .pdf y espacios limpios sin guiones.
+                                                </p>
                                             </div>
                                         )}
 

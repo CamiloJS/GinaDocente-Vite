@@ -6,7 +6,8 @@ import {
 } from './Icons.jsx'
 import {
   compressImage, containsBadWords, checkBadWordsAsync, uploadImageToStorage, uploadRawFileToStorage, deleteFileFromStorage, deleteAllStorageFilesInObject, deleteReplacedStorageFiles, TEACHER_NAME, SECOND_TEACHER_NAME, SECOND_TEACHER_ID, isCamiloTeacher, isTeacherId, getCanonicalTeacherId, getTeacherDisplayName, getItemTeacherId, COMMENT_EMOJIS, REACTION_EMOJIS, FACEBOOK_REACTIONS, splitNameFirstAndLast, FALLBACK_MAP, format12HourTime, formatDateTime12H,
-  isImageLikeFile, convertHeicToJpeg, resolveUserDisplayName, resolveUserPhoto, handleForceDownload, copyTextToClipboard, sanitizeFirestoreData
+  isImageLikeFile, convertHeicToJpeg, resolveUserDisplayName, resolveUserPhoto, handleForceDownload, copyTextToClipboard, sanitizeFirestoreData,
+  sanitizeDocumentDownloadName, cleanDisplayDocName
 } from '../utils/helpers.js'
 import UniversalImage from './UniversalImage.jsx'
 import { isImageLikeUrl, IMAGE_EXTENSIONS_REGEX, getKnownConvertedUrl } from '../utils/heicConverter.js'
@@ -92,9 +93,11 @@ const TaskCard = React.memo(({
         e?.stopPropagation?.();
         e?.preventDefault?.();
         if (!url || downloadingUrl === url) return;
+        const isPdf = String(url).toLowerCase().includes('.pdf') || String(fileName).toLowerCase().endsWith('.pdf') || String(url).startsWith('data:application/pdf');
+        const finalName = sanitizeDocumentDownloadName(fileName, isPdf);
         try {
             setDownloadingUrl(url);
-            await handleForceDownload(url, fileName);
+            await handleForceDownload(url, finalName);
         } catch (err) {
             console.error('Error al descargar archivo:', err);
         } finally {
@@ -112,9 +115,13 @@ const TaskCard = React.memo(({
     const bookPreviewFlipTimerRef = useRef(null);
     const suppressPreviewClickRef = useRef(0);
     const lastPreviewCoverOpenAtRef = useRef(0);
+    const [isRenamingDoc, setIsRenamingDoc] = useState(false);
+    const [customDocName, setCustomDocName] = useState('');
+    const [isSavingDocName, setIsSavingDocName] = useState(false);
     const [editTaskData, setEditTaskData] = useState({ 
         title: task?.title || '', 
         description: task?.description || '', 
+        fileName: task?.fileName || '',
         dueDate: task?.dueDate || '', 
         dueTime: task?.dueTime || '', 
         allowLate: task?.allowLate || false, 
@@ -1842,7 +1849,41 @@ const TaskCard = React.memo(({
             console.error("Error al eliminar comentario:", err);
             showMessage("Hubo un error al eliminar el comentario.");
         }
+    };
 
+    const handleStartRenameDoc = (e) => {
+        e?.stopPropagation?.();
+        const docUrl = task?.fileUrl || task?.pdfUrl || '';
+        const cleanN = (task?.fileName || '').trim().toLowerCase();
+        const isPdf = cleanN.endsWith('.pdf') || cleanN.includes('.pdf') || docUrl.toLowerCase().includes('.pdf') || docUrl.startsWith('data:application/pdf');
+        const currentName = task?.fileName || (isPdf ? 'Documento.pdf' : 'Documento');
+        setCustomDocName(currentName);
+        setIsRenamingDoc(true);
+    };
+
+    const handleSaveDocName = async (e) => {
+        e?.stopPropagation?.();
+        const trimmed = (customDocName || '').trim();
+        if (!trimmed) {
+            showMessage("El nombre no puede estar vacío.");
+            return;
+        }
+        setIsSavingDocName(true);
+        try {
+            await updateTaskDoc({ fileName: trimmed });
+            setIsRenamingDoc(false);
+            showMessage("Nombre del documento actualizado.");
+        } catch (err) {
+            console.error("Error al actualizar nombre del documento:", err);
+            showMessage("Error al actualizar el nombre.");
+        } finally {
+            setIsSavingDocName(false);
+        }
+    };
+
+    const handleCancelRenameDoc = (e) => {
+        e?.stopPropagation?.();
+        setIsRenamingDoc(false);
     };
 
     const handleSaveEditedTask = async () => {
@@ -1865,6 +1906,9 @@ const TaskCard = React.memo(({
                 targetGroupId: selectedGrpId,
                 targetGroupName: selectedGrpName
             };
+            if (editTaskData.fileName !== undefined) {
+                updates.fileName = editTaskData.fileName.trim();
+            }
             if (task.type !== 'post' && task.type !== 'kahoot' && !isSlides && !isBook3D) { updates.dueDate = editTaskData.dueDate; updates.dueTime = editTaskData.dueTime; updates.allowLate = editTaskData.allowLate; }
             if (isKahoot && isEditingKahootQuestions) {
                 const validation = validateKahootConfig(editedKahootQuestions);
@@ -2511,7 +2555,7 @@ const TaskCard = React.memo(({
                                         <button onClick={handleSaveEditedTask} className="p-1 rounded-lg bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 hover:scale-110 transition-transform shadow-xs" title="Guardar cambios">
                                             <CheckLine size={16}/>
                                         </button>
-                                        <button onClick={() => { setIsEditingTask(false); setIsEditingKahootQuestions(false); setEditedKahootQuestions([]); setEditTaskData({title: task.title, description: task.description, dueDate: task.dueDate || '', dueTime: task.dueTime || '', allowLate: task.allowLate || false, geniallyUrl: task.geniallyUrl || '', hideDate: !!task.hideDate, targetGroupId: task.targetGroupId || 'all', targetGroupName: task.targetGroupName || ''}); }} className="p-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-400 hover:text-red-500 hover:scale-110 transition-transform shadow-xs" title="Cancelar">
+                                        <button onClick={() => { setIsEditingTask(false); setIsEditingKahootQuestions(false); setEditedKahootQuestions([]); setEditTaskData({title: task.title, description: task.description, fileName: task.fileName || '', dueDate: task.dueDate || '', dueTime: task.dueTime || '', allowLate: task.allowLate || false, geniallyUrl: task.geniallyUrl || '', hideDate: !!task.hideDate, targetGroupId: task.targetGroupId || 'all', targetGroupName: task.targetGroupName || ''}); }} className="p-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-400 hover:text-red-500 hover:scale-110 transition-transform shadow-xs" title="Cancelar">
                                             <XLine size={16}/>
                                         </button>
                                     </>
@@ -2524,6 +2568,7 @@ const TaskCard = React.memo(({
                                             setEditTaskData({
                                                 title: task?.title || '',
                                                 description: task?.description || '',
+                                                fileName: task?.fileName || '',
                                                 dueDate: task?.dueDate || '',
                                                 dueTime: task?.dueTime || '',
                                                 allowLate: task?.allowLate || false,
@@ -2731,6 +2776,29 @@ const TaskCard = React.memo(({
                             Ocultar día, fecha y hora de la publicación
                         </span>
                     </label>
+                </div>
+            )}
+
+            {/* Opción Docente: Nombre de documento adjunto en edición */}
+            {role === 'teacher' && isEditingTask && (task.fileUrl || task.pdfUrl || task.fileName) && (
+                <div className="flex flex-wrap items-center gap-2 mb-3 p-2.5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-xs">
+                    <FileDocIcon size={16} className="text-[#AD3333] dark:text-red-400 shrink-0" />
+                    <span className="font-bold text-gray-700 dark:text-gray-300 shrink-0">Nombre del archivo:</span>
+                    <input 
+                        type="text" 
+                        value={editTaskData.fileName || ''} 
+                        onChange={e => setEditTaskData(prev => ({ ...prev, fileName: e.target.value }))} 
+                        placeholder="Ej: Instrucciones MODO OFFLINE" 
+                        className="flex-1 min-w-[160px] py-1 px-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500" 
+                    />
+                    <button
+                        type="button"
+                        onClick={() => setEditTaskData(prev => ({ ...prev, fileName: cleanDisplayDocName(prev.fileName || '', true) }))}
+                        className="px-2 py-1 rounded-lg text-[10px] font-bold bg-gray-200 dark:bg-gray-750 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors shrink-0 cursor-pointer shadow-2xs"
+                        title="Quitar extensión .pdf del nombre visual"
+                    >
+                        Quitar .pdf
+                    </button>
                 </div>
             )}
 
@@ -4267,46 +4335,114 @@ const TaskCard = React.memo(({
                 }
                 return (
                     <div 
-                        onClick={() => setPreviewDoc({ url: docUrl, title: task.fileName || (isPdfDoc ? 'Documento PDF' : 'Documento adjunto') })}
-                        className={`flex items-center justify-between gap-3 p-3 rounded-2xl border mt-3 w-fit max-w-full transition-all shadow-xs hover:border-blue-400 dark:hover:border-blue-500 hover:scale-[1.01] cursor-pointer select-none ${
+                        onClick={() => {
+                            if (!isRenamingDoc) {
+                                setPreviewDoc({ url: docUrl, title: task.fileName || (isPdfDoc ? 'Documento PDF' : 'Documento adjunto') });
+                            }
+                        }}
+                        className={`flex items-center justify-between gap-3 p-3 rounded-2xl border mt-3 w-fit max-w-full transition-all shadow-xs hover:border-blue-400 dark:hover:border-blue-500 hover:scale-[1.01] ${isRenamingDoc ? 'cursor-default' : 'cursor-pointer'} select-none ${
                             isDarkMode ? 'bg-gray-800/90 border-gray-700 text-gray-100' : 'bg-white border-gray-200 text-gray-900'
                         }`}
-                        title="Clic para abrir vista previa del documento"
+                        title={isRenamingDoc ? undefined : "Clic para abrir vista previa del documento"}
                     >
-                        <div className="flex items-center gap-3 min-w-0 pr-2">
+                        <div className="flex items-center gap-3 min-w-0 pr-2 flex-1">
                             <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 flex items-center justify-center shrink-0 shadow-2xs">
                                 <FileDocIcon size={22} className="text-[#AD3333] dark:text-red-400" />
                             </div>
-                            <div className="flex flex-col min-w-0">
-                                <span className="text-xs font-black truncate max-w-[200px] sm:max-w-[320px]">
-                                    {task.fileName || (isPdfDoc ? 'Documento PDF' : 'Documento adjunto')}
-                                </span>
-                                <span className="text-[10px] text-gray-500 font-medium flex items-center gap-1.5 mt-0.5">
-                                    <span className="text-blue-600 dark:text-blue-400 font-bold hover:underline">Ver documento</span>
-                                    {isPdfDoc && (
-                                        <>
-                                            <span>•</span>
-                                            <span className="text-gray-400">PDF</span>
-                                        </>
+                            {isRenamingDoc ? (
+                                <div className="flex flex-col gap-1.5 flex-1 min-w-[220px] sm:min-w-[300px]" onClick={e => e.stopPropagation()}>
+                                    <div className="flex items-center gap-1.5">
+                                        <input 
+                                            type="text"
+                                            value={customDocName}
+                                            onChange={e => setCustomDocName(e.target.value)}
+                                            onKeyDown={e => {
+                                                if (e.key === 'Enter') handleSaveDocName(e);
+                                                if (e.key === 'Escape') handleCancelRenameDoc(e);
+                                            }}
+                                            autoFocus
+                                            placeholder="Nombre del documento..."
+                                            className="flex-1 text-xs font-bold py-1 px-2.5 rounded-lg border border-blue-400 dark:border-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500 shadow-inner"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={handleSaveDocName}
+                                            disabled={isSavingDocName}
+                                            className="p-1.5 rounded-lg bg-green-500 text-white hover:bg-green-600 transition-colors shadow-2xs cursor-pointer"
+                                            title="Guardar nombre"
+                                        >
+                                            {isSavingDocName ? <Loader2 size={13} className="animate-spin" /> : <CheckLine size={13} />}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleCancelRenameDoc}
+                                            disabled={isSavingDocName}
+                                            className="p-1.5 rounded-lg bg-gray-200 dark:bg-gray-750 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors shadow-2xs cursor-pointer"
+                                            title="Cancelar"
+                                        >
+                                            <XLine size={13} />
+                                        </button>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setCustomDocName(cleanDisplayDocName(customDocName, true))}
+                                            className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                                            title="Remover extensión .pdf del texto visual"
+                                        >
+                                            Quitar .pdf visual
+                                        </button>
+                                        <span className="text-[10px] text-gray-400">
+                                            (se descargará con .pdf y espacios)
+                                        </span>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col min-w-0">
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-xs font-black truncate max-w-[200px] sm:max-w-[320px]">
+                                            {task.fileName || (isPdfDoc ? 'Documento PDF' : 'Documento adjunto')}
+                                        </span>
+                                        {role === 'teacher' && (
+                                            <button
+                                                type="button"
+                                                onClick={handleStartRenameDoc}
+                                                className="p-1 rounded-md text-gray-400 hover:text-blue-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                                                title="Cambiar nombre al archivo"
+                                            >
+                                                <Edit3 size={12} />
+                                            </button>
+                                        )}
+                                    </div>
+                                    <span className="text-[10px] text-gray-500 font-medium flex items-center gap-1.5 mt-0.5">
+                                        <span className="text-blue-600 dark:text-blue-400 font-bold hover:underline">Ver documento</span>
+                                        {isPdfDoc && (
+                                            <>
+                                                <span>•</span>
+                                                <span className="text-gray-400">PDF</span>
+                                            </>
+                                        )}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                        {!isRenamingDoc && (
+                            <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                <button 
+                                    type="button"
+                                    onClick={(e) => handleDirectDownload(docUrl, task.fileName || (isPdfDoc ? "documento.pdf" : "documento"), e)}
+                                    disabled={downloadingUrl === docUrl}
+                                    className="p-2 rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors cursor-pointer disabled:opacity-50"
+                                    title="Descargar archivo directamente"
+                                >
+                                    {downloadingUrl === docUrl ? (
+                                        <Loader2 size={15} className="animate-spin text-blue-600 dark:text-blue-400" />
+                                    ) : (
+                                        <Download size={15} />
                                     )}
-                                </span>
+                                </button>
                             </div>
-                        </div>
-                        <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-                            <button 
-                                type="button"
-                                onClick={(e) => handleDirectDownload(docUrl, task.fileName || (isPdfDoc ? "documento.pdf" : "documento"), e)}
-                                disabled={downloadingUrl === docUrl}
-                                className="p-2 rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors cursor-pointer disabled:opacity-50"
-                                title="Descargar archivo directamente"
-                            >
-                                {downloadingUrl === docUrl ? (
-                                    <Loader2 size={15} className="animate-spin text-blue-600 dark:text-blue-400" />
-                                ) : (
-                                    <Download size={15} />
-                                )}
-                            </button>
-                        </div>
+                        )}
                     </div>
                 );
             })()}
