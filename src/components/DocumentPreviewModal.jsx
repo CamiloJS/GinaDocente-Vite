@@ -17,6 +17,7 @@ import UniversalImage from './UniversalImage.jsx';
 import { isImageLikeUrl, isHeicUrl } from '../utils/heicConverter.js';
 import { renderPdfToBookPages } from '../utils/flipbookEngine.js';
 import { handleForceDownload, sanitizeDocumentDownloadName } from '../utils/helpers.js';
+import { getStorage, ref, getBlob } from '../firebase/config.js';
 
 export const getGoogleDocViewerUrl = (url) => {
   if (!url || typeof url !== 'string') return '';
@@ -61,6 +62,8 @@ export const DocumentPreviewModal = ({
   const [zoom, setZoom] = useState(1);
   const [viewMode, setViewMode] = useState('pages'); // 'pages' | 'native'
   const [isDownloading, setIsDownloading] = useState(false);
+  const [blobPdfUrl, setBlobPdfUrl] = useState(null);
+  const blobUrlRef = useRef(null);
   const scrollContainerRef = useRef(null);
 
   useEffect(() => {
@@ -70,6 +73,18 @@ export const DocumentPreviewModal = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
+
+  // Mantener document.title sincronizado con el título de vista previa mientras esté abierto
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const originalDocTitle = document.title;
+    if (documentTitle) {
+      document.title = `${documentTitle} • English TECH`;
+    }
+    return () => {
+      document.title = originalDocTitle;
+    };
+  }, [documentTitle]);
 
   if (!documentUrl || typeof document === 'undefined' || !document.body || typeof documentUrl !== 'string') return null;
 
@@ -99,8 +114,34 @@ export const DocumentPreviewModal = ({
     setPdfError(false);
 
     const loadPages = async () => {
+      let pdfSource = documentUrl;
+      let createdBlobUrl = null;
+
+      // Si es Firebase Storage, resolver blob mediante getBlob oficial para eludir bloqueos CORS
+      if (typeof documentUrl === 'string' && documentUrl.includes('firebasestorage.googleapis.com')) {
+        try {
+          const storage = getStorage();
+          const match = documentUrl.match(/\/o\/([^?]+)/);
+          if (match && match[1]) {
+            const decodedPath = decodeURIComponent(match[1]);
+            const fileRef = ref(storage, decodedPath);
+            const blob = await getBlob(fileRef);
+            if (blob && blob.size > 0) {
+              pdfSource = blob;
+              if (typeof window !== 'undefined' && window.URL?.createObjectURL) {
+                createdBlobUrl = window.URL.createObjectURL(blob);
+                blobUrlRef.current = createdBlobUrl;
+                if (!isCancelled) setBlobPdfUrl(createdBlobUrl);
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Firebase getBlob fallback in DocumentPreviewModal:', e);
+        }
+      }
+
       try {
-        const result = await renderPdfToBookPages(documentUrl, {
+        const result = await renderPdfToBookPages(pdfSource, {
           maxPages: 120,
           quality: 0.90,
           compressionLevel: 'light',
@@ -129,6 +170,12 @@ export const DocumentPreviewModal = ({
 
     return () => {
       isCancelled = true;
+      if (blobUrlRef.current && typeof window !== 'undefined' && window.URL?.revokeObjectURL) {
+        try {
+          window.URL.revokeObjectURL(blobUrlRef.current);
+        } catch {}
+        blobUrlRef.current = null;
+      }
     };
   }, [documentUrl, reloadKey, isPdf, documentTitle]);
 
@@ -272,7 +319,7 @@ export const DocumentPreviewModal = ({
           </button>
 
           <a
-            href={documentUrl}
+            href={blobPdfUrl || documentUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-200 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 transition-all cursor-pointer"
@@ -354,23 +401,28 @@ export const DocumentPreviewModal = ({
                   </span>
                 </div>
               )}
-              {/* Visor nativo de PDF en navegador (sin docs.google.com/viewer para evitar el bug de descarga "viewer") */}
-              <object
-                key={`${documentUrl}-${reloadKey}`}
-                data={`${documentUrl}#toolbar=1`}
-                type="application/pdf"
-                className="w-full h-full border-0 bg-white"
-                onLoad={() => setIsLoading(false)}
-                onError={() => setIsLoading(false)}
-              >
-                <iframe
-                  src={`${documentUrl}#toolbar=1`}
-                  title={documentTitle || 'Documento PDF'}
-                  className="w-full h-full border-0 bg-white"
-                  onLoad={() => setIsLoading(false)}
-                  onError={() => setIsLoading(false)}
-                />
-              </object>
+              {/* Visor nativo de PDF en navegador (con toolbar=0 para no duplicar barras ni mostrar metadatos de Word antiguos) */}
+              {(() => {
+                const targetPdfUrl = blobPdfUrl || documentUrl;
+                return (
+                  <object
+                    key={`${targetPdfUrl}-${reloadKey}`}
+                    data={`${targetPdfUrl}#toolbar=0&navpanes=0`}
+                    type="application/pdf"
+                    className="w-full h-full border-0 bg-white"
+                    onLoad={() => setIsLoading(false)}
+                    onError={() => setIsLoading(false)}
+                  >
+                    <iframe
+                      src={`${targetPdfUrl}#toolbar=0&navpanes=0`}
+                      title={documentTitle || 'Documento PDF'}
+                      className="w-full h-full border-0 bg-white"
+                      onLoad={() => setIsLoading(false)}
+                      onError={() => setIsLoading(false)}
+                    />
+                  </object>
+                );
+              })()}
             </div>
           )
         ) : (
