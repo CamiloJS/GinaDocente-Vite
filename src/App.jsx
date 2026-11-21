@@ -568,7 +568,7 @@ function App() {
 
   const [postType, setPostType] = useState('task'); 
   const [taskTitle, setTaskTitle] = useState("");
-  const [postTargetGroup, setPostTargetGroup] = useState("all");
+  const [postTargetGroup, setPostTargetGroup] = useState("");
   const [isFormExpanded, setIsFormExpanded] = useState(false);
   const [taskDesc, setTaskDesc] = useState("");
   const [postImageUrl, setPostImageUrl] = useState("");
@@ -1712,7 +1712,7 @@ function App() {
     }
     if (tab !== 'groups') {
       setSelectedGroupForFeed(null);
-      setPostTargetGroup("all");
+      setPostTargetGroup("");
     }
     try { 
       window.history.pushState(
@@ -10798,7 +10798,7 @@ Escribe en español con tono pedagógico moderno.`;
                         <div className="relative z-10 flex items-center justify-between gap-3">
                             <button
                                 type="button"
-                                onClick={() => { setSelectedGroupForFeed(null); setPostTargetGroup("all"); }}
+                                onClick={() => { setSelectedGroupForFeed(null); setPostTargetGroup(""); }}
                                 className="p-2.5 rounded-2xl bg-black/30 hover:bg-black/60 text-white backdrop-blur-xs border border-white/15 transition-all shadow-md active:scale-95"
                                 title="Volver a lista de grupos"
                             >
@@ -15740,7 +15740,7 @@ Escribe en español con tono pedagógico moderno.`;
                                       <UsersIcon size={18} className="text-indigo-500" /> Directorio
                                   </button>
                               )}
-                              <button onClick={() => { if (activeTab === 'groups' && selectedGroupForFeed) { setSelectedGroupForFeed(null); setPostTargetGroup("all"); } changeTab('groups'); }} className={`w-full flex items-center justify-between gap-2.5 px-2.5 py-1.5 text-xs font-bold rounded-xl transition-colors ${activeTab === 'groups' ? 'bg-teal-50 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400' : isDarkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-100 text-gray-700'}`}>
+                              <button onClick={() => { if (activeTab === 'groups' && selectedGroupForFeed) { setSelectedGroupForFeed(null); setPostTargetGroup(""); } changeTab('groups'); }} className={`w-full flex items-center justify-between gap-2.5 px-2.5 py-1.5 text-xs font-bold rounded-xl transition-colors ${activeTab === 'groups' ? 'bg-teal-50 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400' : isDarkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-100 text-gray-700'}`}>
                                   <div className="flex items-center gap-2.5 min-w-0">
                                       <UsersGroupIcon size={18} className="text-teal-500" />
                                       <span>Grupos</span>
@@ -16188,7 +16188,7 @@ Escribe en español con tono pedagógico moderno.`;
                 {/* 3. Grupos */}
                 <button 
                     type="button"
-                    onClick={() => { setIsMobileMenuOpen(false); setIsChatAppOpen(false); if (activeChat) setIsChatMinimized(true); if (activeTab === 'groups' && selectedGroupForFeed) { setSelectedGroupForFeed(null); setPostTargetGroup("all"); } changeTab('groups'); }} 
+                    onClick={() => { setIsMobileMenuOpen(false); setIsChatAppOpen(false); if (activeChat) setIsChatMinimized(true); if (activeTab === 'groups' && selectedGroupForFeed) { setSelectedGroupForFeed(null); setPostTargetGroup(""); } changeTab('groups'); }} 
                     className={`flex flex-col items-center justify-center py-1 px-1 rounded-2xl transition-all duration-150 relative ${getMobileTabClass('groups')}`}
                 >
                   <div className="relative">
@@ -18436,7 +18436,7 @@ Escribe en español con tono pedagógico moderno.`;
                                       {/* Grupos */}
                                       <button
                                           type="button"
-                                          onClick={() => { setIsMobileMenuOpen(false); if (activeTab === 'groups' && selectedGroupForFeed) { setSelectedGroupForFeed(null); setPostTargetGroup("all"); } changeTab('groups'); }}
+                                          onClick={() => { setIsMobileMenuOpen(false); if (activeTab === 'groups' && selectedGroupForFeed) { setSelectedGroupForFeed(null); setPostTargetGroup(""); } changeTab('groups'); }}
                                           className={`p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between gap-2 shadow-2xs hover:scale-[1.01] active:scale-95 relative ${
                                               activeTab === 'groups'
                                                   ? (isDarkMode ? 'bg-teal-950/40 border-teal-800' : 'bg-teal-50 border-teal-200')

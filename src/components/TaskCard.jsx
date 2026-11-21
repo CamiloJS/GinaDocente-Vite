@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import ReactDOM from 'react-dom'
 import {
-  CheckCheck, CheckCircle2, CheckLine, Clock, Edit3, EyeOff, FileDocIcon, FileText, ImageIcon, Loader2, Lock, Unlock, Share2, MessageSquareText, Mic, PaperclipIcon, Plus, ReplyIcon, Send, SmileIcon, Square, Star, Pin, Trash2, Upload, X, XLine, Volume2, VolumeX, Languages, UserIcon, BookOpen, NavNotebook, Play, Pause, Download, MessageCircle, BarChart2, Vote, Gamepad2, Trophy, Zap, Flame, NavSlides, ClipboardList, Shield, ShieldAlert, AlertTriangle, ChevronLeft, ChevronRight, Maximize2, Minimize2, ExternalLink, Layers, MonitorPlay, Globe, Sparkles, RotateCcw, Eye, ThumbsUp, Link2, Forward
+  CheckCheck, CheckCircle2, CheckLine, Clock, Edit3, EyeOff, FileDocIcon, FileText, ImageIcon, Loader2, Lock, Unlock, Share2, MessageSquareText, Mic, PaperclipIcon, Plus, ReplyIcon, Send, SmileIcon, Square, Star, Pin, Trash2, Upload, X, XLine, Volume2, VolumeX, Languages, UserIcon, BookOpen, Book, NavNotebook, Play, Pause, Download, MessageCircle, BarChart2, Vote, Gamepad2, Trophy, Zap, Flame, NavSlides, ClipboardList, Shield, ShieldAlert, AlertTriangle, ChevronLeft, ChevronRight, Maximize2, Minimize2, ExternalLink, Layers, MonitorPlay, Globe, Sparkles, RotateCcw, Eye, ThumbsUp, Link2, Forward
 } from './Icons.jsx'
 import {
   compressImage, containsBadWords, checkBadWordsAsync, uploadImageToStorage, uploadRawFileToStorage, deleteFileFromStorage, deleteAllStorageFilesInObject, deleteReplacedStorageFiles, TEACHER_NAME, SECOND_TEACHER_NAME, SECOND_TEACHER_ID, isCamiloTeacher, isTeacherId, getCanonicalTeacherId, getTeacherDisplayName, getItemTeacherId, COMMENT_EMOJIS, REACTION_EMOJIS, FACEBOOK_REACTIONS, splitNameFirstAndLast, FALLBACK_MAP, format12HourTime, formatDateTime12H,
@@ -112,7 +112,17 @@ const TaskCard = React.memo(({
     const bookPreviewFlipTimerRef = useRef(null);
     const suppressPreviewClickRef = useRef(0);
     const lastPreviewCoverOpenAtRef = useRef(0);
-    const [editTaskData, setEditTaskData] = useState({ title: task?.title || '', description: task?.description || '', dueDate: task?.dueDate || '', dueTime: task?.dueTime || '', allowLate: task?.allowLate || false, geniallyUrl: task?.geniallyUrl || '', hideDate: !!task?.hideDate });
+    const [editTaskData, setEditTaskData] = useState({ 
+        title: task?.title || '', 
+        description: task?.description || '', 
+        dueDate: task?.dueDate || '', 
+        dueTime: task?.dueTime || '', 
+        allowLate: task?.allowLate || false, 
+        geniallyUrl: task?.geniallyUrl || '', 
+        hideDate: !!task?.hideDate,
+        targetGroupId: task?.targetGroupId || 'all',
+        targetGroupName: task?.targetGroupName || ''
+    });
     const [showKahootLiveModal, setShowKahootLiveModal] = useState(false);
     const [kahootModalStartInReview, setKahootModalStartInReview] = useState(false);
     const [isEditingKahootQuestions, setIsEditingKahootQuestions] = useState(false);
@@ -1838,11 +1848,22 @@ const TaskCard = React.memo(({
     const handleSaveEditedTask = async () => {
         if (!editTaskData.title.trim() || (!isKahoot && !isPoll && !isEvaluation && !isSlides && !isBook3D && !editTaskData.description.trim())) return showMessage("El título y la descripción no pueden estar vacíos.");
         try {
+            const selectedGrpId = editTaskData.targetGroupId || 'all';
+            const matchedGrp = (academicGroups || []).find(g => {
+                if (!g) return false;
+                const cleanG = String(g.id || '').replace(/^acad_/i, '').trim().toLowerCase();
+                const cleanTarget = String(selectedGrpId).replace(/^acad_/i, '').trim().toLowerCase();
+                return String(g.id).toLowerCase() === String(selectedGrpId).toLowerCase() || cleanG === cleanTarget;
+            });
+            const selectedGrpName = matchedGrp ? matchedGrp.name : (selectedGrpId === 'all' ? 'Global' : (editTaskData.targetGroupName || ''));
+
             const updates = { 
                 title: editTaskData.title.trim(), 
                 description: editTaskData.description.trim(),
                 geniallyUrl: editTaskData.geniallyUrl ? extractGeniallyUrl(editTaskData.geniallyUrl.trim()) : '',
-                hideDate: Boolean(editTaskData.hideDate)
+                hideDate: Boolean(editTaskData.hideDate),
+                targetGroupId: selectedGrpId,
+                targetGroupName: selectedGrpName
             };
             if (task.type !== 'post' && task.type !== 'kahoot' && !isSlides && !isBook3D) { updates.dueDate = editTaskData.dueDate; updates.dueTime = editTaskData.dueTime; updates.allowLate = editTaskData.allowLate; }
             if (isKahoot && isEditingKahootQuestions) {
@@ -2490,7 +2511,7 @@ const TaskCard = React.memo(({
                                         <button onClick={handleSaveEditedTask} className="p-1 rounded-lg bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 hover:scale-110 transition-transform shadow-xs" title="Guardar cambios">
                                             <CheckLine size={16}/>
                                         </button>
-                                        <button onClick={() => { setIsEditingTask(false); setIsEditingKahootQuestions(false); setEditedKahootQuestions([]); setEditTaskData({title: task.title, description: task.description, dueDate: task.dueDate || '', dueTime: task.dueTime || '', allowLate: task.allowLate || false, geniallyUrl: task.geniallyUrl || '', hideDate: !!task.hideDate}); }} className="p-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-400 hover:text-red-500 hover:scale-110 transition-transform shadow-xs" title="Cancelar">
+                                        <button onClick={() => { setIsEditingTask(false); setIsEditingKahootQuestions(false); setEditedKahootQuestions([]); setEditTaskData({title: task.title, description: task.description, dueDate: task.dueDate || '', dueTime: task.dueTime || '', allowLate: task.allowLate || false, geniallyUrl: task.geniallyUrl || '', hideDate: !!task.hideDate, targetGroupId: task.targetGroupId || 'all', targetGroupName: task.targetGroupName || ''}); }} className="p-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-400 hover:text-red-500 hover:scale-110 transition-transform shadow-xs" title="Cancelar">
                                             <XLine size={16}/>
                                         </button>
                                     </>
@@ -2507,7 +2528,9 @@ const TaskCard = React.memo(({
                                                 dueTime: task?.dueTime || '',
                                                 allowLate: task?.allowLate || false,
                                                 geniallyUrl: task?.geniallyUrl || '',
-                                                hideDate: !!task?.hideDate
+                                                hideDate: !!task?.hideDate,
+                                                targetGroupId: task?.targetGroupId || 'all',
+                                                targetGroupName: task?.targetGroupName || ''
                                             });
                                             if (isKahoot && task.kahoot) {
                                                 setEditedKahootQuestions(Array.isArray(task.kahoot.questions) ? task.kahoot.questions : []);
@@ -2596,12 +2619,55 @@ const TaskCard = React.memo(({
 
             {/* Título de la Tarea / Publicación y Botones de Traducir/Escuchar */}
             {isEditingTask ? (
-                <input 
-                    value={editTaskData.title} 
-                    onChange={e => setEditTaskData({...editTaskData, title: e.target.value})} 
-                    className="w-full text-base font-bold mb-2 p-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500" 
-                    placeholder="Título de la publicación..." 
-                />
+                <div className="space-y-2 mb-2 w-full">
+                    {/* Reasignación de Grupo/Materia para el docente */}
+                    {role === 'teacher' && (
+                        <div className="p-2.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 text-xs">
+                            <label className="block text-[11px] font-extrabold text-blue-900 dark:text-blue-200 mb-1.5 flex items-center justify-between">
+                                <span className="flex items-center gap-1.5">
+                                    <Book size={14} className="text-blue-600 dark:text-blue-400" />
+                                    Materia / Grupo asignado:
+                                </span>
+                                <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">
+                                    Reasignar materia destino
+                                </span>
+                            </label>
+                            <select
+                                value={editTaskData.targetGroupId || 'all'}
+                                onChange={(e) => {
+                                    const newId = e.target.value;
+                                    const grp = (academicGroups || []).find(g => {
+                                        if (!g) return false;
+                                        const cleanG = String(g.id || '').replace(/^acad_/i, '').trim().toLowerCase();
+                                        const cleanTarget = String(newId).replace(/^acad_/i, '').trim().toLowerCase();
+                                        return String(g.id).toLowerCase() === String(newId).toLowerCase() || cleanG === cleanTarget;
+                                    });
+                                    setEditTaskData(prev => ({
+                                        ...prev,
+                                        targetGroupId: newId,
+                                        targetGroupName: grp ? grp.name : (newId === 'all' ? 'Global' : '')
+                                    }));
+                                }}
+                                className="w-full py-2 px-3 rounded-lg border border-blue-300 dark:border-blue-700 bg-white dark:bg-gray-800 text-xs font-bold text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                            >
+                                {academicGroups && academicGroups.map(g => (
+                                    <option key={g.id} value={g.id}>
+                                        📚 {g.name}
+                                    </option>
+                                ))}
+                                <option value="all">
+                                    🌐 Todas las materias (General / Todos los estudiantes)
+                                </option>
+                            </select>
+                        </div>
+                    )}
+                    <input 
+                        value={editTaskData.title} 
+                        onChange={e => setEditTaskData({...editTaskData, title: e.target.value})} 
+                        className="w-full text-base font-bold p-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500" 
+                        placeholder="Título de la publicación..." 
+                    />
+                </div>
             ) : (
                 <div className="flex items-start justify-between gap-3 mb-2 w-full">
                     <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100 leading-snug flex-1">
