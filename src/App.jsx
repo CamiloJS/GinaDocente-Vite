@@ -2261,7 +2261,7 @@ function App() {
     if (isTeacherBotOpen) {
       setTimeout(() => teacherBotEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
     }
-  }, [isTeacherBotOpen, teacherBotHistory]);
+  }, [isTeacherBotOpen, teacherBotHistory, isTeacherBotLoading]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -16313,9 +16313,11 @@ Escribe en español con tono pedagógico moderno.`;
                           let resultQuickReplies = [];
                           let resultWidget = null;
 
-                          // 1. Atajo local instantáneo (0 tokens) para acciones directas, saludos y reportes
+                          // 1. Atajo local instantáneo (ahorra tokens en saludos/básicos y acciones directas)
                           const fastLocal = tryLocalFastAction(userMsg, academicGroups || [], teacherPromptName);
                           if (fastLocal) {
+                              const humanWait = fastLocal.humanDelayMs || (fastLocal.isAction ? 550 : 1000);
+                              await new Promise(r => setTimeout(r, humanWait));
                               if (fastLocal.isAction) {
                                   const actionResult = await executeTeacherAssistantActionRich(fastLocal, botActionContext);
                                   resultMessages = actionResult.messages || [];
@@ -16370,10 +16372,11 @@ Escribe en español con tono pedagógico moderno.`;
                           }
 
                           let runningHistory = [...newHistory];
+                          const betweenBubblesMs = fastLocal?.bubbleDelayMs || (fastLocal ? 550 : 380);
                           for (let idx = 0; idx < resultMessages.length; idx++) {
                               const isLastMsg = idx === resultMessages.length - 1;
                               if (idx > 0) {
-                                  await new Promise(r => setTimeout(r, 260));
+                                  await new Promise(r => setTimeout(r, betweenBubblesMs));
                               }
                               const botMsgObj = {
                                   role: 'bot',
@@ -16592,13 +16595,17 @@ Escribe en español con tono pedagógico moderno.`;
                               })}
 
                               {isTeacherBotLoading && (
-                                  <div className="flex items-center gap-2 py-2 px-3">
-                                      <div className="flex gap-1">
-                                          <span className="w-1.5 h-1.5 rounded-full bg-purple-400 dark:bg-purple-500" style={{ animation: 'typing-dot 1.4s ease-in-out infinite' }} />
-                                          <span className="w-1.5 h-1.5 rounded-full bg-purple-400 dark:bg-purple-500" style={{ animation: 'typing-dot 1.4s ease-in-out 0.2s infinite' }} />
-                                          <span className="w-1.5 h-1.5 rounded-full bg-purple-400 dark:bg-purple-500" style={{ animation: 'typing-dot 1.4s ease-in-out 0.4s infinite' }} />
+                                  <div className="flex w-full justify-start mb-1.5 animate-in fade-in slide-in-from-bottom-1 duration-200">
+                                      <div className={`px-3.5 py-2.5 rounded-r-2xl rounded-tl-2xl rounded-bl-[4px] border shadow-xs backdrop-blur-xl flex items-center gap-2.5 ${
+                                          isDarkMode ? 'bg-gray-800/80 border-gray-700/60 text-purple-300' : 'bg-white/90 border-gray-200/70 text-purple-600'
+                                      }`}>
+                                          <div className="flex items-center gap-1">
+                                              <span className="w-2 h-2 rounded-full bg-purple-500 dark:bg-purple-400" style={{ animation: 'typing-dot 1.2s ease-in-out infinite' }} />
+                                              <span className="w-2 h-2 rounded-full bg-purple-500 dark:bg-purple-400" style={{ animation: 'typing-dot 1.2s ease-in-out 0.18s infinite' }} />
+                                              <span className="w-2 h-2 rounded-full bg-purple-500 dark:bg-purple-400" style={{ animation: 'typing-dot 1.2s ease-in-out 0.36s infinite' }} />
+                                          </div>
+                                          <span className="text-[11px] italic font-medium opacity-90">escribiendo...</span>
                                       </div>
-                                      <span className="text-[10px] text-purple-500 dark:text-purple-400 italic font-medium">escribiendo...</span>
                                   </div>
                               )}
                               <div ref={teacherBotEndRef} />

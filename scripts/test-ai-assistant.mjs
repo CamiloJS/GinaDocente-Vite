@@ -6,6 +6,8 @@ import {
   evaluateMathExpression,
   parseTimerDurationSeconds,
   computePendingGradingReport,
+  getHumanResponseCount,
+  pickHumanBasicResponse,
   tryLocalFastAction,
   getWelcomeQuickReplies,
   buildTeacherAssistantPrompt,
@@ -428,6 +430,42 @@ console.log('🧪 Iniciando pruebas de Asistente IA Docente...\n');
   assert.ok(req.promptText.includes('¿Qué actividades sugieres para B1?'));
   assert.ok(!req.promptText.includes('Mensaje 0\n'), 'promptText debe recortar historial a los últimos 6 turnos');
   console.log('✔ Caso 13 superado: Prompt separado en systemInstruction estático cacheable y contexto compacto.');
+}
+
+// 14. Banco de 200+ variaciones humanas profesionales por interacción básica y derivación de tareas a IA
+{
+  const categories = ['greeting', 'how_are_you', 'thanks', 'farewell', 'ack'];
+  for (const cat of categories) {
+    assert.ok(getHumanResponseCount(cat) >= 200, `La categoría ${cat} debe tener al menos 200 combinaciones distintas`);
+  }
+
+  const groups = [{ id: 'g1', name: 'TIC' }];
+  const greetRes = tryLocalFastAction('hola', groups, 'Gina');
+  const howAreYouRes = tryLocalFastAction('cómo estás', groups, 'Gina');
+  const thanksRes = tryLocalFastAction('muchas gracias', groups, 'Gina');
+  const byeRes = tryLocalFastAction('hasta luego', groups, 'Gina');
+  const ackRes = tryLocalFastAction('perfecto', groups, 'Gina');
+
+  assert.equal(greetRes?.humanCategory, 'greeting');
+  assert.equal(howAreYouRes?.humanCategory, 'how_are_you');
+  assert.equal(thanksRes?.humanCategory, 'thanks');
+  assert.equal(byeRes?.humanCategory, 'farewell');
+  assert.equal(ackRes?.humanCategory, 'ack');
+  assert.ok(greetRes.humanDelayMs >= 900 && howAreYouRes.humanDelayMs >= 900, 'Las interacciones básicas deben incluir demora humana >=900ms');
+
+  // Verificar que "cómo estás" no responde con la misma frase de saludo
+  assert.notEqual(greetRes.messages[0], howAreYouRes.messages[0]);
+
+  // Verificar variedad anti-repetición en 10 saludos consecutivos
+  const samples = new Set();
+  for (let i = 0; i < 10; i++) {
+    samples.add(pickHumanBasicResponse('thanks', 'Gina').messages.join('|'));
+  }
+  assert.equal(samples.size, 10, 'No debe repetir respuestas seguidas en agradecimientos');
+
+  // Tareas y solicitudes creativas deben ir siempre a Gemini (null en tryLocalFastAction)
+  assert.equal(tryLocalFastAction('Crea una tarea sobre Present Perfect para TIC', groups, 'Gina'), null);
+  console.log('✔ Caso 14 superado: 256 combinaciones por cada interacción básica, demora humana y envío de tareas a Gemini.');
 }
 
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DEL ASISTENTE CON IA PASARON SATISFACTORIAMENTE!');

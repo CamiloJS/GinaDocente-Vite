@@ -651,9 +651,238 @@ export function detectNaturalLanguageIntent(text) {
 }
 
 /**
- * 4b. Enrutador Local Rápido (0 tokens, <50ms)
- * Resuelve saludos puros, botones rápidos, reportes directos y herramientas sin gastar tokens en la API.
- * Devuelve null cuando hay preguntas abiertas o solicitudes compuestas para que las responda Gemini.
+ * 4a. Banco de respuestas humanas profesionales (256 combinaciones por cada interacción básica)
+ * Separa claramente saludos, "cómo estás", agradecimientos, despedidas y confirmaciones cortas.
+ */
+const HUMAN_RESPONSE_BANKS = {
+  greeting: {
+    openers: [
+      '¡Hola, {name}! Qué gusto saludarte.',
+      '¡Hola, {name}! Qué alegría coincidir por aquí.',
+      '¡Muy buenas, {name}! Qué bueno verte conectado.',
+      '¡Hola, {name}! Espero que estés teniendo una excelente jornada.',
+      '¡Qué tal, {name}! Aquí estoy listo para apoyarte.',
+      '¡Hola, {name}! Un gusto atenderte como siempre.',
+      '¡Buenas, {name}! Con toda la disposición para colaborarte hoy.',
+      '¡Hola, {name}! Qué bueno saber de ti en la plataforma.',
+      '¡Saludos cordiales, {name}! Estoy atento a lo que necesites.',
+      '¡Hola, {name}! Me alegra mucho recibir tu saludo.',
+      '¡Hola, profe {name}! Qué buena energía tenerte por acá.',
+      '¡Bienvenido de nuevo al chat, {name}! Aquí a tu entera disposición.',
+      '¡Hola, {name}! Espero que tu día vaya marchando de maravilla.',
+      '¡Qué gusto saludarte hoy, {name}!',
+      '¡Hola, {name}! Ya estoy al 100% atento para ayudarte.',
+      '¡Buen día, {name}! Siempre es un placer acompañarte en tus clases.'
+    ],
+    followups: [
+      '¿En qué te colaboro ahorita en English TECH?',
+      'Cuéntame, ¿por dónde arrancamos hoy?',
+      '¿Qué actividad, evaluación o herramienta preparamos primero?',
+      '¿Necesitas revisar algo de tus grupos o creamos un recurso nuevo?',
+      'Dime qué tienes en mente para tus clases y lo armamos juntos.',
+      '¿Revisamos entregas pendientes o preparamos material para hoy?',
+      '¿En qué te puedo echar una mano en este momento?',
+      '¿Qué te gustaría adelantar hoy en la plataforma?',
+      'Estoy listo: ¿trabajamos en evaluaciones, libros, muro o herramientas?',
+      '¿Tienes alguna clase próxima para la que necesites apoyo?',
+      'Si quieres podemos revisar pendientes o crear algo nuevo, tú mandas.',
+      '¿Cómo te ayudo a hacer tu jornada docente más liviana hoy?',
+      'Cuéntame qué necesitas y nos ponemos a ello de una vez.',
+      '¿Empezamos por algún grupo en especial o abrimos una herramienta?',
+      'Aquí estoy pendiente: ¿qué deseas gestionar primero?',
+      'Dime cómo te apoyo hoy para que tus clases queden espectaculares.'
+    ]
+  },
+  how_are_you: {
+    openers: [
+      '¡Muy bien, {name}, gracias por preguntar! Con toda la energía para apoyarte hoy.',
+      '¡Excelente, {name}! Súper disponible para ayudarte con tus clases y recursos.',
+      '¡De maravilla, {name}, mil gracias por preguntar!',
+      '¡Todo muy bien por aquí, {name}! Listo y con ánimo para trabajar contigo.',
+      '¡Súper bien, {name}! Muy contento de poder acompañarte en tu labor docente.',
+      '¡Excelente, {name}, muy agradecido por tu amabilidad al preguntar!',
+      '¡Muy bien, profe {name}! Con las pilas puestas para lo que necesites hoy.',
+      '¡Genial, {name}! Aquí atento y preparado para agilizar tu trabajo.',
+      '¡Estupendamente bien, {name}, muchas gracias!',
+      '¡Todo en orden por este lado, {name}! Listo para darte la mejor atención.',
+      '¡Con muy buena energía hoy, {name}, gracias por preguntar!',
+      '¡Bastante bien, {name}! Siempre motivado para ayudarte con English TECH.',
+      '¡A todo dar, {name}! Muy pendiente para colaborarte en lo que haga falta.',
+      '¡Muy bien, {name}! Encantado de saludarte y conversar contigo.',
+      '¡De diez, {name}, gracias por el detalle de preguntar!',
+      '¡Súper activo y listo para ayudarte, {name}! Muchas gracias por preguntar.'
+    ],
+    followups: [
+      '¿Y tú cómo vas con tu jornada hoy? ¿En qué te ayudo?',
+      '¿Cómo ha estado tu día con los estudiantes? Cuéntame qué necesitas.',
+      '¿Y qué tal va todo por tu lado? ¿Trabajamos en algo de tus clases?',
+      'Espero que tú también estés súper bien. ¿Qué hacemos ahorita?',
+      '¿Cómo te sientes hoy, profe? Dime en qué te puedo colaborar.',
+      '¿Todo marchando bien con tus grupos? Aquí estoy para lo que necesites.',
+      '¿Qué tal tu semana hasta ahora? ¿Te ayudo con alguna tarea o evaluación?',
+      'Ojalá tu día esté igual de tranquilo. ¿Por dónde empezamos hoy?',
+      '¿Cómo vas de tiempo hoy? Si quieres te ayudo a adelantar pendientes.',
+      '¿Y tú cómo estás, profe? Cuéntame qué quieres crear o revisar hoy.',
+      '¿Cómo va esa energía para las clases de hoy? Estoy a tu servicio.',
+      'Espero que estés teniendo un excelente día. ¿Qué gestionamos primero?',
+      '¿Todo al día en tus cursos o revisamos juntos lo que falte?',
+      'Cuéntame cómo va todo y dime en qué herramienta te apoyo ahorita.',
+      '¿Cómo te ha rendido la jornada? Estoy listo cuando quieras empezar.',
+      'Ojalá estés de maravilla. ¿En qué te colaboro en este momento?'
+    ]
+  },
+  thanks: {
+    openers: [
+      '¡Con muchísimo gusto, {name}!',
+      '¡Para servirte siempre, {name}!',
+      '¡No hay de qué, {name}! Es un verdadero placer colaborarte.',
+      '¡Con todo el gusto del mundo, {name}!',
+      '¡Siempre a la orden, profe {name}!',
+      '¡Faltaba más, {name}! Para eso estoy aquí.',
+      '¡A ti por confiar en mí, {name}! Con mucho gusto.',
+      '¡Un placer ayudarte, {name}!',
+      '¡De nada, {name}! Me alegra mucho que te haya servido.',
+      '¡Para eso estamos, {name}, con el mayor de los gustos!',
+      '¡Siempre disponible para apoyarte, {name}!',
+      '¡Qué alegría haberte podido ayudar, {name}!',
+      '¡Es un gusto enorme trabajar contigo, {name}!',
+      '¡Con mucho cariño y profesionalismo, {name}!',
+      '¡No tienes nada que agradecer, {name}!',
+      '¡Para mí siempre es un gusto darte una mano, {name}!'
+    ],
+    followups: [
+      'Si necesitas ajustar algo más en tus clases, aquí sigo pendiente.',
+      'Cuando necesites otra mano con evaluaciones, libros o tareas, solo dime.',
+      '¿Te ayudo con algún otro grupo o herramienta antes de continuar?',
+      'Aquí quedo atento por si surge cualquier otra cosa en la jornada.',
+      'Si quieres revisar otro detalle o preparar algo nuevo, cuentas conmigo.',
+      'Cualquier otra idea que quieras llevar a tus clases, me avisas de una.',
+      'Seguimos conectados por si necesitas cualquier apoyo adicional.',
+      '¿Hay algo más que te gustaría dejar listo de una vez?',
+      'Ya sabes que puedes pedirme desde reportes hasta actividades completas.',
+      'Quedo al pendiente para lo próximo que necesites en English TECH.',
+      '¿Revisamos algo más o por ahora quedamos listos?',
+      'Cuando gustes volvemos a trabajar juntos en tus materiales.',
+      'Un gusto apoyarte; si surge otra duda, escríbeme sin pena.',
+      'Si deseas continuar con otro curso o evaluación, solo indícamelo.',
+      'Estoy a un mensaje de distancia para lo que necesites hoy.',
+      '¿Deseas aprovechar para abrir alguna herramienta o consultar algo más?'
+    ]
+  },
+  farewell: {
+    openers: [
+      '¡Hasta luego, {name}! Que tengas una excelente continuación de jornada.',
+      '¡Nos vemos pronto, {name}! Éxitos con tus clases.',
+      '¡Que te vaya súper bien, {name}!',
+      '¡Cuídate mucho, {name}! Aquí estaré cuando regreses.',
+      '¡Feliz resto de día, {name}! Un gusto haberte acompañado.',
+      '¡Hasta la próxima, profe {name}!',
+      '¡Que disfrutes mucho tu jornada, {name}!',
+      '¡Adiós, {name}! Todo mi apoyo para tus próximas sesiones.',
+      '¡Nos hablamos luego, {name}! Mucho éxito con los estudiantes.',
+      '¡Un saludo cordial de despedida, {name}!',
+      '¡Que tengas un descanso muy merecido cuando termines, {name}!',
+      '¡Excelente cierre de jornada, {name}!',
+      '¡Que todo siga saliendo de maravilla, {name}!',
+      '¡Chao, {name}! Un placer trabajar contigo hoy.',
+      '¡Hasta pronto, {name}! Que sigas cosechando grandes clases.',
+      '¡Feliz jornada, {name}! Quedo atento para cuando vuelvas.'
+    ],
+    followups: [
+      'Cuando vuelvas a necesitar apoyo en English TECH, aquí te espero.',
+      'Éxitos en todo lo que viene hoy con tus grupos.',
+      'Aquí quedo guardado por si más tarde necesitas crear o revisar algo.',
+      'Que sea un día súper productivo y tranquilo para ti.',
+      'Cuando quieras retomar evaluaciones o recursos, solo me escribes.',
+      'Un abrazo virtual y muchos éxitos en clase.',
+      'Recuerda que estoy disponible 24/7 en cuanto abras el chat.',
+      '¡Mucho ánimo y excelente energía para el resto del día!',
+      'Si luego recuerdas algún pendiente, aquí lo resolvemos en segundos.',
+      'Que todo salga excelente con tus estudiantes.',
+      'Quedo pendiente para nuestra próxima sesión de trabajo.',
+      '¡Que tengas muy buenas horas por delante!',
+      'Nos vemos en la próxima consulta, profe.',
+      'Todo listo por ahora; disfruta mucho tu día.',
+      'Siempre será un gusto volver a colaborarte.',
+      '¡Hasta cuando gustes volver a conversar!'
+    ]
+  },
+  ack: {
+    openers: [
+      '¡Perfecto, {name}!',
+      '¡Entendido, {name}!',
+      '¡Listo, {name}, anotado!',
+      '¡Excelente, {name}!',
+      '¡Súper bien, {name}!',
+      '¡De una, profe {name}!',
+      '¡Claro que sí, {name}!',
+      '¡Magnífico, {name}!',
+      '¡Genial, {name}!',
+      '¡Muy bien, {name}!',
+      '¡Estupendo, {name}!',
+      '¡Me parece excelente, {name}!',
+      '¡Qué bien, {name}!',
+      '¡Correcto, {name}!',
+      '¡Anotado con gusto, {name}!',
+      '¡Fantástico, {name}!'
+    ],
+    followups: [
+      '¿Qué te gustaría que hagamos a continuación?',
+      'Dime qué siguiente paso damos en tus cursos.',
+      'Aquí sigo pendiente para el próximo recurso o consulta.',
+      '¿Pasamos a otro tema o revisamos alguna evaluación?',
+      'Cuéntame si seguimos con otra herramienta o actividad.',
+      'Estoy listo cuando quieras indicarme la siguiente tarea.',
+      '¿Necesitas que preparemos algo más para tus estudiantes?',
+      'Si quieres podemos revisar pendientes o crear material con IA.',
+      'Tú me indicas cómo continuamos hoy.',
+      'Quedo atento a tu siguiente instrucción, profe.',
+      '¿En qué otro detalle te puedo aportar valor ahora?',
+      'Cuando quieras avanzamos con el próximo paso.',
+      '¿Te gustaría revisar notas o crear alguna actividad en el muro?',
+      'Aquí sigo a tu disposición para lo que siga.',
+      'Dime qué más necesitas y lo trabajamos de una vez.',
+      '¿Continuamos con otro grupo o herramienta?'
+    ]
+  }
+};
+
+const recentHumanReplyKeys = new Map();
+
+export function getHumanResponseCount(category) {
+  const bank = HUMAN_RESPONSE_BANKS[category];
+  if (!bank) return 0;
+  return bank.openers.length * bank.followups.length;
+}
+
+export function pickHumanBasicResponse(category, teacherName = 'profe') {
+  const bank = HUMAN_RESPONSE_BANKS[category] || HUMAN_RESPONSE_BANKS.greeting;
+  const totalOpeners = bank.openers.length;
+  const totalFollowups = bank.followups.length;
+  const recent = recentHumanReplyKeys.get(category) || [];
+
+  let i = Math.floor(Math.random() * totalOpeners);
+  let j = Math.floor(Math.random() * totalFollowups);
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const key = `${i}:${j}`;
+    if (!recent.includes(key)) break;
+    i = Math.floor(Math.random() * totalOpeners);
+    j = Math.floor(Math.random() * totalFollowups);
+  }
+
+  const chosenKey = `${i}:${j}`;
+  const nextRecent = [...recent.slice(-24), chosenKey];
+  recentHumanReplyKeys.set(category, nextRecent);
+
+  const msg1 = bank.openers[i].replace(/\{name\}/g, teacherName);
+  const msg2 = bank.followups[j].replace(/\{name\}/g, teacherName);
+  return { messages: [msg1, msg2], category };
+}
+
+/**
+ * 4b. Enrutador Local Rápido (ahorra tokens en saludos/básicos y acciones directas)
+ * Resuelve interacciones básicas humanas con 256 variaciones por tipo y acciones directas sin gastar tokens.
+ * Devuelve null para tareas, evaluaciones, libros, preguntas abiertas o peticiones compuestas para usar Gemini.
  */
 export function tryLocalFastAction(userMessage, academicGroups = [], teacherName = 'profe') {
   const raw = String(userMessage || '').trim();
@@ -668,15 +897,68 @@ export function tryLocalFastAction(userMessage, academicGroups = [], teacherName
     return null;
   }
 
-  // 1. Saludo puro -> respuesta cálida y botones sin gastar tokens
-  if (/^(hola+|buen[oa]s(\s+(d[ií]as|tardes|noches))?|hey+|holi+|qu[eé]\s+tal|saludos|c[oó]mo\s+est[aá]s)[!.\s,?]*$/i.test(lower)) {
+  // 1a. "¿Cómo estás?" / "¿Qué tal?" (separado de saludo genérico)
+  if (/^(?:(?:hola+|buen[oa]s(?:\s+(?:d[ií]as|tardes|noches))?|hey+|holi+)[,\s]+)?(?:c[oó]mo\s+est[aá]s|c[oó]mo\s+vas|c[oó]mo\s+te\s+va|c[oó]mo\s+andas|c[oó]mo\s+te\s+encuentras|qu[eé]\s+tal(?:\s+est[aá]s|\s+todo|\s+tu\s+d[ií]a)?|todo\s+bien)(?:\s+(?:asistente|profe|amigo|bot|hoy))?[!.\s,?]*$/i.test(lower)) {
+    const picked = pickHumanBasicResponse('how_are_you', teacherName);
     return {
       isAction: false,
-      messages: [
-        `¡Hola, ${teacherName}! Qué gusto saludarte.`,
-        '¿En qué te colaboro ahorita en English TECH?'
-      ],
+      humanCategory: 'how_are_you',
+      humanDelayMs: 950 + Math.floor(Math.random() * 350),
+      bubbleDelayMs: 650,
+      messages: picked.messages,
       quickReplies: getWelcomeQuickReplies(academicGroups)
+    };
+  }
+
+  // 1b. Saludos puros
+  if (/^(?:hola+|buen[oa]s(?:\s+(?:d[ií]as|tardes|noches))?|hey+|holi+|saludos(?:\s+cordiales)?|qué\s+hubo|quiubo)(?:\s+(?:asistente|bot|profe|amigo))?[!.\s,?]*$/i.test(lower)) {
+    const picked = pickHumanBasicResponse('greeting', teacherName);
+    return {
+      isAction: false,
+      humanCategory: 'greeting',
+      humanDelayMs: 950 + Math.floor(Math.random() * 350),
+      bubbleDelayMs: 650,
+      messages: picked.messages,
+      quickReplies: getWelcomeQuickReplies(academicGroups)
+    };
+  }
+
+  // 1c. Agradecimientos puros
+  if (/^(?:muchas\s+|mil\s+|much[ií]simas\s+|s[uú]per\s+|genial\s+|excelente\s+)?(?:gracias|te\s+lo\s+agradezco|te\s+agradezco|muy\s+amable|se\s+te\s+agradece)(?:\s+(?:asistente|bot|amigo|de\s+verdad|por\s+todo))?[!.\s,?]*$/i.test(lower)) {
+    const picked = pickHumanBasicResponse('thanks', teacherName);
+    return {
+      isAction: false,
+      humanCategory: 'thanks',
+      humanDelayMs: 900 + Math.floor(Math.random() * 300),
+      bubbleDelayMs: 600,
+      messages: picked.messages,
+      quickReplies: []
+    };
+  }
+
+  // 1d. Despedidas puras
+  if (/^(?:chao+|adi[oó]s|hasta\s+(?:luego|pronto|ma[nñ]ana|la\s+pr[oó]xima)|nos\s+vemos(?:\s+luego)?|bye+|feliz\s+(?:d[ií]a|tarde|noche|jornada)|que\s+est[eé]s\s+bien|cu[ií]date)[!.\s,?]*$/i.test(lower)) {
+    const picked = pickHumanBasicResponse('farewell', teacherName);
+    return {
+      isAction: false,
+      humanCategory: 'farewell',
+      humanDelayMs: 900 + Math.floor(Math.random() * 300),
+      bubbleDelayMs: 600,
+      messages: picked.messages,
+      quickReplies: []
+    };
+  }
+
+  // 1e. Confirmaciones cortas puras
+  if (/^(?:ok(?:ay)?|vale|listo|perfecto|genial|entendido|s[uú]per(?:\s+bien)?|de\s+una|excelente|claro(?:\s+que\s+s[ií])?|ch[eé]vere|brutal|estupendo|magnífico|magnifico)[!.\s,?]*$/i.test(lower)) {
+    const picked = pickHumanBasicResponse('ack', teacherName);
+    return {
+      isAction: false,
+      humanCategory: 'ack',
+      humanDelayMs: 900 + Math.floor(Math.random() * 300),
+      bubbleDelayMs: 600,
+      messages: picked.messages,
+      quickReplies: getWelcomeQuickReplies(academicGroups).slice(0, 4)
     };
   }
 
