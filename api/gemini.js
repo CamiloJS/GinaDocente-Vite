@@ -6,11 +6,20 @@ const FIREBASE_WEB_API_KEY = process.env.FIREBASE_WEB_API_KEY || 'AIzaSyB-BDGpMh
 const LIMITE_PETICIONES = process.env.MAX_AI_REQUESTS_PER_WINDOW ? Number(process.env.MAX_AI_REQUESTS_PER_WINDOW) : 500; // por usuario (sin bloqueos en cuenta de pago)
 const VENTANA_MS = 5 * 60 * 1000; // 5 minutos
 const registro = new Map(); // uid -> { n, reset }
+const TOKEN_CACHE_TTL_MS = 3 * 60 * 1000;
+const tokenCache = new Map(); // token -> { uid, exp }
 
 async function verificarUsuario(req) {
   const cabecera = req.headers?.authorization || req.headers?.Authorization || '';
   const token = String(cabecera).replace(/^Bearer\s+/i, '').trim();
   if (!token) return null;
+
+  const ahora = Date.now();
+  const cached = tokenCache.get(token);
+  if (cached && cached.exp > ahora) {
+    return { uid: cached.uid };
+  }
+
   try {
     const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_WEB_API_KEY}`, {
       method: 'POST',
@@ -19,7 +28,17 @@ async function verificarUsuario(req) {
     });
     const j = await r.json();
     const u = j && Array.isArray(j.users) ? j.users[0] : null;
-    return u && u.localId ? { uid: u.localId } : null;
+    if (u && u.localId) {
+      if (tokenCache.size > 300) {
+        for (const [k, v] of tokenCache.entries()) {
+          if (!v || v.exp <= ahora) tokenCache.delete(k);
+        }
+        if (tokenCache.size > 300) tokenCache.clear();
+      }
+      tokenCache.set(token, { uid: u.localId, exp: ahora + TOKEN_CACHE_TTL_MS });
+      return { uid: u.localId };
+    }
+    return null;
   } catch (e) {
     return null;
   }
@@ -58,7 +77,7 @@ export default async function handler(req, res) {
     });
   }
 
-  const { promptText, contents, model } = req.body || {};
+  const { promptText, contents, model, systemInstruction, responseMimeType, maxOutputTokens } = req.body || {};
 
   // 1. Google Gemini Keys (Prioridad 1 y Prioridad 2)
   const geminiKeys = [
@@ -76,6 +95,28 @@ export default async function handler(req, res) {
 
   const payloadContents = contents || [{ parts: [{ text: promptText || '' }] }];
 
+  const generationConfig = {
+    temperature: 0.7,
+    topP: 0.95,
+    thinkingConfig: {
+      thinkingLevel: 'LOW'
+    }
+  };
+  if (responseMimeType && typeof responseMimeType === 'string') {
+    generationConfig.responseMimeType = responseMimeType;
+  }
+  if (Number.isFinite(Number(maxOutputTokens)) && Number(maxOutputTokens) > 0) {
+    generationConfig.maxOutputTokens = Math.min(8192, Math.max(128, Math.round(Number(maxOutputTokens))));
+  }
+
+  const requestBody = {
+    contents: payloadContents,
+    generationConfig
+  };
+  if (systemInstruction && typeof systemInstruction === 'string' && systemInstruction.trim()) {
+    requestBody.systemInstruction = { parts: [{ text: systemInstruction }] };
+  }
+
   // Modelo único solicitado: Gemini 4 Hydrogen en nivel de razonamiento LOW
   const geminiModels = [process.env.GEMINI_MODEL || 'gemini-4-hydrogen'];
 
@@ -91,16 +132,7 @@ export default async function handler(req, res) {
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${currentKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: payloadContents,
-            generationConfig: {
-              temperature: 0.7,
-              topP: 0.95,
-              thinkingConfig: {
-                thinkingLevel: 'LOW'
-              }
-            }
-          })
+          body: JSON.stringify(requestBody)
         });
 
         if (response.ok) {
@@ -115,6 +147,9 @@ export default async function handler(req, res) {
 
         lastStatus = response.status;
         const errText = await response.text().catch(() => '');
+        if (response.status === 400) {
+          break;
+        }
         if (response.status === 429 || errText.includes('RESOURCE_EXHAUSTED') || errText.includes('quota') || errText.includes('rate limit')) {
           isQuota = true;
         }
@@ -125,12 +160,16 @@ export default async function handler(req, res) {
         }
       }
     }
+    if (lastStatus === 400) break;
   }
 
   // --- INTENTO CON PROVEEDOR 2: GROQ (Respaldo Automático) ---
   if (groqApiKey) {
     // Convertir contents de Gemini a formato messages de OpenAI/Groq
     const groqMessages = [];
+    if (systemInstruction && typeof systemInstruction === 'string' && systemInstruction.trim()) {
+      groqMessages.push({ role: 'system', content: systemInstruction.trim() });
+    }
     if (contents && Array.isArray(contents)) {
       contents.forEach(item => {
         const role = (item.role === 'model' || item.role === 'assistant') ? 'assistant' : 'user';
@@ -138,7 +177,7 @@ export default async function handler(req, res) {
         if (text) groqMessages.push({ role, content: text });
       });
     }
-    if (groqMessages.length === 0 && promptText && String(promptText).trim()) {
+    if (!groqMessages.some(m => m.role !== 'system') && promptText && String(promptText).trim()) {
       groqMessages.push({ role: 'user', content: String(promptText).trim() });
     }
 

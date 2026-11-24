@@ -795,6 +795,30 @@ export const FloatingTimer = ({ isDarkMode = false, onTimerUpdate = null }) => {
   const [isTimerFinished, setIsTimerFinished] = useState(false);
   const [stopwatchSeconds, setStopwatchSeconds] = useState(0);
 
+  const applyCustomTimer = useCallback((detail) => {
+    if (detail && Number(detail.totalSeconds) > 0) {
+      const secs = Math.max(1, Math.min(86400, Math.round(Number(detail.totalSeconds))));
+      setTimerMode('countdown');
+      setTotalSecondsSet(secs);
+      setSecondsRemaining(secs);
+      setIsTimerFinished(false);
+      setIsTimerRunning(detail.autoStart !== false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    if (window.__englishTechPendingTimer) {
+      applyCustomTimer(window.__englishTechPendingTimer);
+      window.__englishTechPendingTimer = null;
+    }
+    const handler = (ev) => {
+      if (ev?.detail) applyCustomTimer(ev.detail);
+    };
+    window.addEventListener('englishTech:setTimer', handler);
+    return () => window.removeEventListener('englishTech:setTimer', handler);
+  }, [applyCustomTimer]);
+
   // Broadcast current timer status (e.g. for minimized pill badge)
   useEffect(() => {
     if (onTimerUpdate) {
@@ -859,8 +883,13 @@ export const FloatingTimer = ({ isDarkMode = false, onTimerUpdate = null }) => {
   };
 
   const formatTimerDigits = (secs) => {
-    const m = Math.floor(secs / 60);
-    const s = secs % 60;
+    const safe = Math.max(0, Math.floor(Number(secs) || 0));
+    const h = Math.floor(safe / 3600);
+    const m = Math.floor((safe % 3600) / 60);
+    const s = safe % 60;
+    if (h > 0) {
+      return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 

@@ -208,6 +208,99 @@ export function evaluateMathExpression(input) {
 }
 
 /**
+ * 1b. Parser exacto de duración para el temporizador (horas, minutos, segundos, MM:SS)
+ */
+export function parseTimerDurationSeconds(text = '', params = {}) {
+  if (params && Number.isFinite(Number(params.totalSeconds)) && Number(params.totalSeconds) > 0) {
+    return Math.min(86400, Math.round(Number(params.totalSeconds)));
+  }
+
+  let paramTotal = 0;
+  if (params && typeof params === 'object') {
+    const h = Number(params.hours) || 0;
+    const m = Number(params.minutes) || 0;
+    const s = Number(params.seconds) || 0;
+    if (h > 0 || m > 0 || s > 0) {
+      paramTotal = Math.round(h * 3600 + m * 60 + s);
+      if (paramTotal > 0) return Math.min(86400, paramTotal);
+    }
+  }
+
+  const raw = String(text || '').trim().toLowerCase();
+  if (!raw) return 0;
+
+  let total = 0;
+  let matched = false;
+
+  // Formato H:MM:SS o MM:SS (ej. "3:13", "02:30", "1:05:00")
+  const clock3 = raw.match(/\b(\d{1,2}):(\d{1,2}):(\d{1,2})\b/);
+  if (clock3) {
+    total = (parseInt(clock3[1], 10) * 3600) + (parseInt(clock3[2], 10) * 60) + parseInt(clock3[3], 10);
+    return Math.min(86400, Math.max(0, total));
+  }
+  const clock2 = raw.match(/\b(\d{1,3}):(\d{1,2})\b/);
+  if (clock2) {
+    total = (parseInt(clock2[1], 10) * 60) + parseInt(clock2[2], 10);
+    return Math.min(86400, Math.max(0, total));
+  }
+
+  // Frases naturales en español
+  if (/\bmedio\s+minuto\b/.test(raw)) {
+    total += 30;
+    matched = true;
+  }
+  if (/\bmedia\s+hora\b/.test(raw)) {
+    total += 1800;
+    matched = true;
+  }
+
+  const hourMatches = [...raw.matchAll(/(\d+|una?)\s*(?:horas?|hrs?|h\b)/gi)];
+  for (const hm of hourMatches) {
+    const val = /^una?$/i.test(hm[1]) ? 1 : parseInt(hm[1], 10);
+    if (val > 0) {
+      total += val * 3600;
+      matched = true;
+    }
+  }
+
+  const minMatches = [...raw.matchAll(/(\d+|un[oa]?)\s*(?:minutos?|mins?|m\b)/gi)];
+  for (const mm of minMatches) {
+    const val = /^un[oa]?$/i.test(mm[1]) ? 1 : parseInt(mm[1], 10);
+    if (val > 0) {
+      total += val * 60;
+      matched = true;
+    }
+  }
+
+  const secMatches = [...raw.matchAll(/(\d+|un[oa]?)\s*(?:segundos?|segs?|s\b)/gi)];
+  for (const sm of secMatches) {
+    const val = /^un[oa]?$/i.test(sm[1]) ? 1 : parseInt(sm[1], 10);
+    if (val > 0) {
+      total += val;
+      matched = true;
+    }
+  }
+
+  if (!matched) return 0;
+  return Math.min(86400, Math.max(0, Math.round(total)));
+}
+
+export function formatDurationHuman(totalSeconds) {
+  const safe = Math.max(0, Math.round(Number(totalSeconds) || 0));
+  const h = Math.floor(safe / 3600);
+  const m = Math.floor((safe % 3600) / 60);
+  const s = safe % 60;
+  const parts = [];
+  if (h > 0) parts.push(`${h} ${h === 1 ? 'hora' : 'horas'}`);
+  if (m > 0) parts.push(`${m} ${m === 1 ? 'minuto' : 'minutos'}`);
+  if (s > 0 || parts.length === 0) parts.push(`${s} ${s === 1 ? 'segundo' : 'segundos'}`);
+  const clock = h > 0
+    ? `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+    : `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  return `${parts.join(' y ')} (${clock})`;
+}
+
+/**
  * 2. Escáner real de pendientes por calificar (Tareas, Foros, Evaluaciones y Sugerencias)
  */
 export function computePendingGradingReport({
@@ -482,7 +575,9 @@ export function detectNaturalLanguageIntent(text) {
     return { action: 'open_floating_tool', params: { tool: 'calculator' }, response: 'Abriendo la Calculadora en ventana flotante.' };
   }
   if (lower.match(/temporizador|cronometro|cronómetro|timer/) && !lower.match(/cerrar|ocultar|quitar/)) {
-    return { action: 'open_floating_tool', params: { tool: 'timer' }, response: 'Abriendo el Temporizador en ventana flotante.' };
+    const secs = parseTimerDurationSeconds(text);
+    const params = secs > 0 ? { tool: 'timer', totalSeconds: secs, durationText: text } : { tool: 'timer' };
+    return { action: 'open_floating_tool', params, response: 'Abriendo el Temporizador en ventana flotante.' };
   }
   if (lower.match(/cerrar|cierra|quita|quitar|oculta|ocultar/) && lower.match(/herramienta|flotante|ventana/)) {
     return { action: 'close_floating_tool', params: { tool: 'all' }, response: 'Cerrando herramientas flotantes.' };
@@ -556,6 +651,122 @@ export function detectNaturalLanguageIntent(text) {
 }
 
 /**
+ * 4b. Enrutador Local Rápido (0 tokens, <50ms)
+ * Resuelve saludos puros, botones rápidos, reportes directos y herramientas sin gastar tokens en la API.
+ * Devuelve null cuando hay preguntas abiertas o solicitudes compuestas para que las responda Gemini.
+ */
+export function tryLocalFastAction(userMessage, academicGroups = [], teacherName = 'profe') {
+  const raw = String(userMessage || '').trim();
+  if (!raw || raw.length > 115) return null;
+
+  const lower = raw.toLowerCase();
+  const questionMarks = (raw.match(/\?/g) || []).length;
+  if (questionMarks > 1) return null;
+
+  // Preguntas abiertas o peticiones combinadas -> enviarlas a Gemini
+  if (lower.match(/\b(qu[eé]\s+puedes\s+hacer|para\s+qu[eé]\s+sirves|c[oó]mo\s+funciona|expl[ií]came|ay[uú]dame\s+a\s+entender|por\s+qu[eé])\b/)) {
+    return null;
+  }
+
+  // 1. Saludo puro -> respuesta cálida y botones sin gastar tokens
+  if (/^(hola+|buen[oa]s(\s+(d[ií]as|tardes|noches))?|hey+|holi+|qu[eé]\s+tal|saludos|c[oó]mo\s+est[aá]s)[!.\s,?]*$/i.test(lower)) {
+    return {
+      isAction: false,
+      messages: [
+        `¡Hola, ${teacherName}! Qué gusto saludarte.`,
+        '¿En qué te colaboro ahorita en English TECH?'
+      ],
+      quickReplies: getWelcomeQuickReplies(academicGroups)
+    };
+  }
+
+  // 2. Consultas y reportes directos (0 tokens)
+  if ((lower.match(/pendientes?/) && lower.match(/calificar|entregas?|revisar|evaluaci[oó]n|evaluaciones|tareas?/)) || lower.match(/entregas\s*sin\s*calificar|qu[eé]\s*falta\s*por\s*calificar/)) {
+    return { isAction: true, action: 'pending_submissions', params: {} };
+  }
+  if (lower.match(/(reporte|resumen|promedios?)\s*(general|global)?\s*(de\s*)?notas|promedios?\s+generales/)) {
+    return { isAction: true, action: 'grade_report', params: {} };
+  }
+  if (lower.match(/estudiantes\s*en\s*riesgo|peores\s*notas|bajo\s*rendimiento|en\s*riesgo/)) {
+    return { isAction: true, action: 'students_at_risk', params: {} };
+  }
+  if (lower.match(/mejores\s*estudiantes|mejores\s*notas|top\s*estudiantes|cuadro\s*de\s*honor|mejores\s*promedios/)) {
+    return { isAction: true, action: 'top_students', params: {} };
+  }
+  if (lower.match(/^(?:qu[eé]\s+grupos\s+tengo|lista\s+de\s+grupos|ver\s+grupos|mis\s+grupos)[!.\s?]*$/i)) {
+    return { isAction: true, action: 'list_groups', params: {} };
+  }
+  if (lower.match(/cu[aá]ntos\s+estudiantes\s+(tengo|hay)/i)) {
+    return { isAction: true, action: 'student_count', params: {} };
+  }
+
+  // 3. Temporizador (incluyendo duración exacta tipo "3 minutos con 13 segundos")
+  if (lower.match(/temporizador|cron[oó]metro|timer/) && !lower.match(/cerrar|ocultar|quitar/)) {
+    const secs = parseTimerDurationSeconds(raw);
+    return {
+      isAction: true,
+      action: 'open_floating_tool',
+      params: secs > 0 ? { tool: 'timer', totalSeconds: secs, durationText: raw } : { tool: 'timer' }
+    };
+  }
+
+  // 4. Moneda (inline en chat o flotante)
+  if (lower.match(/moneda|cara\s*o\s*sello|cara\s*o\s*cruz/) && !lower.match(/cerrar|ocultar|quitar/)) {
+    if (lower.match(/ventana\s*flotante|abre\s+la\s+moneda|abrir\s+la\s+moneda|flotante/)) {
+      return { isAction: true, action: 'open_floating_tool', params: { tool: 'coin' } };
+    }
+    return { isAction: true, action: 'flip_coin', params: {} };
+  }
+
+  // 5. Calculadora y operaciones aritméticas directas
+  const hasMathOpWord = lower.match(/\b(por|entre|dividido|m[aá]s|menos)\b|[+\-*/×÷^]/);
+  if ((lower.match(/calculadora/) && !lower.match(/cerrar|ocultar|quitar/)) || (/\d/.test(lower) && hasMathOpWord && lower.match(/^(?:cu[aá]nto\s+es|calcula|divide|multiplica|suma|resta|\d|\()/))) {
+    const mathCheck = evaluateMathExpression(raw);
+    if (mathCheck.ok) {
+      return { isAction: true, action: 'calculate_and_open', params: { expression: raw } };
+    }
+    if (lower.match(/calculadora/)) {
+      return { isAction: true, action: 'open_floating_tool', params: { tool: 'calculator' } };
+    }
+  }
+
+  // 6. Ajustes y navegación directa simple (sin texto complejo mezclado)
+  if (lower.match(/^(?:pon|poner|activa|activar|cambia|cambiar\s+a|quiero)?\s*(?:el\s*)?(modo\s*oscuro|tema\s*oscuro|dark\s*mode|modo\s*claro|tema\s*claro|light\s*mode|lights?\s*out|negro\s*puro)[!.\s?]*$/i)) {
+    if (lower.match(/lights?\s*out|negro\s*puro/)) return { isAction: true, action: 'set_theme', params: { theme: 'lights_out' } };
+    if (lower.match(/oscuro|dark/)) return { isAction: true, action: 'set_theme', params: { theme: 'dim' } };
+    return { isAction: true, action: 'set_theme', params: { theme: 'light' } };
+  }
+  if (lower.match(/^(?:silencia|silenciar|apaga|apagar|activa|activar)\s*(?:los\s*)?(sonidos?|audio)[!.\s?]*$/i)) {
+    const off = Boolean(lower.match(/silenc|apag/));
+    return { isAction: true, action: 'set_sound', params: { enabled: !off } };
+  }
+  if (lower.match(/^(?:cierra|cerrar|oculta|ocultar)\s*(?:las?\s*)?(?:herramientas?\s*flotantes?|calculadora|temporizador|moneda)[!.\s?]*$/i)) {
+    const tool = lower.includes('calculadora') ? 'calculator' : lower.includes('temporizador') ? 'timer' : lower.includes('moneda') ? 'coin' : 'all';
+    return { isAction: true, action: 'close_floating_tool', params: { tool } };
+  }
+
+  const navMatch = lower.match(/^(?:ll[eé]vame|llevame|ir|ve|abre|abrir|mu[eé]strame)\s+(?:a|al|a\s+la|a\s+los|el|la|los)?\s*(muro(?:\s+principal|\s+de\s+tareas)?|evaluaciones|libros(?:\s+3d)?|diapositivas|v[ií]deos|videos|s[ií]labo|silabo|contenidos(?:\s+program[aá]ticos)?|notas|cuaderno|grupos|directorio|estudiantes|herramientas|ajustes|perfil)[!.\s?]*$/i);
+  if (navMatch) {
+    const target = navMatch[1];
+    const tab = target.includes('evalua') ? 'evaluations'
+      : target.includes('libro') ? 'books'
+      : target.includes('diapo') ? 'reviews'
+      : target.includes('deo') ? 'videos'
+      : (target.includes('labo') || target.includes('contenido')) ? 'syllabus'
+      : (target.includes('nota') || target.includes('cuaderno')) ? 'notes'
+      : target.includes('grupo') ? 'groups'
+      : (target.includes('directorio') || target.includes('estudian')) ? 'directory'
+      : target.includes('herramienta') ? 'tools'
+      : target.includes('ajuste') ? 'settings'
+      : target.includes('perfil') ? 'profile'
+      : 'tasks';
+    return { isAction: true, action: 'navigate_tab', params: { tab } };
+  }
+
+  return null;
+}
+
+/**
  * Chips de sugerencias iniciales para la bienvenida del bot
  */
 export function getWelcomeQuickReplies(academicGroups = []) {
@@ -570,10 +781,28 @@ export function getWelcomeQuickReplies(academicGroups = []) {
   ];
 }
 
+const STATIC_ASSISTANT_SYSTEM_INSTRUCTION = `Eres el Asistente Pedagógico personal en English TECH. Hablas en español natural de Colombia: cercano, cálido, respetuoso, ágil y humano (sin sonar robótico ni usar **markdown**).
+
+RESPONDE SIEMPRE EN JSON PURO:
+{"action":string|null,"params":{},"messages":["msg 1","msg 2 opcional"],"quickReplies":[{"label":"Botón","value":"Texto a enviar"}]}
+
+REGLAS CLAVE:
+1. Puedes enviar 1 o 2 burbujas cortas y humanas en "messages" (máx 3).
+2. En saludos/charla libre: usa "action": null, saluda cálido y ofrece quickReplies. NO inventes reportes no pedidos.
+3. En acciones de datos/reportes ("pending_submissions","grade_report","students_at_risk","top_students","student_report","eval_stats"): el sistema mostrará los datos reales automáticamente, así que NO escribas frases de espera ("dame un segundito", "ya reviso") ni inventes cifras.
+4. Si falta el grupo o el método para crear libro/diapositivas/vídeo/sílabo/evaluación/Kahoot/encuesta: usa "action": null y pregunta guiando paso a paso con botones en "quickReplies" usando los nombres reales de los grupos.
+5. Temporizador con tiempo exacto: usa "action":"open_floating_tool" con {"tool":"timer","minutes":M,"seconds":S,"durationText":"..."}. Cuentas matemáticas: "calculate_and_open" {"expression":"..."}. Moneda: "flip_coin".
+
+CATÁLOGO COMPLETO DE ACCIONES:
+- Herramientas: flip_coin{}, calculate_and_open{expression}, open_floating_tool{tool:"timer"|"coin"|"calculator",minutes?,seconds?,durationText?}, close_floating_tool{tool}, minimize_floating_tool{tool}
+- Contenido: create_book_ai{title,topic,language,pageCount,targetGroupName}, open_book_creator{mode:"ai"|"pdf"|"wall",targetGroupName}, open_slides_studio{mode:"powerpoint"|"google_slides"|"ai",targetGroupName}, open_videos_module{targetGroupName}, open_syllabus_pdf{targetGroupName}, open_syllabus_form{targetGroupName}, open_lesson_plans{}, add_syllabus_week{week,unit,topic,description,activities,targetGroupName}
+- Evaluaciones/Muro: open_create_eval{title,description,timeLimit,dueDate,targetGroupName,mode:"ai"|"manual"|"bank"}, publish_poll{title,options,isMultipleChoice,targetGroupName}, open_poll_composer{title,targetGroupName}, publish_kahoot_ai{topic,numQuestions,targetGroupName}, open_kahoot_composer{title,targetGroupName}, publish_task{title,description,postType:"task"|"forum"|"post",targetGroupName,dueDate}, delete_task{title}, pending_submissions{}
+- Notas/Grupos/Reportes/UI: create_note{title,content,scope,format,color}, list_notes{}, archive_evaluation{title,archive}, eval_stats{title}, create_group{name,type}, list_groups{}, student_report{name}, students_at_risk{}, top_students{}, grade_report{}, syllabus_info{week}, generate_activity{topic,level}, generate_lesson_plan{topic,duration}, generate_quiz{topic,num_questions}, navigate_tab{tab:"tasks"|"evaluations"|"notes"|"books"|"videos"|"syllabus"|"reviews"|"groups"|"directory"|"inbox"|"tools"|"profile"|"settings"}, set_theme{theme:"dim"|"light"|"lights_out"}, set_sound{enabled}, set_notifications{enabled}, logout{}`;
+
 /**
- * 5. Constructor del Prompt Humano, Multi-Mensaje y con Botones Interactivos
+ * 5. Constructor compacto y cacheable (separa systemInstruction estático + promptText dinámico)
  */
-export function buildTeacherAssistantPrompt({
+export function buildTeacherAssistantRequest({
   teacherName = 'Docente',
   nowString = '',
   students = [],
@@ -589,109 +818,37 @@ export function buildTeacherAssistantPrompt({
   history = [],
   userMessage = ''
 }) {
-  const studsSummary = students.slice(0, 25).map(s => s.name || s.fullName).filter(Boolean).join(', ');
-  const groupsSummary = academicGroups.map(g => `${g.name} (ID:${g.id})`).join(' | ');
-  const evalsSummary = evaluations.slice(0, 15).map(e => `"${e.title}" (${e.isArchived ? 'archivada' : 'activa'})`).join(', ');
-  const tasksSummary = tasks.slice(0, 12).map(t => `"${t.title || 'Sin título'}" (${t.targetGroupName || 'Global'})`).join(', ');
+  const groupsSummary = academicGroups.map(g => g.name).filter(Boolean).join(', ') || 'Ninguno';
   const customKnowledge = Array.isArray(teacherBotInfoList) && teacherBotInfoList.length > 0
-    ? `\nCONOCIMIENTO ADICIONAL DEL DOCENTE:\n${teacherBotInfoList.map(i => `- ${i.text || i}`).join('\n')}`
+    ? `\nNotas del docente: ${teacherBotInfoList.map(i => i.text || i).slice(0, 6).join(' | ')}`
     : '';
+  const recentHistory = history
+    .slice(-6)
+    .map(m => `${m.role === 'user' ? teacherName : 'Asistente'}: ${String(m.text || '').slice(0, 240)}`)
+    .join('\n');
 
-  const prompt = `Eres el Asistente Pedagógico y Ejecutivo personal de ${teacherName} en English TECH.
-Hablas como un colega humano cercano, cálido, respetuoso, proactivo y súper resolutivo en español natural de Colombia (sin sonar robótico ni frío).
+  const promptText = `Docente: ${teacherName} | Fecha: ${nowString}
+Grupos: ${groupsSummary}
+Conteos: ${students.length} estudiantes, ${tasks.length} muro, ${evaluations.length} evals, ${books.length} libros, ${reviews.length} slides, ${videos.length} videos, ${syllabus.length} sem sílabo, ${grades.length} notas${customKnowledge}
 
-FECHA ACTUAL: ${nowString}
-
-CONTEXTO EN VIVO DE LA PLATAFORMA:
-- Grupos académicos (${academicGroups.length}): ${groupsSummary || 'Ninguno aún'}
-- Estudiantes (${students.length}): ${studsSummary || 'Ninguno'}
-- Muro/Tareas (${tasks.length}): ${tasksSummary || 'Sin publicaciones'}
-- Evaluaciones (${evaluations.length}): ${evalsSummary || 'Sin evaluaciones'}
-- Libros 3D (${books.length}), Diapositivas (${reviews.length}), Vídeos (${videos.length}), Sílabo (${syllabus.length} semanas), Notas (${grades.length})${customKnowledge}
-
-REGLAS DE CONVERSACIÓN HUMANA (MUY IMPORTANTE):
-1. Responde SIEMPRE en JSON válido dentro de \`\`\`json ... \`\`\` con esta estructura exacta:
-{
-  "action": "NOMBRE_ACCION" | null,
-  "params": { ... },
-  "messages": [
-    "Primer mensaje natural y cercano.",
-    "Segundo mensaje opcional continuando la charla o preguntando qué sigue..."
-  ],
-  "quickReplies": [
-    { "label": "Texto corto del botón", "value": "Mensaje que enviará al hacer clic" }
-  ]
-}
-2. MENSAJES MÚLTIPLES: Cuando sea natural (como haría una persona en WhatsApp o chat), divide tu respuesta en 2 burbujas cortas en "messages" (máximo 3). Por ejemplo: primero confirmas o saludas con calidez, y en el segundo mensaje haces la siguiente pregunta o propones cómo seguir.
-3. SALUDOS Y CHARLA NORMAL: Si el docente solo saluda ("hola", "buenas", "cómo estás"), responde ÚNICAMENTE con un saludo cálido y humano, pregúntale cómo va todo o en qué le ayudas hoy y ofrece "quickReplies" útiles, con "action": null. NUNCA sueltes reportes de tareas pendientes si no te lo pidió.
-4. FLUJOS GUIADOS PASO A PASO CON BOTONES ("quickReplies"):
-   Si el docente dice "quiero hacer un libro", "quiero subir unas diapositivas", "quiero publicar un video", "quiero subir contenidos programáticos", "quiero hacer una evaluación", "quiero hacer un Kahoot" o "quiero hacer una encuesta", y TODAVÍA faltan detalles (como el grupo o el método):
-   - NO ejecutes la publicación de golpe ni inventes datos.
-   - Usa "action": null, responde amablemente guiando el paso actual (ejemplo: "¿Quieres subir el PDF o lo creamos juntos con IA? ¿Para qué grupo sería?") e incluye botones en "quickReplies" con las opciones reales Y los nombres reales de los grupos (${academicGroups.map(g => g.name).join(', ') || 'General'}).
-   - Cuando ya tengas los datos necesarios (por ejemplo ya te dijo grupo y tema/método), SÍ ejecuta la acción correspondiente!
-5. ACCIONES INMEDIATAS (no preguntes de más):
-   - Pide abrir temporizador -> "action": "open_floating_tool", params: { "tool": "timer" }
-   - Pide tirar/lanzar la moneda -> "action": "flip_coin" (la tira ahí mismo en el chat).
-   - Pide calcular una operación ("cuánto es 24 por 15", "divide 500 entre 8") -> "action": "calculate_and_open", params: { "expression": "24 * 15" } (calcula en el chat Y abre la calculadora flotante).
-   - Pide revisar pendientes por calificar (tareas, foros o evaluaciones) -> "action": "pending_submissions".
-6. Nunca uses asteriscos dobles (**) ni formato markdown dentro de los strings de "messages".
-
-CATÁLOGO COMPLETO DE ACCIONES:
-1. HERRAMIENTAS EN CHAT Y FLOTANTES:
-   - "flip_coin": params { "openFloating": false } (lanza moneda animada en el chat)
-   - "calculate_and_open": params { "expression": "..." } (calcula el resultado en el chat y abre la calculadora flotante)
-   - "open_floating_tool": params { "tool": "timer" | "coin" | "calculator" }
-   - "close_floating_tool": params { "tool": "timer" | "coin" | "calculator" | "all" }
-   - "minimize_floating_tool": params { "tool": "timer" | "coin" | "calculator" }
-
-2. LIBROS 3D, DIAPOSITIVAS, VÍDEOS Y SÍLABO:
-   - "create_book_ai": params { "title": "...", "topic": "...", "language": "Inglés" | "Español" | "Francés" | "Bilingüe", "pageCount": 6, "targetGroupName": "..." } (crea y publica un libro 3D real con IA)
-   - "open_book_creator": params { "mode": "ai" | "pdf", "targetGroupName": "..." } (abre Biblioteca/creación de libro PDF)
-   - "open_slides_studio": params { "mode": "powerpoint" | "google_slides" | "ai", "targetGroupName": "..." } (abre Diapositivas)
-   - "open_videos_module": params { "targetGroupName": "..." } (abre Vídeos)
-   - "open_syllabus_pdf": params { "targetGroupName": "..." } (abre modal para subir PDF de Contenidos Programáticos)
-   - "open_syllabus_form": params { "targetGroupName": "..." } (abre formulario manual de Contenidos Programáticos)
-   - "open_lesson_plans": params {} (abre el planeador pedagógico)
-   - "add_syllabus_week": params { "week": 1, "unit": "...", "topic": "...", "description": "...", "activities": "...", "targetGroupName": "..." }
-
-3. EVALUACIONES, KAHOOT, ENCUESTAS Y MURO:
-   - "open_create_eval": params { "title": "...", "description": "...", "timeLimit": 30, "dueDate": "YYYY-MM-DD", "targetGroupName": "...", "mode": "ai" | "manual" | "bank" }
-   - "publish_poll": params { "title": "Pregunta...", "options": ["Opción 1", "Opción 2"], "isMultipleChoice": false, "targetGroupName": "..." }
-   - "open_poll_composer": params { "title": "...", "targetGroupName": "..." }
-   - "publish_kahoot_ai": params { "topic": "...", "numQuestions": 5, "targetGroupName": "..." } (genera y publica un Kahoot en vivo real para el grupo)
-   - "open_kahoot_composer": params { "title": "...", "targetGroupName": "..." }
-   - "publish_task": params { "title": "...", "description": "...", "postType": "task" | "forum" | "post", "targetGroupName": "...", "dueDate": "YYYY-MM-DD" }
-   - "delete_task": params { "title": "..." }
-   - "pending_submissions": params {} (revisa tareas, foros y evaluaciones pendientes por calificar)
-
-4. NOTAS, GRUPOS, REPORTES Y AJUSTES:
-   - "create_note": params { "title": "...", "content": "...", "scope": "private" | "shared", "format": "sticky" | "sheet", "color": "yellow" | "blue" | "pink" | "green" }
-   - "list_notes": params {}
-   - "archive_evaluation": params { "title": "...", "archive": true | false }
-   - "eval_stats": params { "title": "..." }
-   - "create_group": params { "name": "...", "type": "chat" | "academic" }
-   - "list_groups": params {}
-   - "student_report": params { "name": "..." }
-   - "students_at_risk": params {}
-   - "top_students": params {}
-   - "grade_report": params {}
-   - "syllabus_info": params { "week": 1 }
-   - "generate_activity": params { "topic": "...", "level": "A1|A2|B1|B2" }
-   - "generate_lesson_plan": params { "topic": "...", "duration": 60 }
-   - "generate_quiz": params { "topic": "...", "num_questions": 5 }
-   - "navigate_tab": params { "tab": "tasks" | "evaluations" | "notes" | "books" | "videos" | "syllabus" | "reviews" | "groups" | "directory" | "inbox" | "tools" | "profile" | "settings" }
-   - "set_theme": params { "theme": "dim" | "light" | "lights_out" }
-   - "set_sound": params { "enabled": true | false }
-   - "set_notifications": params { "enabled": true | false }
-   - "logout": params {}
-
-HISTORIAL RECIENTE:
-${history.slice(-12).map(m => `${m.role === 'user' ? teacherName : 'Asistente'}: ${m.text}`).join('\n')}
+Historial reciente:
+${recentHistory || '(Inicio)'}
 
 ${teacherName}: ${userMessage}
-Asistente (responde en JSON):`;
+JSON:`;
 
-  return prompt;
+  return {
+    systemInstruction: STATIC_ASSISTANT_SYSTEM_INSTRUCTION,
+    promptText
+  };
+}
+
+/**
+ * Wrapper retrocompatible que retorna el prompt completo en una sola cadena
+ */
+export function buildTeacherAssistantPrompt(args = {}) {
+  const { systemInstruction, promptText } = buildTeacherAssistantRequest(args);
+  return `${systemInstruction}\n\n${promptText}`;
 }
 
 /**
@@ -766,10 +923,11 @@ export async function executeTeacherAssistantActionRich(parsed, context) {
     sanitizeFirestoreData = defaultSanitizeFirestore
   } = context || {};
 
-  const finalize = (defaultMsgList, defaultReplies = []) => {
+  const finalize = (actionMsgList, defaultReplies = [], { useAiMessages = false } = {}) => {
+    const fallbackActionMsgs = normalizeMessagesArray(actionMsgList);
     const msgs = outMessages.length > 0
       ? outMessages
-      : (aiMessages.length > 0 ? aiMessages : normalizeMessagesArray(defaultMsgList));
+      : (useAiMessages && aiMessages.length > 0 ? aiMessages : fallbackActionMsgs);
     const replies = outQuickReplies.length > 0 ? outQuickReplies : normalizeQuickReplies(defaultReplies);
     return {
       messages: msgs,
@@ -785,70 +943,70 @@ export async function executeTeacherAssistantActionRich(parsed, context) {
     // =========================================================================
     case 'dark_on':
       setThemeMode('dim');
-      return finalize(['Listo profe, activé el modo oscuro para que descanses la vista.']);
+      return finalize(['Listo profe, activé el modo oscuro para que descanses la vista.'], [], { useAiMessages: true });
 
     case 'dark_off':
       setThemeMode('light');
-      return finalize(['Listo, cambié la plataforma al modo claro.']);
+      return finalize(['Listo, cambié la plataforma al modo claro.'], [], { useAiMessages: true });
 
     case 'lights_out':
       setThemeMode('lights_out');
-      return finalize(['Modo Lights Out (negro puro) activado.']);
+      return finalize(['Modo Lights Out (negro puro) activado.'], [], { useAiMessages: true });
 
     case 'set_theme': {
       if (params.theme === 'lights_out') {
         setThemeMode('lights_out');
-        return finalize(['Modo Lights Out (negro puro) activado.']);
+        return finalize(['Modo Lights Out (negro puro) activado.'], [], { useAiMessages: true });
       }
       if (params.theme === 'dim' || params.theme === 'dark') {
         setThemeMode('dim');
-        return finalize(['Modo oscuro activado con éxito.']);
+        return finalize(['Modo oscuro activado con éxito.'], [], { useAiMessages: true });
       }
       setThemeMode('light');
-      return finalize(['Modo claro activado con éxito.']);
+      return finalize(['Modo claro activado con éxito.'], [], { useAiMessages: true });
     }
 
     case 'sound_on':
       setSoundEnabled(true);
       if (soundEnabledRef) soundEnabledRef.current = true;
       try { localStorage.setItem('englishTech_sound', 'true'); } catch (e) {}
-      return finalize(['Efectos de sonido activados.']);
+      return finalize(['Efectos de sonido activados.'], [], { useAiMessages: true });
 
     case 'sound_off':
       setSoundEnabled(false);
       if (soundEnabledRef) soundEnabledRef.current = false;
       try { localStorage.setItem('englishTech_sound', 'false'); } catch (e) {}
-      return finalize(['Efectos de sonido silenciados.']);
+      return finalize(['Efectos de sonido silenciados.'], [], { useAiMessages: true });
 
     case 'set_sound':
       if (params.enabled === false) {
         setSoundEnabled(false);
         if (soundEnabledRef) soundEnabledRef.current = false;
         try { localStorage.setItem('englishTech_sound', 'false'); } catch (e) {}
-        return finalize(['Efectos de sonido silenciados.']);
+        return finalize(['Efectos de sonido silenciados.'], [], { useAiMessages: true });
       }
       setSoundEnabled(true);
       if (soundEnabledRef) soundEnabledRef.current = true;
       try { localStorage.setItem('englishTech_sound', 'true'); } catch (e) {}
-      return finalize(['Efectos de sonido activados.']);
+      return finalize(['Efectos de sonido activados.'], [], { useAiMessages: true });
 
     case 'push_on':
       togglePushNotifications();
-      return finalize(['Notificaciones push procesadas/habilitadas.']);
+      return finalize(['Notificaciones push procesadas/habilitadas.'], [], { useAiMessages: true });
 
     case 'push_off':
       setPushEnabled(false);
       try { localStorage.setItem('englishTech_push', 'false'); } catch (e) {}
-      return finalize(['Notificaciones push desactivadas.']);
+      return finalize(['Notificaciones push desactivadas.'], [], { useAiMessages: true });
 
     case 'set_notifications':
       if (params.enabled === false) {
         setPushEnabled(false);
         try { localStorage.setItem('englishTech_push', 'false'); } catch (e) {}
-        return finalize(['Notificaciones push desactivadas.']);
+        return finalize(['Notificaciones push desactivadas.'], [], { useAiMessages: true });
       }
       togglePushNotifications();
-      return finalize(['Notificaciones push habilitadas.']);
+      return finalize(['Notificaciones push habilitadas.'], [], { useAiMessages: true });
 
     case 'logout':
       confirmAction('¿Deseas cerrar tu sesión actual?', handleLogout);
@@ -898,21 +1056,40 @@ export async function executeTeacherAssistantActionRich(parsed, context) {
     case 'open_floating_tool': {
       const tool = String(params.tool || 'calculator').toLowerCase();
       if (tool.includes('timer') || tool.includes('temporizador') || tool.includes('cronometro')) {
+        const totalSeconds = parseTimerDurationSeconds(params.durationText || params.rawText || '', params);
+        if (totalSeconds > 0 && typeof window !== 'undefined') {
+          const timerDetail = { totalSeconds, autoStart: params.autoStart !== false };
+          window.__englishTechPendingTimer = timerDetail;
+          try {
+            window.dispatchEvent(new CustomEvent('englishTech:setTimer', { detail: timerDetail }));
+          } catch (e) {}
+        }
         openFloatingTool('timer');
+        if (totalSeconds > 0) {
+          const human = formatDurationHuman(totalSeconds);
+          return finalize([
+            `Listo profe, puse el temporizador en ${human} en ventana flotante y ya está corriendo.`,
+            '¿Necesitas ajustar algo más o abrir otra herramienta?'
+          ], [
+            { label: 'Tirar moneda', value: 'Tira una moneda' },
+            { label: 'Abrir calculadora', value: 'Abre la calculadora flotante' }
+          ]);
+        }
         return finalize([
           'Listo profe, ya te abrí el Temporizador en una ventana flotante.',
-          'Puedes moverlo por la pantalla mientras proyectas o explicas la clase. ¿Necesitas algo más?'
+          'Puedes elegir el tiempo ahí o decirme la duración exacta (ej. "temporizador de 3 minutos con 13 segundos").'
         ], [
+          { label: '3 min con 13 seg', value: 'Ponme un temporizador de 3 minutos con 13 segundos' },
           { label: 'Tirar moneda', value: 'Tira una moneda' },
           { label: 'Abrir calculadora', value: 'Abre la calculadora flotante' }
         ]);
       }
       if (tool.includes('coin') || tool.includes('moneda')) {
         openFloatingTool('coin');
-        return finalize(['Listo, abrí la Moneda 3D en ventana flotante para ti.']);
+        return finalize(['Listo, abrí la Moneda 3D en ventana flotante para ti.'], [], { useAiMessages: true });
       }
       openFloatingTool('calculator');
-      return finalize(['Listo, ya tienes la Calculadora abierta en ventana flotante.']);
+      return finalize(['Listo, ya tienes la Calculadora abierta en ventana flotante.'], [], { useAiMessages: true });
     }
 
     case 'close_floating_tool': {
@@ -921,16 +1098,16 @@ export async function executeTeacherAssistantActionRich(parsed, context) {
         closeFloatingTool('timer');
         closeFloatingTool('coin');
         closeFloatingTool('calculator');
-        return finalize(['Cerré todas las herramientas flotantes.']);
+        return finalize(['Cerré todas las herramientas flotantes.'], [], { useAiMessages: true });
       }
       closeFloatingTool(tool);
-      return finalize([`Herramienta ${tool} cerrada.`]);
+      return finalize([`Herramienta ${tool} cerrada.`], [], { useAiMessages: true });
     }
 
     case 'minimize_floating_tool': {
       const tool = String(params.tool || 'timer').toLowerCase();
       setMinimizedFloatingTools(prev => ({ ...prev, [tool]: true }));
-      return finalize([`Herramienta ${tool} minimizada en la esquina inferior.`]);
+      return finalize([`Herramienta ${tool} minimizada en la esquina inferior.`], [], { useAiMessages: true });
     }
 
     // =========================================================================
@@ -971,7 +1148,7 @@ export async function executeTeacherAssistantActionRich(parsed, context) {
         profile: 'tu Perfil',
         settings: 'los Ajustes'
       };
-      return finalize([`Listo, ya te llevé a ${tabNames[targetTab] || targetTab}.`]);
+      return finalize([`Listo, ya te llevé a ${tabNames[targetTab] || targetTab}.`], [], { useAiMessages: true });
     }
 
     // =========================================================================

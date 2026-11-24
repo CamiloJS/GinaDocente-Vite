@@ -49,7 +49,9 @@ import ProfileHoverCard from './components/ProfileHoverCard.jsx'
 import FloatingToolsOverlay, { CoinFaceHeads, CoinFaceTails, playCoinSound } from './components/FloatingToolsOverlay.jsx'
 import {
   parseAiResponse,
+  tryLocalFastAction,
   buildTeacherAssistantPrompt,
+  buildTeacherAssistantRequest,
   executeTeacherAssistantAction,
   executeTeacherAssistantActionRich,
   getWelcomeQuickReplies
@@ -2573,7 +2575,7 @@ function App() {
               setSavedAccounts(cleaned);
           }, []);
 
-          const callGemini = async (promptText, timeoutMs = 90000) => {
+          const callGemini = async (promptText, timeoutMs = 90000, extraOptions = {}) => {
             try {
               const controller = new AbortController();
               const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -2581,10 +2583,14 @@ function App() {
                 try { await signInAnonymously(auth); } catch (e) { /* continuar */ }
               }
               const tokenIA = auth?.currentUser ? await auth.currentUser.getIdToken().catch(() => null) : null;
+              const reqBody = { promptText: promptText };
+              if (extraOptions?.systemInstruction) reqBody.systemInstruction = extraOptions.systemInstruction;
+              if (extraOptions?.responseMimeType) reqBody.responseMimeType = extraOptions.responseMimeType;
+              if (extraOptions?.maxOutputTokens) reqBody.maxOutputTokens = extraOptions.maxOutputTokens;
               const res = await fetch('/api/gemini', { 
                 method: 'POST', 
                 headers: { 'Content-Type': 'application/json', ...(tokenIA ? { Authorization: 'Bearer ' + tokenIA } : {}) },
-                body: JSON.stringify({ promptText: promptText }),
+                body: JSON.stringify(reqBody),
                 signal: controller.signal
               });
               clearTimeout(timeoutId);
@@ -2604,7 +2610,8 @@ function App() {
               }
 
               const data = await res.json();
-              const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+              const parts = data.candidates?.[0]?.content?.parts || [];
+              const reply = parts.filter(p => !p?.thought && typeof p?.text === 'string').map(p => p.text).join('') || parts[0]?.text || "";
               if (reply) {
                 setIsAiSessionPaused(false);
               }
@@ -16237,99 +16244,125 @@ Escribe en español con tono pedagógico moderno.`;
                       const now = new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
                       const teacherPromptName = isCamiloTeacher(myChatId) ? 'Camilo' : 'Gina';
 
-                      const prompt = buildTeacherAssistantPrompt({
-                          teacherName: teacherPromptName,
-                          nowString: now,
-                          students: Object.values(userMappings || {}).filter(u => u?.role === 'student'),
-                          tasks: tasks || [],
-                          evaluations: evaluations || [],
-                          academicGroups: academicGroups || [],
-                          syllabus: syllabus || [],
-                          grades: grades || [],
-                          books: books || [],
-                          videos: videos || [],
-                          reviews: reviews || [],
-                          teacherBotInfoList: teacherBotInfoList || [],
-                          history: newHistory,
-                          userMessage: userMsg
-                      });
+                      const botActionContext = {
+                          setThemeMode,
+                          setSoundEnabled,
+                          soundEnabledRef,
+                          setPushEnabled,
+                          togglePushNotifications,
+                          handleLogout,
+                          changeTab,
+                          openFloatingTool,
+                          closeFloatingTool,
+                          setMinimizedFloatingTools,
+                          academicGroups,
+                          tasks,
+                          setTasks,
+                          evaluations,
+                          setEvaluations,
+                          grades,
+                          rawNotes,
+                          setRawNotes,
+                          syllabus,
+                          setSyllabus,
+                          books,
+                          setRawBooks,
+                          videos,
+                          setRawVideos,
+                          reviews,
+                          suggestions,
+                          userMappings,
+                          myChatId,
+                          loggedInName,
+                          role,
+                          db,
+                          appId,
+                          isDemoMode,
+                          DEMO_TTL_MS,
+                          saveDemoSandboxItem,
+                          removeDemoSandboxItem,
+                          sanitizeFirestoreData,
+                          setPostType,
+                          setTaskTitle,
+                          setTaskDesc,
+                          setPostTargetGroup,
+                          setIsFormExpanded,
+                          setIsCreatingEval,
+                          setEvalFormData,
+                          setShowAiEvalModal,
+                          setShowQuestionBankModal,
+                          setShowAddSyllabus,
+                          setShowPdfSyllabusModal,
+                          setShowLessonPlansModal,
+                          setSyllabusPdfTargetGroup,
+                          setChatGroups,
+                          callGemini,
+                          showMessage,
+                          confirmAction,
+                          addDoc,
+                          setDoc,
+                          doc,
+                          collection,
+                          toggleArchiveEvaluation,
+                          deleteAllStorageFilesInObject,
+                          deleteDoc
+                      };
 
                       try {
-                          const reply = await callGemini(prompt, 90000);
-                          const parsed = parseAiResponse(reply, { fromAi: true });
-                          let resultMessages = parsed.messages && parsed.messages.length > 0
-                              ? parsed.messages
-                              : [reply && reply.trim() ? reply.trim().replace(/\*\*/g, '').replace(/\*/g, '') : "Disculpa profe, no pude procesar bien eso. ¿Me lo repites de otra forma?"];
-                          let resultQuickReplies = parsed.quickReplies || [];
-                          let resultWidget = parsed.widget || null;
+                          let resultMessages = [];
+                          let resultQuickReplies = [];
+                          let resultWidget = null;
 
-                          if (parsed.isAction) {
-                              const actionResult = await executeTeacherAssistantActionRich(parsed, {
-                                  setThemeMode,
-                                  setSoundEnabled,
-                                  soundEnabledRef,
-                                  setPushEnabled,
-                                  togglePushNotifications,
-                                  handleLogout,
-                                  changeTab,
-                                  openFloatingTool,
-                                  closeFloatingTool,
-                                  setMinimizedFloatingTools,
-                                  academicGroups,
-                                  tasks,
-                                  setTasks,
-                                  evaluations,
-                                  setEvaluations,
-                                  grades,
-                                  rawNotes,
-                                  setRawNotes,
-                                  syllabus,
-                                  setSyllabus,
-                                  books,
-                                  setRawBooks,
-                                  videos,
-                                  setRawVideos,
-                                  reviews,
-                                  suggestions,
-                                  userMappings,
-                                  myChatId,
-                                  loggedInName,
-                                  role,
-                                  db,
-                                  appId,
-                                  isDemoMode,
-                                  DEMO_TTL_MS,
-                                  saveDemoSandboxItem,
-                                  removeDemoSandboxItem,
-                                  sanitizeFirestoreData,
-                                  setPostType,
-                                  setTaskTitle,
-                                  setTaskDesc,
-                                  setPostTargetGroup,
-                                  setIsFormExpanded,
-                                  setIsCreatingEval,
-                                  setEvalFormData,
-                                  setShowAiEvalModal,
-                                  setShowQuestionBankModal,
-                                  setShowAddSyllabus,
-                                  setShowPdfSyllabusModal,
-                                  setShowLessonPlansModal,
-                                  setSyllabusPdfTargetGroup,
-                                  setChatGroups,
-                                  callGemini,
-                                  showMessage,
-                                  confirmAction,
-                                  addDoc,
-                                  setDoc,
-                                  doc,
-                                  collection,
-                                  toggleArchiveEvaluation,
-                                  deleteAllStorageFilesInObject,
-                                  deleteDoc
+                          // 1. Atajo local instantáneo (0 tokens) para acciones directas, saludos y reportes
+                          const fastLocal = tryLocalFastAction(userMsg, academicGroups || [], teacherPromptName);
+                          if (fastLocal) {
+                              if (fastLocal.isAction) {
+                                  const actionResult = await executeTeacherAssistantActionRich(fastLocal, botActionContext);
+                                  resultMessages = actionResult.messages || [];
+                                  resultQuickReplies = actionResult.quickReplies || [];
+                                  resultWidget = actionResult.widget || null;
+                              } else {
+                                  resultMessages = fastLocal.messages || [];
+                                  resultQuickReplies = fastLocal.quickReplies || [];
+                                  resultWidget = fastLocal.widget || null;
+                              }
+                          } else {
+                              // 2. Consulta inteligente a Gemini 4 Hydrogen con systemInstruction cacheable y JSON nativo
+                              const { systemInstruction, promptText } = buildTeacherAssistantRequest({
+                                  teacherName: teacherPromptName,
+                                  nowString: now,
+                                  students: Object.values(userMappings || {}).filter(u => u?.role === 'student'),
+                                  tasks: tasks || [],
+                                  evaluations: evaluations || [],
+                                  academicGroups: academicGroups || [],
+                                  syllabus: syllabus || [],
+                                  grades: grades || [],
+                                  books: books || [],
+                                  videos: videos || [],
+                                  reviews: reviews || [],
+                                  teacherBotInfoList: teacherBotInfoList || [],
+                                  history: newHistory,
+                                  userMessage: userMsg
                               });
-                              if (actionResult.messages && actionResult.messages.length > 0) resultMessages = actionResult.messages;
-                              if (actionResult.quickReplies && actionResult.quickReplies.length > 0) resultQuickReplies = actionResult.quickReplies;
-                              if (actionResult.widget) resultWidget = actionResult.widget;
+
+                              const reply = await callGemini(promptText, 45000, {
+                                  systemInstruction,
+                                  responseMimeType: 'application/json',
+                                  maxOutputTokens: 1024
+                              });
+                              const parsed = parseAiResponse(reply, { fromAi: true });
+                              resultMessages = parsed.messages && parsed.messages.length > 0
+                                  ? parsed.messages
+                                  : [reply && reply.trim() ? reply.trim().replace(/\*\*/g, '').replace(/\*/g, '') : "Disculpa profe, no pude procesar bien eso. ¿Me lo repites de otra forma?"];
+                              resultQuickReplies = parsed.quickReplies || [];
+                              resultWidget = parsed.widget || null;
+
+                              if (parsed.isAction) {
+                                  const actionResult = await executeTeacherAssistantActionRich(parsed, botActionContext);
+                                  if (actionResult.messages && actionResult.messages.length > 0) resultMessages = actionResult.messages;
+                                  if (actionResult.quickReplies && actionResult.quickReplies.length > 0) resultQuickReplies = actionResult.quickReplies;
+                                  if (actionResult.widget) resultWidget = actionResult.widget;
+                              }
                           }
 
                           if (resultWidget?.type === 'coin' && soundEnabledRef?.current) {
@@ -16340,7 +16373,7 @@ Escribe en español con tono pedagógico moderno.`;
                           for (let idx = 0; idx < resultMessages.length; idx++) {
                               const isLastMsg = idx === resultMessages.length - 1;
                               if (idx > 0) {
-                                  await new Promise(r => setTimeout(r, 480));
+                                  await new Promise(r => setTimeout(r, 260));
                               }
                               const botMsgObj = {
                                   role: 'bot',

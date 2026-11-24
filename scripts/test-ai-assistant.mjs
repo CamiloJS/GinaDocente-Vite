@@ -4,9 +4,12 @@ import {
   parseAiResponse,
   detectNaturalLanguageIntent,
   evaluateMathExpression,
+  parseTimerDurationSeconds,
   computePendingGradingReport,
+  tryLocalFastAction,
   getWelcomeQuickReplies,
   buildTeacherAssistantPrompt,
+  buildTeacherAssistantRequest,
   executeTeacherAssistantAction,
   executeTeacherAssistantActionRich
 } from '../src/utils/aiTeacherAssistantEngine.js';
@@ -341,6 +344,90 @@ console.log('🧪 Iniciando pruebas de Asistente IA Docente...\n');
   const welcomeChips = getWelcomeQuickReplies(ctx.academicGroups);
   assert.ok(welcomeChips.length >= 4);
   console.log('✔ Caso 9 superado: Flujos de Encuesta, Evaluación IA, Sílabo, Diapositivas, Vídeos y Libros.');
+}
+
+// 10. Regresión crítica: Reportes NUNCA deben quedar tapados por frases de espera de Gemini
+{
+  const pendingRes = await executeTeacherAssistantActionRich(
+    {
+      action: 'pending_submissions',
+      params: {},
+      messages: ['¡De una, Gina! Ya mismo reviso...', 'Dame un segundito y te muestro el detalle.']
+    },
+    {
+      tasks: [{ id: 't1', type: 'task', title: 'Ensayo B1', targetGroupName: 'TIC', comments: [{ authorId: 'est-1', author: 'Luis', text: 'Listo' }] }],
+      evaluations: [],
+      grades: [],
+      suggestions: []
+    }
+  );
+  assert.ok(!pendingRes.text.includes('Dame un segundito'), 'No debe devolver la frase de relleno');
+  assert.ok(pendingRes.text.includes('Ensayo B1'), 'Debe mostrar los datos reales del escáner');
+
+  const gradeRes = await executeTeacherAssistantActionRich(
+    {
+      action: 'grade_report',
+      params: {},
+      messages: ['¡Claro, Gina! Aquí tienes el reporte de notas actualizado.', '¿Te gustaría ver más?']
+    },
+    {
+      grades: [{ score: 4.0, studentName: 'Ana' }, { score: 5.0, studentName: 'Pedro' }]
+    }
+  );
+  assert.ok(gradeRes.text.includes('4.5/5.0'), 'Debe mostrar el promedio real calculado');
+  console.log('✔ Caso 10 superado: Regresión crítica de reportes reales sin sobrescritura de frases placeholder.');
+}
+
+// 11. Temporizador con duración exacta (3 minutos con 13 segundos = 193s)
+{
+  assert.equal(parseTimerDurationSeconds('necesito que me haga un temporizador de 3 minutos con 13 segundos'), 193);
+  assert.equal(parseTimerDurationSeconds('temporizador de 45 segundos'), 45);
+  assert.equal(parseTimerDurationSeconds('pon un timer 2:30'), 150);
+  assert.equal(parseTimerDurationSeconds('1 hora y 5 minutos'), 3900);
+
+  let openedTool = null;
+  const timerRes = await executeTeacherAssistantActionRich(
+    { action: 'open_floating_tool', params: { tool: 'timer', durationText: '3 minutos con 13 segundos' } },
+    { openFloatingTool: (t) => { openedTool = t; } }
+  );
+  assert.equal(openedTool, 'timer');
+  assert.ok(timerRes.text.includes('03:13'), 'Debe confirmar la duración exacta 03:13');
+  console.log('✔ Caso 11 superado: Parser exacto de duración de temporizador y confirmación real.');
+}
+
+// 12. Enrutador local 0-tokens vs preguntas compuestas hacia Gemini
+{
+  const groups = [{ id: 'g1', name: 'TIC Y LENGUAS' }];
+  assert.equal(tryLocalFastAction('¿Qué tengo pendiente por calificar?', groups)?.action, 'pending_submissions');
+  assert.equal(tryLocalFastAction('Muéstrame el reporte de notas', groups)?.action, 'grade_report');
+  const timerFast = tryLocalFastAction('necesito que me haga un temporizador de 3 minutos con 13 segundos', groups);
+  assert.equal(timerFast?.action, 'open_floating_tool');
+  assert.equal(timerFast?.params?.totalSeconds, 193);
+  assert.equal(tryLocalFastAction('tira la moneda', groups)?.action, 'flip_coin');
+  assert.equal(tryLocalFastAction('cuánto es 45 por 12', groups)?.action, 'calculate_and_open');
+  const greetingFast = tryLocalFastAction('hola', groups, 'Gina');
+  assert.equal(greetingFast?.isAction, false);
+  assert.ok(greetingFast?.quickReplies?.length >= 4);
+
+  // Pregunta compuesta/abierta debe devolver null para ir a Gemini
+  assert.equal(tryLocalFastAction('que puedes hacer? puedes ponerme el modo claro?', groups), null);
+  console.log('✔ Caso 12 superado: Enrutador rápido de 0 tokens y derivación correcta de preguntas compuestas.');
+}
+
+// 13. Separación cacheable systemInstruction / promptText y compacidad
+{
+  const req = buildTeacherAssistantRequest({
+    teacherName: 'Gina',
+    nowString: 'Martes 24 Nov 2026',
+    academicGroups: [{ id: 'g1', name: 'TIC' }],
+    history: Array.from({ length: 12 }, (_, i) => ({ role: i % 2 ? 'bot' : 'user', text: `Mensaje ${i}` })),
+    userMessage: '¿Qué actividades sugieres para B1?'
+  });
+  assert.ok(!req.systemInstruction.includes('Martes 24 Nov 2026'), 'systemInstruction debe ser 100% estático sin fecha para caché implícita');
+  assert.ok(!req.systemInstruction.includes('¿Qué actividades sugieres'), 'systemInstruction no debe contener el mensaje del usuario');
+  assert.ok(req.promptText.includes('¿Qué actividades sugieres para B1?'));
+  assert.ok(!req.promptText.includes('Mensaje 0\n'), 'promptText debe recortar historial a los últimos 6 turnos');
+  console.log('✔ Caso 13 superado: Prompt separado en systemInstruction estático cacheable y contexto compacto.');
 }
 
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DEL ASISTENTE CON IA PASARON SATISFACTORIAMENTE!');
