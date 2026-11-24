@@ -3,7 +3,7 @@
 // --- Control de acceso: solo usuarios de la app (token de Firebase) + limite por usuario ---
 // La llave web de Firebase es publica por diseno (va en el cliente).
 const FIREBASE_WEB_API_KEY = process.env.FIREBASE_WEB_API_KEY || 'AIzaSyB-BDGpMhiNjSfGiGiGHHd6jbu5nQvoOfs';
-const LIMITE_PETICIONES = 60; // por usuario
+const LIMITE_PETICIONES = process.env.MAX_AI_REQUESTS_PER_WINDOW ? Number(process.env.MAX_AI_REQUESTS_PER_WINDOW) : 120; // por usuario (elevado para cuenta de pago)
 const VENTANA_MS = 5 * 60 * 1000; // 5 minutos
 const registro = new Map(); // uid -> { n, reset }
 
@@ -77,7 +77,15 @@ export default async function handler(req, res) {
   const payloadContents = contents || [{ parts: [{ text: promptText || '' }] }];
 
   // Modelos de Gemini por orden de preferencia y compatibilidad (deduplicados)
-  const defaultGeminiModels = ['gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-2.5-flash', 'gemini-2.0-flash'];
+  // Con cuenta de pago / créditos, se priorizan los modelos Pro y Flash de máxima capacidad
+  const defaultGeminiModels = [
+    process.env.GEMINI_MODEL,
+    'gemini-2.5-pro',
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'gemini-flash-latest',
+    'gemini-2.5-flash-lite'
+  ].filter(Boolean);
   const geminiModels = model
     ? [...new Set([model, ...defaultGeminiModels])]
     : defaultGeminiModels;

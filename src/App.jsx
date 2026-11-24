@@ -2571,7 +2571,7 @@ function App() {
               setSavedAccounts(cleaned);
           }, []);
 
-          const callGemini = async (promptText, timeoutMs = 60000) => {
+          const callGemini = async (promptText, timeoutMs = 90000) => {
             try {
               const controller = new AbortController();
               const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
