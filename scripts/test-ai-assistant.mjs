@@ -3,8 +3,12 @@ import assert from 'node:assert/strict';
 import {
   parseAiResponse,
   detectNaturalLanguageIntent,
+  evaluateMathExpression,
+  computePendingGradingReport,
+  getWelcomeQuickReplies,
   buildTeacherAssistantPrompt,
-  executeTeacherAssistantAction
+  executeTeacherAssistantAction,
+  executeTeacherAssistantActionRich
 } from '../src/utils/aiTeacherAssistantEngine.js';
 
 console.log('🧪 Iniciando pruebas de Asistente IA Docente...\n');
@@ -180,6 +184,163 @@ console.log('🧪 Iniciando pruebas de Asistente IA Docente...\n');
   assert.ok(topReply.includes('Laura'), 'Debe reportar a Laura en el top');
 
   console.log('✔ Caso 5 superado: Despachador de acciones ejecuta herramientas, notas, tareas, temas y reportes con éxito.');
+}
+
+// 6. Regresión de saludo ("hola" NO debe disparar pendientes por calificar)
+{
+  assert.equal(detectNaturalLanguageIntent('hola'), null, 'Un saludo simple no debe disparar acciones');
+  assert.equal(detectNaturalLanguageIntent('Buenas tardes'), null, 'Un saludo cordial no debe disparar acciones');
+
+  const proseFromAi = '¡Hola profe! ¿Cómo vas hoy? Si necesitas revisar entregas pendientes por calificar, solo dime.';
+  const parsedFromAi = parseAiResponse(proseFromAi, { fromAi: true });
+  assert.equal(parsedFromAi.isAction, false, 'La prosa libre de IA mencionando palabras clave no debe secuestrar la conversación');
+  assert.equal(parsedFromAi.messages.length, 1);
+
+  const greetingJson = '```json\n{\n  "action": null,\n  "messages": ["¡Hola profe Gina! Qué alegría saludarte.", "¿En qué te colaboro hoy en English TECH?"],\n  "quickReplies": [{ "label": "Revisar pendientes", "value": "Revisa qué tengo pendiente" }]\n}\n```';
+  const parsedGreeting = parseAiResponse(greetingJson, { fromAi: true });
+  assert.equal(parsedGreeting.isAction, false, 'action: null no es una acción ejecutable');
+  assert.equal(parsedGreeting.messages.length, 2, 'Debe conservar múltiples mensajes humanos');
+  assert.equal(parsedGreeting.quickReplies.length, 1, 'Debe conservar quickReplies');
+  console.log('✔ Caso 6 superado: Regresión de saludos y respuestas multi-mensaje con botones.');
+}
+
+// 7. Evaluador aritmético seguro + calculate_and_open + flip_coin
+{
+  const m1 = evaluateMathExpression('cuánto es 45 por 12');
+  assert.equal(m1.ok, true);
+  assert.equal(m1.result, 540);
+
+  const m2 = evaluateMathExpression('divide 380 entre 4');
+  assert.equal(m2.ok, true);
+  assert.equal(m2.result, 95);
+
+  const m3 = evaluateMathExpression('(15 + 5) * 3');
+  assert.equal(m3.ok, true);
+  assert.equal(m3.result, 60);
+
+  const mZero = evaluateMathExpression('10 dividido entre 0');
+  assert.equal(mZero.ok, false);
+
+  let openedTool = null;
+  const calcRes = await executeTeacherAssistantActionRich(
+    { action: 'calculate_and_open', params: { expression: '45 por 12' } },
+    { openFloatingTool: (t) => { openedTool = t; } }
+  );
+  assert.equal(openedTool, 'calculator');
+  assert.equal(calcRes.widget?.type, 'calculator');
+  assert.equal(calcRes.widget?.result, '540');
+
+  const coinRes = await executeTeacherAssistantActionRich(
+    { action: 'flip_coin', params: {} },
+    { openFloatingTool: () => {} }
+  );
+  assert.equal(coinRes.widget?.type, 'coin');
+  assert.ok(['heads', 'tails'].includes(coinRes.widget?.side));
+  console.log('✔ Caso 7 superado: Calculadora en chat + flotante y lanzamiento de moneda inline.');
+}
+
+// 8. Escáner real de pendientes por calificar (Tareas, Foros, Evaluaciones y Sugerencias)
+{
+  const report = computePendingGradingReport({
+    tasks: [
+      {
+        id: 't1',
+        type: 'task',
+        title: 'Taller Past Simple',
+        targetGroupName: 'Inglés B1',
+        comments: [
+          { authorId: 'est-1', author: 'Carlos', text: 'Aquí mi entrega' },
+          { authorId: 'est-2', author: 'María', text: 'Entrega 2', grade: 4.5 },
+          { authorId: 'ginadocente', authorRole: 'teacher', author: 'Gina Marcela Quintana Delgado', text: 'Revisen' }
+        ]
+      }
+    ],
+    evaluations: [
+      {
+        id: 'ev1',
+        title: 'Speaking Midterm',
+        targetGroupName: 'Inglés B1',
+        isArchived: false,
+        questions: [{ type: 'speaking', text: 'Introduce yourself' }]
+      }
+    ],
+    grades: [
+      { id: 'g1', evaluationId: 'ev1', studentName: 'Carlos', score: 0, teacherFeedback: '' },
+      { id: 'g2', evaluationId: 'ev1', studentName: 'María', score: 4.8, teacherFeedback: 'Great pronunciation!' }
+    ],
+    suggestions: [{ id: 's1', read: false }, { id: 's2', read: true }]
+  });
+
+  assert.equal(report.totalTaskSubmissions, 1, 'Debe detectar 1 entrega pendiente en tarea (ignorando docente y ya calificados)');
+  assert.equal(report.totalEvalPending, 1, 'Debe detectar 1 evaluación con pregunta abierta sin feedback');
+  assert.equal(report.unreadSuggestions, 1, 'Debe detectar 1 sugerencia sin leer');
+
+  const pendingActionRes = await executeTeacherAssistantActionRich(
+    { action: 'pending_submissions', params: {} },
+    {
+      tasks: [{ id: 't1', type: 'task', title: 'Taller Past Simple', targetGroupName: 'Inglés B1', comments: [{ authorId: 'est-1', author: 'Carlos', text: 'Entrega' }] }],
+      evaluations: [{ id: 'ev1', title: 'Speaking Midterm', targetGroupName: 'Inglés B1', isArchived: false, questions: [{ type: 'speaking' }] }],
+      grades: [{ id: 'g1', evaluationId: 'ev1', studentName: 'Carlos', teacherFeedback: '' }],
+      suggestions: []
+    }
+  );
+  assert.ok(pendingActionRes.text.includes('Taller Past Simple'));
+  assert.ok(pendingActionRes.text.includes('Speaking Midterm'));
+  console.log('✔ Caso 8 superado: Escáner real de pendientes en tareas, foros y evaluaciones.');
+}
+
+// 9. Flujos guiados de Encuesta, Evaluación IA, Sílabo PDF, Diapositivas, Vídeos y Libros
+{
+  let tab = null;
+  let evalModal = false;
+  let pdfModal = false;
+  let evalData = null;
+  let published = [];
+  const ctx = {
+    academicGroups: [{ id: 'grp-1', name: 'TIC Y LENGUAS EXTRANJERAS' }],
+    changeTab: (t) => { tab = t; },
+    setIsCreatingEval: () => {},
+    setEvalFormData: (d) => { evalData = d; },
+    setShowAiEvalModal: (v) => { evalModal = v; },
+    setShowPdfSyllabusModal: (v) => { pdfModal = v; },
+    setSyllabusPdfTargetGroup: () => {},
+    setTasks: (updater) => { published = typeof updater === 'function' ? updater([]) : updater; },
+    isDemoMode: true,
+    saveDemoSandboxItem: () => {},
+    showMessage: () => {},
+    myChatId: 'ginadocente',
+    loggedInName: 'Gina Docente',
+    role: 'teacher'
+  };
+
+  await executeTeacherAssistantActionRich({ action: 'open_create_eval', params: { mode: 'ai', targetGroupName: 'TIC Y LENGUAS EXTRANJERAS' } }, ctx);
+  assert.equal(tab, 'evaluations');
+  assert.equal(evalModal, true);
+  assert.equal(evalData.targetGroupId, 'grp-1');
+
+  await executeTeacherAssistantActionRich({ action: 'open_syllabus_pdf', params: { targetGroupName: 'TIC' } }, ctx);
+  assert.equal(tab, 'syllabus');
+  assert.equal(pdfModal, true);
+
+  await executeTeacherAssistantActionRich({ action: 'open_slides_studio', params: {} }, ctx);
+  assert.equal(tab, 'reviews');
+
+  await executeTeacherAssistantActionRich({ action: 'open_videos_module', params: {} }, ctx);
+  assert.equal(tab, 'videos');
+
+  await executeTeacherAssistantActionRich({ action: 'open_book_creator', params: {} }, ctx);
+  assert.equal(tab, 'books');
+
+  await executeTeacherAssistantActionRich({ action: 'publish_poll', params: { title: '¿Horario preferido?', options: ['Mañana', 'Tarde'], targetGroupName: 'TIC Y LENGUAS EXTRANJERAS' } }, ctx);
+  assert.equal(tab, 'tasks');
+  assert.equal(published.length, 1);
+  assert.equal(published[0].type, 'poll');
+  assert.equal(published[0].poll.options.length, 2);
+  assert.equal(published[0].targetGroupId, 'grp-1');
+
+  const welcomeChips = getWelcomeQuickReplies(ctx.academicGroups);
+  assert.ok(welcomeChips.length >= 4);
+  console.log('✔ Caso 9 superado: Flujos de Encuesta, Evaluación IA, Sílabo, Diapositivas, Vídeos y Libros.');
 }
 
 console.log('\n🎉 ¡TODAS LAS PRUEBAS DEL ASISTENTE CON IA PASARON SATISFACTORIAMENTE!');

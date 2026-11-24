@@ -46,11 +46,13 @@ import {
   Lock, Key, ClipboardList, BarChart3, Music, Video, Film, Timer, Coins, Calculator
 } from './components/Icons.jsx'
 import ProfileHoverCard from './components/ProfileHoverCard.jsx'
-import FloatingToolsOverlay from './components/FloatingToolsOverlay.jsx'
+import FloatingToolsOverlay, { CoinFaceHeads, CoinFaceTails, playCoinSound } from './components/FloatingToolsOverlay.jsx'
 import {
   parseAiResponse,
   buildTeacherAssistantPrompt,
-  executeTeacherAssistantAction
+  executeTeacherAssistantAction,
+  executeTeacherAssistantActionRich,
+  getWelcomeQuickReplies
 } from './utils/aiTeacherAssistantEngine.js'
 import AudioPlayer, { AudioRecordingVisualizer } from './components/AudioPlayer.jsx'
 import AudioCall from './components/AudioCall.jsx'
@@ -16219,7 +16221,163 @@ Escribe en español con tono pedagógico moderno.`;
               </nav>
 
               {/* MODAL / POPUP DEL BOT DE LA PROFESORA (Abierto desde el panel derecho) */}
-              {role === 'teacher' && hasEntered && isTeacherBotOpen && (
+              {role === 'teacher' && hasEntered && isTeacherBotOpen && (() => {
+                  const welcomeReplies = getWelcomeQuickReplies(academicGroups || []);
+                  const sendTeacherBotMessage = async (rawText) => {
+                      const userMsg = String(rawText || '').trim();
+                      if (!userMsg || isTeacherBotLoading) return;
+                      setTeacherBotInput("");
+                      const ph = ["¿En qué necesitas ayuda?", "Pregúntame lo que sea...", "¿Cómo puedo ayudarte hoy?", "Dime qué actividad o recurso armamos...", "Estoy aquí para colaborarte, profe..."];
+                      setBotPlaceholder(ph[Math.floor(Math.random() * ph.length)]);
+                      setIsTeacherBotLoading(true);
+                      const userTime = new Date().toLocaleTimeString('es-CO', { timeZone: 'America/Bogota', hour: '2-digit', minute: '2-digit' });
+                      const newHistory = [...teacherBotHistory, { role: 'user', text: userMsg, time: userTime }];
+                      setTeacherBotHistory(newHistory);
+
+                      const now = new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                      const teacherPromptName = isCamiloTeacher(myChatId) ? 'Camilo' : 'Gina';
+
+                      const prompt = buildTeacherAssistantPrompt({
+                          teacherName: teacherPromptName,
+                          nowString: now,
+                          students: Object.values(userMappings || {}).filter(u => u?.role === 'student'),
+                          tasks: tasks || [],
+                          evaluations: evaluations || [],
+                          academicGroups: academicGroups || [],
+                          syllabus: syllabus || [],
+                          grades: grades || [],
+                          books: books || [],
+                          videos: videos || [],
+                          reviews: reviews || [],
+                          teacherBotInfoList: teacherBotInfoList || [],
+                          history: newHistory,
+                          userMessage: userMsg
+                      });
+
+                      try {
+                          const reply = await callGemini(prompt, 90000);
+                          const parsed = parseAiResponse(reply, { fromAi: true });
+                          let resultMessages = parsed.messages && parsed.messages.length > 0
+                              ? parsed.messages
+                              : [reply && reply.trim() ? reply.trim().replace(/\*\*/g, '').replace(/\*/g, '') : "Disculpa profe, no pude procesar bien eso. ¿Me lo repites de otra forma?"];
+                          let resultQuickReplies = parsed.quickReplies || [];
+                          let resultWidget = parsed.widget || null;
+
+                          if (parsed.isAction) {
+                              const actionResult = await executeTeacherAssistantActionRich(parsed, {
+                                  setThemeMode,
+                                  setSoundEnabled,
+                                  soundEnabledRef,
+                                  setPushEnabled,
+                                  togglePushNotifications,
+                                  handleLogout,
+                                  changeTab,
+                                  openFloatingTool,
+                                  closeFloatingTool,
+                                  setMinimizedFloatingTools,
+                                  academicGroups,
+                                  tasks,
+                                  setTasks,
+                                  evaluations,
+                                  setEvaluations,
+                                  grades,
+                                  rawNotes,
+                                  setRawNotes,
+                                  syllabus,
+                                  setSyllabus,
+                                  books,
+                                  setRawBooks,
+                                  videos,
+                                  setRawVideos,
+                                  reviews,
+                                  suggestions,
+                                  userMappings,
+                                  myChatId,
+                                  loggedInName,
+                                  role,
+                                  db,
+                                  appId,
+                                  isDemoMode,
+                                  DEMO_TTL_MS,
+                                  saveDemoSandboxItem,
+                                  removeDemoSandboxItem,
+                                  sanitizeFirestoreData,
+                                  setPostType,
+                                  setTaskTitle,
+                                  setTaskDesc,
+                                  setPostTargetGroup,
+                                  setIsFormExpanded,
+                                  setIsCreatingEval,
+                                  setEvalFormData,
+                                  setShowAiEvalModal,
+                                  setShowQuestionBankModal,
+                                  setShowAddSyllabus,
+                                  setShowPdfSyllabusModal,
+                                  setShowLessonPlansModal,
+                                  setSyllabusPdfTargetGroup,
+                                  setChatGroups,
+                                  callGemini,
+                                  showMessage,
+                                  confirmAction,
+                                  addDoc,
+                                  setDoc,
+                                  doc,
+                                  collection,
+                                  toggleArchiveEvaluation,
+                                  deleteAllStorageFilesInObject,
+                                  deleteDoc
+                              });
+                              if (actionResult.messages && actionResult.messages.length > 0) resultMessages = actionResult.messages;
+                              if (actionResult.quickReplies && actionResult.quickReplies.length > 0) resultQuickReplies = actionResult.quickReplies;
+                              if (actionResult.widget) resultWidget = actionResult.widget;
+                          }
+
+                          if (resultWidget?.type === 'coin' && soundEnabledRef?.current) {
+                              try { playCoinSound(); } catch (e) {}
+                          }
+
+                          let runningHistory = [...newHistory];
+                          for (let idx = 0; idx < resultMessages.length; idx++) {
+                              const isLastMsg = idx === resultMessages.length - 1;
+                              if (idx > 0) {
+                                  await new Promise(r => setTimeout(r, 480));
+                              }
+                              const botMsgObj = {
+                                  role: 'bot',
+                                  text: resultMessages[idx],
+                                  time: new Date().toLocaleTimeString('es-CO', { timeZone: 'America/Bogota', hour: '2-digit', minute: '2-digit' }),
+                                  ...(idx === 0 && resultWidget ? { widget: resultWidget } : {}),
+                                  ...(isLastMsg && resultQuickReplies.length > 0 ? { quickReplies: resultQuickReplies } : {})
+                              };
+                              runningHistory = [...runningHistory, botMsgObj];
+                              setTeacherBotHistory(runningHistory);
+                          }
+
+                          if (!isDemoMode) {
+                              const botUserKey = isCamiloTeacher(myChatId) ? 'camilodocente' : (user?.uid || myChatId || 'teacher');
+                              setDoc(doc(db, 'artifacts', appId, 'users', botUserKey, 'teacherBot', 'history'), sanitizeFirestoreData({ messages: runningHistory })).catch(e => console.warn("Historial local guardado:", e));
+                          }
+                      } catch (err) {
+                          console.error("Teacher bot error:", err);
+                          let errorText = "Ocurrió un error al procesar su solicitud. Por favor, intente de nuevo.";
+                          if (err?.message === 'QUOTA_EXCEEDED' || err?.code === 'QUOTA_EXCEEDED' || err?.toString()?.includes('429') || err?.toString()?.includes('quota') || err?.toString()?.includes('RESOURCE_EXHAUSTED')) {
+                              setIsAiSessionPaused(true);
+                              errorText = "Cuota de uso agotada temporalmente.";
+                          } else if (err?.message?.includes('demasiado') || err?.name === 'AbortError') {
+                              errorText = "La IA tardó demasiado en responder. Intenta con una solicitud más corta.";
+                          }
+                          const finalHistory = [...newHistory, { role: 'bot', text: errorText, time: new Date().toLocaleTimeString('es-CO', { timeZone: 'America/Bogota', hour: '2-digit', minute: '2-digit' }) }];
+                          setTeacherBotHistory(finalHistory);
+                          if (!isDemoMode) {
+                              const botUserKey = isCamiloTeacher(myChatId) ? 'camilodocente' : (user?.uid || myChatId || 'teacher');
+                              setDoc(doc(db, 'artifacts', appId, 'users', botUserKey, 'teacherBot', 'history'), sanitizeFirestoreData({ messages: finalHistory })).catch(()=>{});
+                          }
+                      } finally {
+                          setIsTeacherBotLoading(false);
+                      }
+                  };
+
+                  return (
                   <div className="fixed bottom-20 sm:bottom-6 right-3 sm:right-6 z-[150] flex flex-col items-end max-w-[calc(100vw-24px)]">
                       <div key={themeMode} className={`w-[92vw] sm:w-[420px] md:w-[480px] h-[520px] md:h-[600px] max-h-[80vh] flex flex-col p-4 animate-in slide-in-from-bottom-10 fade-in shadow-2xl rounded-2xl border transition-colors ${isDarkMode ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'}`}>
                           <div className={`flex justify-between items-center mb-3 border-b pb-3 ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
@@ -16242,7 +16400,7 @@ Escribe en español con tono pedagógico moderno.`;
                                        ) : isTeacherBotLoading ? (
                                            <span className="text-[10px] text-purple-500 dark:text-purple-400 font-bold flex items-center gap-1" style={{ transition: 'opacity 0.3s' }}>
                                                <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
-                                               {["Hmm, déjame pensar...", "Interesante pregunta...", "Un segundito...", "Procesando...", "Analizando...", "Cargando conocimiento...", "Ya casi...", "Oooh buena esa..."][thinkingMsg]}
+                                               {["Hmm, déjame pensar...", "Revisando...", "Un segundito...", "Preparando...", "Analizando...", "Ya casi...", "Listo en un momento...", "Enseguida te respondo..."][thinkingMsg]}
                                            </span>
                                        ) : (
                                            <span className="text-[10px] text-emerald-500 font-bold flex items-center gap-1">
@@ -16279,33 +16437,127 @@ Escribe en español con tono pedagógico moderno.`;
                           </div>
                           
                           <div className="flex-1 overflow-y-auto space-y-3 pr-1 mb-3">
-                              <div className={`text-xs sm:text-sm p-3.5 rounded-2xl rounded-tl-none shadow-xs font-medium whitespace-pre-wrap leading-relaxed border ${
-                                  isDarkMode ? 'bg-gray-800/80 text-blue-200 border-gray-700/80' : 'bg-blue-50/90 text-blue-950 border-blue-100'
-                              }`}>
-                                  {`¡Hola, ${isCamiloTeacher(myChatId) ? 'Profesor Camilo' : 'Profesora Gina'}! Soy su Asistente de English TECH. Estoy aquí para orientarle en la gestión de contenidos, evaluaciones, asignaciones y uso de las herramientas de la plataforma. ¿En qué le puedo colaborar hoy?`}
+                              <div className="space-y-2">
+                                  <div className={`text-xs sm:text-sm p-3.5 rounded-2xl rounded-tl-none shadow-xs font-medium whitespace-pre-wrap leading-relaxed border ${
+                                      isDarkMode ? 'bg-gray-800/80 text-blue-200 border-gray-700/80' : 'bg-blue-50/90 text-blue-950 border-blue-100'
+                                  }`}>
+                                      {`¡Hola, ${isCamiloTeacher(myChatId) ? 'Profesor Camilo' : 'Profesora Gina'}! Soy su Asistente de English TECH. Puedo ayudarte a crear evaluaciones, libros 3D, diapositivas, Kahoots, encuestas, revisar pendientes por calificar o abrir herramientas rápidas. ¿En qué arrancamos hoy?`}
+                                  </div>
+                                  {teacherBotHistory.length === 0 && !isTeacherBotLoading && (
+                                      <div className="flex flex-wrap gap-1.5 pt-1">
+                                          {welcomeReplies.map((btn, bIdx) => (
+                                              <button
+                                                  key={bIdx}
+                                                  type="button"
+                                                  onClick={() => sendTeacherBotMessage(btn.value)}
+                                                  className={`text-[11px] font-semibold px-2.5 py-1.5 rounded-xl border transition-all cursor-pointer ${
+                                                      isDarkMode
+                                                          ? 'bg-gray-800/90 border-gray-700 text-blue-300 hover:bg-blue-900/40 hover:border-blue-500/60'
+                                                          : 'bg-white border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-400 shadow-2xs'
+                                                  }`}
+                                              >
+                                                  {btn.label}
+                                              </button>
+                                          ))}
+                                      </div>
+                                  )}
                               </div>
+
                               {teacherBotHistory.map((m, i) => {
                                   const isMe = m.role === 'user';
                                   const isFirst = i === 0 || teacherBotHistory[i-1]?.role !== m.role;
                                   const isLast = i === teacherBotHistory.length - 1 || teacherBotHistory[i+1]?.role !== m.role;
+                                  const isLastOverall = i === teacherBotHistory.length - 1;
                                   const radius = isMe
                                       ? `rounded-l-2xl ${isFirst ? 'rounded-tr-2xl' : 'rounded-tr-[4px]'} ${isLast ? 'rounded-br-2xl' : 'rounded-br-[4px]'}`
                                       : `rounded-r-2xl ${isFirst ? 'rounded-tl-2xl' : 'rounded-tl-[4px]'} ${isLast ? 'rounded-bl-2xl' : 'rounded-bl-[4px]'}`;
                                   return (
-                                      <div key={i} className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} ${isLast ? 'mb-2.5' : 'mb-[2px]'}`}>
-                                          <div className={`relative max-w-[90%] sm:max-w-[85%] px-3 py-2 shadow-xs relative backdrop-blur-xl border transition-all duration-200 ${radius} ${
-                                              isMe
-                                                  ? (isDarkMode ? 'bg-blue-600/90 text-white border-blue-500/50' : 'bg-blue-600/90 text-white border-blue-500/20')
-                                                  : (isDarkMode ? 'bg-gray-800/80 text-gray-100 border-gray-700/50' : 'bg-white/80 text-gray-800 border-gray-200/50')
-                                          }`}>
-                                              <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap pr-6">{formatBotText(m.text)}</p>
-                                              <div className={`flex items-center justify-end gap-1 mt-0.5 opacity-80 ${isMe ? 'text-blue-100' : (isDarkMode ? 'text-gray-400' : 'text-gray-500')}`}>
-                                                  <span className="text-[9px] font-medium leading-none">{m.time || ''}</span>
+                                      <div key={i} className="space-y-1.5">
+                                          <div className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} ${isLast ? 'mb-1.5' : 'mb-[2px]'}`}>
+                                              <div className={`relative max-w-[90%] sm:max-w-[85%] px-3 py-2 shadow-xs backdrop-blur-xl border transition-all duration-200 ${radius} ${
+                                                  isMe
+                                                      ? (isDarkMode ? 'bg-blue-600/90 text-white border-blue-500/50' : 'bg-blue-600/90 text-white border-blue-500/20')
+                                                      : (isDarkMode ? 'bg-gray-800/80 text-gray-100 border-gray-700/50' : 'bg-white/80 text-gray-800 border-gray-200/50')
+                                              }`}>
+                                                  <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap pr-6">{formatBotText(m.text)}</p>
+
+                                                  {!isMe && m.widget?.type === 'coin' && (
+                                                      <div className={`mt-2 p-2.5 rounded-xl border flex items-center gap-3 ${isDarkMode ? 'bg-gray-900/70 border-gray-700' : 'bg-amber-50/70 border-amber-200'}`}>
+                                                          <div className="w-12 h-12 shrink-0 animate-in zoom-in-75 spin-in-180 duration-500">
+                                                              {m.widget.side === 'heads' ? <CoinFaceHeads /> : <CoinFaceTails />}
+                                                          </div>
+                                                          <div className="flex-1 min-w-0">
+                                                              <div className="text-xs font-extrabold text-amber-600 dark:text-amber-400">
+                                                                  ¡Cayó {m.widget.label || (m.widget.side === 'heads' ? 'Cara' : 'Sello')}!
+                                                              </div>
+                                                              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                                                  <button
+                                                                      type="button"
+                                                                      onClick={() => sendTeacherBotMessage('Tira la moneda otra vez')}
+                                                                      className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border transition-colors cursor-pointer ${isDarkMode ? 'bg-gray-800 border-gray-600 text-gray-200 hover:bg-gray-700' : 'bg-white border-amber-300 text-amber-800 hover:bg-amber-100'}`}
+                                                                  >
+                                                                      Tirar otra vez
+                                                                  </button>
+                                                                  <button
+                                                                      type="button"
+                                                                      onClick={() => openFloatingTool('coin')}
+                                                                      className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border transition-colors cursor-pointer ${isDarkMode ? 'bg-gray-800 border-gray-600 text-blue-300 hover:bg-gray-700' : 'bg-white border-blue-200 text-blue-700 hover:bg-blue-50'}`}
+                                                                  >
+                                                                      Flotante
+                                                                  </button>
+                                                              </div>
+                                                          </div>
+                                                      </div>
+                                                  )}
+
+                                                  {!isMe && m.widget?.type === 'calculator' && (
+                                                      <div className={`mt-2 p-2.5 rounded-xl border flex items-center justify-between gap-2 ${isDarkMode ? 'bg-gray-900/70 border-gray-700' : 'bg-blue-50/70 border-blue-200'}`}>
+                                                          <div className="min-w-0">
+                                                              <div className="text-[11px] font-medium text-gray-500 dark:text-gray-400 truncate">
+                                                                  {m.widget.expression}
+                                                              </div>
+                                                              <div className="text-sm font-black text-blue-600 dark:text-blue-400">
+                                                                  = {m.widget.result}
+                                                              </div>
+                                                          </div>
+                                                          <button
+                                                              type="button"
+                                                              onClick={() => openFloatingTool('calculator')}
+                                                              className={`shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-colors cursor-pointer ${isDarkMode ? 'bg-gray-800 border-gray-600 text-blue-300 hover:bg-gray-700' : 'bg-white border-blue-200 text-blue-700 hover:bg-blue-50'}`}
+                                                          >
+                                                              Abrir calculadora
+                                                          </button>
+                                                      </div>
+                                                  )}
+
+                                                  <div className={`flex items-center justify-end gap-1 mt-0.5 opacity-80 ${isMe ? 'text-blue-100' : (isDarkMode ? 'text-gray-400' : 'text-gray-500')}`}>
+                                                      <span className="text-[9px] font-medium leading-none">{m.time || ''}</span>
+                                                  </div>
                                               </div>
                                           </div>
+
+                                          {!isMe && isLastOverall && !isTeacherBotLoading && Array.isArray(m.quickReplies) && m.quickReplies.length > 0 && (
+                                              <div className="flex flex-wrap gap-1.5 pl-1 pb-1">
+                                                  {m.quickReplies.map((btn, bIdx) => (
+                                                      <button
+                                                          key={bIdx}
+                                                          type="button"
+                                                          onClick={() => sendTeacherBotMessage(btn.value)}
+                                                          className={`text-[11px] font-semibold px-2.5 py-1.5 rounded-xl border transition-all cursor-pointer ${
+                                                              isDarkMode
+                                                                  ? 'bg-gray-800/90 border-gray-700 text-blue-300 hover:bg-blue-900/40 hover:border-blue-500/60'
+                                                                  : 'bg-white border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-400 shadow-2xs'
+                                                          }`}
+                                                      >
+                                                          {btn.label}
+                                                      </button>
+                                                  ))}
+                                              </div>
+                                          )}
                                       </div>
                                   );
                               })}
+
                               {isTeacherBotLoading && (
                                   <div className="flex items-center gap-2 py-2 px-3">
                                       <div className="flex gap-1">
@@ -16319,118 +16571,9 @@ Escribe en español con tono pedagógico moderno.`;
                               <div ref={teacherBotEndRef} />
                           </div>
 
-                          <form onSubmit={async (e) => {
+                          <form onSubmit={(e) => {
                               e.preventDefault();
-                              if (!teacherBotInput.trim()) return;
-                              const userMsg = teacherBotInput.trim(); 
-                              setTeacherBotInput("");
-                              const ph = ["¿En qué necesitas ayuda?", "¿Hay algo que no entiendas?", "Pregúntame lo que sea...", "Escribe tu duda aquí...", "¿Cómo puedo ayudarte?", "¿Necesitas apoyo con algo?", "Estoy aquí para servirte...", "¿Alguna duda, profe?", "Pregúntame sin miedo...", "¿Qué necesitas hoy?", "¿Hay algo que te preocupe?", "¿Necesitas ideas para la clase?", "¿Quieres que te ayude?", "¿Cómo va todo, profe?", "¿Necesitas que te oriente?", "¿Tienes alguna consulta?", "¿En qué te puedo ayudar?", "¿Hay algún problema?", "¿Necesitas apoyo pedagógico?", "¿Qué tal tu día, profe?", "¿Necesitas que te explique algo?", "¿Hay algo nuevo para aprender?", "¿Quieres que repasemos juntos?", "¿Cómo están tus alumnos?", "¿Necesitas recursos didácticos?", "¿Quieres que genere una actividad?", "¿Hay algo que mejorar?", "¿Necesitas una idea fresca?", "¿Qué tal el semestre, profe?", "¿Necesitas motivación hoy?", "¿Hay algo que te cause curiosidad?", "¿Quieres que te sorprenda?", "¿Necesitas un consejo rápido?", "¿Cómo va la clase de hoy?", "¿Necesitas que te recuerde algo?", "¿Hay algo pendiente?", "¿Quieres que revisemos algo juntos?", "¿Qué necesitas saber ahora?", "¿Necesitas que te guíe?", "¿Hay algo que te cause duda?", "¿Quieres practicar algo?", "¿Cómo podemos mejorar hoy?", "¿Necesitas que te recomiende algo?", "¿Hay algo nuevo en tu clase?", "¿Quieres que te apoye?", "¿Necesitas una mano amiga?", "¿Qué tal tu progreso, profe?", "¿Necesitas que te ayude a planear?", "¿Hay algo que te inspire?", "¿Quieres que creemos algo juntos?"];
-                              setBotPlaceholder(ph[Math.floor(Math.random() * ph.length)]);
-                              setIsTeacherBotLoading(true);
-                              const newHistory = [...teacherBotHistory, { role: 'user', text: userMsg, time: new Date().toLocaleTimeString('es-CO', { timeZone: 'America/Bogota', hour: '2-digit', minute: '2-digit' }) }];
-                              setTeacherBotHistory(newHistory);
-
-                              // INTELIGENCIA: Asistente Docente con motor integral de acciones en toda la plataforma
-                              const now = new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-                              const teacherPromptName = isCamiloTeacher(myChatId) ? 'Camilo' : 'Gina';
-
-                              // Construir prompt enriquecido con contexto en vivo de la plataforma
-                              const prompt = buildTeacherAssistantPrompt({
-                                  teacherName: teacherPromptName,
-                                  nowString: now,
-                                  students: Object.values(userMappings || {}).filter(u => u?.role === 'student'),
-                                  tasks: tasks || [],
-                                  evaluations: evaluations || [],
-                                  academicGroups: academicGroups || [],
-                                  syllabus: syllabus || [],
-                                  grades: grades || [],
-                                  teacherBotInfoList: teacherBotInfoList || [],
-                                  history: newHistory,
-                                  userMessage: userMsg
-                              });
-
-                              try {
-                                  const reply = await callGemini(prompt);
-                                  const botTime = new Date().toLocaleTimeString('es-CO', { timeZone: 'America/Bogota', hour: '2-digit', minute: '2-digit' });
-
-                                  // Parsear respuesta (soporta bloques ```json, JSON embebido y detección semántica por lenguaje natural)
-                                  const parsed = parseAiResponse(reply);
-                                  let cleanReply = parsed.text || (reply && reply.trim() ? reply.trim().replace(/\*\*/g, '').replace(/\*/g, '') : "Disculpe, no pude procesar la respuesta en este momento. Por favor intente de nuevo.");
-
-                                  if (parsed.isAction) {
-                                      cleanReply = await executeTeacherAssistantAction(parsed, {
-                                          setThemeMode,
-                                          setSoundEnabled,
-                                          soundEnabledRef,
-                                          setPushEnabled,
-                                          togglePushNotifications,
-                                          handleLogout,
-                                          changeTab,
-                                          openFloatingTool,
-                                          closeFloatingTool,
-                                          setMinimizedFloatingTools,
-                                          academicGroups,
-                                          tasks,
-                                          setTasks,
-                                          evaluations,
-                                          setEvaluations,
-                                          grades,
-                                          rawNotes,
-                                          setRawNotes,
-                                          syllabus,
-                                          userMappings,
-                                          myChatId,
-                                          loggedInName,
-                                          role,
-                                          db,
-                                          appId,
-                                          isDemoMode,
-                                          saveDemoSandboxItem,
-                                          removeDemoSandboxItem,
-                                          setTaskTitle,
-                                          setTaskDesc,
-                                          setPostTargetGroup,
-                                          setIsFormExpanded,
-                                          setIsCreatingEval,
-                                          setEvalFormData,
-                                          setChatGroups,
-                                          callGemini,
-                                          showMessage,
-                                          confirmAction,
-                                          addDoc,
-                                          setDoc,
-                                          doc,
-                                          collection,
-                                          toggleArchiveEvaluation,
-                                          deleteAllStorageFilesInObject,
-                                          deleteDoc
-                                      });
-                                  }
-
-                                  const finalHistory = [...newHistory, { role: 'bot', text: cleanReply, time: botTime }];
-                                  setTeacherBotHistory(finalHistory);
-                                  if (!isDemoMode) {
-                                      const botUserKey = isCamiloTeacher(myChatId) ? 'camilodocente' : (user?.uid || myChatId || 'teacher');
-                                      setDoc(doc(db, 'artifacts', appId, 'users', botUserKey, 'teacherBot', 'history'), { messages: finalHistory }).catch(e => console.warn("Historial local guardado:", e));
-                                  }
-                              } catch (err) {
-                                   console.error("Teacher bot error:", err);
-                                   let errorText = "Ocurrió un error al procesar su solicitud. Por favor, intente de nuevo.";
-                                   if (err?.message === 'QUOTA_EXCEEDED' || err?.code === 'QUOTA_EXCEEDED' || err?.toString()?.includes('429') || err?.toString()?.includes('quota') || err?.toString()?.includes('RESOURCE_EXHAUSTED')) {
-                                       setIsAiSessionPaused(true);
-                                       errorText = "Cuota de uso agotada temporalmente.";
-                                   } else if (err?.message?.includes('demasiado') || err?.name === 'AbortError') {
-                                       errorText = "La IA tardó demasiado en responder. Intenta con una pregunta más corta.";
-                                   }
-                                   const finalHistory = [...newHistory, { role: 'bot', text: errorText }];
-                                   setTeacherBotHistory(finalHistory);
-                                   if (!isDemoMode) {
-                                       const botUserKey = isCamiloTeacher(myChatId) ? 'camilodocente' : (user?.uid || myChatId || 'teacher');
-                                       setDoc(doc(db, 'artifacts', appId, 'users', botUserKey, 'teacherBot', 'history'), { messages: finalHistory }).catch(()=>{});
-                                   }
-                              } finally {
-                                  setIsTeacherBotLoading(false);
-                              }
+                              sendTeacherBotMessage(teacherBotInput);
                           }} className="flex gap-2">
                               <input 
                                   value={teacherBotInput} 
@@ -16452,7 +16595,8 @@ Escribe en español con tono pedagógico moderno.`;
                           </form>
                       </div>
                   </div>
-              )}
+                  );
+              })()}
 
               {/* MODAL DE CREAR GRUPO */}
               {isCreatingGroup && ReactDOM.createPortal(
