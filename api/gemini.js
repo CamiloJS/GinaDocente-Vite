@@ -3,7 +3,7 @@
 // --- Control de acceso: solo usuarios de la app (token de Firebase) + limite por usuario ---
 // La llave web de Firebase es publica por diseno (va en el cliente).
 const FIREBASE_WEB_API_KEY = process.env.FIREBASE_WEB_API_KEY || 'AIzaSyB-BDGpMhiNjSfGiGiGHHd6jbu5nQvoOfs';
-const LIMITE_PETICIONES = process.env.MAX_AI_REQUESTS_PER_WINDOW ? Number(process.env.MAX_AI_REQUESTS_PER_WINDOW) : 120; // por usuario (elevado para cuenta de pago)
+const LIMITE_PETICIONES = process.env.MAX_AI_REQUESTS_PER_WINDOW ? Number(process.env.MAX_AI_REQUESTS_PER_WINDOW) : 500; // por usuario (sin bloqueos en cuenta de pago)
 const VENTANA_MS = 5 * 60 * 1000; // 5 minutos
 const registro = new Map(); // uid -> { n, reset }
 
@@ -76,15 +76,15 @@ export default async function handler(req, res) {
 
   const payloadContents = contents || [{ parts: [{ text: promptText || '' }] }];
 
-  // Modelos de Gemini por orden de preferencia y compatibilidad (deduplicados)
-  // Con cuenta de pago / créditos, se priorizan los modelos Pro y Flash de máxima capacidad
+  // Modelos de Gemini por orden de preferencia (Familia Gemini 4 + respaldos 3.8/2.5)
   const defaultGeminiModels = [
     process.env.GEMINI_MODEL,
-    'gemini-2.5-pro',
-    'gemini-2.5-flash',
-    'gemini-2.0-flash',
-    'gemini-flash-latest',
-    'gemini-2.5-flash-lite'
+    'gemini-4-hydrogen',
+    'gemini-4-neon',
+    'gemini-3.8-flash',
+    'gemini-4-carbon',
+    'gemini-4-argon',
+    'gemini-2.5-flash'
   ].filter(Boolean);
   const geminiModels = model
     ? [...new Set([model, ...defaultGeminiModels])]
