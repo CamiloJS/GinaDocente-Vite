@@ -76,19 +76,8 @@ export default async function handler(req, res) {
 
   const payloadContents = contents || [{ parts: [{ text: promptText || '' }] }];
 
-  // Modelos de Gemini por orden de preferencia (Familia Gemini 4 + respaldos 3.8/2.5)
-  const defaultGeminiModels = [
-    process.env.GEMINI_MODEL,
-    'gemini-4-hydrogen',
-    'gemini-4-neon',
-    'gemini-3.8-flash',
-    'gemini-4-carbon',
-    'gemini-4-argon',
-    'gemini-2.5-flash'
-  ].filter(Boolean);
-  const geminiModels = model
-    ? [...new Set([model, ...defaultGeminiModels])]
-    : defaultGeminiModels;
+  // Modelo único solicitado: Gemini 4 Hydrogen en nivel de razonamiento LOW
+  const geminiModels = [process.env.GEMINI_MODEL || 'gemini-4-hydrogen'];
 
   let lastStatus = 500;
   let isQuota = false;
@@ -106,8 +95,10 @@ export default async function handler(req, res) {
             contents: payloadContents,
             generationConfig: {
               temperature: 0.7,
-              topK: 40,
-              topP: 0.95
+              topP: 0.95,
+              thinkingConfig: {
+                thinkingLevel: 'LOW'
+              }
             }
           })
         });
